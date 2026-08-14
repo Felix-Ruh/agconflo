@@ -45,6 +45,24 @@ in the repository.
 Testing policy: property-based tests wherever a property can be stated, alongside ordinary positive
 tests and error-path tests that assert *which* failure occurs and how the system behaves afterwards.
 
+### Pre-commit hook
+
+`core.hooksPath` is local configuration and cannot be committed, so each clone enables the hook once:
+
+```
+git config core.hooksPath .githooks
+```
+
+It is a POSIX shell script, so running it by hand needs `sh` — PowerShell cannot execute it directly:
+
+```
+sh .githooks/pre-commit
+```
+
+It scans staged changes for credentials (this repository is public, so a leak is permanent), and runs
+`cargo fmt --check`, `clippy -D warnings` and the tests once the workspace has any crates in it.
+`git commit --no-verify` bypasses it deliberately.
+
 ## Licence
 
 Dual-licensed under either of

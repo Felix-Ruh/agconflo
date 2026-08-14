@@ -1,0 +1,14 @@
+# `cargo fmt` normalises line endings to LF, and `cargo fmt --check` fails on a
+# file that uses CRLF — but both only because of this setting.
+#
+# Measured with rustfmt 1.9.0, on a file that was already correctly formatted and
+# whose only defect was CRLF endings:
+#
+#   default (newline_style = "Auto")   --check passes, file left as CRLF
+#   newline_style = "Unix"             --check fails, `cargo fmt` rewrites to LF
+#
+# So without this pin, wrong line endings are invisible to the formatter and
+# therefore to the pre-commit hook that runs it. With it, they are a formatting
+# error like any other. This is the Rust half of the rule; .gitattributes is the
+# git half, and neither replaces the other.
+newline_style = "Unix"

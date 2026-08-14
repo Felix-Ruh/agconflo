@@ -1,0 +1,113 @@
+#!/bin/sh
+#
+# The Agconflo pre-commit gate.
+#
+# THIS IS A POSIX SHELL SCRIPT AND MUST BE RUN THROUGH `sh`. PowerShell cannot
+# execute it directly, so to run it by hand before committing:
+#
+#     sh .githooks/pre-commit
+#
+# Enable it for every commit, once per clone. `core.hooksPath` is local
+# configuration and so cannot itself be committed:
+#
+#     git config core.hooksPath .githooks
+#
+# Bypass deliberately:  git commit --no-verify
+# That is an escape hatch for work in progress rather than a secret one, but a
+# commit handed over as finished is expected to have passed.
+
+set -u
+
+# Hooks already run from the repository root. Saying so explicitly means running
+# this by hand from a subdirectory behaves identically.
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+fail() {
+    echo
+    echo "pre-commit: $1"
+    echo "pre-commit: commit aborted - fix the above, or bypass with 'git commit --no-verify'."
+    exit 1
+}
+
+# --- secrets -----------------------------------------------------------------
+# This repository is public from its first commit, so a leaked key is leaked
+# permanently: the history is world-readable and a later removal does not undo
+# it. While the workspace is still empty this is the only step that does real
+# work, and it stays the most important one afterwards.
+#
+# `.githooks/` is excluded from the content scan because this file necessarily
+# contains the very patterns it searches for, and would otherwise reject its own
+# commit.
+
+echo "pre-commit: staged secret scan"
+
+if git diff --cached --name-only --diff-filter=ACM | grep -qE '(^|/)\.env$'; then
+    fail "a file named .env is staged; it holds real keys and must never be committed"
+fi
+
+secrets=$(
+    git diff --cached --diff-filter=ACM -U0 -- . ':(exclude).githooks/' |
+        grep -E '^\+' |
+        grep -vE '^\+\+\+' |
+        grep -E \
+            -e 'sk-[A-Za-z0-9_-]{16,}' \
+            -e 'gh[pousr]_[A-Za-z0-9]{16,}' \
+            -e 'github_pat_[A-Za-z0-9_]{20,}' \
+            -e '-----BEGIN [A-Z ]*PRIVATE KEY-----' \
+            -e '(OPEN_ROUTER|ANTHROPIC|OPENAI)_API_KEY=[^[:space:]]+'
+)
+if [ -n "$secrets" ]; then
+    echo "$secrets"
+    fail "staged changes look like they contain a credential"
+fi
+
+# --- rust --------------------------------------------------------------------
+# The Rust gate is written now and skipped until the first crate lands, so it
+# does not have to be remembered and retrofitted once there is finally code for
+# it to be wrong about.
+#
+# The skip is necessary, not defensive: cargo refuses to operate on a workspace
+# with no members. Measured against this very repository — `cargo fmt --all
+# --check` exits 1 with "Failed to find targets", and clippy and test both exit
+# 101. An unguarded gate would therefore block every commit until the first
+# crate existed.
+#
+# The probe reads cargo's own answer rather than guessing from the directory
+# layout. `cargo metadata --no-deps` emits compact JSON, so an empty workspace
+# is literally `"packages":[]`.
+
+if cargo metadata --format-version 1 --no-deps 2>/dev/null | grep -q '"packages":\[\]'; then
+    echo "pre-commit: workspace has no crates yet - skipping fmt, clippy and tests"
+else
+    echo "pre-commit: cargo fmt --all --check"
+    cargo fmt --all --check ||
+        fail "formatting differs; run 'cargo fmt --all', review it, and stage the result"
+
+    # `-D warnings` is what makes this a gate. Clippy exits 0 even when it has
+    # findings, so without it the hook would pass on precisely the output it
+    # exists to catch. This also subsumes `cargo check`: the clippy driver
+    # compiles the same targets and reports a superset of the same diagnostics,
+    # so running both would double the cold build for no extra coverage.
+    echo "pre-commit: cargo clippy --workspace --all-targets"
+    cargo clippy --workspace --all-targets -- -D warnings ||
+        fail "clippy reported findings"
+
+    echo "pre-commit: cargo test --workspace --all-targets"
+    cargo test --workspace --all-targets --quiet ||
+        fail "tests failed"
+fi
+
+# --- deliberately absent, for now --------------------------------------------
+# Phase 1 of the bootstrap plan adds the documentation gate here:
+#
+#     sphinx-build -W -b html docs docs/_build/html
+#     ubc check docs
+#
+# Left out until docs/ actually exists, so the hook never fails on a toolchain
+# that has not been installed yet.
+#
+# Line endings are NOT checked. .gitattributes pins `* text=auto eol=lf` and
+# rustfmt.toml pins `newline_style = "Unix"`, which together make a CRLF commit
+# impossible rather than merely detectable — leaving nothing for a check to find.
+
+echo "pre-commit: ok"

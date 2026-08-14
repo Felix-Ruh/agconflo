@@ -1,0 +1,22 @@
+# Line endings are LF everywhere — in the repository and in the working tree
+# alike — and this is pinned rather than checked. `text=auto eol=lf` makes a CRLF
+# checkout impossible whatever a contributor's `core.autocrlf` says, which is a
+# local setting the repository cannot see and must not depend on. Pinning beats
+# checking: there is nothing left for a hook to detect.
+#
+# This is only half the rule for Rust. rustfmt defaults to
+# `newline_style = "Auto"`, under which a CRLF file can survive formatting
+# untouched and `cargo fmt --check` reports it clean. rustfmt.toml pins
+# `newline_style = "Unix"` so that `cargo fmt` normalises to LF and `--check`
+# treats CRLF as the formatting error it is. Neither half replaces the other.
+#
+# To inspect: `git ls-files --eol` reports index and working tree separately.
+# Grepping a file for carriage returns answers only the uninteresting half.
+* text=auto eol=lf
+
+# Binary, and corrupted by any end-of-line conversion.
+*.png binary
+*.jpg binary
+*.pdf binary
+*.jar binary
+*.ico binary
