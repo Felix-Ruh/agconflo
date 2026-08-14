@@ -1,0 +1,28 @@
+# --- secrets -----------------------------------------------------------------
+# This repository is public. Nothing below may ever be committed.
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+
+# --- rust --------------------------------------------------------------------
+/target/
+**/*.rs.bk
+
+# --- docs (sphinx-needs) -----------------------------------------------------
+docs/_build/
+docs/_generated/
+
+# --- python (docs toolchain only) --------------------------------------------
+.venv/
+__pycache__/
+*.py[cod]
+
+# --- tools -------------------------------------------------------------------
+plantuml.jar
+
+# --- editors / os ------------------------------------------------------------
+.idea/
+.DS_Store
+Thumbs.db

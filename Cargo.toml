@@ -1,0 +1,24 @@
+[workspace]
+resolver = "3"
+members = []
+
+# Shared metadata. Member crates opt in with `field.workspace = true`.
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+authors = ["Felix Ruh <agconflo@mailbox.org>"]
+readme = "README.md"
+
+# Shared dependency versions. Member crates opt in with `dep.workspace = true`.
+[workspace.dependencies]
+# Testing policy: property-based tests wherever a property can be stated,
+# alongside positive tests and error-path ("negative") tests.
+proptest = "1.11"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
