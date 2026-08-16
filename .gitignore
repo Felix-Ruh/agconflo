@@ -14,12 +14,23 @@
 docs/_build/
 docs/_generated/
 
+# ubc's project index cache. It writes its own `.gitignore` containing `*`, so
+# this entry is belt-and-braces rather than strictly required - it is here to
+# document that the directory exists and to keep working if that ever changes.
+# No leading slash: ubc creates one per project directory, not only at the root.
+.ub_cache/
+
 # --- python (docs toolchain only) --------------------------------------------
 .venv/
 __pycache__/
 *.py[cod]
 
 # --- tools -------------------------------------------------------------------
+# Downloaded by scripts/get-ubc.{ps1,sh}. The `ubc` binary is ~66 MB, which is
+# both far too large to commit and pointless to: it is pinned by version and
+# SHA-256 in those scripts, so any clone can reproduce exactly these bytes.
+/tools/
+
 plantuml.jar
 
 # --- editors / os ------------------------------------------------------------
