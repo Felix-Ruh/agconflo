@@ -1,0 +1,51 @@
+# Agconflo's documentation project.
+#
+# This file is the whole configuration. There is no conf.py and no Python: the
+# toolchain is `ubc` (ubCode) alone, and `ubc` reads this file directly. The
+# format is not a ubCode invention - it is sphinx-needs' own modern TOML
+# configuration, which is what keeps the data portable if Sphinx is ever wanted
+# back.
+#
+# ubc's project root is this directory, so `docs/` is what gets indexed and
+# README.md at the repository root cannot be swept in. Install the pinned binary
+# with `sh scripts/get-ubc.sh`; it is not on PATH, so invoke it by path:
+#
+#     ./tools/ubc.exe check docs
+#
+# Phase 1 is deliberately thin: ONE need type and ONE need, enough to prove the
+# chain works end to end. The full metamodel - the rest of the type set, link
+# types, and schemas.json validation - is Phase 2.
+
+"$schema" = "https://ubcode.useblocks.com/ubproject.schema.json"
+
+[project]
+name = "Agconflo"
+version = "0.0.0"
+
+[needs]
+# `id_required` DEFAULTS TO FALSE, which is the trap here: left alone, a need
+# with no `:id:` is accepted and silently given a generated one. Generated ids
+# are derived from content, so editing a requirement's text would change its
+# identity and quietly break every link to it. Requirements must have stable,
+# human-chosen ids, so this is mandatory rather than stylistic.
+id_required = true
+
+# Anchored at BOTH ends, deliberately. The built-in default is
+# `^[A-Z0-9_]{5,}`, which is unanchored at the end and therefore accepts
+# trailing junk - `STKH_FOO benign-looking-typo` passes it. Requiring a type
+# prefix, an underscore, and an uppercase remainder to the end of the string
+# means an id is either well formed or rejected.
+#
+# The pattern is intentionally general rather than `^STKH_...`: the prefixes for
+# the other levels (FEAT_, COMP_, IMPL_, TEST_) arrive in Phase 2 and should not
+# need this line rewritten.
+id_regex = "^[A-Z]+_[A-Z0-9_]+$"
+
+# The only type for now. A level in this project's V-Model is characterised by
+# the decision made at it and must carry at least one mandatory field that is
+# meaningless one level up - so the remaining types are added with those fields,
+# in Phase 2, rather than declared empty here and filled in later.
+[[needs.types]]
+directive = "stkh_req"
+title = "Stakeholder Requirement"
+prefix = "STKH_"

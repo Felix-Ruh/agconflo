@@ -61,6 +61,91 @@ if [ -n "$secrets" ]; then
     fail "staged changes look like they contain a credential"
 fi
 
+# --- docs --------------------------------------------------------------------
+# The documentation project holds the requirements graph, and it is gated here
+# rather than only in CI because a broken need costs seconds to fix now and a
+# round trip to fix after a push. Measured on this repository: 80 ms with a cold
+# index, 41 ms with a warm one. That is free next to the cargo gate below, which
+# is why it runs first - and why it is deliberately NOT restricted to commits
+# that touch docs/. The needs graph is cross-file, and once [codelinks] points
+# at ../crates a Rust source change can break it too.
+#
+# `ubc` is not on PATH: it lives in the gitignored tools/, downloaded by
+# scripts/get-ubc.sh, so it is resolved by path. That is deliberate rather than
+# incidental - git GUIs run hooks with a minimal environment, so a PATH lookup
+# that works in an interactive shell can still fail from an editor's commit
+# button. One POSIX script covers both platforms; the Windows binary is ubc.exe.
+# Git Bash's MSYS layer does resolve `tools/ubc` to it, but relying on that
+# would make this script quietly Windows-only.
+
+echo "pre-commit: docs gate"
+
+UBC="$(pwd)/tools/ubc"
+[ -x "$UBC" ] || UBC="$UBC.exe"
+
+if [ ! -f docs/ubproject.toml ]; then
+    echo "pre-commit: no docs/ubproject.toml - skipping the docs gate"
+elif [ ! -x "$UBC" ]; then
+    # Skipped rather than fatal, the same way the cargo gate skips an empty
+    # workspace: a fresh clone that has not run the installer can still commit.
+    # The message names the command and not the path, because on Windows the
+    # resolved path reads `tools/ubc` while the file on disk is `ubc.exe`.
+    echo "pre-commit: ubc is not installed - skipping the docs gate"
+    echo "pre-commit: install it with 'sh scripts/get-ubc.sh'"
+else
+    # NO PATH ARGUMENT, and that is the load-bearing detail here. `ubc check
+    # <path>` does not scope the check, it FILTERS THE DIAGNOSTICS: the whole
+    # project is still resolved, but findings outside <path> are dropped
+    # silently. Measured on a two-directory probe project - `ubc check inside`
+    # printed "No errors found" and exited 0 while a needs.id_regex warning sat
+    # in outside/bad.rst. Harmless today, because the project root is docs/
+    # itself and the argument selects everything; actively dangerous from the
+    # moment [codelinks] points at ../crates, when every diagnostic in Rust
+    # source would be filtered away by an argument that looks like it merely
+    # names the project. Hence the subshell cd instead.
+    #
+    # No pipe either: `$?` after a pipe reports the last command in it, not ubc.
+    # And `--deny warning` is already ubc's default, passed explicitly so that a
+    # future change to that default cannot quietly loosen this gate.
+    echo "pre-commit: ubc check"
+    ( cd docs && "$UBC" check --deny warning ) ||
+        fail "the documentation project has diagnostics"
+
+    # The formatter is licence-gated where `ubc check` is not. Measured: in a
+    # directory with no qualifying git remote, `check` exits 0 and `format`
+    # exits 1 with "Requires active license". The open-source grant is a network
+    # determination cached for three days, so an unguarded formatter step would
+    # block every commit made offline once that cache expired.
+    #
+    # Worse, it exits 1 for BOTH cases, so the exit code cannot separate a
+    # licence failure from a real formatting difference - a plain `|| fail`
+    # would tell someone to reformat files that are perfectly fine. The output
+    # does separate them: a genuine failure prints "1 file would be reformatted"
+    # and carries none of the licence wording. So match on that, and downgrade
+    # only the licence case to a warning.
+    #
+    # If useblocks ever changes that wording this fails closed - the licence
+    # case starts being reported as a formatting error. That is the right
+    # direction for a gate, a visible false alarm rather than a silent hole, and
+    # it is one of the things to re-measure when the pinned ubc version is
+    # bumped. `--preview` is required: the formatter is still Beta.
+    echo "pre-commit: ubc format --check"
+    fmt_output=$("$UBC" format --check --preview docs 2>&1)
+    fmt_status=$?
+
+    if [ "$fmt_status" -ne 0 ]; then
+        echo "$fmt_output"
+        if printf '%s' "$fmt_output" |
+            grep -qE 'Requires active license|Not determined to be an open source project'; then
+            echo "pre-commit: WARNING - ubc could not confirm the open-source licence"
+            echo "pre-commit: WARNING - grant, so the documentation formatter did not run."
+            echo "pre-commit: WARNING - This usually means no network access. CI runs it."
+        else
+            fail "documentation formatting differs; run 'tools/ubc format --preview docs', review it, and stage the result"
+        fi
+    fi
+fi
+
 # --- rust --------------------------------------------------------------------
 # The Rust gate is written now and skipped until the first crate lands, so it
 # does not have to be remembered and retrofitted once there is finally code for
@@ -75,8 +160,23 @@ fi
 # The probe reads cargo's own answer rather than guessing from the directory
 # layout. `cargo metadata --no-deps` emits compact JSON, so an empty workspace
 # is literally `"packages":[]`.
+#
+# cargo has to be probed for separately and FIRST, because the metadata probe
+# cannot distinguish "no crates" from "no cargo": with cargo absent it emits
+# nothing, the grep fails, and the else branch runs `cargo fmt` straight into
+# "command not found" - which this hook would then report as "formatting
+# differs; run 'cargo fmt --all'". Measured by running the hook with cargo off
+# PATH. That is a wrong diagnosis sending someone to fix a file that is fine,
+# the same failure shape the documentation formatter above is guarded against,
+# and it blocked the commit outright. Skipping instead of failing matches how
+# the docs gate treats a missing ubc: the hook is a convenience, CI is the
+# authority, and someone editing only documentation should not need a Rust
+# toolchain to commit.
 
-if cargo metadata --format-version 1 --no-deps 2>/dev/null | grep -q '"packages":\[\]'; then
+if ! command -v cargo >/dev/null 2>&1; then
+    echo "pre-commit: cargo not found - skipping fmt, clippy and tests"
+    echo "pre-commit: install the Rust toolchain from https://rustup.rs"
+elif cargo metadata --format-version 1 --no-deps 2>/dev/null | grep -q '"packages":\[\]'; then
     echo "pre-commit: workspace has no crates yet - skipping fmt, clippy and tests"
 else
     echo "pre-commit: cargo fmt --all --check"
@@ -97,17 +197,19 @@ else
         fail "tests failed"
 fi
 
-# --- deliberately absent, for now --------------------------------------------
-# Phase 1 of the bootstrap plan adds the documentation gate here:
-#
-#     sphinx-build -W -b html docs docs/_build/html
-#     ubc check docs
-#
-# Left out until docs/ actually exists, so the hook never fails on a toolchain
-# that has not been installed yet.
-#
+# --- deliberately absent -----------------------------------------------------
 # Line endings are NOT checked. .gitattributes pins `* text=auto eol=lf` and
 # rustfmt.toml pins `newline_style = "Unix"`, which together make a CRLF commit
 # impossible rather than merely detectable — leaving nothing for a check to find.
+#
+# The ubCode licence probe (`ubc query cypher`) is NOT run here. That is CI's
+# job: locally it establishes nothing `ubc check` has not already, and it would
+# make every commit depend on a network round trip.
+#
+# These gates all inspect the WORKING TREE, not the staged content - true of the
+# cargo steps as much as the docs ones. Staging a fix while leaving the break on
+# disk therefore passes, and the reverse fails. Closing that gap needs `git
+# stash --keep-index`, which can lose work when a hook aborts and interacts
+# badly with untracked files; CI checks the pushed tree and is the authority.
 
 echo "pre-commit: ok"

@@ -1,0 +1,143 @@
+# Agconflo's continuous integration.
+#
+# Two gates, mirroring .githooks/pre-commit: the Rust one - dormant until the
+# workspace has crates - and the documentation one.
+#
+# THE DOCS JOB IS ALSO A LICENCE PROBE, and right now that is its main purpose.
+# `ubc check` is ungated: it runs with no licence at all, so a green check
+# proves nothing about ubCode's terms. `ubc query cypher` IS gated, and the
+# free open-source grant is what is expected to satisfy it. Whether that grant
+# holds on a CI runner is the one thing about this toolchain that cannot be
+# tested locally, and it is a project-level go/no-go.
+
+name: ci
+
+# No `pull_request` trigger, deliberately. A pull request from a branch of this
+# repository is already covered: the push-triggered run attaches to the same
+# head commit, so it still satisfies a required status check. Adding the
+# trigger today would only double every run. It becomes necessary the day a
+# fork opens a pull request.
+on:
+  push:
+    branches: ['**']
+  workflow_dispatch:
+
+# Least privilege. Nothing here writes to the repository.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      # Pinned to a commit rather than a tag, for the same reason the ubc
+      # download is pinned to a SHA-256: a tag is a movable pointer, and a
+      # supply-chain compromise of a popular action is a live threat rather
+      # than a theoretical one.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Cargo refuses to operate on a workspace with no members, so the gate
+      # below is written now and skipped until the first crate lands. Same
+      # probe as .githooks/pre-commit: cargo's own answer, not a guess from the
+      # directory layout.
+      - name: Probe for crates
+        id: probe
+        run: |
+          meta=$(cargo metadata --format-version 1 --no-deps)
+          if printf '%s' "$meta" | grep -q '"packages":\[\]'; then
+            echo 'empty=true' >> "$GITHUB_OUTPUT"
+            echo 'workspace has no crates yet - fmt, clippy and tests are skipped'
+          else
+            echo 'empty=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: cargo fmt
+        if: steps.probe.outputs.empty == 'false'
+        run: cargo fmt --all --check
+
+      # `-D warnings` is what makes this a gate: clippy exits 0 even when it has
+      # findings. It also subsumes `cargo check` - the same targets are compiled
+      # and a superset of the diagnostics reported.
+      - name: cargo clippy
+        if: steps.probe.outputs.empty == 'false'
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: cargo test
+        if: steps.probe.outputs.empty == 'false'
+        run: cargo test --workspace --all-targets
+
+  docs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Deliberately NOT cached. Measured: the download takes under 4 s and
+      # hashing it 0.2 s, so a cache would save nothing worth having - while
+      # a cache hit would skip the script's SHA-256 verification entirely.
+      # Running it every time makes this step a canary for the pinned
+      # pre-release artefact being rebuilt or replaced upstream, which is
+      # precisely the event the pin exists to detect.
+      - name: Install the pinned ubc
+        run: sh scripts/get-ubc.sh
+
+      # NO PATH ARGUMENT, hence `working-directory`. `ubc check <path>` does not
+      # scope the check, it filters the diagnostics: the whole project is still
+      # resolved, but findings outside <path> are dropped silently. Measured on
+      # a two-directory probe project - `ubc check inside` printed "No errors
+      # found" and exited 0 while a needs.id_regex warning sat in
+      # outside/bad.rst. That is harmless while the project root is docs/ and
+      # the argument selects everything, and actively dangerous from the moment
+      # [codelinks] points at ../crates: every diagnostic in Rust source would
+      # be filtered away by an argument that looks like it merely names the
+      # project. .githooks/pre-commit avoids it the same way.
+      - name: ubc check
+        working-directory: docs
+        run: ../tools/ubc check --deny warning
+
+      # `--preview` is required: the formatter is still Beta and refuses to run
+      # without it.
+      - name: ubc format
+        run: ./tools/ubc format --check --preview docs
+
+      # The load-bearing step. The output is asserted on, not merely the exit
+      # code, so that a green run means the need was really returned - and it
+      # is written to a file rather than piped, because `$?` after a pipe
+      # reports the last command in it, not ubc.
+      #
+      # `--strict` separates the failure modes by exit code: 1 for a query
+      # naming a label or property the project does not have, 2 for a licence
+      # or configuration error. Without it a typo is a warning and the query
+      # runs anyway, returning nothing.
+      - name: ubc query cypher (licence probe)
+        id: licence
+        run: |
+          ./tools/ubc query cypher --project docs --strict -f json \
+            'MATCH (n:stkh_req) RETURN n.id' > "$RUNNER_TEMP/cypher.json"
+          cat "$RUNNER_TEMP/cypher.json"
+          grep -q 'STKH_EXPLICIT_CONTEXT' "$RUNNER_TEMP/cypher.json"
+
+      # ubCode prints "Not determined to be an open source project" and exits 2
+      # both for a genuine licence denial and for any failure to reach
+      # github.com. Measured two ways: blackholing HTTPS through a proxy, and
+      # running in a container with no CA bundle - identical message in every
+      # case. A red probe is therefore ambiguous, and this step is what
+      # disambiguates it. The open-source check contacts github.com directly
+      # (not api.github.com), unauthenticated, and caches the answer for three
+      # days; that cache is intentionally not restored here, because caching it
+      # would hide the very thing this job exists to measure.
+      - name: Diagnose a failed licence probe
+        if: failure() && steps.licence.outcome == 'failure'
+        run: |
+          echo '--- can this runner reach github.com? ---'
+          curl -sS -o /dev/null -w "https://github.com/$GITHUB_REPOSITORY -> HTTP %{http_code}\n" \
+            "https://github.com/$GITHUB_REPOSITORY" || echo 'github.com is unreachable from this runner'
+          echo '--- cached open-source determination, if any ---'
+          find "$HOME" -name 'oss_repo_*.json' -exec cat {} + 2>/dev/null || true
+          echo '--- verbose re-run ---'
+          ./tools/ubc query cypher --project docs -v 'MATCH (n) RETURN n.id' || true

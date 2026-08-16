@@ -10,17 +10,30 @@
 /target/
 **/*.rs.bk
 
-# --- docs (sphinx-needs) -----------------------------------------------------
+# --- docs (ubc) --------------------------------------------------------------
+# Where `ubc build html` writes by default.
 docs/_build/
-docs/_generated/
 
-# --- python (docs toolchain only) --------------------------------------------
-.venv/
-__pycache__/
-*.py[cod]
+# `ubc build needs` writes to the CURRENT DIRECTORY, not to the project root, so
+# these can land anywhere the command happens to be run from - hence no leading
+# slash. Named exactly rather than as `needs*.json`: a wildcard here would also
+# swallow a future hand-built export (the JUnit-to-needs converter that replaces
+# sphinx-test-reports), and silently ignoring generated needs is precisely the
+# failure this repository already removed `docs/_generated/` to avoid.
+needs.json
+needs.parquet
+
+# ubc's project index cache. It writes its own `.gitignore` containing `*`, so
+# this entry is belt-and-braces rather than strictly required - it is here to
+# document that the directory exists and to keep working if that ever changes.
+# No leading slash: ubc creates one per project directory, not only at the root.
+.ub_cache/
 
 # --- tools -------------------------------------------------------------------
-plantuml.jar
+# Downloaded by scripts/get-ubc.sh. The `ubc` binary is ~66 MB, which is both
+# far too large to commit and pointless to: it is pinned by version and SHA-256
+# in that script, so any clone can reproduce exactly these bytes.
+/tools/
 
 # --- editors / os ------------------------------------------------------------
 .idea/

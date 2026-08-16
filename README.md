@@ -15,8 +15,9 @@ where did every byte come from?"* has an exact answer.
 
 ## Status
 
-**Pre-alpha. Nothing is implemented yet.** This repository currently contains only a skeleton: a
-licence, a workspace manifest, and this file. The design is well developed; the code is not.
+**Pre-alpha. The engine is not implemented yet.** What exists today is the development toolchain
+around it: a requirements project under `docs/`, a commit gate, and continuous integration. The
+design is well developed; the code is not.
 
 Expect the public API to change without warning, and expect force-pushes to be avoided but breaking
 changes not to be.
@@ -35,33 +36,77 @@ changes not to be.
 - **An MCP server whose tools actually edit workflows and node types**, so agents can help build
   agents.
 
-## Development process
+## Development
 
-This project is developed against its own requirements, in a V-Model shape, using
-[Sphinx-Needs](https://sphinx-needs.readthedocs.io/). Requirements, architecture, decisions and test
-cases live in `docs/` as linked, schema-validated objects rather than prose. That tooling is not yet
-in the repository.
+### Prerequisites
 
-Testing policy: property-based tests wherever a property can be stated, alongside ordinary positive
-tests and error-path tests that assert *which* failure occurs and how the system behaves afterwards.
+- **Git.** On Windows, [Git for Windows](https://git-scm.com/download/win) — it supplies the POSIX
+  `sh`, `curl` and `sha256sum` that the setup script and the commit hook need, so nothing else has to
+  be installed for them.
+- **Rust**, via [rustup](https://rustup.rs). `rust-toolchain.toml` pins the channel and components,
+  so the right ones are installed on first use.
 
-### Pre-commit hook
+The documentation toolchain is [ubCode](https://ubcode.useblocks.com/) (`ubc`) and nothing else — no
+Python, no Sphinx, no Java. Setup fetches it.
 
-`core.hooksPath` is local configuration and cannot be committed, so each clone enables the hook once:
+### Setup
+
+Two steps, once per clone, in either order:
 
 ```
+sh scripts/get-ubc.sh
 git config core.hooksPath .githooks
 ```
 
-It is a POSIX shell script, so running it by hand needs `sh` — PowerShell cannot execute it directly:
+`get-ubc.sh` downloads one pinned version of `ubc` (~66 MB) into `tools/`, verifies its SHA-256, and
+refuses to install anything that does not match. `tools/` is gitignored, and is deliberately *not*
+added to `PATH`: `ubc` is always invoked by path. Re-running the script is free — an already-correct
+binary is left alone — and `--force` reinstalls anyway.
+
+`core.hooksPath` is local configuration and so cannot be committed, which is why every clone sets it
+for itself. Until it is set, the hook does not run at all.
+
+The order really does not matter: with the hook enabled but `ubc` not yet installed, the
+documentation gate skips itself and tells you the command to fix that.
+
+### Running the checks by hand
 
 ```
-sh .githooks/pre-commit
+sh .githooks/pre-commit                                        # everything the commit gate does
+( cd docs && ../tools/ubc check --deny warning )               # lint the requirements project
+tools/ubc query cypher --project docs 'MATCH (n) RETURN n.id'  # query the needs graph
 ```
 
-It scans staged changes for credentials (this repository is public, so a leak is permanent), and runs
-`cargo fmt --check`, `clippy -D warnings` and the tests once the workspace has any crates in it.
-`git commit --no-verify` bypasses it deliberately.
+`ubc check` is run from `docs/` because that is the project root; from the repository root it stops
+with "No configuration file found". Under Git Bash on Windows, `tools/ubc` resolves to
+`tools/ubc.exe` on its own.
+
+### The commit hook
+
+`.githooks/pre-commit` is a POSIX shell script, so running it by hand needs `sh` — PowerShell cannot
+execute it directly.
+
+It scans staged changes for credentials — this repository is public, so a leak is permanent — then
+checks and format-checks the requirements project, then runs `cargo fmt --check`,
+`clippy -D warnings` and the tests. Both toolchains degrade rather than block: a missing `ubc` or a
+missing `cargo` skips its own gate with a message rather than failing the commit, and the Rust steps
+are also skipped while the workspace has no crates in it.
+
+`ubc`'s formatter is licensed through ubCode's free open-source grant, which is determined from the
+repository's remote and needs network access. When that cannot be confirmed the hook says so and
+carries on; `ubc check` needs no licence and always runs.
+
+`git commit --no-verify` bypasses the hook deliberately.
+
+### Process and testing
+
+This project is developed against its own requirements, in a V-Model shape. Requirements,
+architecture, decisions and test cases live in `docs/` as linked, schema-validated objects rather
+than prose, written in [Sphinx-Needs](https://sphinx-needs.readthedocs.io/) format — the format is
+what is shared with that project, not the build, which is `ubc`.
+
+Testing policy: property-based tests wherever a property can be stated, alongside ordinary positive
+tests and error-path tests that assert *which* failure occurs and how the system behaves afterwards.
 
 ## Licence
 
