@@ -19,8 +19,8 @@ where did every byte come from?"* has an exact answer.
 it: a requirements project under `docs/` with a validated metamodel behind it, a commit gate, and
 continuous integration. The design is well developed; the code is not.
 
-Expect the public API to change without warning, and expect force-pushes to be avoided but breaking
-changes not to be.
+Expect the public API to change without warning. Breaking changes, yes; force-pushes to `main`, no —
+those are blocked outright, along with direct pushes to it.
 
 ## Planned shape
 
@@ -106,6 +106,36 @@ so the hook tells the two apart by the message: when the grant cannot be confirm
 carries on rather than sending you to fix documentation that is fine. CI runs both and fails hard.
 
 `git commit --no-verify` bypasses the hook deliberately.
+
+### Branch protection on `main`
+
+The hook is a courtesy and can be bypassed; `main` cannot. It is protected, and **the rules apply to
+the repository owner too — there is no admin bypass**, on the grounds that a gate the only contributor
+can step around is not a gate. So `git push origin main` is rejected and every change lands through a
+pull request.
+
+- **Both CI jobs must pass** — `rust` and `docs` — and the branch must be up to date with `main` first.
+- **Signed commits are required**, history must stay **linear** (so merge by squash or rebase, never a
+  merge commit), review conversations must be resolved, and force-pushes and deletion are blocked.
+- **Zero approving reviews are required.** Not laxity: GitHub does not allow approving your own pull
+  request, so on a single-contributor repository any non-zero count would make `main` permanently
+  unmergeable. It becomes one the day there is a second contributor.
+
+One coupling is worth knowing, because it is a hard block rather than an inconvenience: `ci.yml` has no
+`pull_request` trigger, and the required checks are satisfied only because the push-triggered run
+attaches to the same head commit as the pull request. That holds for a branch of this repository and
+**not for a fork** — the first pull request from a fork will never report its required checks, and
+cannot be merged until `pull_request` is added to the workflow.
+
+The live configuration is the source of truth, and reading it costs nothing:
+
+```
+gh api repos/Felix-Ruh/agconflo/branches/main/protection
+```
+
+Required signatures is the one setting that lives at its own endpoint
+(`.../protection/required_signatures`) rather than in that payload, so a `PUT` of the protection object
+cannot switch it on — though an already-enabled setting does survive one.
 
 ### Process and testing
 
