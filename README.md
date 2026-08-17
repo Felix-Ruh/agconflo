@@ -15,9 +15,9 @@ where did every byte come from?"* has an exact answer.
 
 ## Status
 
-**Pre-alpha. The engine is not implemented yet.** What exists today is the development toolchain
-around it: a requirements project under `docs/`, a commit gate, and continuous integration. The
-design is well developed; the code is not.
+**Pre-alpha. The engine is not implemented yet.** What exists today is the development process around
+it: a requirements project under `docs/` with a validated metamodel behind it, a commit gate, and
+continuous integration. The design is well developed; the code is not.
 
 Expect the public API to change without warning, and expect force-pushes to be avoided but breaking
 changes not to be.
@@ -74,6 +74,7 @@ documentation gate skips itself and tells you the command to fix that.
 ```
 sh .githooks/pre-commit                                        # everything the commit gate does
 ( cd docs && ../tools/ubc check --deny warning )               # lint the requirements project
+sh scripts/docs-selftest.sh                                    # prove the metamodel's rules still fire
 tools/ubc query cypher --project docs 'MATCH (n) RETURN n.id'  # query the needs graph
 ```
 
@@ -87,10 +88,15 @@ with "No configuration file found". Under Git Bash on Windows, `tools/ubc` resol
 execute it directly.
 
 It scans staged changes for credentials — this repository is public, so a leak is permanent — then
-checks and format-checks the requirements project, then runs `cargo fmt --check`,
-`clippy -D warnings` and the tests. Both toolchains degrade rather than block: a missing `ubc` or a
-missing `cargo` skips its own gate with a message rather than failing the commit, and the Rust steps
-are also skipped while the workspace has no crates in it.
+checks and format-checks the requirements project, then runs the metamodel self-test, then
+`cargo fmt --check`, `clippy -D warnings` and the tests. Both toolchains degrade rather than block: a
+missing `ubc` or a missing `cargo` skips its own gate with a message rather than failing the commit, and
+the Rust steps are also skipped while the workspace has no crates in it.
+
+The self-test is the one step restricted to commits that can affect it — the metamodel, the fixtures,
+the driver, or the pinned `ubc` version. It costs around a quarter of a second per fixture, and it is
+safe to filter precisely because each fixture is checked as a one-file project, so editing prose in
+`docs/` cannot change its result. CI runs it unconditionally regardless.
 
 Both `ubc` steps are licensed through ubCode's free open-source grant, which is determined from the
 repository's remote and needs network access — the answer is then cached for a few days. `ubc format`
@@ -110,6 +116,60 @@ what is shared with that project, not the build, which is `ubc`.
 
 Testing policy: property-based tests wherever a property can be stated, alongside ordinary positive
 tests and error-path tests that assert *which* failure occurs and how the system behaves afterwards.
+
+### The requirements metamodel
+
+Six need types, descending from what someone wants to the code that does it:
+
+```
+stkh_req -> feat_req -> feat_arch -> comp_req -> Rust
+                            |            |
+                          comp <---------+          test_case verifies either requirement level
+```
+
+Each level exists because it carries a decision the level above cannot: `stkh_req` says whose goal it
+is, `feat_req` says how the behaviour will be verified, `feat_arch` names the components a feature
+decomposes into, `comp_req` allocates a behaviour to exactly one of them. A level that cannot name such
+a field is not a level — which is why there is no detailed-design level below `comp_req`. In Rust the
+type system *is* the detailed design, and a need restating a trait signature restates it by
+construction.
+
+Links always point **up** the V, from the concrete to the abstract, so a link can never dangle at
+authoring time.
+
+**The obligation lives in a `statement` field, not in the need's body.** This is the one thing worth
+knowing before writing a requirement here. A need's body is invisible to schema validation, so a rule
+about it silently matches nothing; the body therefore carries rationale and derivation, and the
+sentence that can be held to a grammar lives in `statement`. Requirement statements follow
+[EARS](https://alistairmavin.com/ears/), declared per requirement in `ears_pattern` and checked against
+that pattern's grammar.
+
+**Where the reference actually is:** `docs/ubproject.toml` for the types, links and fields,
+`docs/schemas.json` for the 32 rules, and `docs-selftest/fixtures/` for what each rule catches in
+practice. All three are commented; this section is an orientation, not a specification, so that there
+is only one copy to keep true.
+
+### Changing a rule
+
+`docs-selftest/` holds deliberately invalid needs. Each fixture breaks one rule on purpose, and
+`docs-selftest/expected/` records the exact diagnostics that break must produce.
+
+It exists because a wrongly shaped rule in `ubc` is **not rejected — it is silently ignored**, and the
+project goes green. Four ways to do that have been measured: a composite keyword in the wrong place, a
+misspelled keyword, a keyword of the wrong kind for the field, and any rule about a need's body. So a
+rule that has never been seen to fail cannot be assumed to work.
+
+After deliberately changing a rule, or bumping the pinned `ubc`:
+
+```
+sh scripts/docs-selftest.sh --bless    # rewrite every golden file
+git diff                               # this diff is the review
+```
+
+Two rules of thumb. **Every rule needs a fixture that fails without it** — the driver refuses to pass a
+rule in `schemas.json` that no golden file mentions. And **append new rules to the end of
+`schemas.json`, never insert**: a rule's array index appears in every message it produces, so inserting
+one re-blesses every golden below it for nothing.
 
 ## Licence
 

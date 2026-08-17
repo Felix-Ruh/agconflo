@@ -9,11 +9,14 @@ before there is any material for them to be wrong about.
 
 The requirement below is a real one rather than a placeholder - it is the
 project's core thesis, stated in the form the rest will take. The obligation
-itself is the ``statement`` field; the body carries the reasoning behind it. Six
-need types and five link types are declared in ``ubproject.toml``; the rules that
-constrain them - mandatory fields per level, link targets, coverage and
-requirement wording - arrive next, each one guarded by a fixture in
-``docs-selftest/``.
+itself is the ``statement`` field; the body carries the reasoning behind it.
+
+The metamodel it is written against is complete: six need types and five link
+types in ``ubproject.toml``, and thirty-two rules in ``schemas.json`` covering
+mandatory fields per level, link targets, allocation cardinality, EARS grammar
+and requirement smells. Every one of those rules is guarded by a fixture in
+``docs-selftest/`` that fails without it, because a wrongly shaped rule is
+silently ignored rather than rejected.
 
 Stakeholder requirements
 ========================
