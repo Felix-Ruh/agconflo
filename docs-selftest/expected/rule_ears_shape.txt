@@ -1,0 +1,26 @@
+# exit: 1
+[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_ears_shape.rst:70:4
+  FEAT_EARS_COMPLEX:statement: "While a loop is active, Agconflo shall end the iteration." does not match "^While [^,]+, when [^,]+, [A-Z][A-Za-z -]* shall .+\.$" (ears-complex-statement-must-match-its-grammar[27]/properties/statement/pattern)
+[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_ears_shape.rst:34:4
+  FEAT_EARS_EVENT:statement: "Agconflo shall bind contexts when an activation begins." does not match "^When [^,]+, [A-Z][A-Za-z -]* shall .+\.$" (ears-event-statement-must-match-its-grammar[23]/properties/statement/pattern)
+[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_ears_shape.rst:52:4
+  FEAT_EARS_OPTIONAL:statement: "Agconflo shall order fragments by their cached prefix." does not match "^Where [^,]+, [A-Z][A-Za-z -]* shall .+\.$" (ears-optional-statement-must-match-its-grammar[25]/properties/statement/pattern)
+[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_ears_shape.rst:43:4
+  FEAT_EARS_STATE:statement: "Agconflo shall treat a node parked on a human gate as live." does not match "^While [^,]+, [A-Z][A-Za-z -]* shall .+\.$" (ears-state-statement-must-match-its-grammar[24]/properties/statement/pattern)
+[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_ears_shape.rst:25:4
+  FEAT_EARS_UBIQUITOUS:statement: "Agconflo records the provenance of every context." does not match "^[A-Z][A-Za-z -]* shall .+\.$" (ears-ubiquitous-statement-must-match-its-grammar[22]/properties/statement/pattern)
+[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_ears_shape.rst:61:4
+  FEAT_EARS_UNWANTED:statement: "If a join receives contexts from two activations, Agconflo shall withhold it." does not match "^If [^,]+, then [A-Z][A-Za-z -]* shall .+\.$" (ears-unwanted-statement-must-match-its-grammar[26]/properties/statement/pattern)
+Found 6 error(s).

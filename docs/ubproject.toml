@@ -214,10 +214,22 @@ description = "The requirement this test case checks."
 # the body holds rationale and derivation, the prose a person writes around the
 # requirement, and the obligation itself lives here where it can be checked.
 #
-# Length bounds and the EARS grammar arrive with the wording rules.
-description = "The single normative sentence. Rationale belongs in the body."
+# The bounds are crude guards against the two ways this field goes wrong -
+# a placeholder and a pasted paragraph - and not quality measures. 20 is about
+# the shortest legitimate EARS sentence ("Agconflo shall stop." is exactly 20),
+# so it admits that while rejecting "TBD" or "see body". 240 is roughly forty
+# words: generous for one sentence, tight enough that a paragraph fails.
+#
+# A STATEMENT MUST BE ONE PHYSICAL LINE, enforced as a rule in schemas.json
+# rather than here. Measured: a wrapped field value keeps a literal newline in
+# it, so a wrapped statement would fail every anchored grammar rule with a
+# baffling message. Refusing the newline outright is also the honest data
+# constraint - these statements are rendered into prompts and read through
+# needs.json, where a line break inside a sentence is noise. Long statements
+# therefore make long lines, which nothing here wraps.
+description = "The single normative sentence, on one line. Rationale belongs in the body."
 nullable = true
-schema = { type = "string" }
+schema = { type = "string", minLength = 20, maxLength = 240 }
 
 [needs.fields.ears_pattern]
 # Which EARS template the statement follows (Mavin et al.), which decides which

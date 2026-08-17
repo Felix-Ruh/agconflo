@@ -1,0 +1,18 @@
+# exit: 1
+[needs.invalid_field_value]
+  --> (need)
+      fixtures/rule_statement_field.rst:32:4
+  STKH_TOO_LONG:statement: "Agconflo shall record the provenance of every context, including the node that produced it, the activation it belonged to, the parameters it was bound to, the transform that combined it, and anything else a reader might later wish to know about it." is longer than 240 characters (statement/maxLength)
+[needs.invalid_field_value]
+  --> (need)
+      fixtures/rule_statement_field.rst:25:4
+  STKH_TOO_SHORT:statement: "It shall work." is shorter than 20 characters (statement/minLength)
+[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_statement_field.rst:17:4
+  STKH_WRAPPED:statement: {"pattern":"\\n"} is not allowed for "Agconflo shall give a node exactly the contexts that were wired\nto it and no others." (statement-must-be-one-physical-line[19]/allOf/0/properties/statement/not)
+[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_statement_field.rst:17:4
+  STKH_WRAPPED:statement: "Agconflo shall give a node exactly the contexts that were wired\nto it and no others." does not match "^[A-Z][A-Za-z -]* shall .+\.$" (stkh-req-statement-must-oblige-with-shall[20]/properties/statement/pattern)
+Found 2 error(s), 2 warning(s).

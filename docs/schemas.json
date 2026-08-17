@@ -197,6 +197,137 @@
           }
         }
       }
+    },
+    {
+      "id": "statement-must-be-one-physical-line",
+      "severity": "violation",
+      "message": "A wrapped field value keeps a literal newline, which would fail every grammar rule below with a baffling message - and a line break inside a sentence is noise in data that gets rendered into prompts. Selects on the field rather than the type, because this is a property of statements.",
+      "select": { "required": ["statement"] },
+      "validate": {
+        "local": {
+          "allOf": [
+            { "properties": { "statement": { "not": { "pattern": "\\n" } } } }
+          ]
+        }
+      }
+    },
+    {
+      "id": "stkh-req-statement-must-oblige-with-shall",
+      "severity": "violation",
+      "message": "A stakeholder requirement states a goal rather than system behaviour, so it gets no EARS pattern - but it still has to oblige rather than describe.",
+      "select": { "$ref": "#/$defs/type-stkh-req" },
+      "validate": {
+        "local": {
+          "properties": { "statement": { "pattern": "^[A-Z][A-Za-z -]* shall .+\\.$" } }
+        }
+      }
+    },
+    {
+      "id": "feat-arch-statement-must-oblige-with-shall",
+      "severity": "violation",
+      "message": "A design decision that cannot be stated as an obligation on the system is a description, not a decision.",
+      "select": { "$ref": "#/$defs/type-feat-arch" },
+      "validate": {
+        "local": {
+          "properties": { "statement": { "pattern": "^[A-Z][A-Za-z -]* shall .+\\.$" } }
+        }
+      }
+    },
+    {
+      "id": "ears-ubiquitous-statement-must-match-its-grammar",
+      "severity": "violation",
+      "message": "Selects on the ears_pattern value rather than the type: if a requirement is labelled ubiquitous, it must read like one, whichever level carries it.",
+      "select": {
+        "properties": { "ears_pattern": { "const": "ubiquitous" } },
+        "required": ["ears_pattern"]
+      },
+      "validate": {
+        "local": {
+          "properties": { "statement": { "pattern": "^[A-Z][A-Za-z -]* shall .+\\.$" } }
+        }
+      }
+    },
+    {
+      "id": "ears-event-statement-must-match-its-grammar",
+      "severity": "violation",
+      "message": "When <trigger>, <subject> shall <response>.",
+      "select": {
+        "properties": { "ears_pattern": { "const": "event" } },
+        "required": ["ears_pattern"]
+      },
+      "validate": {
+        "local": {
+          "properties": {
+            "statement": { "pattern": "^When [^,]+, [A-Z][A-Za-z -]* shall .+\\.$" }
+          }
+        }
+      }
+    },
+    {
+      "id": "ears-state-statement-must-match-its-grammar",
+      "severity": "violation",
+      "message": "While <state>, <subject> shall <response>.",
+      "select": {
+        "properties": { "ears_pattern": { "const": "state" } },
+        "required": ["ears_pattern"]
+      },
+      "validate": {
+        "local": {
+          "properties": {
+            "statement": { "pattern": "^While [^,]+, [A-Z][A-Za-z -]* shall .+\\.$" }
+          }
+        }
+      }
+    },
+    {
+      "id": "ears-optional-statement-must-match-its-grammar",
+      "severity": "violation",
+      "message": "Where <feature is included>, <subject> shall <response>.",
+      "select": {
+        "properties": { "ears_pattern": { "const": "optional" } },
+        "required": ["ears_pattern"]
+      },
+      "validate": {
+        "local": {
+          "properties": {
+            "statement": { "pattern": "^Where [^,]+, [A-Z][A-Za-z -]* shall .+\\.$" }
+          }
+        }
+      }
+    },
+    {
+      "id": "ears-unwanted-statement-must-match-its-grammar",
+      "severity": "violation",
+      "message": "If <trigger>, then <subject> shall <response>. The 'then' is required, which is what separates this pattern from a state-driven one.",
+      "select": {
+        "properties": { "ears_pattern": { "const": "unwanted" } },
+        "required": ["ears_pattern"]
+      },
+      "validate": {
+        "local": {
+          "properties": {
+            "statement": { "pattern": "^If [^,]+, then [A-Z][A-Za-z -]* shall .+\\.$" }
+          }
+        }
+      }
+    },
+    {
+      "id": "ears-complex-statement-must-match-its-grammar",
+      "severity": "violation",
+      "message": "While <state>, when <trigger>, <subject> shall <response>. The lowercase 'when' is deliberate: it is the second clause of one sentence.",
+      "select": {
+        "properties": { "ears_pattern": { "const": "complex" } },
+        "required": ["ears_pattern"]
+      },
+      "validate": {
+        "local": {
+          "properties": {
+            "statement": {
+              "pattern": "^While [^,]+, when [^,]+, [A-Z][A-Za-z -]* shall .+\\.$"
+            }
+          }
+        }
+      }
     }
   ]
 }
