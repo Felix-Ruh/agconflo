@@ -93,6 +93,110 @@
       "message": "The kind carries the testing policy - property-based, positive, or error-path - and coverage says whether this case settles its requirement or only part of it.",
       "select": { "$ref": "#/$defs/type-test-case" },
       "validate": { "local": { "required": ["test_kind", "coverage"] } }
+    },
+    {
+      "id": "feat-req-must-derive-from-a-stkh-req",
+      "severity": "violation",
+      "message": "A feature requirement nobody asked for is the commonest way for scope to grow unnoticed. The network rule fires when the link is absent as well as when it points at the wrong type.",
+      "select": { "$ref": "#/$defs/type-feat-req" },
+      "validate": {
+        "network": {
+          "derived_from": {
+            "contains": { "local": { "$ref": "#/$defs/type-stkh-req" } },
+            "minContains": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "feat-arch-must-realise-a-feat-req",
+      "severity": "violation",
+      "message": "An architecture decision serving no stated behaviour is a decision about nothing.",
+      "select": { "$ref": "#/$defs/type-feat-arch" },
+      "validate": {
+        "network": {
+          "realises": {
+            "contains": { "local": { "$ref": "#/$defs/type-feat-req" } },
+            "minContains": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "feat-arch-must-use-at-least-one-comp",
+      "severity": "violation",
+      "message": "Naming the components a feature decomposes into is what this level decides; without them it is a paraphrase of the feature requirement.",
+      "select": { "$ref": "#/$defs/type-feat-arch" },
+      "validate": {
+        "network": {
+          "uses": {
+            "contains": { "local": { "$ref": "#/$defs/type-comp" } },
+            "minContains": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "comp-req-must-derive-from-a-feat-req",
+      "severity": "violation",
+      "message": "A component requirement with no parent behaviour cannot be traced to anything a stakeholder wanted.",
+      "select": { "$ref": "#/$defs/type-comp-req" },
+      "validate": {
+        "network": {
+          "derived_from": {
+            "contains": { "local": { "$ref": "#/$defs/type-feat-req" } },
+            "minContains": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "comp-req-must-be-allocated-to-a-comp",
+      "severity": "violation",
+      "message": "Allocation is what this level decides. It is also what lets the statement's grammatical subject be checked against the component's own title.",
+      "select": { "$ref": "#/$defs/type-comp-req" },
+      "validate": {
+        "network": {
+          "allocated_to": {
+            "contains": { "local": { "$ref": "#/$defs/type-comp" } },
+            "minContains": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "comp-req-must-be-allocated-to-at-most-one-comp",
+      "severity": "violation",
+      "message": "Two components answerable for one requirement means neither is. Written as maxItems because minItems does NOT fire when the link is absent - the lower bound comes from the network rule above.",
+      "select": { "$ref": "#/$defs/type-comp-req" },
+      "validate": {
+        "local": { "properties": { "allocated_to": { "maxItems": 1 } } }
+      }
+    },
+    {
+      "id": "test-case-must-verify-a-requirement",
+      "severity": "violation",
+      "message": "A test case may verify either requirement level, but not a component, an architecture decision or another test.",
+      "select": { "$ref": "#/$defs/type-test-case" },
+      "validate": {
+        "network": {
+          "verifies": {
+            "contains": {
+              "local": {
+                "allOf": [
+                  {
+                    "anyOf": [
+                      { "$ref": "#/$defs/type-feat-req" },
+                      { "$ref": "#/$defs/type-comp-req" }
+                    ]
+                  }
+                ]
+              }
+            },
+            "minContains": 1
+          }
+        }
+      }
     }
   ]
 }

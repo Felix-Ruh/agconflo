@@ -15,8 +15,16 @@ Fixture: field_enums
    Two needs rather than one, so each field sits on a type that would plausibly
    carry it.
 
+.. stkh_req:: A parent, so the requirement below breaks nothing but its enums
+   :id: STKH_ENUMS_OK
+   :stakeholder: user
+   :statement: Agconflo shall reject a value outside a field's enumeration.
+
+   Body.
+
 .. feat_req:: Illegal values on a requirement
    :id: FEAT_BAD_ENUMS
+   :derived_from: STKH_ENUMS_OK
    :ears_pattern: whenever
    :verification_method: vibes
    :stakeholder: shareholder
@@ -26,6 +34,7 @@ Fixture: field_enums
 
 .. test_case:: Illegal values on a test case
    :id: TEST_BAD_ENUMS
+   :verifies: FEAT_BAD_ENUMS
    :test_kind: smoke
    :coverage: mostly
 

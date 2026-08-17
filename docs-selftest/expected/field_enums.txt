@@ -1,22 +1,22 @@
 # exit: 1
 [needs.invalid_field_value]
   --> (need)
-      fixtures/field_enums.rst:18:4
+      fixtures/field_enums.rst:25:4
   FEAT_BAD_ENUMS:ears_pattern: "whenever" is not one of "ubiquitous", "state" or 4 other candidates (ears_pattern/enum)
 [needs.invalid_field_value]
   --> (need)
-      fixtures/field_enums.rst:18:4
+      fixtures/field_enums.rst:25:4
   FEAT_BAD_ENUMS:stakeholder: "shareholder" is not one of "user", "agent" or "maintainer" (stakeholder/enum)
 [needs.invalid_field_value]
   --> (need)
-      fixtures/field_enums.rst:18:4
+      fixtures/field_enums.rst:25:4
   FEAT_BAD_ENUMS:verification_method: "vibes" is not one of "test", "analysis" or 2 other candidates (verification_method/enum)
 [needs.invalid_field_value]
   --> (need)
-      fixtures/field_enums.rst:27:4
+      fixtures/field_enums.rst:35:4
   TEST_BAD_ENUMS:coverage: "mostly" is not one of "full" or "partial" (coverage/enum)
 [needs.invalid_field_value]
   --> (need)
-      fixtures/field_enums.rst:27:4
+      fixtures/field_enums.rst:35:4
   TEST_BAD_ENUMS:test_kind: "smoke" is not one of "property", "positive" or "error_path" (test_kind/enum)
 Found 5 warning(s).
