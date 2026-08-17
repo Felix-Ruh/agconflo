@@ -19,13 +19,9 @@ Fixture: rule_link_targets
    :stakeholder: user
    :statement: Agconflo shall reject a link that resolves to the wrong type.
 
-   Body.
-
 .. comp:: A component, used as a wrong target
    :id: COMP_TARGETS
    :crate: agconflo-core
-
-   Body.
 
 .. feat_req:: Derived from a component rather than a stakeholder requirement
    :id: FEAT_WRONG_PARENT
@@ -34,15 +30,11 @@ Fixture: rule_link_targets
    :verification_method: review
    :statement: Agconflo shall reject a link that resolves to the wrong type.
 
-   Body.
-
 .. feat_arch:: Realises a component and uses a requirement, both inverted
    :id: ARCH_WRONG_TARGETS
    :realises: COMP_TARGETS
    :uses: FEAT_WRONG_PARENT
    :statement: Agconflo shall reject an architecture decision wired backwards.
-
-   Body.
 
 .. comp_req:: Derived from a stakeholder requirement, skipping the feature level
    :id: CREQ_WRONG_PARENT
@@ -51,8 +43,6 @@ Fixture: rule_link_targets
    :ears_pattern: ubiquitous
    :statement: A component shall reject a requirement that skips a level.
 
-   Body.
-
 .. comp_req:: Allocated to a requirement rather than a component
    :id: CREQ_WRONG_ALLOC
    :derived_from: FEAT_WRONG_PARENT
@@ -60,12 +50,8 @@ Fixture: rule_link_targets
    :ears_pattern: ubiquitous
    :statement: A component shall reject an allocation to something that is not one.
 
-   Body.
-
 .. test_case:: Verifies a component, which is not a requirement
    :id: TEST_WRONG_TARGET
    :verifies: COMP_TARGETS
    :test_kind: positive
    :coverage: full
-
-   Body.

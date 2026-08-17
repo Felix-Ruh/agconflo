@@ -16,8 +16,6 @@ Fixture: rule_statement_shape
    :stakeholder: user
    :statement: Agconflo records the provenance of every context.
 
-   Body.
-
 .. feat_req:: A conformant parent for the architecture decision below
    :id: FEAT_SHAPE_OK
    :derived_from: STKH_DESCRIBES
@@ -25,18 +23,12 @@ Fixture: rule_statement_shape
    :verification_method: review
    :statement: Agconflo shall record the provenance of every context.
 
-   Body.
-
 .. comp:: A component for the architecture decision to use
    :id: COMP_SHAPE_OK
    :crate: agconflo-core
-
-   Body.
 
 .. feat_arch:: An architecture decision whose statement starts lowercase
    :id: ARCH_LOWERCASE
    :realises: FEAT_SHAPE_OK
    :uses: COMP_SHAPE_OK
    :statement: agconflo shall record provenance inside the context store.
-
-   Body.

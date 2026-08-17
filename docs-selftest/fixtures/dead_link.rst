@@ -12,5 +12,3 @@ Fixture: dead_link
    :links: STKH_NOT_PRESENT
    :stakeholder: user
    :statement: Agconflo shall give a node exactly the contexts wired to it.
-
-   Body.

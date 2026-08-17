@@ -20,8 +20,6 @@ Fixture: field_enums
    :stakeholder: user
    :statement: Agconflo shall reject a value outside a field's enumeration.
 
-   Body.
-
 .. feat_req:: Illegal values on a requirement
    :id: FEAT_BAD_ENUMS
    :derived_from: STKH_ENUMS_OK
@@ -30,12 +28,8 @@ Fixture: field_enums
    :stakeholder: shareholder
    :statement: Agconflo shall reject a value outside a field's enumeration.
 
-   Body.
-
 .. test_case:: Illegal values on a test case
    :id: TEST_BAD_ENUMS
    :verifies: FEAT_BAD_ENUMS
    :test_kind: smoke
    :coverage: mostly
-
-   Body.

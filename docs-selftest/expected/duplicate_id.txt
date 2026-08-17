@@ -3,6 +3,6 @@
   --> (need)
       fixtures/duplicate_id.rst:10:4
   --> (need)
-      fixtures/duplicate_id.rst:17:4
+      fixtures/duplicate_id.rst:15:4
   Duplicate need 'STKH_DUPLICATE'
 Found 1 warning(s).

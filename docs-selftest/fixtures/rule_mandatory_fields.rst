@@ -18,35 +18,23 @@ Fixture: rule_mandatory_fields
 .. stkh_req:: No statement, no stakeholder
    :id: STKH_NO_FIELDS
 
-   Body.
-
 .. feat_req:: No statement, pattern or verification method
    :id: FEAT_NO_FIELDS
    :derived_from: STKH_NO_FIELDS
-
-   Body.
 
 .. feat_arch:: No statement
    :id: ARCH_NO_FIELDS
    :realises: FEAT_NO_FIELDS
    :uses: COMP_NO_FIELDS
 
-   Body.
-
 .. comp:: No crate
    :id: COMP_NO_FIELDS
-
-   Body.
 
 .. comp_req:: No statement or pattern
    :id: CREQ_NO_FIELDS
    :derived_from: FEAT_NO_FIELDS
    :allocated_to: COMP_NO_FIELDS
 
-   Body.
-
 .. test_case:: No kind or coverage
    :id: TEST_NO_FIELDS
    :verifies: CREQ_NO_FIELDS
-
-   Body.

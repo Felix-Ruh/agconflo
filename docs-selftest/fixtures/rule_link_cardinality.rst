@@ -22,8 +22,6 @@ Fixture: rule_link_cardinality
    :stakeholder: user
    :statement: Agconflo shall hold one component answerable for each requirement.
 
-   Body.
-
 .. feat_req:: A parent behaviour
    :id: FEAT_CARDINALITY
    :derived_from: STKH_CARDINALITY
@@ -31,19 +29,13 @@ Fixture: rule_link_cardinality
    :verification_method: review
    :statement: Agconflo shall hold one component answerable for each requirement.
 
-   Body.
-
 .. comp:: The first candidate
    :id: COMP_FIRST
    :crate: agconflo-core
 
-   Body.
-
 .. comp:: The second candidate
    :id: COMP_SECOND
    :crate: agconflo-core
-
-   Body.
 
 .. comp_req:: Allocated to two components at once
    :id: CREQ_TWO_COMPS
@@ -52,12 +44,8 @@ Fixture: rule_link_cardinality
    :ears_pattern: ubiquitous
    :statement: The first candidate shall reject a divided allocation.
 
-   Body.
-
 .. comp_req:: Allocated to nothing at all
    :id: CREQ_NO_ALLOC
    :derived_from: FEAT_CARDINALITY
    :ears_pattern: ubiquitous
    :statement: Some component shall be answerable for this requirement.
-
-   Body.

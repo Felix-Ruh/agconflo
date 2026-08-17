@@ -12,11 +12,7 @@ Fixture: duplicate_id
    :stakeholder: user
    :statement: Agconflo shall give a node exactly the contexts wired to it.
 
-   Body.
-
 .. stkh_req:: Second use of the same id
    :id: STKH_DUPLICATE
    :stakeholder: user
    :statement: Agconflo shall give a node exactly the contexts wired to it.
-
-   Body.

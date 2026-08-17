@@ -1,19 +1,19 @@
 # exit: 1
 [needs.schema_definition_violation]
   --> (need)
-      fixtures/rule_id_prefix.rst:30:4
+      fixtures/rule_id_prefix.rst:26:4
   WRONG_ARCH:id: "WRONG_ARCH" does not match "^ARCH_" (feat-arch-id-must-start-with-arch[2]/properties/id/pattern)
 [needs.schema_definition_violation]
   --> (need)
-      fixtures/rule_id_prefix.rst:38:4
+      fixtures/rule_id_prefix.rst:32:4
   WRONG_COMP:id: "WRONG_COMP" does not match "^COMP_" (comp-id-must-start-with-comp[3]/properties/id/pattern)
 [needs.schema_definition_violation]
   --> (need)
-      fixtures/rule_id_prefix.rst:44:4
+      fixtures/rule_id_prefix.rst:36:4
   WRONG_CREQ:id: "WRONG_CREQ" does not match "^CREQ_" (comp-req-id-must-start-with-creq[4]/properties/id/pattern)
 [needs.schema_definition_violation]
   --> (need)
-      fixtures/rule_id_prefix.rst:21:4
+      fixtures/rule_id_prefix.rst:19:4
   WRONG_FEAT:id: "WRONG_FEAT" does not match "^FEAT_" (feat-req-id-must-start-with-feat[1]/properties/id/pattern)
 [needs.schema_definition_violation]
   --> (need)
@@ -21,6 +21,6 @@
   WRONG_STKH:id: "WRONG_STKH" does not match "^STKH_" (stkh-req-id-must-start-with-stkh[0]/properties/id/pattern)
 [needs.schema_definition_violation]
   --> (need)
-      fixtures/rule_id_prefix.rst:53:4
+      fixtures/rule_id_prefix.rst:43:4
   WRONG_TEST:id: "WRONG_TEST" does not match "^TEST_" (test-case-id-must-start-with-test[5]/properties/id/pattern)
 Found 6 error(s).

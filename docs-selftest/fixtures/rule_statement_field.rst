@@ -20,18 +20,12 @@ Fixture: rule_statement_field
    :statement: Agconflo shall give a node exactly the contexts that were wired
       to it and no others.
 
-   Body.
-
 .. stkh_req:: A statement below the lower bound
    :id: STKH_TOO_SHORT
    :stakeholder: user
    :statement: It shall work.
 
-   Body.
-
 .. stkh_req:: A statement above the upper bound
    :id: STKH_TOO_LONG
    :stakeholder: user
    :statement: Agconflo shall record the provenance of every context, including the node that produced it, the activation it belonged to, the parameters it was bound to, the transform that combined it, and anything else a reader might later wish to know about it.
-
-   Body.

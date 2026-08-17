@@ -1,26 +1,26 @@
 # exit: 1
 [needs.schema_network_violation]
   --> (need)
-      fixtures/rule_link_targets.rst:39:4
+      fixtures/rule_link_targets.rst:33:4
   ARCH_WRONG_TARGETS:realises: Too few valid links of type 'realises' (0 < 1) / nok: COMP_TARGETS (feat-arch-must-realise-a-feat-req[13]/contains_too_few)
 [needs.schema_network_violation]
   --> (need)
-      fixtures/rule_link_targets.rst:39:4
+      fixtures/rule_link_targets.rst:33:4
   ARCH_WRONG_TARGETS:uses: Too few valid links of type 'uses' (0 < 1) / nok: FEAT_WRONG_PARENT (feat-arch-must-use-at-least-one-comp[14]/contains_too_few)
 [needs.schema_network_violation]
   --> (need)
-      fixtures/rule_link_targets.rst:56:4
+      fixtures/rule_link_targets.rst:46:4
   CREQ_WRONG_ALLOC:allocated_to: Too few valid links of type 'allocated_to' (0 < 1) / nok: FEAT_WRONG_PARENT (comp-req-must-be-allocated-to-a-comp[16]/contains_too_few)
 [needs.schema_network_violation]
   --> (need)
-      fixtures/rule_link_targets.rst:47:4
+      fixtures/rule_link_targets.rst:39:4
   CREQ_WRONG_PARENT:derived_from: Too few valid links of type 'derived_from' (0 < 1) / nok: STKH_TARGETS (comp-req-must-derive-from-a-feat-req[15]/contains_too_few)
 [needs.schema_network_violation]
   --> (need)
-      fixtures/rule_link_targets.rst:30:4
+      fixtures/rule_link_targets.rst:26:4
   FEAT_WRONG_PARENT:derived_from: Too few valid links of type 'derived_from' (0 < 1) / nok: COMP_TARGETS (feat-req-must-derive-from-a-stkh-req[12]/contains_too_few)
 [needs.schema_network_violation]
   --> (need)
-      fixtures/rule_link_targets.rst:65:4
+      fixtures/rule_link_targets.rst:53:4
   TEST_WRONG_TARGET:verifies: Too few valid links of type 'verifies' (0 < 1) / nok: COMP_TARGETS (test-case-must-verify-a-requirement[18]/contains_too_few)
 Found 6 error(s).
