@@ -83,6 +83,32 @@ echo "pre-commit: docs gate"
 UBC="$(pwd)/tools/ubc"
 [ -x "$UBC" ] || UBC="$UBC.exe"
 
+# Both ubc gates below depend on ubCode's free open-source grant, and BOTH
+# report an unavailable grant with exit 1 - the same code each uses for a real
+# defect. The message is the only discriminator, so it lives here once rather
+# than at each call site.
+#
+# The grant is a network determination against github.com, cached for three
+# days, so this path is not hypothetical: it is what a machine that has been
+# offline for longer than that sees on every commit. Which is why neither gate
+# may treat it as fatal.
+#
+# `ubc check` was believed to need no licence at all. Measured 2026-08-17, it
+# has a five-FILE free tier: one to five files exit 0 unlicensed, six exit 1
+# with "Files to index (6) exceeds maximum without license (5)" on stderr and
+# nothing on stdout. The earlier measurement had used a single file holding 2000
+# needs, so the limit was never reached - and docs/ passes today only by being
+# one file, which it will not stay.
+#
+# The match fails closed: if useblocks changes this wording, a licence failure
+# starts being reported as a documentation defect. That is the right direction
+# for a gate - a visible false alarm rather than a silent hole - and it is one
+# of the things to re-measure when the pinned ubc version is bumped.
+is_licence_failure() {
+    printf '%s' "$1" | grep -qE \
+        'Requires active license|Not determined to be an open source project|exceeds maximum without license'
+}
+
 if [ ! -f docs/ubproject.toml ]; then
     echo "pre-commit: no docs/ubproject.toml - skipping the docs gate"
 elif [ ! -x "$UBC" ]; then
@@ -93,6 +119,8 @@ elif [ ! -x "$UBC" ]; then
     echo "pre-commit: ubc is not installed - skipping the docs gate"
     echo "pre-commit: install it with 'sh scripts/get-ubc.sh'"
 else
+    licence_unavailable=0
+
     # NO PATH ARGUMENT, and that is the load-bearing detail here. `ubc check
     # <path>` does not scope the check, it FILTERS THE DIAGNOSTICS: the whole
     # project is still resolved, but findings outside <path> are dropped
@@ -104,44 +132,62 @@ else
     # source would be filtered away by an argument that looks like it merely
     # names the project. Hence the subshell cd instead.
     #
-    # No pipe either: `$?` after a pipe reports the last command in it, not ubc.
-    # And `--deny warning` is already ubc's default, passed explicitly so that a
+    # The output is captured rather than left to the terminal because it is the
+    # only thing separating a real defect from an unavailable licence - see
+    # is_licence_failure above. Capturing needs 2>&1, because diagnostics go to
+    # stdout and licence refusals to stderr. This is a subshell and not a pipe,
+    # so `$?` really is ubc's status.
+    #
+    # `--deny warning` is already ubc's default, passed explicitly so that a
     # future change to that default cannot quietly loosen this gate.
     echo "pre-commit: ubc check"
-    ( cd docs && "$UBC" check --deny warning ) ||
-        fail "the documentation project has diagnostics"
+    check_output=$( ( cd docs && "$UBC" check --deny warning ) 2>&1 )
+    check_status=$?
 
-    # The formatter is licence-gated where `ubc check` is not. Measured: in a
-    # directory with no qualifying git remote, `check` exits 0 and `format`
-    # exits 1 with "Requires active license". The open-source grant is a network
-    # determination cached for three days, so an unguarded formatter step would
-    # block every commit made offline once that cache expired.
-    #
-    # Worse, it exits 1 for BOTH cases, so the exit code cannot separate a
-    # licence failure from a real formatting difference - a plain `|| fail`
-    # would tell someone to reformat files that are perfectly fine. The output
-    # does separate them: a genuine failure prints "1 file would be reformatted"
-    # and carries none of the licence wording. So match on that, and downgrade
-    # only the licence case to a warning.
-    #
-    # If useblocks ever changes that wording this fails closed - the licence
-    # case starts being reported as a formatting error. That is the right
-    # direction for a gate, a visible false alarm rather than a silent hole, and
-    # it is one of the things to re-measure when the pinned ubc version is
-    # bumped. `--preview` is required: the formatter is still Beta.
-    echo "pre-commit: ubc format --check"
-    fmt_output=$("$UBC" format --check --preview docs 2>&1)
-    fmt_status=$?
+    if [ -n "$check_output" ]; then
+        echo "$check_output"
+    fi
 
-    if [ "$fmt_status" -ne 0 ]; then
-        echo "$fmt_output"
-        if printf '%s' "$fmt_output" |
-            grep -qE 'Requires active license|Not determined to be an open source project'; then
-            echo "pre-commit: WARNING - ubc could not confirm the open-source licence"
-            echo "pre-commit: WARNING - grant, so the documentation formatter did not run."
+    if [ "$check_status" -ne 0 ]; then
+        if is_licence_failure "$check_output"; then
+            licence_unavailable=1
+            echo "pre-commit: WARNING - ubc could not confirm the open-source"
+            echo "pre-commit: WARNING - licence grant, so the documentation"
+            echo "pre-commit: WARNING - project was NOT checked at all."
             echo "pre-commit: WARNING - This usually means no network access. CI runs it."
         else
-            fail "documentation formatting differs; run 'tools/ubc format --preview docs', review it, and stage the result"
+            fail "the documentation project has diagnostics"
+        fi
+    fi
+
+    # The formatter is gated at ANY project size, where `check` is gated only
+    # above five files, so it needs its own guard even when check sailed
+    # through. That is exactly today's situation, with docs/ inside the free
+    # tier: offline, `check` exits 0 and `format` exits 1. What it does not need
+    # is to repeat a diagnosis the step above has already made, so when the
+    # grant is known to be unavailable it is skipped outright and one cause
+    # prints one message.
+    #
+    # Its failure is ambiguous the same way - exit 1 for both a licence problem
+    # and a real formatting difference - and separable only by the message: a
+    # genuine difference prints "1 file would be reformatted" and carries none
+    # of the licence wording. `--preview` is required, the formatter is Beta.
+    if [ "$licence_unavailable" -eq 1 ]; then
+        echo "pre-commit: skipping ubc format - the same grant gates it"
+    else
+        echo "pre-commit: ubc format --check"
+        fmt_output=$("$UBC" format --check --preview docs 2>&1)
+        fmt_status=$?
+
+        if [ "$fmt_status" -ne 0 ]; then
+            echo "$fmt_output"
+            if is_licence_failure "$fmt_output"; then
+                echo "pre-commit: WARNING - ubc could not confirm the open-source licence"
+                echo "pre-commit: WARNING - grant, so the documentation formatter did not run."
+                echo "pre-commit: WARNING - This usually means no network access. CI runs it."
+            else
+                fail "documentation formatting differs; run 'tools/ubc format --preview docs', review it, and stage the result"
+            fi
         fi
     fi
 fi
@@ -203,8 +249,11 @@ fi
 # impossible rather than merely detectable — leaving nothing for a check to find.
 #
 # The ubCode licence probe (`ubc query cypher`) is NOT run here. That is CI's
-# job: locally it establishes nothing `ubc check` has not already, and it would
-# make every commit depend on a network round trip.
+# job: it would make every commit depend on a network round trip, and once docs/
+# holds more than five files the check step above is a licence probe in its own
+# right, since it cannot run unlicensed either. What is lost locally is only the
+# distinction between a genuine denial and an unreachable github.com, which the
+# CI docs job diagnoses.
 #
 # These gates all inspect the WORKING TREE, not the staged content - true of the
 # cargo steps as much as the docs ones. Staging a fix while leaving the break on

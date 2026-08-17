@@ -92,9 +92,12 @@ checks and format-checks the requirements project, then runs `cargo fmt --check`
 missing `cargo` skips its own gate with a message rather than failing the commit, and the Rust steps
 are also skipped while the workspace has no crates in it.
 
-`ubc`'s formatter is licensed through ubCode's free open-source grant, which is determined from the
-repository's remote and needs network access. When that cannot be confirmed the hook says so and
-carries on; `ubc check` needs no licence and always runs.
+Both `ubc` steps are licensed through ubCode's free open-source grant, which is determined from the
+repository's remote and needs network access — the answer is then cached for a few days. `ubc format`
+needs the grant at any size; `ubc check` has a five-file free tier and needs it once the project holds
+more than that. Either way an unavailable grant is reported with the same exit code as a real defect,
+so the hook tells the two apart by the message: when the grant cannot be confirmed it says so and
+carries on rather than sending you to fix documentation that is fine. CI runs both and fails hard.
 
 `git commit --no-verify` bypasses the hook deliberately.
 

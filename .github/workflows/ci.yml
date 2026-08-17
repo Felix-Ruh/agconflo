@@ -3,12 +3,19 @@
 # Two gates, mirroring .githooks/pre-commit: the Rust one - dormant until the
 # workspace has crates - and the documentation one.
 #
-# THE DOCS JOB IS ALSO A LICENCE PROBE, and right now that is its main purpose.
-# `ubc check` is ungated: it runs with no licence at all, so a green check
-# proves nothing about ubCode's terms. `ubc query cypher` IS gated, and the
-# free open-source grant is what is expected to satisfy it. Whether that grant
-# holds on a CI runner is the one thing about this toolchain that cannot be
-# tested locally, and it is a project-level go/no-go.
+# THE DOCS JOB IS ALSO A LICENCE PROBE. `ubc check` is gated only above five
+# files - measured 2026-08-17, and docs/ is one file today - so a green check
+# still proves nothing about ubCode's terms. `ubc format` and `ubc query cypher`
+# ARE gated at any size, and the free open-source grant is what satisfies them.
+# That the grant holds on a runner was the project-level go/no-go and was
+# answered on this workflow's first run; the Cypher step keeps it under standing
+# observation.
+#
+# Unlike .githooks/pre-commit, this job does NOT degrade when the grant is
+# unavailable. The hook stands down so that being offline cannot block a commit;
+# CI is the authority, the grant is proven to work here, and a licence failure
+# on a runner is therefore a regression to look at rather than an inconvenience
+# to route around.
 
 name: ci
 
@@ -97,12 +104,14 @@ jobs:
       # be filtered away by an argument that looks like it merely names the
       # project. .githooks/pre-commit avoids it the same way.
       - name: ubc check
+        id: check
         working-directory: docs
         run: ../tools/ubc check --deny warning
 
       # `--preview` is required: the formatter is still Beta and refuses to run
       # without it.
       - name: ubc format
+        id: format
         run: ./tools/ubc format --check --preview docs
 
       # The load-bearing step. The output is asserted on, not merely the exit
@@ -122,17 +131,27 @@ jobs:
           cat "$RUNNER_TEMP/cypher.json"
           grep -q 'STKH_EXPLICIT_CONTEXT' "$RUNNER_TEMP/cypher.json"
 
-      # ubCode prints "Not determined to be an open source project" and exits 2
-      # both for a genuine licence denial and for any failure to reach
-      # github.com. Measured two ways: blackholing HTTPS through a proxy, and
-      # running in a container with no CA bundle - identical message in every
-      # case. A red probe is therefore ambiguous, and this step is what
-      # disambiguates it. The open-source check contacts github.com directly
-      # (not api.github.com), unauthenticated, and caches the answer for three
-      # days; that cache is intentionally not restored here, because caching it
-      # would hide the very thing this job exists to measure.
-      - name: Diagnose a failed licence probe
-        if: failure() && steps.licence.outcome == 'failure'
+      # ubCode prints "Not determined to be an open source project" both for a
+      # genuine licence denial and for any failure to reach github.com. Measured
+      # two ways: blackholing HTTPS through a proxy, and running in a container
+      # with no CA bundle - identical message in every case. A red probe is
+      # therefore ambiguous, and this step is what disambiguates it. The
+      # open-source check contacts github.com directly (not api.github.com),
+      # unauthenticated, and caches the answer for three days; that cache is
+      # intentionally not restored here, because caching it would hide the very
+      # thing this job exists to measure.
+      #
+      # All three ubc steps are covered, not just the Cypher one: `format` is
+      # gated at any size and `check` above five files, so either can fail for
+      # this reason and both report it with exit 1 - the same code they use for a
+      # real defect. The cost of the wider condition is that a genuine
+      # diagnostic or formatting difference also prints this network detail,
+      # which is noise rather than harm.
+      - name: Diagnose a failed ubc licence determination
+        if: >-
+          failure() && (steps.check.outcome == 'failure'
+          || steps.format.outcome == 'failure'
+          || steps.licence.outcome == 'failure')
         run: |
           echo '--- can this runner reach github.com? ---'
           curl -sS -o /dev/null -w "https://github.com/$GITHUB_REPOSITORY -> HTTP %{http_code}\n" \
