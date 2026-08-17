@@ -1,0 +1,46 @@
+# exit: 1
+[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_mandatory_fields.rst:29:4
+  ARCH_NO_FIELDS:feat-arch-must-have-a-statement: "statement" is a required property (feat-arch-must-have-a-statement[8]/required)
+[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_mandatory_fields.rst:36:4
+  COMP_NO_FIELDS:comp-must-name-its-crate: "crate" is a required property (comp-must-name-its-crate[9]/required)
+[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_mandatory_fields.rst:41:4
+  CREQ_NO_FIELDS:comp-req-must-have-a-statement-and-a-pattern: "statement" is a required property (comp-req-must-have-a-statement-and-a-pattern[10]/required)
+[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_mandatory_fields.rst:41:4
+  CREQ_NO_FIELDS:comp-req-must-have-a-statement-and-a-pattern: "ears_pattern" is a required property (comp-req-must-have-a-statement-and-a-pattern[10]/required)
+[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_mandatory_fields.rst:23:4
+  FEAT_NO_FIELDS:feat-req-must-have-a-statement-a-pattern-and-a-verification-method: "statement" is a required property (feat-req-must-have-a-statement-a-pattern-and-a-verification-method[7]/required)
+[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_mandatory_fields.rst:23:4
+  FEAT_NO_FIELDS:feat-req-must-have-a-statement-a-pattern-and-a-verification-method: "ears_pattern" is a required property (feat-req-must-have-a-statement-a-pattern-and-a-verification-method[7]/required)
+[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_mandatory_fields.rst:23:4
+  FEAT_NO_FIELDS:feat-req-must-have-a-statement-a-pattern-and-a-verification-method: "verification_method" is a required property (feat-req-must-have-a-statement-a-pattern-and-a-verification-method[7]/required)
+[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_mandatory_fields.rst:18:4
+  STKH_NO_FIELDS:stkh-req-must-have-a-statement-and-a-stakeholder: "statement" is a required property (stkh-req-must-have-a-statement-and-a-stakeholder[6]/required)
+[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_mandatory_fields.rst:18:4
+  STKH_NO_FIELDS:stkh-req-must-have-a-statement-and-a-stakeholder: "stakeholder" is a required property (stkh-req-must-have-a-statement-and-a-stakeholder[6]/required)
+[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_mandatory_fields.rst:48:4
+  TEST_NO_FIELDS:test-case-must-have-a-kind-and-a-coverage: "test_kind" is a required property (test-case-must-have-a-kind-and-a-coverage[11]/required)
+[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_mandatory_fields.rst:48:4
+  TEST_NO_FIELDS:test-case-must-have-a-kind-and-a-coverage: "coverage" is a required property (test-case-must-have-a-kind-and-a-coverage[11]/required)
+Found 11 error(s).

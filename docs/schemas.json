@@ -1,0 +1,98 @@
+{
+  "$defs": {
+    "type-stkh-req": { "properties": { "type": { "const": "stkh_req" } } },
+    "type-feat-req": { "properties": { "type": { "const": "feat_req" } } },
+    "type-feat-arch": { "properties": { "type": { "const": "feat_arch" } } },
+    "type-comp": { "properties": { "type": { "const": "comp" } } },
+    "type-comp-req": { "properties": { "type": { "const": "comp_req" } } },
+    "type-test-case": { "properties": { "type": { "const": "test_case" } } }
+  },
+  "schemas": [
+    {
+      "id": "stkh-req-id-must-start-with-stkh",
+      "severity": "violation",
+      "message": "An id whose prefix disagrees with its type makes every id-based reading of the graph unreliable. ubc does not enforce [[needs.types]].prefix itself.",
+      "select": { "$ref": "#/$defs/type-stkh-req" },
+      "validate": { "local": { "properties": { "id": { "pattern": "^STKH_" } } } }
+    },
+    {
+      "id": "feat-req-id-must-start-with-feat",
+      "severity": "violation",
+      "message": "An id whose prefix disagrees with its type makes every id-based reading of the graph unreliable.",
+      "select": { "$ref": "#/$defs/type-feat-req" },
+      "validate": { "local": { "properties": { "id": { "pattern": "^FEAT_" } } } }
+    },
+    {
+      "id": "feat-arch-id-must-start-with-arch",
+      "severity": "violation",
+      "message": "An id whose prefix disagrees with its type makes every id-based reading of the graph unreliable.",
+      "select": { "$ref": "#/$defs/type-feat-arch" },
+      "validate": { "local": { "properties": { "id": { "pattern": "^ARCH_" } } } }
+    },
+    {
+      "id": "comp-id-must-start-with-comp",
+      "severity": "violation",
+      "message": "An id whose prefix disagrees with its type makes every id-based reading of the graph unreliable.",
+      "select": { "$ref": "#/$defs/type-comp" },
+      "validate": { "local": { "properties": { "id": { "pattern": "^COMP_" } } } }
+    },
+    {
+      "id": "comp-req-id-must-start-with-creq",
+      "severity": "violation",
+      "message": "An id whose prefix disagrees with its type makes every id-based reading of the graph unreliable. CREQ_ and not COMP_, which belongs to the component itself.",
+      "select": { "$ref": "#/$defs/type-comp-req" },
+      "validate": { "local": { "properties": { "id": { "pattern": "^CREQ_" } } } }
+    },
+    {
+      "id": "test-case-id-must-start-with-test",
+      "severity": "violation",
+      "message": "An id whose prefix disagrees with its type makes every id-based reading of the graph unreliable.",
+      "select": { "$ref": "#/$defs/type-test-case" },
+      "validate": { "local": { "properties": { "id": { "pattern": "^TEST_" } } } }
+    },
+    {
+      "id": "stkh-req-must-have-a-statement-and-a-stakeholder",
+      "severity": "violation",
+      "message": "A goal with no owner cannot be prioritised or retired, and the obligation must be in the statement field because a need's body is invisible to validation.",
+      "select": { "$ref": "#/$defs/type-stkh-req" },
+      "validate": { "local": { "required": ["statement", "stakeholder"] } }
+    },
+    {
+      "id": "feat-req-must-have-a-statement-a-pattern-and-a-verification-method",
+      "severity": "violation",
+      "message": "Choosing how a behaviour will be shown to hold is what makes this a level of its own; the pattern decides which grammar the statement is held to.",
+      "select": { "$ref": "#/$defs/type-feat-req" },
+      "validate": {
+        "local": { "required": ["statement", "ears_pattern", "verification_method"] }
+      }
+    },
+    {
+      "id": "feat-arch-must-have-a-statement",
+      "severity": "violation",
+      "message": "An architecture decision that cannot be stated in one sentence is not yet a decision.",
+      "select": { "$ref": "#/$defs/type-feat-arch" },
+      "validate": { "local": { "required": ["statement"] } }
+    },
+    {
+      "id": "comp-must-name-its-crate",
+      "severity": "violation",
+      "message": "A component that is not anchored somewhere in the workspace cannot be traced to code.",
+      "select": { "$ref": "#/$defs/type-comp" },
+      "validate": { "local": { "required": ["crate"] } }
+    },
+    {
+      "id": "comp-req-must-have-a-statement-and-a-pattern",
+      "severity": "violation",
+      "message": "The statement's grammatical subject is what distinguishes a component requirement from a restatement of its parent.",
+      "select": { "$ref": "#/$defs/type-comp-req" },
+      "validate": { "local": { "required": ["statement", "ears_pattern"] } }
+    },
+    {
+      "id": "test-case-must-have-a-kind-and-a-coverage",
+      "severity": "violation",
+      "message": "The kind carries the testing policy - property-based, positive, or error-path - and coverage says whether this case settles its requirement or only part of it.",
+      "select": { "$ref": "#/$defs/type-test-case" },
+      "validate": { "local": { "required": ["test_kind", "coverage"] } }
+    }
+  ]
+}

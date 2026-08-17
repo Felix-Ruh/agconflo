@@ -10,5 +10,7 @@ Fixture: dead_link
 .. stkh_req:: A link to an id that does not exist
    :id: STKH_DANGLING
    :links: STKH_NOT_PRESENT
+   :stakeholder: user
+   :statement: Agconflo shall give a node exactly the contexts wired to it.
 
-   A node shall receive exactly the contexts that are wired to it.
+   Body.

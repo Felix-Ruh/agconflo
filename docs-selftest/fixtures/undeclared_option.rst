@@ -10,7 +10,10 @@ Fixture: undeclared_option
 
 .. stkh_req:: A need carrying an option nobody declared
    :id: STKH_STRAY_OPTION
+   :stakeholder: user
    :stakeholdr: user
    :statement: Agconflo shall give a node exactly the contexts wired to it.
 
-   Body.
+   The declared field is set as well, so the only defect is the stray option -
+   otherwise this fixture would also trip the mandatory-field rule and stop
+   being about option declarations.

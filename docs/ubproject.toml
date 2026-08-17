@@ -40,6 +40,19 @@ version = "0.0.0"
 # -----------------------------------------------------------------------------
 
 [needs]
+# The rules. Relative to THIS file, and the one place they live - docs-selftest/
+# inherits it through `extend`, so the fixtures test these rules rather than a
+# copy of them.
+#
+# JSON carries no comments, so schemas.json cannot explain itself. Two
+# conventions make up for that. Each rule's `id` is a self-explanatory sentence,
+# because it is the only text `ubc check` prints - the `message` field is NOT
+# displayed, so it holds the reasoning for a reader of the file rather than for
+# the person who tripped the rule. And every rule has a fixture in
+# docs-selftest/ that violates it, which is the working documentation of what it
+# actually catches.
+schema_definitions_from_json = "schemas.json"
+
 # `id_required` DEFAULTS TO FALSE, which is the trap here: left alone, a need
 # with no `:id:` is accepted and silently given a generated one. Generated ids
 # are derived from content, so editing a requirement's text would change its

@@ -9,5 +9,7 @@ Fixture: ok_minimal
 
 .. stkh_req:: A well formed stakeholder requirement
    :id: STKH_WELL_FORMED
+   :stakeholder: user
+   :statement: Agconflo shall give a node exactly the contexts wired to it.
 
-   A node shall receive exactly the contexts that are wired to it.
+   Nothing here is optional any more: this is the minimum a stkh_req may carry.
