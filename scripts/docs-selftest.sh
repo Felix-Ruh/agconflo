@@ -107,6 +107,26 @@ for fixture in "$selftest"/fixtures/*.rst; do
     )
     status=$?
 
+    # An environment problem must not be diffed as though it were a diagnostic.
+    # ubc prints cache-write failures on STDOUT, mixed in with the findings, so
+    # one would otherwise land in every golden file at once and bury whatever
+    # really changed. It also says the cache "may be inconsistent", which means
+    # the comparison is worthless in that state, so this aborts rather than
+    # reporting failures it cannot stand behind.
+    #
+    # Seen for real: a clone under a deep path, where the cache's own
+    # needs_index.sqlite reached 254 characters and SQLite could not create its
+    # journal beside it within Windows' 260-character limit. docs-selftest/ hits
+    # this eight characters before docs/ does.
+    case "$actual" in
+        *'Failed to write the project cache'*)
+            echo "$actual" >&2
+            abort "ubc could not write its cache, so the index may be inconsistent and these
+             results cannot be trusted. On Windows this is usually the 260-character path
+             limit - try a clone whose path is shorter."
+            ;;
+    esac
+
     # The exit code is recorded as well as the output, because the two can move
     # independently. Every diagnostic these fixtures provoke is a WARNING, so
     # `--deny warning` is the only thing making them a gate: if that ever
