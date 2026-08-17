@@ -1,0 +1,5 @@
+# exit: 1
+[needs.id_required]
+  --> fixtures/id_required.rst:10:4
+  No id provided for need directive
+Found 1 warning(s).

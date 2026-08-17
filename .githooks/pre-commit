@@ -192,6 +192,35 @@ else
     fi
 fi
 
+# --- docs self-test ----------------------------------------------------------
+# scripts/docs-selftest.sh proves the metamodel's rules still fire, by checking a
+# directory of deliberately broken needs against golden diagnostics. Measured at
+# roughly 150 ms per fixture - the whole docs gate above costs 80 ms - so unlike
+# that gate it IS restricted to commits that can affect it.
+#
+# That filtering is safe here and would not be safe there. Each fixture is
+# checked as a ONE-FILE project, so its result depends on nothing but the shared
+# config, the rules, the fixture set, the driver, and which ubc is pinned; the
+# list below is that closed set. Editing prose in docs/ cannot change a fixture's
+# outcome, whereas it can change the docs gate's, because the needs graph is
+# cross-file.
+#
+# The gap in the filter, stated rather than hidden: tools/ubc is gitignored, so a
+# hand-swapped binary is invisible to it. CI runs the self-test unconditionally
+# and catches that.
+#
+# Note it keeps working when the gate above stands down - a one-file project
+# stays inside ubc's unlicensed free tier, so this needs no network.
+
+if git diff --cached --name-only |
+    grep -qE '^(docs/ubproject\.toml|docs/schemas\.json|docs-selftest/|scripts/(docs-selftest|get-ubc)\.sh)'; then
+    echo "pre-commit: docs self-test"
+    sh scripts/docs-selftest.sh ||
+        fail "the metamodel self-test did not produce its expected diagnostics"
+else
+    echo "pre-commit: docs self-test - nothing staged that can affect it, skipping"
+fi
+
 # --- rust --------------------------------------------------------------------
 # The Rust gate is written now and skipped until the first crate lands, so it
 # does not have to be remembered and retrofitted once there is finally code for

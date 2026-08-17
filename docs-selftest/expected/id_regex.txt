@@ -1,0 +1,5 @@
+# exit: 1
+[needs.id_regex]
+  --> fixtures/id_regex.rst:10:9
+  Need directive ID does not match regex '^[A-Z]+_[A-Z0-9_]+$'
+Found 1 warning(s).

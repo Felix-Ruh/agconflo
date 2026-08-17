@@ -114,6 +114,18 @@ jobs:
         id: format
         run: ./tools/ubc format --check --preview docs
 
+      # Unconditional, where .githooks/pre-commit runs this only for commits that
+      # can affect it. This is the gate that actually has to hold, and it is also
+      # the only place the golden files are compared on Linux while being written
+      # on Windows - so a path-separator or line-ending difference surfaces here
+      # rather than silently never being tested.
+      #
+      # No step id: unlike check and format this cannot fail for licence reasons.
+      # Every fixture is a one-file project, which keeps each run inside ubc's
+      # five-file unlicensed free tier.
+      - name: docs self-test
+        run: sh scripts/docs-selftest.sh
+
       # The load-bearing step. The output is asserted on, not merely the exit
       # code, so that a green run means the need was really returned - and it
       # is written to a file rather than piped, because `$?` after a pipe
