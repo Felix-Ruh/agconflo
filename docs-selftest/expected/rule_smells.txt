@@ -1,0 +1,14 @@
+# exit: 1
+[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_smells.rst:32:4
+  STKH_SMELL_DEGREE:statement: {"pattern":"(?i)\\b(quickly|approximately|roughly|normally|usually|typically|minimal|optimal|best|better|faster|improved)\\b"} is not allowed for "Agconflo shall render a run log quickly." (statement-must-not-use-an-unquantified-degree[30]/allOf/0/properties/statement/not)
+[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_smells.rst:22:4
+  STKH_SMELL_LOOPHOLE:statement: {"pattern":"(?i)\\b(if possible|where possible|when possible|as appropriate|if necessary|where applicable|as needed|as required|to be determined|tbd|and so on)\\b"} is not allowed for "Agconflo shall compress a context as appropriate." (statement-must-not-use-loophole-wording[28]/allOf/0/properties/statement/not)
+[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_smells.rst:27:4
+  STKH_SMELL_SUBJECTIVE:statement: {"pattern":"(?i)\\b(user-friendly|user friendly|easy|simple|fast|efficient|robust|flexible|scalable|seamless|intuitive|state of the art)\\b"} is not allowed for "Agconflo shall expose a simple interface to the host." (statement-must-not-use-subjective-or-non-verifiable-wording[29]/allOf/0/properties/statement/not)
+Found 3 error(s).

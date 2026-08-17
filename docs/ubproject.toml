@@ -8,13 +8,19 @@
 #
 # ubc's project root is this directory, so `docs/` is what gets indexed and
 # README.md at the repository root cannot be swept in. Install the pinned binary
-# with `sh scripts/get-ubc.sh`; it is not on PATH, so invoke it by path:
+# with `sh scripts/get-ubc.sh`; it is not on PATH, so invoke it by path, and from
+# in here rather than by passing a path:
 #
-#     ./tools/ubc.exe check docs
+#     ( cd docs && ../tools/ubc check --deny warning )
 #
-# Phase 1 is deliberately thin: ONE need type and ONE need, enough to prove the
-# chain works end to end. The full metamodel - the rest of the type set, link
-# types, and schemas.json validation - is Phase 2.
+# The cd is not a stylistic preference. `ubc check <path>` does not scope the
+# check, it FILTERS THE DIAGNOSTICS - the whole project is resolved either way,
+# but findings outside <path> are dropped silently.
+#
+# The rules that constrain these types - mandatory fields per level, link
+# targets, coverage, requirement wording - live in schemas.json and arrive next.
+# Every one of them is proved to fire by a fixture in docs-selftest/, because a
+# wrongly shaped rule is silently ignored rather than rejected.
 
 "$schema" = "https://ubcode.useblocks.com/ubproject.schema.json"
 
@@ -22,7 +28,31 @@
 name = "Agconflo"
 version = "0.0.0"
 
+# -----------------------------------------------------------------------------
+# KEEP EVERY BARE `needs` KEY IN THIS BLOCK, above the tables that follow.
+#
+# TOML assigns a bare key to whichever table header precedes it, so a key added
+# at the end of this file lands inside the last [[needs.types]] entry instead of
+# in [needs] - where ubc accepts it and silently ignores it, with `ubc check`
+# still reporting no errors. Measured, after doing exactly that: the project ran
+# with zero schema rules and looked perfectly healthy. Verify a change here with
+# `ubc config`, not by the absence of complaints.
+# -----------------------------------------------------------------------------
+
 [needs]
+# The rules. Relative to THIS file, and the one place they live - docs-selftest/
+# inherits it through `extend`, so the fixtures test these rules rather than a
+# copy of them.
+#
+# JSON carries no comments, so schemas.json cannot explain itself. Two
+# conventions make up for that. Each rule's `id` is a self-explanatory sentence,
+# because it is the only text `ubc check` prints - the `message` field is NOT
+# displayed, so it holds the reasoning for a reader of the file rather than for
+# the person who tripped the rule. And every rule has a fixture in
+# docs-selftest/ that violates it, which is the working documentation of what it
+# actually catches.
+schema_definitions_from_json = "schemas.json"
+
 # `id_required` DEFAULTS TO FALSE, which is the trap here: left alone, a need
 # with no `:id:` is accepted and silently given a generated one. Generated ids
 # are derived from content, so editing a requirement's text would change its
@@ -36,16 +66,245 @@ id_required = true
 # prefix, an underscore, and an uppercase remainder to the end of the string
 # means an id is either well formed or rejected.
 #
-# The pattern is intentionally general rather than `^STKH_...`: the prefixes for
-# the other levels (FEAT_, COMP_, IMPL_, TEST_) arrive in Phase 2 and should not
-# need this line rewritten.
+# It stays deliberately general rather than listing the prefixes below: which
+# prefix belongs to which TYPE cannot be expressed here at all, because a need's
+# type is not available to this regex. That check is a schema rule, one per type.
 id_regex = "^[A-Z]+_[A-Z0-9_]+$"
 
-# The only type for now. A level in this project's V-Model is characterised by
-# the decision made at it and must carry at least one mandatory field that is
-# meaningless one level up - so the remaining types are added with those fields,
-# in Phase 2, rather than declared empty here and filled in later.
+# -----------------------------------------------------------------------------
+# Types.
+#
+# A level is a DECISION, not a paraphrase. Each one below carries at least one
+# mandatory field that would be meaningless one level up, and the design test is
+# that if such a field cannot be named, the level is fake and must not exist.
+# That test is what removed `comp_arch`: in Rust the type system IS the detailed
+# design, so a need restating a trait signature is restatement by construction.
+#
+# The prefixes are one-to-one with the types and deliberately do not overlap -
+# COMP_ for a component, CREQ_ for a requirement allocated to one. `prefix` is
+# NOT enforced by ubc, though: measured, a feat_req carrying the id
+# STKH_MISPLACED passes every built-in check. Enforcement is a schema rule.
+#
+# `impl` and `test_run` are deliberately absent. Nothing can create them until
+# codelinks points at the crates and test results are imported, and a coverage
+# rule naming a type nobody can author would fire on every need in the project.
+# -----------------------------------------------------------------------------
+
 [[needs.types]]
+# The root: whose goal this is, and why the project would bother. Decided by
+# `stakeholder`, which has no meaning further down - by then the goal is settled
+# and only its realisation is in question.
 directive = "stkh_req"
 title = "Stakeholder Requirement"
 prefix = "STKH_"
+
+[[needs.types]]
+# One observable behaviour of the product. Decided by `verification_method`:
+# choosing how a behaviour will be shown to hold is a decision about the
+# behaviour, and a stakeholder goal is not yet concrete enough to have one.
+directive = "feat_req"
+title = "Feature Requirement"
+prefix = "FEAT_"
+
+[[needs.types]]
+# How a feature is decomposed. Decided by the set of components it names, so its
+# mandatory field is the `uses` link - the first point at which the answer stops
+# being about behaviour and starts being about structure.
+directive = "feat_arch"
+title = "Feature Architecture"
+prefix = "ARCH_"
+
+[[needs.types]]
+# A component. An OBJECT rather than a level: nothing is derived from it, it is
+# what requirements are allocated *to*. It exists as a need rather than as a
+# string in a field so that `allocated_to` can be type-checked, and so that a
+# component requirement's grammatical subject can be compared against the
+# component's own title - which is what catches a requirement that merely
+# restates its parent.
+directive = "comp"
+title = "Component"
+prefix = "COMP_"
+
+[[needs.types]]
+# One behaviour of ONE component. Decided by `allocated_to`, which is the whole
+# point of the level: a feature requirement deliberately does not say which part
+# of the system is responsible.
+directive = "comp_req"
+title = "Component Requirement"
+prefix = "CREQ_"
+
+[[needs.types]]
+# How a requirement is checked. Decided by `test_kind`, which encodes the
+# testing policy - property-based wherever a property can be stated, alongside
+# positive and error-path cases - and by `coverage`, since a case may verify a
+# requirement fully or only in part. Test RESULTS are never authored here; they
+# are imported from the test runner.
+directive = "test_case"
+title = "Test Case"
+prefix = "TEST_"
+
+# -----------------------------------------------------------------------------
+# Links.
+#
+# EVERY LINK POINTS UP THE V, from the concrete to the abstract, so a link can
+# never dangle at authoring time: the thing being referred to already exists
+# when the referring need is written. `allow_dead_links` is left at its default
+# of false, so a broken reference is a diagnostic rather than a silent hole.
+#
+# Which types a link may join is not expressible here - it is a schema rule -
+# and neither is cardinality, so `allocated_to` accepting exactly one component
+# also arrives with the rules.
+#
+# ubc's built-in `links` type survives these declarations rather than being
+# replaced by them (measured), which is why docs-selftest still uses it for the
+# dead-link fixture: it belongs to no level and so cannot go stale.
+# -----------------------------------------------------------------------------
+
+[needs.links.derived_from]
+outgoing = "derived from"
+incoming = "derives"
+description = "The requirement one level up that this one refines."
+
+[needs.links.realises]
+outgoing = "realises"
+incoming = "realised by"
+description = "The feature requirement this architecture decision serves."
+
+[needs.links.uses]
+outgoing = "uses"
+incoming = "used by"
+description = "A component this architecture decision decomposes the feature into."
+
+[needs.links.allocated_to]
+outgoing = "allocated to"
+incoming = "allocates"
+description = "The single component answerable for this requirement."
+
+[needs.links.verifies]
+outgoing = "verifies"
+incoming = "verified by"
+description = "The requirement this test case checks."
+
+# -----------------------------------------------------------------------------
+# Fields.
+#
+# THESE DECLARATIONS ALREADY ENFORCE. An `enum` here is a real gate: a value
+# outside it is reported as `needs.invalid_field_value`, and although that is a
+# WARNING rather than an error, every gate in this repository runs
+# `--deny warning`, so it fails the build. Each enum therefore has a fixture in
+# docs-selftest/ that violates it.
+#
+# The enum messages truncate above three values - `"a", "b" or 4 other
+# candidates` - so a fixture's golden file pins the first two values and the
+# count. That is enough to force a diff when a value set changes, which matters
+# most for `ears_pattern`, whose set is provisional until there are enough real
+# requirements to judge it.
+#
+# Fields are global, not per-type: nothing here says which type may carry which
+# field, and mandatory-per-level is a schema rule.
+# -----------------------------------------------------------------------------
+
+[needs.fields.statement]
+# The single normative sentence, and the thing every wording rule is applied to.
+#
+# IT IS A FIELD RATHER THAN THE NEED'S BODY, and that is forced rather than
+# chosen: measured, a need's `content` is invisible to schema validation. An
+# impossible pattern on it matches nothing, and declaring content as a field
+# does not help - the key is simply absent from the data the validator sees. So
+# the body holds rationale and derivation, the prose a person writes around the
+# requirement, and the obligation itself lives here where it can be checked.
+#
+# The bounds are crude guards against the two ways this field goes wrong -
+# a placeholder and a pasted paragraph - and not quality measures. 20 is about
+# the shortest legitimate EARS sentence ("Agconflo shall stop." is exactly 20),
+# so it admits that while rejecting "TBD" or "see body". 240 is roughly forty
+# words: generous for one sentence, tight enough that a paragraph fails.
+#
+# A STATEMENT MUST BE ONE PHYSICAL LINE, enforced as a rule in schemas.json
+# rather than here. Measured: a wrapped field value keeps a literal newline in
+# it, so a wrapped statement would fail every anchored grammar rule with a
+# baffling message. Refusing the newline outright is also the honest data
+# constraint - these statements are rendered into prompts and read through
+# needs.json, where a line break inside a sentence is noise. Long statements
+# therefore make long lines, which nothing here wraps.
+description = "The single normative sentence, on one line. Rationale belongs in the body."
+nullable = true
+schema = { type = "string", minLength = 20, maxLength = 240 }
+
+[needs.fields.ears_pattern]
+# Which EARS template the statement follows (Mavin et al.), which decides which
+# grammar the statement is held to.
+#
+# EXACTLY THE SIX EARS PATTERNS, and the tempting seventh - a `constraint` value
+# for quality attributes and architectural constraints - is deliberately absent:
+# such a statement is grammatically identical to a ubiquitous one, so no rule
+# could tell them apart, and these values are required to be mutually exclusive
+# with exactly one appropriate per requirement. The six are exclusive because
+# each is identified by its opener: none, While, When, Where, If/then, and
+# While+when. Quality attributes are therefore `ubiquitous`, and for them this
+# field constrains little - their quality comes from the smell rules instead.
+#
+# Named `ears_pattern` rather than `pattern` on purpose. The rules that use it
+# read `properties.ears_pattern.const` directly beside
+# `properties.statement.pattern`, where `pattern` is JSON Schema's own keyword,
+# and one word meaning two things in adjacent lines is a trap for whoever edits
+# them next.
+description = "Which EARS pattern the statement follows."
+nullable = true
+schema = { type = "string", enum = [
+    "ubiquitous",
+    "state",
+    "event",
+    "optional",
+    "unwanted",
+    "complex",
+] }
+
+[needs.fields.verification_method]
+# What makes a feature requirement a level of its own. Deliberately coarse: it
+# records the KIND of evidence that will settle the requirement, not the test
+# that produces it, which is a test_case linked by `verifies`.
+description = "How this requirement is to be verified."
+nullable = true
+schema = { type = "string", enum = ["test", "analysis", "review", "demonstration"] }
+
+[needs.fields.stakeholder]
+# Whose goal a stakeholder requirement is.
+#
+# Three values, chosen to be mutually exclusive rather than exhaustive: someone
+# running workflows, an LLM operating or authoring them, or someone working on
+# Agconflo itself. `agent` is not decoration - agents are the primary readers of
+# this graph, and requirements that exist for their benefit are real. An earlier
+# split into author and contributor was dropped: both are maintainers, and a
+# value set nobody can apply unambiguously is worse than a coarser one.
+description = "Whose goal this is."
+nullable = true
+schema = { type = "string", enum = ["user", "agent", "maintainer"] }
+
+[needs.fields.crate]
+# Where a component lives. Left as a free string rather than an enum of crate
+# names: the workspace has no members yet, and an enum would have to be edited
+# in lockstep with Cargo.toml for no gain over a rule that can check it later.
+description = "Where this component lives in the workspace."
+nullable = true
+schema = { type = "string" }
+
+[needs.fields.test_kind]
+# The testing policy, made checkable. Every expected failure mode gets an
+# error-path case asserting WHICH error occurs and what happens next, because a
+# failure mode that is never asserted is a failure mode that was never designed.
+description = "Which kind of test this case is."
+nullable = true
+schema = { type = "string", enum = ["property", "positive", "error_path"] }
+
+[needs.fields.coverage]
+# Whether one case settles its requirement or only part of it.
+#
+# This is a field rather than a second link type (`fully_verifies` alongside
+# `partially_verifies`) for a mechanical reason: `validate.network_back` with two
+# link keys is an AND over both, so a coverage rule spanning two link types
+# cannot be written at all. One link plus this field says the same thing and
+# keeps every rule to a single link key.
+description = "Whether this case verifies its requirement fully or in part."
+nullable = true
+schema = { type = "string", enum = ["full", "partial"] }

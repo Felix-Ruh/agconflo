@@ -1,0 +1,10 @@
+# exit: 1
+[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_link_cardinality.rst:40:4
+  CREQ_TWO_COMPS:allocated_to: ["COMP_FIRST","COMP_SECOND"] has more than 1 item (comp-req-must-be-allocated-to-at-most-one-comp[17]/properties/allocated_to/maxItems)
+[needs.schema_network_violation]
+  --> (need)
+      fixtures/rule_link_cardinality.rst:47:4
+  CREQ_NO_ALLOC:allocated_to: Too few valid links of type 'allocated_to' (0 < 1) (comp-req-must-be-allocated-to-a-comp[16]/contains_too_few)
+Found 2 error(s).

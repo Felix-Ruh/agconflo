@@ -1,0 +1,6 @@
+# exit: 1
+[needs.dead_link]
+  --> (need)
+      fixtures/dead_link.rst:10:4
+  STKH_DANGLING:links: unknown link target 'STKH_NOT_PRESENT'
+Found 1 warning(s).

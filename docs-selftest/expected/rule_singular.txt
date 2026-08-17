@@ -1,0 +1,14 @@
+# exit: 1
+[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_singular.rst:21:4
+  STKH_SEMICOLON:statement: {"pattern":";"} is not allowed for "Agconflo shall record provenance; the viewer renders it." (statement-must-carry-exactly-one-obligation[31]/allOf/1/properties/statement/not)
+[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_singular.rst:16:4
+  STKH_TWO_OBLIGATIONS:statement: {"pattern":"shall[^.]* shall "} is not allowed for "Agconflo shall record provenance and shall render it on request." (statement-must-carry-exactly-one-obligation[31]/allOf/0/properties/statement/not)
+[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_singular.rst:26:4
+  STKH_TWO_SENTENCES:statement: {"pattern":"\\. "} is not allowed for "Agconflo shall record provenance. The viewer renders it." (statement-must-carry-exactly-one-obligation[31]/allOf/2/properties/statement/not)
+Found 3 error(s).

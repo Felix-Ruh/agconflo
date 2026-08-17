@@ -1,0 +1,43 @@
+# The metamodel's self-test project.
+#
+# Every file under fixtures/ breaks exactly one rule on purpose, and
+# expected/<name>.txt holds the exact diagnostics that break must produce.
+# scripts/docs-selftest.sh drives the comparison; run it by hand with
+#
+#     sh scripts/docs-selftest.sh
+#
+# WHY A WHOLE DIRECTORY OF BROKEN NEEDS EXISTS. A wrongly shaped schema rule is
+# not rejected by ubc, it is silently ignored - measured four ways: a composite
+# keyword placed directly under validate.local, a misspelled keyword, a keyword
+# of the wrong kind for the field's type, and any rule about a need's body. All
+# four leave the project green. So a rule that has never been seen to fail
+# cannot be assumed to work, and "the schema checks passed" means nothing on its
+# own.
+#
+# THIS IS A SEPARATE PROJECT, AND A SIBLING OF docs/ RATHER THAN A CHILD OF IT.
+# Source include patterns are recursive, so a docs/selftest/ would sweep every
+# deliberately-invalid need here into the real requirements project.
+#
+# Running `ubc check` in this directory by hand, or opening it in the editor,
+# reports all the fixture diagnostics at once. That is correct and expected -
+# they are the point. Silencing them with lint.per_file_ignores would blind the
+# driver too, so they are left visible.
+
+"$schema" = "https://ubcode.useblocks.com/ubproject.schema.json"
+
+# THE LOAD-BEARING LINE. The fixtures test the rules of the real project, not a
+# copy of them: `extend` inherits the need types, the link types, the fields,
+# id_required, id_regex and - once it exists - schemas.json, so a rule cannot
+# drift out of coverage by being edited in one file and not the other.
+#
+# Measured: relative paths inside the extended file resolve against THAT file,
+# so the inherited `schema_definitions_from_json` will point at docs/, not here.
+#
+# Three fixtures fail loudly if this ever stops working: id_required (whose
+# default is false, so the diagnostic would vanish), ok_minimal (whose stkh_req
+# would become an unknown directive), and id_regex (whose message quotes our own
+# pattern rather than ubc's default).
+extend = "../docs/ubproject.toml"
+
+[project]
+name = "Agconflo metamodel self-test"

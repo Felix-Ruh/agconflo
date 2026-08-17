@@ -1,0 +1,412 @@
+{
+  "$defs": {
+    "type-stkh-req": { "properties": { "type": { "const": "stkh_req" } } },
+    "type-feat-req": { "properties": { "type": { "const": "feat_req" } } },
+    "type-feat-arch": { "properties": { "type": { "const": "feat_arch" } } },
+    "type-comp": { "properties": { "type": { "const": "comp" } } },
+    "type-comp-req": { "properties": { "type": { "const": "comp_req" } } },
+    "type-test-case": { "properties": { "type": { "const": "test_case" } } }
+  },
+  "schemas": [
+    {
+      "id": "stkh-req-id-must-start-with-stkh",
+      "severity": "violation",
+      "message": "An id whose prefix disagrees with its type makes every id-based reading of the graph unreliable. ubc does not enforce [[needs.types]].prefix itself.",
+      "select": { "$ref": "#/$defs/type-stkh-req" },
+      "validate": { "local": { "properties": { "id": { "pattern": "^STKH_" } } } }
+    },
+    {
+      "id": "feat-req-id-must-start-with-feat",
+      "severity": "violation",
+      "message": "An id whose prefix disagrees with its type makes every id-based reading of the graph unreliable.",
+      "select": { "$ref": "#/$defs/type-feat-req" },
+      "validate": { "local": { "properties": { "id": { "pattern": "^FEAT_" } } } }
+    },
+    {
+      "id": "feat-arch-id-must-start-with-arch",
+      "severity": "violation",
+      "message": "An id whose prefix disagrees with its type makes every id-based reading of the graph unreliable.",
+      "select": { "$ref": "#/$defs/type-feat-arch" },
+      "validate": { "local": { "properties": { "id": { "pattern": "^ARCH_" } } } }
+    },
+    {
+      "id": "comp-id-must-start-with-comp",
+      "severity": "violation",
+      "message": "An id whose prefix disagrees with its type makes every id-based reading of the graph unreliable.",
+      "select": { "$ref": "#/$defs/type-comp" },
+      "validate": { "local": { "properties": { "id": { "pattern": "^COMP_" } } } }
+    },
+    {
+      "id": "comp-req-id-must-start-with-creq",
+      "severity": "violation",
+      "message": "An id whose prefix disagrees with its type makes every id-based reading of the graph unreliable. CREQ_ and not COMP_, which belongs to the component itself.",
+      "select": { "$ref": "#/$defs/type-comp-req" },
+      "validate": { "local": { "properties": { "id": { "pattern": "^CREQ_" } } } }
+    },
+    {
+      "id": "test-case-id-must-start-with-test",
+      "severity": "violation",
+      "message": "An id whose prefix disagrees with its type makes every id-based reading of the graph unreliable.",
+      "select": { "$ref": "#/$defs/type-test-case" },
+      "validate": { "local": { "properties": { "id": { "pattern": "^TEST_" } } } }
+    },
+    {
+      "id": "stkh-req-must-have-a-statement-and-a-stakeholder",
+      "severity": "violation",
+      "message": "A goal with no owner cannot be prioritised or retired, and the obligation must be in the statement field because a need's body is invisible to validation.",
+      "select": { "$ref": "#/$defs/type-stkh-req" },
+      "validate": { "local": { "required": ["statement", "stakeholder"] } }
+    },
+    {
+      "id": "feat-req-must-have-a-statement-a-pattern-and-a-verification-method",
+      "severity": "violation",
+      "message": "Choosing how a behaviour will be shown to hold is what makes this a level of its own; the pattern decides which grammar the statement is held to.",
+      "select": { "$ref": "#/$defs/type-feat-req" },
+      "validate": {
+        "local": { "required": ["statement", "ears_pattern", "verification_method"] }
+      }
+    },
+    {
+      "id": "feat-arch-must-have-a-statement",
+      "severity": "violation",
+      "message": "An architecture decision that cannot be stated in one sentence is not yet a decision.",
+      "select": { "$ref": "#/$defs/type-feat-arch" },
+      "validate": { "local": { "required": ["statement"] } }
+    },
+    {
+      "id": "comp-must-name-its-crate",
+      "severity": "violation",
+      "message": "A component that is not anchored somewhere in the workspace cannot be traced to code.",
+      "select": { "$ref": "#/$defs/type-comp" },
+      "validate": { "local": { "required": ["crate"] } }
+    },
+    {
+      "id": "comp-req-must-have-a-statement-and-a-pattern",
+      "severity": "violation",
+      "message": "The statement's grammatical subject is what distinguishes a component requirement from a restatement of its parent.",
+      "select": { "$ref": "#/$defs/type-comp-req" },
+      "validate": { "local": { "required": ["statement", "ears_pattern"] } }
+    },
+    {
+      "id": "test-case-must-have-a-kind-and-a-coverage",
+      "severity": "violation",
+      "message": "The kind carries the testing policy - property-based, positive, or error-path - and coverage says whether this case settles its requirement or only part of it.",
+      "select": { "$ref": "#/$defs/type-test-case" },
+      "validate": { "local": { "required": ["test_kind", "coverage"] } }
+    },
+    {
+      "id": "feat-req-must-derive-from-a-stkh-req",
+      "severity": "violation",
+      "message": "A feature requirement nobody asked for is the commonest way for scope to grow unnoticed. The network rule fires when the link is absent as well as when it points at the wrong type.",
+      "select": { "$ref": "#/$defs/type-feat-req" },
+      "validate": {
+        "network": {
+          "derived_from": {
+            "contains": { "local": { "$ref": "#/$defs/type-stkh-req" } },
+            "minContains": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "feat-arch-must-realise-a-feat-req",
+      "severity": "violation",
+      "message": "An architecture decision serving no stated behaviour is a decision about nothing.",
+      "select": { "$ref": "#/$defs/type-feat-arch" },
+      "validate": {
+        "network": {
+          "realises": {
+            "contains": { "local": { "$ref": "#/$defs/type-feat-req" } },
+            "minContains": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "feat-arch-must-use-at-least-one-comp",
+      "severity": "violation",
+      "message": "Naming the components a feature decomposes into is what this level decides; without them it is a paraphrase of the feature requirement.",
+      "select": { "$ref": "#/$defs/type-feat-arch" },
+      "validate": {
+        "network": {
+          "uses": {
+            "contains": { "local": { "$ref": "#/$defs/type-comp" } },
+            "minContains": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "comp-req-must-derive-from-a-feat-req",
+      "severity": "violation",
+      "message": "A component requirement with no parent behaviour cannot be traced to anything a stakeholder wanted.",
+      "select": { "$ref": "#/$defs/type-comp-req" },
+      "validate": {
+        "network": {
+          "derived_from": {
+            "contains": { "local": { "$ref": "#/$defs/type-feat-req" } },
+            "minContains": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "comp-req-must-be-allocated-to-a-comp",
+      "severity": "violation",
+      "message": "Allocation is what this level decides. It is also what lets the statement's grammatical subject be checked against the component's own title.",
+      "select": { "$ref": "#/$defs/type-comp-req" },
+      "validate": {
+        "network": {
+          "allocated_to": {
+            "contains": { "local": { "$ref": "#/$defs/type-comp" } },
+            "minContains": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "comp-req-must-be-allocated-to-at-most-one-comp",
+      "severity": "violation",
+      "message": "Two components answerable for one requirement means neither is. Written as maxItems because minItems does NOT fire when the link is absent - the lower bound comes from the network rule above.",
+      "select": { "$ref": "#/$defs/type-comp-req" },
+      "validate": {
+        "local": { "properties": { "allocated_to": { "maxItems": 1 } } }
+      }
+    },
+    {
+      "id": "test-case-must-verify-a-requirement",
+      "severity": "violation",
+      "message": "A test case may verify either requirement level, but not a component, an architecture decision or another test.",
+      "select": { "$ref": "#/$defs/type-test-case" },
+      "validate": {
+        "network": {
+          "verifies": {
+            "contains": {
+              "local": {
+                "allOf": [
+                  {
+                    "anyOf": [
+                      { "$ref": "#/$defs/type-feat-req" },
+                      { "$ref": "#/$defs/type-comp-req" }
+                    ]
+                  }
+                ]
+              }
+            },
+            "minContains": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "statement-must-be-one-physical-line",
+      "severity": "violation",
+      "message": "A wrapped field value keeps a literal newline, which would fail every grammar rule below with a baffling message - and a line break inside a sentence is noise in data that gets rendered into prompts. Selects on the field rather than the type, because this is a property of statements.",
+      "select": { "required": ["statement"] },
+      "validate": {
+        "local": {
+          "allOf": [
+            { "properties": { "statement": { "not": { "pattern": "\\n" } } } }
+          ]
+        }
+      }
+    },
+    {
+      "id": "stkh-req-statement-must-oblige-with-shall",
+      "severity": "violation",
+      "message": "A stakeholder requirement states a goal rather than system behaviour, so it gets no EARS pattern - but it still has to oblige rather than describe.",
+      "select": { "$ref": "#/$defs/type-stkh-req" },
+      "validate": {
+        "local": {
+          "properties": { "statement": { "pattern": "^[A-Z][A-Za-z -]* shall .+\\.$" } }
+        }
+      }
+    },
+    {
+      "id": "feat-arch-statement-must-oblige-with-shall",
+      "severity": "violation",
+      "message": "A design decision that cannot be stated as an obligation on the system is a description, not a decision.",
+      "select": { "$ref": "#/$defs/type-feat-arch" },
+      "validate": {
+        "local": {
+          "properties": { "statement": { "pattern": "^[A-Z][A-Za-z -]* shall .+\\.$" } }
+        }
+      }
+    },
+    {
+      "id": "ears-ubiquitous-statement-must-match-its-grammar",
+      "severity": "violation",
+      "message": "Selects on the ears_pattern value rather than the type: if a requirement is labelled ubiquitous, it must read like one, whichever level carries it.",
+      "select": {
+        "properties": { "ears_pattern": { "const": "ubiquitous" } },
+        "required": ["ears_pattern"]
+      },
+      "validate": {
+        "local": {
+          "properties": { "statement": { "pattern": "^[A-Z][A-Za-z -]* shall .+\\.$" } }
+        }
+      }
+    },
+    {
+      "id": "ears-event-statement-must-match-its-grammar",
+      "severity": "violation",
+      "message": "When <trigger>, <subject> shall <response>.",
+      "select": {
+        "properties": { "ears_pattern": { "const": "event" } },
+        "required": ["ears_pattern"]
+      },
+      "validate": {
+        "local": {
+          "properties": {
+            "statement": { "pattern": "^When [^,]+, [A-Z][A-Za-z -]* shall .+\\.$" }
+          }
+        }
+      }
+    },
+    {
+      "id": "ears-state-statement-must-match-its-grammar",
+      "severity": "violation",
+      "message": "While <state>, <subject> shall <response>.",
+      "select": {
+        "properties": { "ears_pattern": { "const": "state" } },
+        "required": ["ears_pattern"]
+      },
+      "validate": {
+        "local": {
+          "properties": {
+            "statement": { "pattern": "^While [^,]+, [A-Z][A-Za-z -]* shall .+\\.$" }
+          }
+        }
+      }
+    },
+    {
+      "id": "ears-optional-statement-must-match-its-grammar",
+      "severity": "violation",
+      "message": "Where <feature is included>, <subject> shall <response>.",
+      "select": {
+        "properties": { "ears_pattern": { "const": "optional" } },
+        "required": ["ears_pattern"]
+      },
+      "validate": {
+        "local": {
+          "properties": {
+            "statement": { "pattern": "^Where [^,]+, [A-Z][A-Za-z -]* shall .+\\.$" }
+          }
+        }
+      }
+    },
+    {
+      "id": "ears-unwanted-statement-must-match-its-grammar",
+      "severity": "violation",
+      "message": "If <trigger>, then <subject> shall <response>. The 'then' is required, which is what separates this pattern from a state-driven one.",
+      "select": {
+        "properties": { "ears_pattern": { "const": "unwanted" } },
+        "required": ["ears_pattern"]
+      },
+      "validate": {
+        "local": {
+          "properties": {
+            "statement": { "pattern": "^If [^,]+, then [A-Z][A-Za-z -]* shall .+\\.$" }
+          }
+        }
+      }
+    },
+    {
+      "id": "ears-complex-statement-must-match-its-grammar",
+      "severity": "violation",
+      "message": "While <state>, when <trigger>, <subject> shall <response>. The lowercase 'when' is deliberate: it is the second clause of one sentence.",
+      "select": {
+        "properties": { "ears_pattern": { "const": "complex" } },
+        "required": ["ears_pattern"]
+      },
+      "validate": {
+        "local": {
+          "properties": {
+            "statement": {
+              "pattern": "^While [^,]+, when [^,]+, [A-Z][A-Za-z -]* shall .+\\.$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "statement-must-not-use-loophole-wording",
+      "severity": "violation",
+      "message": "Wording that makes the obligation optional. A requirement nobody can fail is not a requirement. 'etc.' is a second pattern because a trailing word boundary after a period never matches, so it cannot sit in the alternation.",
+      "select": { "required": ["statement"] },
+      "validate": {
+        "local": {
+          "allOf": [
+            {
+              "properties": {
+                "statement": {
+                  "not": {
+                    "pattern": "(?i)\\b(if possible|where possible|when possible|as appropriate|if necessary|where applicable|as needed|as required|to be determined|tbd|and so on)\\b"
+                  }
+                }
+              }
+            },
+            { "properties": { "statement": { "not": { "pattern": "(?i)etc\\." } } } }
+          ]
+        }
+      }
+    },
+    {
+      "id": "statement-must-not-use-subjective-or-non-verifiable-wording",
+      "severity": "violation",
+      "message": "Words that cannot be settled by a test, an analysis or a measurement. Note that best-effort trips this through 'best', measured and accepted: the term means no guarantee, which is what a requirement should not hide behind.",
+      "select": { "required": ["statement"] },
+      "validate": {
+        "local": {
+          "allOf": [
+            {
+              "properties": {
+                "statement": {
+                  "not": {
+                    "pattern": "(?i)\\b(user-friendly|user friendly|easy|simple|fast|efficient|robust|flexible|scalable|seamless|intuitive|state of the art)\\b"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "statement-must-not-use-an-unquantified-degree",
+      "severity": "violation",
+      "message": "Adverbs, comparatives and superlatives with nothing to compare against. 'about' is deliberately absent: it has legitimate uses and the hyphen counts as a word boundary, so about-face would fire.",
+      "select": { "required": ["statement"] },
+      "validate": {
+        "local": {
+          "allOf": [
+            {
+              "properties": {
+                "statement": {
+                  "not": {
+                    "pattern": "(?i)\\b(quickly|approximately|roughly|normally|usually|typically|minimal|optimal|best|better|faster|improved)\\b"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "statement-must-carry-exactly-one-obligation",
+      "severity": "violation",
+      "message": "ISO 29148's singular property, in three parts: two obligations in one sentence, clauses joined by a semicolon, and two sentences. The last is a period followed by a SPACE, so a decimal such as 0.5 seconds survives - which is why the grammar rules allow internal periods at all.",
+      "select": { "required": ["statement"] },
+      "validate": {
+        "local": {
+          "allOf": [
+            { "properties": { "statement": { "not": { "pattern": "shall[^.]* shall " } } } },
+            { "properties": { "statement": { "not": { "pattern": ";" } } } },
+            { "properties": { "statement": { "not": { "pattern": "\\. " } } } }
+          ]
+        }
+      }
+    }
+  ]
+}
