@@ -328,6 +328,85 @@
           }
         }
       }
+    },
+    {
+      "id": "statement-must-not-use-loophole-wording",
+      "severity": "violation",
+      "message": "Wording that makes the obligation optional. A requirement nobody can fail is not a requirement. 'etc.' is a second pattern because a trailing word boundary after a period never matches, so it cannot sit in the alternation.",
+      "select": { "required": ["statement"] },
+      "validate": {
+        "local": {
+          "allOf": [
+            {
+              "properties": {
+                "statement": {
+                  "not": {
+                    "pattern": "(?i)\\b(if possible|where possible|when possible|as appropriate|if necessary|where applicable|as needed|as required|to be determined|tbd|and so on)\\b"
+                  }
+                }
+              }
+            },
+            { "properties": { "statement": { "not": { "pattern": "(?i)etc\\." } } } }
+          ]
+        }
+      }
+    },
+    {
+      "id": "statement-must-not-use-subjective-or-non-verifiable-wording",
+      "severity": "violation",
+      "message": "Words that cannot be settled by a test, an analysis or a measurement. Note that best-effort trips this through 'best', measured and accepted: the term means no guarantee, which is what a requirement should not hide behind.",
+      "select": { "required": ["statement"] },
+      "validate": {
+        "local": {
+          "allOf": [
+            {
+              "properties": {
+                "statement": {
+                  "not": {
+                    "pattern": "(?i)\\b(user-friendly|user friendly|easy|simple|fast|efficient|robust|flexible|scalable|seamless|intuitive|state of the art)\\b"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "statement-must-not-use-an-unquantified-degree",
+      "severity": "violation",
+      "message": "Adverbs, comparatives and superlatives with nothing to compare against. 'about' is deliberately absent: it has legitimate uses and the hyphen counts as a word boundary, so about-face would fire.",
+      "select": { "required": ["statement"] },
+      "validate": {
+        "local": {
+          "allOf": [
+            {
+              "properties": {
+                "statement": {
+                  "not": {
+                    "pattern": "(?i)\\b(quickly|approximately|roughly|normally|usually|typically|minimal|optimal|best|better|faster|improved)\\b"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "statement-must-carry-exactly-one-obligation",
+      "severity": "violation",
+      "message": "ISO 29148's singular property, in three parts: two obligations in one sentence, clauses joined by a semicolon, and two sentences. The last is a period followed by a SPACE, so a decimal such as 0.5 seconds survives - which is why the grammar rules allow internal periods at all.",
+      "select": { "required": ["statement"] },
+      "validate": {
+        "local": {
+          "allOf": [
+            { "properties": { "statement": { "not": { "pattern": "shall[^.]* shall " } } } },
+            { "properties": { "statement": { "not": { "pattern": ";" } } } },
+            { "properties": { "statement": { "not": { "pattern": "\\. " } } } }
+          ]
+        }
+      }
     }
   ]
 }
