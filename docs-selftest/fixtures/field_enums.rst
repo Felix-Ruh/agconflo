@@ -37,11 +37,11 @@ Fixture: field_enums
 .. dec:: A status outside its value set
    :id: DEC_BAD_STATUS
    :dec_status: maybe
-   :decided_on: 2026-08-20
+   :decided_on: 2026-08-18
    :statement: Agconflo shall reject a decision status outside its value set.
 
 .. evd:: A kind outside its value set
    :id: EVD_BAD_KIND
    :evd_kind: hearsay
-   :observed_on: 2026-08-20
+   :observed_on: 2026-08-18
    :observation: This evidence exists to hold the evd_kind value set in a golden file.

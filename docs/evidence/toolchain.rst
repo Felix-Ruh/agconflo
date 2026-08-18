@@ -24,7 +24,7 @@ stale: nearly all of it was taken against one pinned version of one tool.
 .. evd:: The formatter skips Markdown
    :id: EVD_FORMATTER_RST_ONLY
    :evd_kind: measurement
-   :observed_on: 2026-08-20
+   :observed_on: 2026-08-18
    :observation: ubc format processed the six reStructuredText files of this project and skipped a Markdown file in the same source set.
 
    To re-run it: widen the source include pattern to cover Markdown as well, put a

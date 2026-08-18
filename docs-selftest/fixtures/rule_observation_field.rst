@@ -22,24 +22,24 @@ Fixture: rule_observation_field
 .. evd:: An observation below the lower bound
    :id: EVD_TOO_SHORT
    :evd_kind: measurement
-   :observed_on: 2026-08-20
+   :observed_on: 2026-08-18
    :observation: TBD
 
 .. evd:: An observation wrapped over two source lines
    :id: EVD_WRAPPED
    :evd_kind: measurement
-   :observed_on: 2026-08-20
+   :observed_on: 2026-08-18
    :observation: The warm index took 41 ms and the cold index took 80 ms,
       measured on this machine.
 
 .. evd:: An observation carrying a non-breaking space
    :id: EVD_NBSP
    :evd_kind: measurement
-   :observed_on: 2026-08-20
+   :observed_on: 2026-08-18
    :observation: The warm index took 41 ms and the cold index took 80 ms.
 
 .. evd:: An observation above the upper bound
    :id: EVD_TOO_LONG
    :evd_kind: measurement
-   :observed_on: 2026-08-20
+   :observed_on: 2026-08-18
    :observation: ubc check was measured at one, five, six, ten and fifty thousand needs across two operating systems, three network conditions and both a cold and a warm licence cache, and every one of those runs is recorded here at a length no bound would allow.

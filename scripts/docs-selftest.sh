@@ -70,7 +70,7 @@ if [ ! -x "$UBC" ]; then
     exit 0
 fi
 
-# `[ -x ]` ANSWERS A DIFFERENT QUESTION, measured 2026-08-20: a binary can carry
+# `[ -x ]` ANSWERS A DIFFERENT QUESTION, measured 2026-08-18: a binary can carry
 # the execute bit and still be refused by group policy, exiting 126. This driver
 # had the worst failure of the three that shared the assumption - every fixture
 # produced empty output, so every golden file mismatched and the harness reported

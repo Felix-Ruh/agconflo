@@ -49,11 +49,11 @@ Fixture: rule_id_prefix
 .. dec:: A decision not called DEC
    :id: WRONG_DEC
    :dec_status: accepted
-   :decided_on: 2026-08-20
+   :decided_on: 2026-08-18
    :statement: Agconflo shall reject an id whose prefix disagrees with its type.
 
 .. evd:: Evidence not called EVD
    :id: WRONG_EVD
    :evd_kind: measurement
-   :observed_on: 2026-08-20
+   :observed_on: 2026-08-18
    :observation: An id prefix disagreeing with its type was accepted before this rule.
