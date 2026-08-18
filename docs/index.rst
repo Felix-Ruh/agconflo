@@ -27,3 +27,5 @@ because a wrongly shaped rule is silently ignored rather than rejected.
    stakeholder/execution
    stakeholder/process
    decisions/context
+   decisions/toolchain
+   evidence/toolchain
