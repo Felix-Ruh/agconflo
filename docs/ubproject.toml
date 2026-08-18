@@ -18,9 +18,14 @@
 # but findings outside <path> are dropped silently.
 #
 # The rules that constrain these types - mandatory fields per level, link
-# targets, coverage, requirement wording - live in schemas.json and arrive next.
-# Every one of them is proved to fire by a fixture in docs-selftest/, because a
-# wrongly shaped rule is silently ignored rather than rejected.
+# targets, link purity, requirement wording - live in schemas.json. Every one of
+# them is proved to fire by a fixture in docs-selftest/, because a wrongly shaped
+# rule is silently ignored rather than rejected.
+#
+# Coverage rules are deliberately absent, and this list named one for a while by
+# mistake. A coverage rule fires on every need that has not been built out yet,
+# so it would block the first step of authoring. What is not yet covered is a
+# question to ask a query, not a reason to refuse a commit.
 
 "$schema" = "https://ubcode.useblocks.com/ubproject.schema.json"
 
@@ -175,14 +180,23 @@ prefix = "EVD_"
 # -----------------------------------------------------------------------------
 # Links.
 #
-# EVERY LINK POINTS UP THE V, from the concrete to the abstract, so a link can
-# never dangle at authoring time: the thing being referred to already exists
-# when the referring need is written. `allow_dead_links` is left at its default
-# of false, so a broken reference is a diagnostic rather than a silent hole.
+# NO LINK MAY DANGLE AT AUTHORING TIME: whatever a need refers to already exists
+# when that need is written. `allow_dead_links` is left at its default of false,
+# so a broken reference is a diagnostic rather than a silent hole.
 #
-# Which types a link may join is not expressible here - it is a schema rule -
+# Pointing up the V is how most of them manage it, from the concrete to the
+# abstract, the abstract having been written first. The two decision links manage
+# it by pointing the other way, for the reason given beside them.
+#
+# So the invariant is the ABSENCE OF DANGLING REFERENCES, not the direction. This
+# header used to state the direction as though it were the rule, and then stayed
+# that way for four commits after the exceptions were added directly below it -
+# which is the argument for stating a rule by what it guarantees rather than by
+# how it is usually achieved.
+#
+# Which types a link may join is not expressible here - that is a schema rule -
 # and neither is cardinality, so `allocated_to` accepting exactly one component
-# also arrives with the rules.
+# is enforced there as well.
 #
 # ubc's built-in `links` type survives these declarations rather than being
 # replaced by them (measured), which is why docs-selftest still uses it for the

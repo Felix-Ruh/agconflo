@@ -97,8 +97,13 @@ UBC="$(pwd)/tools/ubc"
 # has a five-FILE free tier: one to five files exit 0 unlicensed, six exit 1
 # with "Files to index (6) exceeds maximum without license (5)" on stderr and
 # nothing on stdout. The earlier measurement had used a single file holding 2000
-# needs, so the limit was never reached - and docs/ passes today only by being
-# one file, which it will not stay.
+# needs, so the limit was never reached.
+#
+# docs/ HAS SINCE CROSSED IT, so this is no longer a branch that waits for some
+# future project size: a machine whose licence answer has expired now gets no
+# documentation checking at all locally, and is told so. That was accepted
+# deliberately when requirements were grouped by subject instead of packed under
+# a file limit. CI has the grant and remains the authority.
 #
 # The match fails closed: if useblocks changes this wording, a licence failure
 # starts being reported as a documentation defect. That is the right direction

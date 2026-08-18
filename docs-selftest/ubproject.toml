@@ -27,8 +27,8 @@
 
 # THE LOAD-BEARING LINE. The fixtures test the rules of the real project, not a
 # copy of them: `extend` inherits the need types, the link types, the fields,
-# id_required, id_regex and - once it exists - schemas.json, so a rule cannot
-# drift out of coverage by being edited in one file and not the other.
+# id_required, id_regex and schemas.json itself, so a rule cannot drift out of
+# coverage by being edited in one file and not the other.
 #
 # Measured: relative paths inside the extended file resolve against THAT file,
 # so the inherited `schema_definitions_from_json` will point at docs/, not here.
