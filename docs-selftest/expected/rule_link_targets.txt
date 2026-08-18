@@ -1,50 +1,58 @@
 # exit: 1
 [needs.schema_network_violation]
   --> (need)
-      fixtures/rule_link_targets.rst:33:4
+      fixtures/rule_link_targets.rst:36:4
   ARCH_WRONG_TARGETS:realises/COMP_TARGETS: "feat_req" was expected (feat-arch-must-realise-a-feat-req[13]/local_fail)
 [needs.schema_network_violation]
   --> (need)
-      fixtures/rule_link_targets.rst:33:4
+      fixtures/rule_link_targets.rst:36:4
   ARCH_WRONG_TARGETS:realises: Too few valid links of type 'realises' (0 < 1) / nok: COMP_TARGETS (feat-arch-must-realise-a-feat-req[13]/contains_too_few)
 [needs.schema_network_violation]
   --> (need)
-      fixtures/rule_link_targets.rst:33:4
+      fixtures/rule_link_targets.rst:36:4
   ARCH_WRONG_TARGETS:uses/FEAT_WRONG_PARENT: "comp" was expected (feat-arch-must-use-at-least-one-comp[14]/local_fail)
 [needs.schema_network_violation]
   --> (need)
-      fixtures/rule_link_targets.rst:33:4
+      fixtures/rule_link_targets.rst:36:4
   ARCH_WRONG_TARGETS:uses: Too few valid links of type 'uses' (0 < 1) / nok: FEAT_WRONG_PARENT (feat-arch-must-use-at-least-one-comp[14]/contains_too_few)
 [needs.schema_network_violation]
   --> (need)
-      fixtures/rule_link_targets.rst:46:4
+      fixtures/rule_link_targets.rst:49:4
   CREQ_WRONG_ALLOC:allocated_to/FEAT_WRONG_PARENT: "comp" was expected (comp-req-must-be-allocated-to-a-comp[16]/local_fail)
 [needs.schema_network_violation]
   --> (need)
-      fixtures/rule_link_targets.rst:46:4
+      fixtures/rule_link_targets.rst:49:4
   CREQ_WRONG_ALLOC:allocated_to: Too few valid links of type 'allocated_to' (0 < 1) / nok: FEAT_WRONG_PARENT (comp-req-must-be-allocated-to-a-comp[16]/contains_too_few)
 [needs.schema_network_violation]
   --> (need)
-      fixtures/rule_link_targets.rst:39:4
+      fixtures/rule_link_targets.rst:42:4
   CREQ_WRONG_PARENT:derived_from/STKH_TARGETS: "feat_req" was expected (comp-req-must-derive-from-a-feat-req[15]/local_fail)
 [needs.schema_network_violation]
   --> (need)
-      fixtures/rule_link_targets.rst:39:4
+      fixtures/rule_link_targets.rst:42:4
   CREQ_WRONG_PARENT:derived_from: Too few valid links of type 'derived_from' (0 < 1) / nok: STKH_TARGETS (comp-req-must-derive-from-a-feat-req[15]/contains_too_few)
 [needs.schema_network_violation]
   --> (need)
-      fixtures/rule_link_targets.rst:26:4
+      fixtures/rule_link_targets.rst:74:4
+  DEC_WRONG_TARGETS:supported_by/DEC_TARGETS: "evd" was expected (dec-supported-by-must-point-at-evidence[40]/local_fail)
+[needs.schema_network_violation]
+  --> (need)
+      fixtures/rule_link_targets.rst:74:4
+  DEC_WRONG_TARGETS:supersedes/EVD_TARGETS: "dec" was expected (dec-supersedes-must-point-at-a-decision[41]/local_fail)
+[needs.schema_network_violation]
+  --> (need)
+      fixtures/rule_link_targets.rst:29:4
   FEAT_WRONG_PARENT:derived_from/COMP_TARGETS: "stkh_req" was expected (feat-req-must-derive-from-a-stkh-req[12]/local_fail)
 [needs.schema_network_violation]
   --> (need)
-      fixtures/rule_link_targets.rst:26:4
+      fixtures/rule_link_targets.rst:29:4
   FEAT_WRONG_PARENT:derived_from: Too few valid links of type 'derived_from' (0 < 1) / nok: COMP_TARGETS (feat-req-must-derive-from-a-stkh-req[12]/contains_too_few)
 [needs.schema_network_violation]
   --> (need)
-      fixtures/rule_link_targets.rst:53:4
+      fixtures/rule_link_targets.rst:56:4
   TEST_WRONG_TARGET:verifies/COMP_TARGETS: "comp" is not one of "feat_req" or "comp_req" (test-case-must-verify-a-requirement[18]/local_fail)
 [needs.schema_network_violation]
   --> (need)
-      fixtures/rule_link_targets.rst:53:4
+      fixtures/rule_link_targets.rst:56:4
   TEST_WRONG_TARGET:verifies: Too few valid links of type 'verifies' (0 < 1) / nok: COMP_TARGETS (test-case-must-verify-a-requirement[18]/contains_too_few)
-Found 12 error(s).
+Found 14 error(s).

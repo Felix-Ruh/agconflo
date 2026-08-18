@@ -2,7 +2,7 @@
 Fixture: rule_statement_shape
 =============================
 
-.. The two levels that carry a statement but no EARS pattern, and so are held
+.. The three types that carry a statement but no EARS pattern, and so are held
    only to the loose shape: a capitalised subject, the word shall, a terminal
    period.
 
@@ -32,3 +32,9 @@ Fixture: rule_statement_shape
    :realises: FEAT_SHAPE_OK
    :uses: COMP_SHAPE_OK
    :statement: agconflo shall record provenance inside the context store.
+
+.. dec:: A decision that narrates rather than obliges
+   :id: DEC_NARRATES
+   :dec_status: accepted
+   :decided_on: 2026-08-20
+   :statement: We evaluated three options and picked the second one.

@@ -6,7 +6,7 @@ Fixture: rule_mandatory_fields
    mandatory-field rules. Ids and links are correct throughout, so the only
    defect in each need is the absent field - and `required` reports one
    diagnostic per missing FIELD, not one per need, which is why the golden file
-   holds eleven lines for six needs.
+   holds seventeen lines for eight needs.
 
    As in rule_id_prefix, the needs link to each other: a link rule checks its
    target's TYPE, which is right here even though the targets are themselves
@@ -38,3 +38,9 @@ Fixture: rule_mandatory_fields
 .. test_case:: No kind or coverage
    :id: TEST_NO_FIELDS
    :verifies: CREQ_NO_FIELDS
+
+.. dec:: No statement, status or date
+   :id: DEC_NO_FIELDS
+
+.. evd:: No observation, kind or date
+   :id: EVD_NO_FIELDS

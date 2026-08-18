@@ -6,7 +6,9 @@
     "type-comp": { "properties": { "type": { "const": "comp" } } },
     "type-comp-req": { "properties": { "type": { "const": "comp_req" } } },
     "type-test-case": { "properties": { "type": { "const": "test_case" } } },
-    "type-requirement": { "properties": { "type": { "enum": ["feat_req", "comp_req"] } } }
+    "type-requirement": { "properties": { "type": { "enum": ["feat_req", "comp_req"] } } },
+    "type-dec": { "properties": { "type": { "const": "dec" } } },
+    "type-evd": { "properties": { "type": { "const": "evd" } } }
   },
   "schemas": [
     {
@@ -440,6 +442,83 @@
           "allOf": [
             { "properties": { "observation": { "not": { "pattern": "[^\\x00-\\x7F]" } } } }
           ]
+        }
+      }
+    },
+    {
+      "id": "dec-id-must-start-with-dec",
+      "severity": "violation",
+      "message": "An id whose prefix disagrees with its type makes every id-based reading of the graph unreliable, and ubc does not enforce [[needs.types]].prefix itself.",
+      "select": { "$ref": "#/$defs/type-dec" },
+      "validate": { "local": { "properties": { "id": { "pattern": "^DEC_" } } } }
+    },
+    {
+      "id": "evd-id-must-start-with-evd",
+      "severity": "violation",
+      "message": "An id whose prefix disagrees with its type makes every id-based reading of the graph unreliable.",
+      "select": { "$ref": "#/$defs/type-evd" },
+      "validate": { "local": { "properties": { "id": { "pattern": "^EVD_" } } } }
+    },
+    {
+      "id": "dec-must-have-a-statement-a-status-and-a-date",
+      "severity": "violation",
+      "message": "A decision with no status presents itself as current whether or not it is, and this project has reversed itself more than once - the Python toolchain, the obligation living in a need's body, the detailed-design level. The date is when the choice was taken, which is not when it was committed, and it is what orders a supersedes chain when the chain itself is incomplete.",
+      "select": { "$ref": "#/$defs/type-dec" },
+      "validate": { "local": { "required": ["statement", "dec_status", "decided_on"] } }
+    },
+    {
+      "id": "evd-must-have-an-observation-a-kind-and-a-date",
+      "severity": "violation",
+      "message": "The kind is the same question as how the finding could be re-checked, and the date is what lets it be retired. Nearly all evidence here was measured against one pinned ubc, so an undated observation is one nobody can trust or refute later.",
+      "select": { "$ref": "#/$defs/type-evd" },
+      "validate": { "local": { "required": ["observation", "evd_kind", "observed_on"] } }
+    },
+    {
+      "id": "dec-statement-must-oblige-with-shall",
+      "severity": "violation",
+      "message": "A decision that narrates - 'we evaluated three options and picked the second' - records the meeting rather than the constraint, and a constraint is the only part worth carrying forward. Held to the same loose shape as stkh_req and feat_arch, a decision carrying no EARS pattern. Note that a superseded or rejected decision states what was PROPOSED rather than what is true of the system; dec_status is the field that tells them apart, and any query over decisions has to filter on it.",
+      "select": { "$ref": "#/$defs/type-dec" },
+      "validate": {
+        "local": {
+          "properties": { "statement": { "pattern": "^[A-Z][A-Za-z' -]* shall .+\\.$" } }
+        }
+      }
+    },
+    {
+      "id": "dec-supported-by-must-point-at-evidence",
+      "severity": "violation",
+      "message": "items with no contains, deliberately, so this fires on a target of the wrong type and never on an absent link. A decision often rests on reasoning rather than on a measurement, and requiring evidence would block recording one before its evidence existed - the same authoring-blocking failure that kept the coverage rules out of this file.",
+      "select": { "$ref": "#/$defs/type-dec" },
+      "validate": {
+        "network": { "supported_by": { "items": { "local": { "$ref": "#/$defs/type-evd" } } } }
+      }
+    },
+    {
+      "id": "dec-supersedes-must-point-at-a-decision",
+      "severity": "violation",
+      "message": "Same shape and same reason as the rule above: a decision that supersedes nothing is the normal case, so only the target type is constrained.",
+      "select": { "$ref": "#/$defs/type-dec" },
+      "validate": {
+        "network": { "supersedes": { "items": { "local": { "$ref": "#/$defs/type-dec" } } } }
+      }
+    },
+    {
+      "id": "superseded-decision-must-be-named-by-its-successor",
+      "severity": "violation",
+      "message": "A tombstone with no forwarding address, which is worse than deleting the decision outright: it says do not follow this without saying what to follow instead. This is the only network_back rule here and the only one that looks at a need's INCOMING links. It is safe to gate on where a coverage rule would not be, and the difference is the point: a coverage rule fires on every need not yet built out and so blocks the first step of authoring, where this fires only on a need whose author has deliberately typed superseded, which is itself a claim that a successor exists. Measured: network_back resolves across files, so the successor need not share a document with it.",
+      "select": {
+        "allOf": [
+          { "$ref": "#/$defs/type-dec" },
+          { "properties": { "dec_status": { "const": "superseded" } } }
+        ],
+        "required": ["dec_status"]
+      },
+      "validate": {
+        "network_back": {
+          "supersedes": {
+            "contains": { "local": { "$ref": "#/$defs/type-dec" } },
+            "minContains": 1
+          }
         }
       }
     }

@@ -5,6 +5,10 @@
   ARCH_LOWERCASE:statement: "agconflo shall record provenance inside the context store." does not match "^[A-Z][A-Za-z' -]* shall .+\.$" (feat-arch-statement-must-oblige-with-shall[21]/properties/statement/pattern)
 [needs.schema_definition_violation]
   --> (need)
+      fixtures/rule_statement_shape.rst:36:4
+  DEC_NARRATES:statement: "We evaluated three options and picked the second one." does not match "^[A-Z][A-Za-z' -]* shall .+\.$" (dec-statement-must-oblige-with-shall[39]/properties/statement/pattern)
+[needs.schema_definition_violation]
+  --> (need)
       fixtures/rule_statement_shape.rst:14:4
   STKH_DESCRIBES:statement: "Agconflo records the provenance of every context." does not match "^[A-Z][A-Za-z' -]* shall .+\.$" (stkh-req-statement-must-oblige-with-shall[20]/properties/statement/pattern)
-Found 2 error(s).
+Found 3 error(s).
