@@ -416,6 +416,32 @@
           ]
         }
       }
+    },
+    {
+      "id": "observation-must-be-one-physical-line",
+      "severity": "violation",
+      "message": "The evidence twin of statement-must-be-one-physical-line, and it needs its own entry because that rule selects on the statement FIELD and an evidence need carries no statement at all. The reason is narrower here: an observation is held to no anchored grammar, so a newline cannot produce the baffling near-miss it produces in a statement. What remains is the honest data constraint - the field's own description promises one line, and these values are read through needs.json and rendered into prompts, where a break inside a sentence is noise.",
+      "select": { "required": ["observation"] },
+      "validate": {
+        "local": {
+          "allOf": [
+            { "properties": { "observation": { "not": { "pattern": "\\n" } } } }
+          ]
+        }
+      }
+    },
+    {
+      "id": "observation-must-use-only-plain-ascii-characters",
+      "severity": "violation",
+      "message": "The evidence twin of statement-must-use-only-plain-ascii-characters, and the reason both exist as separate rules: they select on a FIELD, and an evidence need has no statement, so without this an observation would be the one normative value in the project still able to hide a non-breaking space. Measured before this rule existed - an observation carrying one produced no diagnostic at all. Same whitelist and same accepted cost as its twin: no micro sign, degree sign or inequality, which bites slightly harder here since measurements are what this field holds. Write microseconds and degrees.",
+      "select": { "required": ["observation"] },
+      "validate": {
+        "local": {
+          "allOf": [
+            { "properties": { "observation": { "not": { "pattern": "[^\\x00-\\x7F]" } } } }
+          ]
+        }
+      }
     }
   ]
 }

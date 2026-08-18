@@ -1,0 +1,18 @@
+# exit: 1
+[needs.invalid_field_value]
+  --> (need)
+      fixtures/rule_observation_field.rst:41:4
+  EVD_TOO_LONG:observation: "ubc check was measured at one, five, six, ten and fifty thousand needs across two operating systems, three network conditions and both a cold and a warm licence cache, and every one of those runs is recorded here at a length no bound would allow." is longer than 240 characters (observation/maxLength)
+[needs.invalid_field_value]
+  --> (need)
+      fixtures/rule_observation_field.rst:22:4
+  EVD_TOO_SHORT:observation: "TBD" is shorter than 20 characters (observation/minLength)
+[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_observation_field.rst:35:4
+  EVD_NBSP:observation: {"pattern":"[^\\x00-\\x7F]"} is not allowed for "The warm index took 41 ms and the cold index took 80 ms." (observation-must-use-only-plain-ascii-characters[34]/allOf/0/properties/observation/not)
+[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_observation_field.rst:28:4
+  EVD_WRAPPED:observation: {"pattern":"\\n"} is not allowed for "The warm index took 41 ms and the cold index took 80 ms,\nmeasured on this machine." (observation-must-be-one-physical-line[33]/allOf/0/properties/observation/not)
+Found 2 error(s), 2 warning(s).

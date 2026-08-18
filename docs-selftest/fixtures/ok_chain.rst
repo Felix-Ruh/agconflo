@@ -57,3 +57,35 @@ Fixture: ok_chain
 
    Asserts which error occurs and what the run does afterwards, not merely that
    something failed.
+
+.. evd:: The unlicensed free tier is measured in files, not needs
+   :id: EVD_CHAIN
+   :evd_kind: measurement
+   :observed_on: 2026-08-17
+   :observation: ubc check exits 0 on five source files without a licence and exits 1 on six.
+
+   Evidence carries its finding in observation rather than statement, so the
+   requirement wording rules never reach it. A measurement is comparative and
+   approximate by nature, which is what those rules exist to ban from a
+   requirement - and what this field has to be free to say.
+
+.. dec:: The documentation toolchain was Sphinx and Python
+   :id: DEC_CHAIN_OLD
+   :dec_status: superseded
+   :decided_on: 2026-08-14
+   :statement: Agconflo shall build its requirements project with Sphinx and Python.
+
+   Kept rather than deleted, and marked superseded rather than edited into the
+   decision that replaced it. A reversal is part of the record.
+
+.. dec:: The documentation toolchain is ubc alone
+   :id: DEC_CHAIN
+   :dec_status: accepted
+   :decided_on: 2026-08-16
+   :supported_by: EVD_CHAIN
+   :supersedes: DEC_CHAIN_OLD
+   :statement: Agconflo shall build its requirements project with ubc and no Python.
+
+   A decision keeps its obligation in statement, so it IS held to the wording
+   rules - one hiding behind "the simpler option" is refused. This pair also
+   wires both new link types, which is what makes their declarations guarded.

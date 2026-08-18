@@ -33,3 +33,15 @@ Fixture: field_enums
    :verifies: FEAT_BAD_ENUMS
    :test_kind: smoke
    :coverage: mostly
+
+.. dec:: A status outside its value set
+   :id: DEC_BAD_STATUS
+   :dec_status: maybe
+   :decided_on: 2026-08-20
+   :statement: Agconflo shall reject a decision status outside its value set.
+
+.. evd:: A kind outside its value set
+   :id: EVD_BAD_KIND
+   :evd_kind: hearsay
+   :observed_on: 2026-08-20
+   :observation: This evidence exists to hold the evd_kind value set in a golden file.
