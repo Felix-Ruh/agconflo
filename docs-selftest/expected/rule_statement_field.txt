@@ -14,5 +14,5 @@
 [needs.schema_definition_violation]
   --> (need)
       fixtures/rule_statement_field.rst:17:4
-  STKH_WRAPPED:statement: "Agconflo shall give a node exactly the contexts that were wired\nto it and no others." does not match "^[A-Z][A-Za-z -]* shall .+\.$" (stkh-req-statement-must-oblige-with-shall[20]/properties/statement/pattern)
+  STKH_WRAPPED:statement: "Agconflo shall give a node exactly the contexts that were wired\nto it and no others." does not match "^[A-Z][A-Za-z' -]* shall .+\.$" (stkh-req-statement-must-oblige-with-shall[20]/properties/statement/pattern)
 Found 2 error(s), 2 warning(s).

@@ -15,7 +15,9 @@ Fixture: ok_legitimate_statements
    What each case guards:
 
    - a decimal, against a singular rule that banned every internal period
-   - an apostrophe in the response, against an over-tight subject slot
+   - an apostrophe in the response, which that slot has always allowed
+   - a possessive subject, which the subject slot rejected until it was widened
+     to admit the ASCII apostrophe - the case the widening exists for
    - a hyphenated subject, which is why the slot allows a hyphen at all
    - simplex, steadfast and atypically, against smell words matching inside a
      longer word
@@ -33,6 +35,11 @@ Fixture: ok_legitimate_statements
    :id: STKH_OK_APOSTROPHE
    :stakeholder: user
    :statement: Agconflo shall bind a node's parameters before it runs.
+
+.. stkh_req:: A possessive subject
+   :id: STKH_OK_POSSESSIVE
+   :stakeholder: user
+   :statement: Agconflo's run log shall record every context that a node consumed.
 
 .. stkh_req:: A hyphenated subject
    :id: STKH_OK_HYPHEN

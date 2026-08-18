@@ -218,7 +218,7 @@
       "select": { "$ref": "#/$defs/type-stkh-req" },
       "validate": {
         "local": {
-          "properties": { "statement": { "pattern": "^[A-Z][A-Za-z -]* shall .+\\.$" } }
+          "properties": { "statement": { "pattern": "^[A-Z][A-Za-z' -]* shall .+\\.$" } }
         }
       }
     },
@@ -229,7 +229,7 @@
       "select": { "$ref": "#/$defs/type-feat-arch" },
       "validate": {
         "local": {
-          "properties": { "statement": { "pattern": "^[A-Z][A-Za-z -]* shall .+\\.$" } }
+          "properties": { "statement": { "pattern": "^[A-Z][A-Za-z' -]* shall .+\\.$" } }
         }
       }
     },
@@ -243,7 +243,7 @@
       },
       "validate": {
         "local": {
-          "properties": { "statement": { "pattern": "^[A-Z][A-Za-z -]* shall .+\\.$" } }
+          "properties": { "statement": { "pattern": "^[A-Z][A-Za-z' -]* shall .+\\.$" } }
         }
       }
     },
@@ -258,7 +258,7 @@
       "validate": {
         "local": {
           "properties": {
-            "statement": { "pattern": "^When [^,]+, [A-Z][A-Za-z -]* shall .+\\.$" }
+            "statement": { "pattern": "^When [^,]+, [A-Z][A-Za-z' -]* shall .+\\.$" }
           }
         }
       }
@@ -274,7 +274,7 @@
       "validate": {
         "local": {
           "properties": {
-            "statement": { "pattern": "^While [^,]+, [A-Z][A-Za-z -]* shall .+\\.$" }
+            "statement": { "pattern": "^While [^,]+, [A-Z][A-Za-z' -]* shall .+\\.$" }
           }
         }
       }
@@ -290,7 +290,7 @@
       "validate": {
         "local": {
           "properties": {
-            "statement": { "pattern": "^Where [^,]+, [A-Z][A-Za-z -]* shall .+\\.$" }
+            "statement": { "pattern": "^Where [^,]+, [A-Z][A-Za-z' -]* shall .+\\.$" }
           }
         }
       }
@@ -306,7 +306,7 @@
       "validate": {
         "local": {
           "properties": {
-            "statement": { "pattern": "^If [^,]+, then [A-Z][A-Za-z -]* shall .+\\.$" }
+            "statement": { "pattern": "^If [^,]+, then [A-Z][A-Za-z' -]* shall .+\\.$" }
           }
         }
       }
@@ -323,7 +323,7 @@
         "local": {
           "properties": {
             "statement": {
-              "pattern": "^While [^,]+, when [^,]+, [A-Z][A-Za-z -]* shall .+\\.$"
+              "pattern": "^While [^,]+, when [^,]+, [A-Z][A-Za-z' -]* shall .+\\.$"
             }
           }
         }
