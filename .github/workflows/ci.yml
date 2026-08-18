@@ -3,13 +3,21 @@
 # Two gates, mirroring .githooks/pre-commit: the Rust one - dormant until the
 # workspace has crates - and the documentation one.
 #
-# THE DOCS JOB IS ALSO A LICENCE PROBE. `ubc check` is gated only above five
-# files - measured 2026-08-17, and docs/ is one file today - so a green check
-# still proves nothing about ubCode's terms. `ubc format` and `ubc query cypher`
-# ARE gated at any size, and the free open-source grant is what satisfies them.
-# That the grant holds on a runner was the project-level go/no-go and was
-# answered on this workflow's first run; the Cypher step keeps it under standing
-# observation.
+# THE DOCS JOB IS ALSO A LICENCE PROBE, and it now has three grant-sensitive
+# steps rather than one. `ubc format` and `ubc query cypher` are gated at any
+# size; `ubc check` is gated above five files - measured 2026-08-17 - and docs/
+# passed that mark once the decisions and evidence landed. So a green check here
+# now does prove the free open-source grant held, where once it proved nothing.
+# That the grant works on a runner was the project-level go/no-go, answered on
+# this workflow's first run.
+#
+# The Cypher step is kept anyway, and not out of habit. `--strict` separates a
+# query naming something the project lacks (exit 1) from a licence or
+# configuration failure (exit 2), where `check` reports both as exit 1. It
+# asserts on the returned rows rather than on an exit code, so it proves the
+# graph is queryable and not merely indexable. And Cypher is a RUNTIME dependency
+# of the pipeline this project is being built to run, not only a CI convenience,
+# which is worth a second of standing observation.
 #
 # Unlike .githooks/pre-commit, this job does NOT degrade when the grant is
 # unavailable. The hook stands down so that being offline cannot block a commit;

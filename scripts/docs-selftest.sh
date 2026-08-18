@@ -70,6 +70,22 @@ if [ ! -x "$UBC" ]; then
     exit 0
 fi
 
+# `[ -x ]` ANSWERS A DIFFERENT QUESTION, measured 2026-08-20: a binary can carry
+# the execute bit and still be refused by group policy, exiting 126. This driver
+# had the worst failure of the three that shared the assumption - every fixture
+# produced empty output, so every golden file mismatched and the harness reported
+# ALL of them failing, with diffs. That reads as "the metamodel is broken" when
+# nothing has run at all.
+#
+# `--version` is not licence-gated, so this probe works offline exactly as the
+# per-fixture checks below do.
+if ! "$UBC" --version >/dev/null 2>&1; then
+    echo "docs-selftest: ubc is installed but will not run - skipping"
+    echo "docs-selftest: nothing is wrong with the binary; this is normally a policy"
+    echo "docs-selftest: allowing execution only from certain paths. CI runs this."
+    exit 0
+fi
+
 failures=0
 total=0
 

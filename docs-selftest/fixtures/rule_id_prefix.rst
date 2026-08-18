@@ -3,7 +3,7 @@ Fixture: rule_id_prefix
 =======================
 
 .. One need of every type whose id prefix disagrees with its type, so this
-   fixture covers all six id-prefix rules at once. Each need is otherwise fully
+   fixture covers all eight id-prefix rules at once. Each need is otherwise fully
    conformant - every mandatory field present, every link pointing at a need of
    the right type - so the only thing wrong with any of them is the prefix.
 
@@ -45,3 +45,15 @@ Fixture: rule_id_prefix
    :verifies: WRONG_CREQ
    :test_kind: error_path
    :coverage: full
+
+.. dec:: A decision not called DEC
+   :id: WRONG_DEC
+   :dec_status: accepted
+   :decided_on: 2026-08-20
+   :statement: Agconflo shall reject an id whose prefix disagrees with its type.
+
+.. evd:: Evidence not called EVD
+   :id: WRONG_EVD
+   :evd_kind: measurement
+   :observed_on: 2026-08-20
+   :observation: An id prefix disagreeing with its type was accepted before this rule.

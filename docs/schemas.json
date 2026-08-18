@@ -5,7 +5,10 @@
     "type-feat-arch": { "properties": { "type": { "const": "feat_arch" } } },
     "type-comp": { "properties": { "type": { "const": "comp" } } },
     "type-comp-req": { "properties": { "type": { "const": "comp_req" } } },
-    "type-test-case": { "properties": { "type": { "const": "test_case" } } }
+    "type-test-case": { "properties": { "type": { "const": "test_case" } } },
+    "type-requirement": { "properties": { "type": { "enum": ["feat_req", "comp_req"] } } },
+    "type-dec": { "properties": { "type": { "const": "dec" } } },
+    "type-evd": { "properties": { "type": { "const": "evd" } } }
   },
   "schemas": [
     {
@@ -97,13 +100,14 @@
     {
       "id": "feat-req-must-derive-from-a-stkh-req",
       "severity": "violation",
-      "message": "A feature requirement nobody asked for is the commonest way for scope to grow unnoticed. The network rule fires when the link is absent as well as when it points at the wrong type.",
+      "message": "A feature requirement nobody asked for is the commonest way for scope to grow unnoticed. This and every network rule below pair two keywords, because neither substitutes for the other: contains with minContains is the only one that fires when the link is ABSENT (minItems does not fire on an absent key), and items is the only one that sees a MIXED array, since contains asks merely that at least one target be of the right type. A wrong target therefore reports twice, once as absence of a valid link and once by name; that is the intended reading, presence then purity.",
       "select": { "$ref": "#/$defs/type-feat-req" },
       "validate": {
         "network": {
           "derived_from": {
             "contains": { "local": { "$ref": "#/$defs/type-stkh-req" } },
-            "minContains": 1
+            "minContains": 1,
+            "items": { "local": { "$ref": "#/$defs/type-stkh-req" } }
           }
         }
       }
@@ -117,7 +121,8 @@
         "network": {
           "realises": {
             "contains": { "local": { "$ref": "#/$defs/type-feat-req" } },
-            "minContains": 1
+            "minContains": 1,
+            "items": { "local": { "$ref": "#/$defs/type-feat-req" } }
           }
         }
       }
@@ -131,7 +136,8 @@
         "network": {
           "uses": {
             "contains": { "local": { "$ref": "#/$defs/type-comp" } },
-            "minContains": 1
+            "minContains": 1,
+            "items": { "local": { "$ref": "#/$defs/type-comp" } }
           }
         }
       }
@@ -145,7 +151,8 @@
         "network": {
           "derived_from": {
             "contains": { "local": { "$ref": "#/$defs/type-feat-req" } },
-            "minContains": 1
+            "minContains": 1,
+            "items": { "local": { "$ref": "#/$defs/type-feat-req" } }
           }
         }
       }
@@ -159,7 +166,8 @@
         "network": {
           "allocated_to": {
             "contains": { "local": { "$ref": "#/$defs/type-comp" } },
-            "minContains": 1
+            "minContains": 1,
+            "items": { "local": { "$ref": "#/$defs/type-comp" } }
           }
         }
       }
@@ -181,19 +189,9 @@
       "validate": {
         "network": {
           "verifies": {
-            "contains": {
-              "local": {
-                "allOf": [
-                  {
-                    "anyOf": [
-                      { "$ref": "#/$defs/type-feat-req" },
-                      { "$ref": "#/$defs/type-comp-req" }
-                    ]
-                  }
-                ]
-              }
-            },
-            "minContains": 1
+            "contains": { "local": { "$ref": "#/$defs/type-requirement" } },
+            "minContains": 1,
+            "items": { "local": { "$ref": "#/$defs/type-requirement" } }
           }
         }
       }
@@ -218,7 +216,7 @@
       "select": { "$ref": "#/$defs/type-stkh-req" },
       "validate": {
         "local": {
-          "properties": { "statement": { "pattern": "^[A-Z][A-Za-z -]* shall .+\\.$" } }
+          "properties": { "statement": { "pattern": "^[A-Z][A-Za-z' -]* shall .+\\.$" } }
         }
       }
     },
@@ -229,7 +227,7 @@
       "select": { "$ref": "#/$defs/type-feat-arch" },
       "validate": {
         "local": {
-          "properties": { "statement": { "pattern": "^[A-Z][A-Za-z -]* shall .+\\.$" } }
+          "properties": { "statement": { "pattern": "^[A-Z][A-Za-z' -]* shall .+\\.$" } }
         }
       }
     },
@@ -243,7 +241,7 @@
       },
       "validate": {
         "local": {
-          "properties": { "statement": { "pattern": "^[A-Z][A-Za-z -]* shall .+\\.$" } }
+          "properties": { "statement": { "pattern": "^[A-Z][A-Za-z' -]* shall .+\\.$" } }
         }
       }
     },
@@ -258,7 +256,7 @@
       "validate": {
         "local": {
           "properties": {
-            "statement": { "pattern": "^When [^,]+, [A-Z][A-Za-z -]* shall .+\\.$" }
+            "statement": { "pattern": "^When [^,]+, [A-Z][A-Za-z' -]* shall .+\\.$" }
           }
         }
       }
@@ -274,7 +272,7 @@
       "validate": {
         "local": {
           "properties": {
-            "statement": { "pattern": "^While [^,]+, [A-Z][A-Za-z -]* shall .+\\.$" }
+            "statement": { "pattern": "^While [^,]+, [A-Z][A-Za-z' -]* shall .+\\.$" }
           }
         }
       }
@@ -290,7 +288,7 @@
       "validate": {
         "local": {
           "properties": {
-            "statement": { "pattern": "^Where [^,]+, [A-Z][A-Za-z -]* shall .+\\.$" }
+            "statement": { "pattern": "^Where [^,]+, [A-Z][A-Za-z' -]* shall .+\\.$" }
           }
         }
       }
@@ -306,7 +304,7 @@
       "validate": {
         "local": {
           "properties": {
-            "statement": { "pattern": "^If [^,]+, then [A-Z][A-Za-z -]* shall .+\\.$" }
+            "statement": { "pattern": "^If [^,]+, then [A-Z][A-Za-z' -]* shall .+\\.$" }
           }
         }
       }
@@ -323,7 +321,7 @@
         "local": {
           "properties": {
             "statement": {
-              "pattern": "^While [^,]+, when [^,]+, [A-Z][A-Za-z -]* shall .+\\.$"
+              "pattern": "^While [^,]+, when [^,]+, [A-Z][A-Za-z' -]* shall .+\\.$"
             }
           }
         }
@@ -405,6 +403,122 @@
             { "properties": { "statement": { "not": { "pattern": ";" } } } },
             { "properties": { "statement": { "not": { "pattern": "\\. " } } } }
           ]
+        }
+      }
+    },
+    {
+      "id": "statement-must-use-only-plain-ascii-characters",
+      "severity": "violation",
+      "message": "A non-ASCII lookalike defeats every anchored rule below while looking correct on screen. The worst case measured: a non-breaking space between 'shall' and the response, which reads as a perfectly valid statement and is rejected by the grammar with nothing visible to fix. A typographic apostrophe is the same trap one step milder - the subject slot admits the ASCII one, so the message shows a pattern that appears to allow exactly what the statement appears to contain. This is a whitelist rather than a list of known offenders because the next lookalike is always worse than the last; a zero-width space would not even occupy a column. The bound stops at ASCII rather than at printable ASCII on purpose: a tab is expanded to spaces by the parser and so is visible, and a newline has its own rule with a better message. Cost, accepted: no micro sign, degree sign or inequality in a statement - write microseconds, degrees and at most.",
+      "select": { "required": ["statement"] },
+      "validate": {
+        "local": {
+          "allOf": [
+            { "properties": { "statement": { "not": { "pattern": "[^\\x00-\\x7F]" } } } }
+          ]
+        }
+      }
+    },
+    {
+      "id": "observation-must-be-one-physical-line",
+      "severity": "violation",
+      "message": "The evidence twin of statement-must-be-one-physical-line, and it needs its own entry because that rule selects on the statement FIELD and an evidence need carries no statement at all. The reason is narrower here: an observation is held to no anchored grammar, so a newline cannot produce the baffling near-miss it produces in a statement. What remains is the honest data constraint - the field's own description promises one line, and these values are read through needs.json and rendered into prompts, where a break inside a sentence is noise.",
+      "select": { "required": ["observation"] },
+      "validate": {
+        "local": {
+          "allOf": [
+            { "properties": { "observation": { "not": { "pattern": "\\n" } } } }
+          ]
+        }
+      }
+    },
+    {
+      "id": "observation-must-use-only-plain-ascii-characters",
+      "severity": "violation",
+      "message": "The evidence twin of statement-must-use-only-plain-ascii-characters, and the reason both exist as separate rules: they select on a FIELD, and an evidence need has no statement, so without this an observation would be the one normative value in the project still able to hide a non-breaking space. Measured before this rule existed - an observation carrying one produced no diagnostic at all. Same whitelist and same accepted cost as its twin: no micro sign, degree sign or inequality, which bites slightly harder here since measurements are what this field holds. Write microseconds and degrees.",
+      "select": { "required": ["observation"] },
+      "validate": {
+        "local": {
+          "allOf": [
+            { "properties": { "observation": { "not": { "pattern": "[^\\x00-\\x7F]" } } } }
+          ]
+        }
+      }
+    },
+    {
+      "id": "dec-id-must-start-with-dec",
+      "severity": "violation",
+      "message": "An id whose prefix disagrees with its type makes every id-based reading of the graph unreliable, and ubc does not enforce [[needs.types]].prefix itself.",
+      "select": { "$ref": "#/$defs/type-dec" },
+      "validate": { "local": { "properties": { "id": { "pattern": "^DEC_" } } } }
+    },
+    {
+      "id": "evd-id-must-start-with-evd",
+      "severity": "violation",
+      "message": "An id whose prefix disagrees with its type makes every id-based reading of the graph unreliable.",
+      "select": { "$ref": "#/$defs/type-evd" },
+      "validate": { "local": { "properties": { "id": { "pattern": "^EVD_" } } } }
+    },
+    {
+      "id": "dec-must-have-a-statement-a-status-and-a-date",
+      "severity": "violation",
+      "message": "A decision with no status presents itself as current whether or not it is, and this project has reversed itself more than once - the Python toolchain, the obligation living in a need's body, the detailed-design level. The date is when the choice was taken, which is not when it was committed, and it is what orders a supersedes chain when the chain itself is incomplete.",
+      "select": { "$ref": "#/$defs/type-dec" },
+      "validate": { "local": { "required": ["statement", "dec_status", "decided_on"] } }
+    },
+    {
+      "id": "evd-must-have-an-observation-a-kind-and-a-date",
+      "severity": "violation",
+      "message": "The kind is the same question as how the finding could be re-checked, and the date is what lets it be retired. Nearly all evidence here was measured against one pinned ubc, so an undated observation is one nobody can trust or refute later.",
+      "select": { "$ref": "#/$defs/type-evd" },
+      "validate": { "local": { "required": ["observation", "evd_kind", "observed_on"] } }
+    },
+    {
+      "id": "dec-statement-must-oblige-with-shall",
+      "severity": "violation",
+      "message": "A decision that narrates - 'we evaluated three options and picked the second' - records the meeting rather than the constraint, and a constraint is the only part worth carrying forward. Held to the same loose shape as stkh_req and feat_arch, a decision carrying no EARS pattern. Note that a superseded or rejected decision states what was PROPOSED rather than what is true of the system; dec_status is the field that tells them apart, and any query over decisions has to filter on it.",
+      "select": { "$ref": "#/$defs/type-dec" },
+      "validate": {
+        "local": {
+          "properties": { "statement": { "pattern": "^[A-Z][A-Za-z' -]* shall .+\\.$" } }
+        }
+      }
+    },
+    {
+      "id": "dec-supported-by-must-point-at-evidence",
+      "severity": "violation",
+      "message": "items with no contains, deliberately, so this fires on a target of the wrong type and never on an absent link. A decision often rests on reasoning rather than on a measurement, and requiring evidence would block recording one before its evidence existed - the same authoring-blocking failure that kept the coverage rules out of this file.",
+      "select": { "$ref": "#/$defs/type-dec" },
+      "validate": {
+        "network": { "supported_by": { "items": { "local": { "$ref": "#/$defs/type-evd" } } } }
+      }
+    },
+    {
+      "id": "dec-supersedes-must-point-at-a-decision",
+      "severity": "violation",
+      "message": "Same shape and same reason as the rule above: a decision that supersedes nothing is the normal case, so only the target type is constrained.",
+      "select": { "$ref": "#/$defs/type-dec" },
+      "validate": {
+        "network": { "supersedes": { "items": { "local": { "$ref": "#/$defs/type-dec" } } } }
+      }
+    },
+    {
+      "id": "superseded-decision-must-be-named-by-its-successor",
+      "severity": "violation",
+      "message": "A tombstone with no forwarding address, which is worse than deleting the decision outright: it says do not follow this without saying what to follow instead. This is the only network_back rule here and the only one that looks at a need's INCOMING links. It is safe to gate on where a coverage rule would not be, and the difference is the point: a coverage rule fires on every need not yet built out and so blocks the first step of authoring, where this fires only on a need whose author has deliberately typed superseded, which is itself a claim that a successor exists. Measured: network_back resolves across files, so the successor need not share a document with it.",
+      "select": {
+        "allOf": [
+          { "$ref": "#/$defs/type-dec" },
+          { "properties": { "dec_status": { "const": "superseded" } } }
+        ],
+        "required": ["dec_status"]
+      },
+      "validate": {
+        "network_back": {
+          "supersedes": {
+            "contains": { "local": { "$ref": "#/$defs/type-dec" } },
+            "minContains": 1
+          }
         }
       }
     }

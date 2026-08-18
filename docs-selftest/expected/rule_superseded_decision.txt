@@ -1,0 +1,6 @@
+# exit: 1
+[needs.schema_network_violation]
+  --> (need)
+      fixtures/rule_superseded_decision.rst:27:4
+  DEC_ORPHANED:supersedes (incoming): Too few valid incoming links of type 'supersedes' (0 < 1) (superseded-decision-must-be-named-by-its-successor[42]/contains_too_few)
+Found 1 error(s).

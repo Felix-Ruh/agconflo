@@ -17,6 +17,30 @@
   CREQ_NO_FIELDS:comp-req-must-have-a-statement-and-a-pattern: "ears_pattern" is a required property (comp-req-must-have-a-statement-and-a-pattern[10]/required)
 [needs.schema_definition_violation]
   --> (need)
+      fixtures/rule_mandatory_fields.rst:42:4
+  DEC_NO_FIELDS:dec-must-have-a-statement-a-status-and-a-date: "statement" is a required property (dec-must-have-a-statement-a-status-and-a-date[37]/required)
+[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_mandatory_fields.rst:42:4
+  DEC_NO_FIELDS:dec-must-have-a-statement-a-status-and-a-date: "dec_status" is a required property (dec-must-have-a-statement-a-status-and-a-date[37]/required)
+[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_mandatory_fields.rst:42:4
+  DEC_NO_FIELDS:dec-must-have-a-statement-a-status-and-a-date: "decided_on" is a required property (dec-must-have-a-statement-a-status-and-a-date[37]/required)
+[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_mandatory_fields.rst:45:4
+  EVD_NO_FIELDS:evd-must-have-an-observation-a-kind-and-a-date: "observation" is a required property (evd-must-have-an-observation-a-kind-and-a-date[38]/required)
+[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_mandatory_fields.rst:45:4
+  EVD_NO_FIELDS:evd-must-have-an-observation-a-kind-and-a-date: "evd_kind" is a required property (evd-must-have-an-observation-a-kind-and-a-date[38]/required)
+[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_mandatory_fields.rst:45:4
+  EVD_NO_FIELDS:evd-must-have-an-observation-a-kind-and-a-date: "observed_on" is a required property (evd-must-have-an-observation-a-kind-and-a-date[38]/required)
+[needs.schema_definition_violation]
+  --> (need)
       fixtures/rule_mandatory_fields.rst:21:4
   FEAT_NO_FIELDS:feat-req-must-have-a-statement-a-pattern-and-a-verification-method: "statement" is a required property (feat-req-must-have-a-statement-a-pattern-and-a-verification-method[7]/required)
 [needs.schema_definition_violation]
@@ -43,4 +67,4 @@
   --> (need)
       fixtures/rule_mandatory_fields.rst:38:4
   TEST_NO_FIELDS:test-case-must-have-a-kind-and-a-coverage: "coverage" is a required property (test-case-must-have-a-kind-and-a-coverage[11]/required)
-Found 11 error(s).
+Found 17 error(s).

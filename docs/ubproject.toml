@@ -18,9 +18,14 @@
 # but findings outside <path> are dropped silently.
 #
 # The rules that constrain these types - mandatory fields per level, link
-# targets, coverage, requirement wording - live in schemas.json and arrive next.
-# Every one of them is proved to fire by a fixture in docs-selftest/, because a
-# wrongly shaped rule is silently ignored rather than rejected.
+# targets, link purity, requirement wording - live in schemas.json. Every one of
+# them is proved to fire by a fixture in docs-selftest/, because a wrongly shaped
+# rule is silently ignored rather than rejected.
+#
+# Coverage rules are deliberately absent, and this list named one for a while by
+# mistake. A coverage rule fires on every need that has not been built out yet,
+# so it would block the first step of authoring. What is not yet covered is a
+# question to ask a query, not a reason to refuse a commit.
 
 "$schema" = "https://ubcode.useblocks.com/ubproject.schema.json"
 
@@ -143,17 +148,55 @@ directive = "test_case"
 title = "Test Case"
 prefix = "TEST_"
 
+[[needs.types]]
+# A choice the project made and must not re-litigate. An OBJECT rather than a
+# level: nothing is derived from it, and it decides nothing about the system's
+# behaviour - it records why the system is shaped the way it is.
+#
+# It carries `statement`, deliberately, so a decision is held to exactly the same
+# wording rules as a requirement. A decision hiding behind "we picked the simpler
+# option" should be rejected, and it is, for free, by rules that already exist.
+directive = "dec"
+title = "Decision"
+prefix = "DEC_"
+
+[[needs.types]]
+# A measurement a decision rests on. This project measures rather than assumes,
+# and recorded evidence is what keeps a decision auditable once the thing it was
+# measured against has moved on.
+#
+# IT DELIBERATELY DOES NOT USE `statement`, and that is the whole design. Every
+# wording rule selects on that field, so the FIELD decides what is policed - and
+# evidence is comparative and approximate by nature ("faster", "approximately
+# 650 ms", "minimal"), which is precisely what those rules exist to ban from a
+# requirement. Its finding lives in `observation` instead, which is subject to
+# the constraints that suit a measurement and to none of the ones that do not.
+# Never move it to `statement`: the rules would start firing on honest evidence,
+# and nothing would flag the change as a mistake.
+directive = "evd"
+title = "Evidence"
+prefix = "EVD_"
+
 # -----------------------------------------------------------------------------
 # Links.
 #
-# EVERY LINK POINTS UP THE V, from the concrete to the abstract, so a link can
-# never dangle at authoring time: the thing being referred to already exists
-# when the referring need is written. `allow_dead_links` is left at its default
-# of false, so a broken reference is a diagnostic rather than a silent hole.
+# NO LINK MAY DANGLE AT AUTHORING TIME: whatever a need refers to already exists
+# when that need is written. `allow_dead_links` is left at its default of false,
+# so a broken reference is a diagnostic rather than a silent hole.
 #
-# Which types a link may join is not expressible here - it is a schema rule -
+# Pointing up the V is how most of them manage it, from the concrete to the
+# abstract, the abstract having been written first. The two decision links manage
+# it by pointing the other way, for the reason given beside them.
+#
+# So the invariant is the ABSENCE OF DANGLING REFERENCES, not the direction. This
+# header used to state the direction as though it were the rule, and then stayed
+# that way for four commits after the exceptions were added directly below it -
+# which is the argument for stating a rule by what it guarantees rather than by
+# how it is usually achieved.
+#
+# Which types a link may join is not expressible here - that is a schema rule -
 # and neither is cardinality, so `allocated_to` accepting exactly one component
-# also arrives with the rules.
+# is enforced there as well.
 #
 # ubc's built-in `links` type survives these declarations rather than being
 # replaced by them (measured), which is why docs-selftest still uses it for the
@@ -184,6 +227,28 @@ description = "The single component answerable for this requirement."
 outgoing = "verifies"
 incoming = "verified by"
 description = "The requirement this test case checks."
+
+# The two links below are the exception to that direction, and it is justified by
+# the rule's own reason rather than in spite of it. Links point up the V so they
+# cannot dangle at authoring time; here the evidence is recorded BEFORE the
+# decision it supports, and a superseded decision exists before the one that
+# replaces it. In both cases the link therefore belongs on the need written
+# second, which is the later one, so it still cannot dangle.
+#
+# Both are optional. A decision often rests on reasoning rather than on a
+# measurement, and requiring evidence would block writing one down before its
+# evidence existed - the same authoring-blocking failure that kept the coverage
+# rules out of the metamodel.
+
+[needs.links.supported_by]
+outgoing = "supported by"
+incoming = "supports"
+description = "Evidence this decision rests on."
+
+[needs.links.supersedes]
+outgoing = "supersedes"
+incoming = "superseded by"
+description = "The earlier decision this one replaces."
 
 # -----------------------------------------------------------------------------
 # Fields.
@@ -308,3 +373,59 @@ schema = { type = "string", enum = ["property", "positive", "error_path"] }
 description = "Whether this case verifies its requirement fully or in part."
 nullable = true
 schema = { type = "string", enum = ["full", "partial"] }
+
+[needs.fields.dec_status]
+# Whether a decision is still current. Load-bearing rather than decorative: this
+# project has reversed itself more than once - the Python toolchain, the
+# obligation living in a need's body, the detailed-design level - and a graph
+# that presented a superseded decision as current would be worse than one that
+# never recorded the decision at all.
+description = "Whether this decision is current."
+nullable = true
+schema = { type = "string", enum = ["accepted", "superseded", "rejected"] }
+
+[needs.fields.evd_kind]
+# How the evidence was obtained, which is the same question as how it could be
+# re-checked. The four values are mutually exclusive and, usefully, ordered by
+# strength: something run here beats a throwaway prototype, which beats what a
+# vendor says about their own product, which beats a citation.
+description = "How this evidence was obtained."
+nullable = true
+schema = { type = "string", enum = ["measurement", "prototype", "vendor_doc", "literature"] }
+
+[needs.fields.observation]
+# What was measured - the evidence counterpart of `statement`, and separate from
+# it on purpose. See the `evd` type above for why folding this into `statement`
+# would quietly subject every measurement to the requirement smell rules.
+#
+# Same bounds and the same one-line constraint as `statement`, for the same
+# reasons: the bounds guard against a placeholder and against a pasted paragraph,
+# and one physical line keeps a value that gets rendered into prompts free of
+# stray breaks. Both of those constraints are enforced for this field by rules of
+# its own in schemas.json rather than by the ones written for `statement`, since
+# those select on the FIELD and an evidence need carries no statement at all.
+description = "What was observed, on one line."
+nullable = true
+schema = { type = "string", minLength = 20, maxLength = 240 }
+
+[needs.fields.decided_on]
+# When the decision was taken, which is not when it was committed and is the date
+# that matters when reading a supersedes chain.
+description = "The date this was decided, as YYYY-MM-DD."
+nullable = true
+schema = { type = "string", pattern = "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
+
+[needs.fields.observed_on]
+# When the measurement was taken. Evidence goes stale: nearly all of it here was
+# measured against one pinned `ubc`, and a finding with no date can be neither
+# re-checked nor retired.
+#
+# A `pattern` in a field's schema enforces exactly as an `enum` does - measured,
+# and reported as needs.invalid_field_value at warning severity, which fails
+# every gate here because they all pass --deny warning. This is a separate field
+# from `decided_on` rather than one shared `dated`: the two mean different
+# things, and the primary readers of this graph are agents, for whom
+# `observed_on` says what it holds where `dated` would not.
+description = "The date this was observed, as YYYY-MM-DD."
+nullable = true
+schema = { type = "string", pattern = "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }

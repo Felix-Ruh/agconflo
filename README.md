@@ -100,10 +100,13 @@ safe to filter precisely because each fixture is checked as a one-file project, 
 
 Both `ubc` steps are licensed through ubCode's free open-source grant, which is determined from the
 repository's remote and needs network access — the answer is then cached for a few days. `ubc format`
-needs the grant at any size; `ubc check` has a five-file free tier and needs it once the project holds
-more than that. Either way an unavailable grant is reported with the same exit code as a real defect,
-so the hook tells the two apart by the message: when the grant cannot be confirmed it says so and
-carries on rather than sending you to fix documentation that is fine. CI runs both and fails hard.
+needs the grant at any size; `ubc check` has a five-file free tier, and **`docs/` is past it**, so both
+now depend on it. In practice that means a machine which has been offline longer than the cached answer
+lives gets **no local documentation checking at all** — it is told so plainly, and the commit proceeds.
+
+An unavailable grant is reported with the same exit code as a real defect, so the hook tells the two
+apart by the message rather than sending you to fix documentation that is fine. CI has the grant, runs
+both, and fails hard; it is the authority.
 
 `git commit --no-verify` bypasses the hook deliberately.
 
@@ -149,12 +152,17 @@ tests and error-path tests that assert *which* failure occurs and how the system
 
 ### The requirements metamodel
 
-Six need types, descending from what someone wants to the code that does it:
+A descending chain from what someone wants to the code that does it, plus two types that sit beside it
+rather than on it:
 
 ```
 stkh_req -> feat_req -> feat_arch -> comp_req -> Rust
                             |            |
                           comp <---------+          test_case verifies either requirement level
+
+dec -> evd                                          a decision, and the measurement it rests on
+ |
+ +-- supersedes -> dec                              a decision this one replaced
 ```
 
 Each level exists because it carries a decision the level above cannot: `stkh_req` says whose goal it
@@ -164,8 +172,19 @@ a field is not a level — which is why there is no detailed-design level below 
 type system *is* the detailed design, and a need restating a trait signature restates it by
 construction.
 
-Links always point **up** the V, from the concrete to the abstract, so a link can never dangle at
-authoring time.
+**A `dec` records a choice the project made and must not re-litigate; an `evd` records a measurement one
+rests on.** Neither is a level — nothing is derived from them. The design point worth knowing is that
+evidence carries its finding in an `observation` field rather than in `statement`: every wording rule
+selects on `statement`, and a measurement legitimately says "faster" and "approximately 650 ms", which
+are exactly the words those rules exist to ban from a requirement. A decision, by contrast, does use
+`statement`, so it is held to them — one hiding behind "the simpler option" is refused.
+
+**No link may dangle at authoring time:** whatever a need refers to already exists when that need is
+written. Most links achieve that by pointing **up** the V, from the concrete to the abstract, because
+the abstract was written first. The two decision links achieve it by pointing the other way — evidence
+is recorded *before* the decision resting on it, and a superseded decision exists before its
+replacement — so the link belongs on whichever need was written second. The guarantee is the absence of
+dangling references, not the direction.
 
 **The obligation lives in a `statement` field, not in the need's body.** This is the one thing worth
 knowing before writing a requirement here. A need's body is invisible to schema validation, so a rule
@@ -175,9 +194,24 @@ sentence that can be held to a grammar lives in `statement`. Requirement stateme
 that pattern's grammar.
 
 **Where the reference actually is:** `docs/ubproject.toml` for the types, links and fields,
-`docs/schemas.json` for the 32 rules, and `docs-selftest/fixtures/` for what each rule catches in
-practice. All three are commented; this section is an orientation, not a specification, so that there
-is only one copy to keep true.
+`docs/schemas.json` for the rules, and `docs-selftest/fixtures/` for what each rule catches in practice.
+All three are commented; this section is an orientation, not a specification, so that there is only one
+copy to keep true. Counts are deliberately not quoted here — prose restating a number goes stale the
+first time the number changes, and nothing checks prose.
+
+### Where things go
+
+```
+docs/index.rst            the table of contents, and nothing else
+docs/stakeholder/         what people want: context, authoring, execution, and the project's own goals
+docs/decisions/           choices made, grouped by what they are about
+docs/evidence/            measurements the decisions rest on
+```
+
+Requirements are grouped by subject, and **the grouping is enforced**. Once any toctree exists, `ubc`
+reports every document that no toctree reaches — so adding a file under `docs/` without listing it in
+`docs/index.rst` fails the build rather than leaving it to be read by nobody. A mistyped entry is caught
+from the other side, as a reference to a document that does not exist.
 
 ### Changing a rule
 

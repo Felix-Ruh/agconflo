@@ -13,6 +13,14 @@
   WRONG_CREQ:id: "WRONG_CREQ" does not match "^CREQ_" (comp-req-id-must-start-with-creq[4]/properties/id/pattern)
 [needs.schema_definition_violation]
   --> (need)
+      fixtures/rule_id_prefix.rst:49:4
+  WRONG_DEC:id: "WRONG_DEC" does not match "^DEC_" (dec-id-must-start-with-dec[35]/properties/id/pattern)
+[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_id_prefix.rst:55:4
+  WRONG_EVD:id: "WRONG_EVD" does not match "^EVD_" (evd-id-must-start-with-evd[36]/properties/id/pattern)
+[needs.schema_definition_violation]
+  --> (need)
       fixtures/rule_id_prefix.rst:19:4
   WRONG_FEAT:id: "WRONG_FEAT" does not match "^FEAT_" (feat-req-id-must-start-with-feat[1]/properties/id/pattern)
 [needs.schema_definition_violation]
@@ -23,4 +31,4 @@
   --> (need)
       fixtures/rule_id_prefix.rst:43:4
   WRONG_TEST:id: "WRONG_TEST" does not match "^TEST_" (test-case-id-must-start-with-test[5]/properties/id/pattern)
-Found 6 error(s).
+Found 8 error(s).

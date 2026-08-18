@@ -1,6 +1,14 @@
 # exit: 1
 [needs.invalid_field_value]
   --> (need)
+      fixtures/field_enums.rst:37:4
+  DEC_BAD_STATUS:dec_status: "maybe" is not one of "accepted", "superseded" or "rejected" (dec_status/enum)
+[needs.invalid_field_value]
+  --> (need)
+      fixtures/field_enums.rst:43:4
+  EVD_BAD_KIND:evd_kind: "hearsay" is not one of "measurement", "prototype" or 2 other candidates (evd_kind/enum)
+[needs.invalid_field_value]
+  --> (need)
       fixtures/field_enums.rst:23:4
   FEAT_BAD_ENUMS:ears_pattern: "whenever" is not one of "ubiquitous", "state" or 4 other candidates (ears_pattern/enum)
 [needs.invalid_field_value]
@@ -19,4 +27,4 @@
   --> (need)
       fixtures/field_enums.rst:31:4
   TEST_BAD_ENUMS:test_kind: "smoke" is not one of "property", "positive" or "error_path" (test_kind/enum)
-Found 5 warning(s).
+Found 7 warning(s).
