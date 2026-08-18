@@ -83,6 +83,24 @@ echo "pre-commit: docs gate"
 UBC="$(pwd)/tools/ubc"
 [ -x "$UBC" ] || UBC="$UBC.exe"
 
+# `[ -x ]` IS NOT THE SAME QUESTION AS "does it run", measured 2026-08-20. A
+# binary can carry the execute bit and still be refused by group policy - exit
+# 126, "This program is blocked by group policy" - which is what AppLocker does
+# on this machine to anything outside a permitted path. The exec bit is set, so
+# `[ -x ]` answers yes, and the failure then surfaces as whatever the next
+# command happens to say. Before this probe existed it surfaced here as
+# "the documentation project has diagnostics", aborting the commit and sending
+# the author to fix documentation that was perfectly fine - the same
+# wrong-diagnosis shape this hook already guards against for a missing cargo and
+# for an unavailable licence.
+#
+# `--version` is the right probe: it is NOT licence-gated (it answers offline
+# with a cold cache), it costs one process, and it separates the cases exactly -
+# 0 when the binary runs, 126 when policy refuses it.
+ubc_runs() {
+    "$UBC" --version >/dev/null 2>&1
+}
+
 # Both ubc gates below depend on ubCode's free open-source grant, and BOTH
 # report an unavailable grant with exit 1 - the same code each uses for a real
 # defect. The message is the only discriminator, so it lives here once rather
@@ -123,6 +141,13 @@ elif [ ! -x "$UBC" ]; then
     # resolved path reads `tools/ubc` while the file on disk is `ubc.exe`.
     echo "pre-commit: ubc is not installed - skipping the docs gate"
     echo "pre-commit: install it with 'sh scripts/get-ubc.sh'"
+elif ! ubc_runs; then
+    # Present, executable by its file mode, and refused anyway. Treated exactly
+    # like "not installed": the hook is a convenience and CI is the authority, so
+    # an environment that will not run the tool must not block a commit.
+    echo "pre-commit: ubc is installed but will not run - skipping the docs gate"
+    echo "pre-commit: nothing is wrong with the binary; this is normally a policy"
+    echo "pre-commit: allowing execution only from certain paths. CI runs these gates."
 else
     licence_unavailable=0
 

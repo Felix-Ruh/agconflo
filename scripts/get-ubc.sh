@@ -207,8 +207,48 @@ mv -f "$temp" "$TARGET"
 trap - EXIT
 
 # --- confirm -----------------------------------------------------------------
+#
+# TWO DIFFERENT FAILURES ARE POSSIBLE HERE and they must not be reported as one.
+# The binary can run and report the wrong version - a bad pin, or an artefact
+# rebuilt upstream - or it can refuse to run at all. The second is not a bad
+# download: the bytes were verified against a recorded SHA-256 a few lines above,
+# so by this point the file is known to be the right file.
+#
+# Measured 2026-08-20, and it is why this block was rewritten: on Windows a
+# perfectly good binary outside a permitted path exits 126 with "This program is
+# blocked by group policy". The old code discarded stderr and printed "installed
+# binary reports ''", which reads as a corrupt download and sends the reader off
+# to re-check a checksum that already passed.
+#
+# stderr is captured rather than thrown away because the operating system says
+# exactly what is wrong, and that sentence is the entire diagnosis.
 
-installed=$("$TARGET" --version 2>/dev/null | head -n 1 || true)
+probe_err=$(mktemp)
+probe_status=0
+# Two shell traps at once, both of which this script has been bitten by before.
+# The `|| probe_status=$?` is required under `set -e`, which would otherwise abort
+# here on the very failure being diagnosed - the same reason the "already
+# installed?" probe above carries a `|| true`. And there is no pipe, because `$?`
+# after a pipeline reports the last command in it, so piping into `head` would
+# discard the status being tested.
+probe_out=$("$TARGET" --version 2>"$probe_err") || probe_status=$?
+installed=$(printf '%s\n' "$probe_out" | head -n 1)
+
+if [ "$probe_status" -ne 0 ] && [ -z "$installed" ]; then
+    echo "get-ubc: the binary was installed but will not run (exit $probe_status)." >&2
+    if [ -s "$probe_err" ]; then
+        sed 's/^/get-ubc:   /' "$probe_err" >&2
+    fi
+    echo "get-ubc: its bytes are correct - the SHA-256 checked above matched - so this is" >&2
+    echo "get-ubc: not a bad download and re-running will not help. Exit 126 means the file" >&2
+    echo "get-ubc: was found and refused, which on Windows is normally AppLocker or another" >&2
+    echo "get-ubc: group policy allowing execution only from certain paths." >&2
+    echo "get-ubc: The binary is left in place; move the clone somewhere execution is" >&2
+    echo "get-ubc: permitted rather than downloading it again." >&2
+    rm -f "$probe_err"
+    exit 1
+fi
+rm -f "$probe_err"
 
 if [ "$installed" != "$VERSION_STRING" ]; then
     echo "get-ubc: installed binary reports '$installed', expected '$VERSION_STRING'" >&2
