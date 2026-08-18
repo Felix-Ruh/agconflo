@@ -5,7 +5,8 @@
     "type-feat-arch": { "properties": { "type": { "const": "feat_arch" } } },
     "type-comp": { "properties": { "type": { "const": "comp" } } },
     "type-comp-req": { "properties": { "type": { "const": "comp_req" } } },
-    "type-test-case": { "properties": { "type": { "const": "test_case" } } }
+    "type-test-case": { "properties": { "type": { "const": "test_case" } } },
+    "type-requirement": { "properties": { "type": { "enum": ["feat_req", "comp_req"] } } }
   },
   "schemas": [
     {
@@ -97,13 +98,14 @@
     {
       "id": "feat-req-must-derive-from-a-stkh-req",
       "severity": "violation",
-      "message": "A feature requirement nobody asked for is the commonest way for scope to grow unnoticed. The network rule fires when the link is absent as well as when it points at the wrong type.",
+      "message": "A feature requirement nobody asked for is the commonest way for scope to grow unnoticed. This and every network rule below pair two keywords, because neither substitutes for the other: contains with minContains is the only one that fires when the link is ABSENT (minItems does not fire on an absent key), and items is the only one that sees a MIXED array, since contains asks merely that at least one target be of the right type. A wrong target therefore reports twice, once as absence of a valid link and once by name; that is the intended reading, presence then purity.",
       "select": { "$ref": "#/$defs/type-feat-req" },
       "validate": {
         "network": {
           "derived_from": {
             "contains": { "local": { "$ref": "#/$defs/type-stkh-req" } },
-            "minContains": 1
+            "minContains": 1,
+            "items": { "local": { "$ref": "#/$defs/type-stkh-req" } }
           }
         }
       }
@@ -117,7 +119,8 @@
         "network": {
           "realises": {
             "contains": { "local": { "$ref": "#/$defs/type-feat-req" } },
-            "minContains": 1
+            "minContains": 1,
+            "items": { "local": { "$ref": "#/$defs/type-feat-req" } }
           }
         }
       }
@@ -131,7 +134,8 @@
         "network": {
           "uses": {
             "contains": { "local": { "$ref": "#/$defs/type-comp" } },
-            "minContains": 1
+            "minContains": 1,
+            "items": { "local": { "$ref": "#/$defs/type-comp" } }
           }
         }
       }
@@ -145,7 +149,8 @@
         "network": {
           "derived_from": {
             "contains": { "local": { "$ref": "#/$defs/type-feat-req" } },
-            "minContains": 1
+            "minContains": 1,
+            "items": { "local": { "$ref": "#/$defs/type-feat-req" } }
           }
         }
       }
@@ -159,7 +164,8 @@
         "network": {
           "allocated_to": {
             "contains": { "local": { "$ref": "#/$defs/type-comp" } },
-            "minContains": 1
+            "minContains": 1,
+            "items": { "local": { "$ref": "#/$defs/type-comp" } }
           }
         }
       }
@@ -181,19 +187,9 @@
       "validate": {
         "network": {
           "verifies": {
-            "contains": {
-              "local": {
-                "allOf": [
-                  {
-                    "anyOf": [
-                      { "$ref": "#/$defs/type-feat-req" },
-                      { "$ref": "#/$defs/type-comp-req" }
-                    ]
-                  }
-                ]
-              }
-            },
-            "minContains": 1
+            "contains": { "local": { "$ref": "#/$defs/type-requirement" } },
+            "minContains": 1,
+            "items": { "local": { "$ref": "#/$defs/type-requirement" } }
           }
         }
       }

@@ -1,0 +1,22 @@
+# exit: 1
+[needs.schema_network_violation]
+  --> (need)
+      fixtures/rule_link_target_purity.rst:37:4
+  ARCH_PURITY:realises/COMP_PURITY: "feat_req" was expected (feat-arch-must-realise-a-feat-req[13]/local_fail)
+[needs.schema_network_violation]
+  --> (need)
+      fixtures/rule_link_target_purity.rst:37:4
+  ARCH_PURITY:uses/FEAT_PURITY: "comp" was expected (feat-arch-must-use-at-least-one-comp[14]/local_fail)
+[needs.schema_network_violation]
+  --> (need)
+      fixtures/rule_link_target_purity.rst:43:4
+  CREQ_PURITY:derived_from/COMP_PURITY: "feat_req" was expected (comp-req-must-derive-from-a-feat-req[15]/local_fail)
+[needs.schema_network_violation]
+  --> (need)
+      fixtures/rule_link_target_purity.rst:30:4
+  FEAT_PURITY:derived_from/COMP_PURITY: "stkh_req" was expected (feat-req-must-derive-from-a-stkh-req[12]/local_fail)
+[needs.schema_network_violation]
+  --> (need)
+      fixtures/rule_link_target_purity.rst:50:4
+  TEST_PURITY:verifies/COMP_PURITY: "comp" is not one of "feat_req" or "comp_req" (test-case-must-verify-a-requirement[18]/local_fail)
+Found 5 error(s).
