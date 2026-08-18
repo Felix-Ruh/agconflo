@@ -62,19 +62,19 @@ Fixture: rule_link_targets
 .. evd:: Evidence, used below as a wrong target for supersedes
    :id: EVD_TARGETS
    :evd_kind: measurement
-   :observed_on: 2026-08-20
+   :observed_on: 2026-08-18
    :observation: This evidence exists only to be pointed at by the wrong link type.
 
 .. dec:: A decision, used below as a wrong target for supported_by
    :id: DEC_TARGETS
    :dec_status: accepted
-   :decided_on: 2026-08-20
+   :decided_on: 2026-08-18
    :statement: Agconflo shall reject a decision link that resolves to the wrong type.
 
 .. dec:: Supported by a decision and superseding evidence, both inverted
    :id: DEC_WRONG_TARGETS
    :dec_status: accepted
-   :decided_on: 2026-08-20
+   :decided_on: 2026-08-18
    :supported_by: DEC_TARGETS
    :supersedes: EVD_TARGETS
    :statement: Agconflo shall reject a decision wired to the wrong kind of need.

@@ -36,5 +36,5 @@ Fixture: rule_statement_shape
 .. dec:: A decision that narrates rather than obliges
    :id: DEC_NARRATES
    :dec_status: accepted
-   :decided_on: 2026-08-20
+   :decided_on: 2026-08-18
    :statement: We evaluated three options and picked the second one.

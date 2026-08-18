@@ -83,7 +83,7 @@ echo "pre-commit: docs gate"
 UBC="$(pwd)/tools/ubc"
 [ -x "$UBC" ] || UBC="$UBC.exe"
 
-# `[ -x ]` IS NOT THE SAME QUESTION AS "does it run", measured 2026-08-20. A
+# `[ -x ]` IS NOT THE SAME QUESTION AS "does it run", measured 2026-08-18. A
 # binary can carry the execute bit and still be refused by group policy - exit
 # 126, "This program is blocked by group policy" - which is what AppLocker does
 # on this machine to anything outside a permitted path. The exec bit is set, so

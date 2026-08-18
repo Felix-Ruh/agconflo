@@ -214,7 +214,7 @@ trap - EXIT
 # download: the bytes were verified against a recorded SHA-256 a few lines above,
 # so by this point the file is known to be the right file.
 #
-# Measured 2026-08-20, and it is why this block was rewritten: on Windows a
+# Measured 2026-08-18, and it is why this block was rewritten: on Windows a
 # perfectly good binary outside a permitted path exits 126 with "This program is
 # blocked by group policy". The old code discarded stderr and printed "installed
 # binary reports ''", which reads as a corrupt download and sends the reader off
