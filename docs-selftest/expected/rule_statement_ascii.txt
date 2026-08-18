@@ -1,0 +1,22 @@
+# exit: 1
+[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_statement_ascii.rst:23:4
+  STKH_ASCII_NBSP:statement: "Agconflo shall record every context that a node consumed." does not match "^[A-Z][A-Za-z -]* shall .+\.$" (stkh-req-statement-must-oblige-with-shall[20]/properties/statement/pattern)
+[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_statement_ascii.rst:23:4
+  STKH_ASCII_NBSP:statement: {"pattern":"[^\\x00-\\x7F]"} is not allowed for "Agconflo shall record every context that a node consumed." (statement-must-use-only-plain-ascii-characters[32]/allOf/0/properties/statement/not)
+[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_statement_ascii.rst:33:4
+  STKH_ASCII_RESPONSE:statement: {"pattern":"[^\\x00-\\x7F]"} is not allowed for "Agconflo shall record every context that a node’s parameters bound." (statement-must-use-only-plain-ascii-characters[32]/allOf/0/properties/statement/not)
+[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_statement_ascii.rst:28:4
+  STKH_ASCII_SUBJECT:statement: "Agconflo’s run log shall record every context that a node consumed." does not match "^[A-Z][A-Za-z -]* shall .+\.$" (stkh-req-statement-must-oblige-with-shall[20]/properties/statement/pattern)
+[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_statement_ascii.rst:28:4
+  STKH_ASCII_SUBJECT:statement: {"pattern":"[^\\x00-\\x7F]"} is not allowed for "Agconflo’s run log shall record every context that a node consumed." (statement-must-use-only-plain-ascii-characters[32]/allOf/0/properties/statement/not)
+Found 5 error(s).

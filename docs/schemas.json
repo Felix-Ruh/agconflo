@@ -407,6 +407,19 @@
           ]
         }
       }
+    },
+    {
+      "id": "statement-must-use-only-plain-ascii-characters",
+      "severity": "violation",
+      "message": "A non-ASCII lookalike defeats every anchored rule below while looking correct on screen. The worst case measured: a non-breaking space between 'shall' and the response, which reads as a perfectly valid statement and is rejected by the grammar with nothing visible to fix. A typographic apostrophe is the same trap one step milder - the subject slot admits the ASCII one, so the message shows a pattern that appears to allow exactly what the statement appears to contain. This is a whitelist rather than a list of known offenders because the next lookalike is always worse than the last; a zero-width space would not even occupy a column. The bound stops at ASCII rather than at printable ASCII on purpose: a tab is expanded to spaces by the parser and so is visible, and a newline has its own rule with a better message. Cost, accepted: no micro sign, degree sign or inequality in a statement - write microseconds, degrees and at most.",
+      "select": { "required": ["statement"] },
+      "validate": {
+        "local": {
+          "allOf": [
+            { "properties": { "statement": { "not": { "pattern": "[^\\x00-\\x7F]" } } } }
+          ]
+        }
+      }
     }
   ]
 }
