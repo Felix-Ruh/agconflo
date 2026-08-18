@@ -95,3 +95,20 @@ other, and the bodies say where.
    blocked, or a run legitimately parked on a human gate is reported as
    deadlocked. That is the agreement this requirement owes to the human-in-the-run
    requirement above.
+
+.. stkh_req:: A failure says which failure it was
+   :id: STKH_TYPED_FAILURE
+   :stakeholder: maintainer
+   :statement: Agconflo shall report which failure occurred when a node fails.
+
+   This supersedes a placeholder rather than filling a gap. The design so far has
+   an erroring node panic and the whole run stop, with no retries, no timeouts and
+   no error edges - recorded openly as something to revisit once anything actually
+   ran. A panic cannot say which failure occurred.
+
+   The testing policy is what forces the issue: every expected failure mode gets a
+   test asserting which error happened and how the system behaved afterwards,
+   because a failure mode nobody can assert on is a failure mode nobody designed.
+   That is impossible against a panic, so a real typed error model is needed
+   earlier than the placeholder assumed, and this is the requirement every
+   error-path test case is written against.

@@ -25,3 +25,4 @@ because a wrongly shaped rule is silently ignored rather than rejected.
    stakeholder/context
    stakeholder/authoring
    stakeholder/execution
+   stakeholder/process
