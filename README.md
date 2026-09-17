@@ -149,6 +149,12 @@ what is shared with that project, not the build, which is `ubc`.
 
 Testing policy: property-based tests wherever a property can be stated, alongside ordinary positive
 tests and error-path tests that assert *which* failure occurs and how the system behaves afterwards.
+A third kind is a proof technique rather than a declared `test_kind` — a **defect-catching** test,
+which must fail against the pre-change code. It is what shows a change does what it claims, and it
+is not a substitute for the error-path test, which must pass against the final code.
+
+**How work is run here** — planning, reviewing a diff before committing, and the commit and
+reporting conventions — is in [AGENTS.md](AGENTS.md).
 
 ### The requirements metamodel
 
