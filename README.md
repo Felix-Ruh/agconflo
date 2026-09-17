@@ -147,8 +147,8 @@ architecture, decisions and test cases live in `docs/` as linked, schema-validat
 than prose, written in [Sphinx-Needs](https://sphinx-needs.readthedocs.io/) format — the format is
 what is shared with that project, not the build, which is `ubc`.
 
-Testing policy: property-based tests wherever a property can be stated, alongside ordinary positive
-tests and error-path tests that assert *which* failure occurs and how the system behaves afterwards.
+The testing policy, and how work is run here — planning, the review of a diff before committing, the
+commit conventions and what to stop and ask about — are in [AGENTS.md](AGENTS.md).
 
 ### The requirements metamodel
 
