@@ -70,10 +70,8 @@ repository asserts that the files contradict.
 
 ## Shell and tooling
 
-- The commit hook and the scripts are POSIX shell: run them through `sh`. PowerShell cannot execute
-  them directly.
-- `tools/ubc` is never on `PATH` and is always invoked by path; under Git Bash on Windows it
-  resolves to `tools/ubc.exe` by itself.
+- The shell rules — POSIX `sh` for the hook and the scripts, `ubc` invoked by path — are in the
+  README, under "Prerequisites" and "The commit hook". They apply unchanged.
 - **Exit 126 from a binary is group policy, not a bad download.** `[ -x ]` returns true for a
   blocked binary, so probe by running it — and ask rather than working around a block.
 - Write commit messages through a Bash heredoc. A PowerShell here-string mangles the subject line.

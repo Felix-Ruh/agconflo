@@ -147,14 +147,8 @@ architecture, decisions and test cases live in `docs/` as linked, schema-validat
 than prose, written in [Sphinx-Needs](https://sphinx-needs.readthedocs.io/) format — the format is
 what is shared with that project, not the build, which is `ubc`.
 
-Testing policy: property-based tests wherever a property can be stated, alongside ordinary positive
-tests and error-path tests that assert *which* failure occurs and how the system behaves afterwards.
-A third kind is a proof technique rather than a declared `test_kind` — a **defect-catching** test,
-which must fail against the pre-change code. It is what shows a change does what it claims, and it
-is not a substitute for the error-path test, which must pass against the final code.
-
-**How work is run here** — planning, reviewing a diff before committing, and the commit and
-reporting conventions — is in [AGENTS.md](AGENTS.md).
+The testing policy, and how work is run here — planning, the review of a diff before committing, the
+commit conventions and what to stop and ask about — are in [AGENTS.md](AGENTS.md).
 
 ### The requirements metamodel
 

@@ -108,8 +108,8 @@ Categories that produce hits here:
   depended on by accident, and no test of the fix can show that — its tests assert the new
   behaviour.
 - **Blast radius, not diff.** Which documents, rules, fixtures and gates reach the thing that
-  changed. A rule's array index appears in every message it produces, so editing `schemas.json`
-  reaches every golden below it.
+  changed. Editing `schemas.json` reaches every golden below the rule you touched, for the reason
+  the README gives under "Changing a rule".
 - **Mechanical.** Line endings, a bare key landing inside the previous table of a TOML file, a
   document added but never listed in the toctree.
 
@@ -188,9 +188,8 @@ and it costs minutes.
 
 ## Gates that go green without checking anything
 
-Measured, not folklore. Each of these reports success while doing less than it appears to. The
-README covers the two that live in the metamodel — a wrongly shaped rule is ignored rather than
-rejected, and a rule's array index appears in every message it produces. These are the rest.
+Measured, not folklore. Each of these reports success while doing less than it appears to. The two
+that live in the metamodel are in the README, under "Changing a rule"; these are the rest.
 
 **`ubc check <path>` filters diagnostics; it does not scope the check.** The whole project is
 resolved either way, and findings outside `<path>` are dropped. On a project carrying eight
@@ -225,8 +224,8 @@ changing an enum value is a change that needs its own fixture, not a neutral edi
 - One branch per unit of work: `infra/<topic>` for tooling and process, `step/<feature>/<slice>`
   for work through the V. One pull request, **squash-merged**, and the branch is kept afterwards so
   the commit-by-commit reasoning survives the squash.
-- `main` is protected with no admin bypass: both CI jobs must pass, commits are signed, history
-  stays linear, and a direct push is rejected.
+- `main` is protected and a direct push is rejected, so every change lands through a pull request.
+  The exact rules, and the one fork coupling worth knowing, are in the README.
 - **Never override the configured git identity.** No `-c user.email=...`, ever. The repository
   carries a signing setup; commit plainly and let it apply. If an identity looks wrong, ask.
 - **Subject: a capitalised imperative saying what changed in plain words** — "Stand up the
