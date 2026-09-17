@@ -186,6 +186,40 @@ and it costs minutes.
   formed, so no rule catches it. One propagated through thirteen places here and reached a
   queryable field, claiming a measurement taken in the future.
 
+## Gates that go green without checking anything
+
+Measured, not folklore. Each of these reports success while doing less than it appears to. The
+README covers the two that live in the metamodel — a wrongly shaped rule is ignored rather than
+rejected, and a rule's array index appears in every message it produces. These are the rest.
+
+**`ubc check <path>` filters diagnostics; it does not scope the check.** The whole project is
+resolved either way, and findings outside `<path>` are dropped. On a project carrying eight
+diagnostics in `decisions/`, `check --deny warning stakeholder/context.rst` prints `No errors
+found.` and exits 0. Passing a path does now print a notice that the whole project was resolved,
+which is the only hint. Never pass a path when the question is "is the project clean" — use the
+`( cd docs && ../tools/ubc check --deny warning )` subshell.
+
+**A Cypher gate is vacuously green in more ways than it looks.** Without `--strict`, an unknown
+label or property is a warning with an empty result and exit 0: `MATCH (n:not_a_real_type) RETURN
+n.id` prints `[]` and exits 0, and exits 1 only under `--strict`. But `--strict` catches just the
+unknown name — a well-formed query matching nothing still exits 0. **Pass `--strict` and count the
+rows yourself.** A gate asserting "no need violates this" is otherwise indistinguishable from one
+whose query could never match.
+
+**Cypher's regex is not `schemas.json`'s regex.** `=~` matches the whole value, so
+`n.statement =~ "shall"` returns nothing where `n.statement =~ ".*shall.*"` returns all 17
+stakeholder requirements. `\b` does not work either: `n.id =~ ".*\bSELF.*"` matches zero needs
+where `".*SELF.*"` matches one. A gate written with either mistake passes by matching nothing.
+
+**A stray key in `ubproject.toml` is dropped without a word.** It produces no diagnostic and it
+does not appear in `ubc config`. TOML also means a bare key appended at the end of the file belongs
+to whatever table precedes it rather than to the document, so it can be both misplaced and ignored.
+**Verify a config change by finding it in `ubc config` output**, never by the absence of complaints.
+
+**Declaring an enum field is already a rule.** A value outside it is `needs.invalid_field_value` at
+warning severity, and every gate here runs `--deny warning`, so it fails the build. Adding or
+changing an enum value is a change that needs its own fixture, not a neutral edit.
+
 ## Commits and branches
 
 - One branch per unit of work: `infra/<topic>` for tooling and process, `step/<feature>/<slice>`
