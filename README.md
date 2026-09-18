@@ -205,6 +205,9 @@ first time the number changes, and nothing checks prose.
 ```
 docs/index.rst            the table of contents, and nothing else
 docs/stakeholder/         what people want: context, authoring, execution, and the project's own goals
+docs/features/            per feature: its feature requirements, then its architecture
+docs/components/          per feature: its components, then the requirements allocated to them
+docs/tests/               per feature: how each of those requirements is checked
 docs/decisions/           choices made, grouped by what they are about
 docs/evidence/            measurements the decisions rest on
 ```

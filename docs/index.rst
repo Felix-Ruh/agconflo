@@ -28,6 +28,7 @@ because a wrongly shaped rule is silently ignored rather than rejected.
    stakeholder/process
    features/context
    components/context
+   tests/context
    decisions/context
    decisions/toolchain
    evidence/toolchain
