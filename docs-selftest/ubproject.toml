@@ -6,6 +6,11 @@
 #
 #     sh scripts/docs-selftest.sh
 #
+# The gate_<name>.rst fixtures are the exception. They break a Cypher gate in
+# scripts/gates/ and no schema rule, so their golden files record no diagnostics
+# on purpose - that is the evidence the gate is needed at all. The gate's own
+# check, scripts/cypher-gates.sh, reads them by a naming convention instead.
+#
 # WHY A WHOLE DIRECTORY OF BROKEN NEEDS EXISTS. A wrongly shaped schema rule is
 # not rejected by ubc, it is silently ignored - measured four ways: a composite
 # keyword placed directly under validate.local, a misspelled keyword, a keyword

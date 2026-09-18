@@ -75,6 +75,7 @@ documentation gate skips itself and tells you the command to fix that.
 sh .githooks/pre-commit                                        # everything the commit gate does
 ( cd docs && ../tools/ubc check --deny warning )               # lint the requirements project
 sh scripts/docs-selftest.sh                                    # prove the metamodel's rules still fire
+sh scripts/cypher-gates.sh                                     # run each Cypher gate, proved first
 tools/ubc query cypher --project docs 'MATCH (n) RETURN n.id'  # query the needs graph
 ```
 
@@ -88,8 +89,8 @@ with "No configuration file found". Under Git Bash on Windows, `tools/ubc` resol
 execute it directly.
 
 It scans staged changes for credentials — this repository is public, so a leak is permanent — then
-checks and format-checks the requirements project, then runs the metamodel self-test, then
-`cargo fmt --check`, `clippy -D warnings` and the tests. Both toolchains degrade rather than block: a
+checks and format-checks the requirements project, runs the Cypher gates, runs the metamodel
+self-test, then `cargo fmt --check`, `clippy -D warnings` and the tests. Both toolchains degrade rather than block: a
 missing `ubc` or a missing `cargo` skips its own gate with a message rather than failing the commit, and
 the Rust steps are also skipped while the workspace has no crates in it.
 
@@ -98,15 +99,15 @@ the driver, or the pinned `ubc` version. It costs around a quarter of a second p
 safe to filter precisely because each fixture is checked as a one-file project, so editing prose in
 `docs/` cannot change its result. CI runs it unconditionally regardless.
 
-Both `ubc` steps are licensed through ubCode's free open-source grant, which is determined from the
-repository's remote and needs network access — the answer is then cached for a few days. `ubc format`
-needs the grant at any size; `ubc check` has a five-file free tier, and **`docs/` is past it**, so both
-now depend on it. In practice that means a machine which has been offline longer than the cached answer
+Every `ubc` step except the self-test is licensed through ubCode's free open-source grant, which is
+determined from the repository's remote and needs network access — the answer is then cached for a
+few days. `ubc format` and the Cypher gates need the grant at any size; `ubc check` has a five-file
+free tier, and **`docs/` is past it**, so all three now depend on it. In practice that means a machine which has been offline longer than the cached answer
 lives gets **no local documentation checking at all** — it is told so plainly, and the commit proceeds.
 
 An unavailable grant is reported with the same exit code as a real defect, so the hook tells the two
 apart by the message rather than sending you to fix documentation that is fine. CI has the grant, runs
-both, and fails hard; it is the authority.
+all of them, and fails hard; it is the authority.
 
 `git commit --no-verify` bypasses the hook deliberately.
 
@@ -234,6 +235,19 @@ Two rules of thumb. **Every rule needs a fixture that fails without it** — the
 rule in `schemas.json` that no golden file mentions. And **append new rules to the end of
 `schemas.json`, never insert**: a rule's array index appears in every message it produces, so inserting
 one re-blesses every golden below it for nothing.
+
+### Adding a Cypher gate
+
+Some checks compare two needs — a requirement's statement against the title of the component it is
+allocated to — and no schema rule can express that. Those are Cypher queries in
+`scripts/gates/<name>.cypher`, run by `sh scripts/cypher-gates.sh`, and a gate passes when its query
+returns no rows. A query must return a column named `offender`; rows without one are refused rather
+than counted as none.
+
+Every gate needs `docs-selftest/fixtures/gate_<name>.rst`, and the runner proves the gate on it before
+trusting it on `docs/`: every need there whose id contains `_BAD_` must be reported, and no other may
+be. The controls matter as much as the offenders — the first version of the subject-agreement gate
+reported five valid requirements and missed one wrong one.
 
 ## Licence
 

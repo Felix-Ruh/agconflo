@@ -3,10 +3,11 @@
 # Two gates, mirroring .githooks/pre-commit: the Rust one - dormant until the
 # workspace has crates - and the documentation one.
 #
-# THE DOCS JOB IS ALSO A LICENCE PROBE, and it now has three grant-sensitive
-# steps rather than one. `ubc format` and `ubc query cypher` are gated at any
-# size; `ubc check` is gated above five files - measured 2026-08-17 - and docs/
-# passed that mark once the decisions and evidence landed. So a green check here
+# THE DOCS JOB IS ALSO A LICENCE PROBE, and it now has four grant-sensitive
+# steps rather than one. `ubc format` and `ubc query cypher` - which the Cypher
+# gates run as well - are gated at any size; `ubc check` is gated above five
+# files - measured 2026-08-17 - and docs/ passed that mark once the decisions
+# and evidence landed. So a green check here
 # now does prove the free open-source grant held, where once it proved nothing.
 # That the grant works on a runner was the project-level go/no-go, answered on
 # this workflow's first run.
@@ -134,6 +135,15 @@ jobs:
       - name: docs self-test
         run: sh scripts/docs-selftest.sh
 
+      # Graph queries that must return no rows. The runner proves each gate
+      # fires on its fixture in docs-selftest/ before running it on docs/, so a
+      # query that can never match fails here rather than passing. Unlike the
+      # self-test above this IS licence-gated - `query cypher` is gated at any
+      # size - so it has a step id and is covered by the diagnosis below.
+      - name: Cypher gates
+        id: gates
+        run: sh scripts/cypher-gates.sh
+
       # The load-bearing step. The output is asserted on, not merely the exit
       # code, so that a green run means the need was really returned - and it
       # is written to a file rather than piped, because `$?` after a pipe
@@ -161,16 +171,18 @@ jobs:
       # intentionally not restored here, because caching it would hide the very
       # thing this job exists to measure.
       #
-      # All three ubc steps are covered, not just the Cypher one: `format` is
-      # gated at any size and `check` above five files, so either can fail for
-      # this reason and both report it with exit 1 - the same code they use for a
-      # real defect. The cost of the wider condition is that a genuine
+      # All four ubc steps are covered, not just the Cypher probe: `format` and
+      # the Cypher gates are gated at any size and `check` above five files, so
+      # any of them can fail for this reason. `check` and `format` report it with
+      # exit 1 - the same code they use for a real defect - and the gates runner
+      # exits 1 for both as well. The cost of the wider condition is that a genuine
       # diagnostic or formatting difference also prints this network detail,
       # which is noise rather than harm.
       - name: Diagnose a failed ubc licence determination
         if: >-
           failure() && (steps.check.outcome == 'failure'
           || steps.format.outcome == 'failure'
+          || steps.gates.outcome == 'failure'
           || steps.licence.outcome == 'failure')
         run: |
           echo '--- can this runner reach github.com? ---'

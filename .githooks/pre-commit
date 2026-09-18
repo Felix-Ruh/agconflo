@@ -212,11 +212,42 @@ else
         if [ "$fmt_status" -ne 0 ]; then
             echo "$fmt_output"
             if is_licence_failure "$fmt_output"; then
+                licence_unavailable=1
                 echo "pre-commit: WARNING - ubc could not confirm the open-source licence"
                 echo "pre-commit: WARNING - grant, so the documentation formatter did not run."
                 echo "pre-commit: WARNING - This usually means no network access. CI runs it."
             else
                 fail "documentation formatting differs; run 'tools/ubc format --preview docs', review it, and stage the result"
+            fi
+        fi
+    fi
+
+    # The Cypher gates: graph queries that must return no rows, each proved to
+    # fire on its own fixture before it is run on docs/ - see
+    # scripts/cypher-gates.sh. Measured at about half a second for one gate.
+    #
+    # NOT restricted to commits that touch docs/, for the same reason `check`
+    # above is not: a gate reads the whole graph, so any requirement can trip it.
+    #
+    # `query cypher` is licence-gated at any project size, so it degrades exactly
+    # as the two steps above do, recognised by the same wording through
+    # is_licence_failure rather than a second copy of it. The runner prints ubc's
+    # own output when ubc fails, which is what makes that recognition possible.
+    if [ "$licence_unavailable" -eq 1 ]; then
+        echo "pre-commit: skipping the Cypher gates - the same grant gates them"
+    else
+        echo "pre-commit: Cypher gates"
+        gates_output=$(sh scripts/cypher-gates.sh 2>&1)
+        gates_status=$?
+        echo "$gates_output"
+
+        if [ "$gates_status" -ne 0 ]; then
+            if is_licence_failure "$gates_output"; then
+                echo "pre-commit: WARNING - ubc could not confirm the open-source licence"
+                echo "pre-commit: WARNING - grant, so the Cypher gates did not run."
+                echo "pre-commit: WARNING - This usually means no network access. CI runs them."
+            else
+                fail "a Cypher gate failed"
             fi
         fi
     fi
@@ -307,10 +338,10 @@ fi
 # rustfmt.toml pins `newline_style = "Unix"`, which together make a CRLF commit
 # impossible rather than merely detectable — leaving nothing for a check to find.
 #
-# The ubCode licence probe (`ubc query cypher`) is NOT run here. That is CI's
-# job: it would make every commit depend on a network round trip, and once docs/
-# holds more than five files the check step above is a licence probe in its own
-# right, since it cannot run unlicensed either. What is lost locally is only the
+# CI's licence DIAGNOSIS is NOT run here - the curl to github.com and the dump of
+# the cached determination. `ubc query cypher` itself now is, as the Cypher gates
+# above, but only after `check` has already shown the grant is available, so it
+# adds no network dependency of its own. What is lost locally is only the
 # distinction between a genuine denial and an unreachable github.com, which the
 # CI docs job diagnoses.
 #
