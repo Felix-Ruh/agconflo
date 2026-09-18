@@ -12,6 +12,10 @@ this be false while its parent is true? The body of each says how, because a
 feature requirement that cannot fail independently of its parent is a
 restatement, and nothing in the toolchain catches one.
 
+The feature's architecture closes the file. It realises all five requirements
+and names the components they are divided between, which are defined in
+``components/context``.
+
 .. feat_req:: A context is identifiable
    :id: FEAT_CONTEXT_IDENTITY
    :derived_from: STKH_PROVENANCE
@@ -119,3 +123,48 @@ restatement, and nothing in the toolchain catches one.
    Checking the wiring itself is not this feature's work. That obligation
    belongs to ``STKH_WIRING_CHECKED`` and to a feature that has a workflow to
    validate, which this one does not.
+
+.. feat_arch:: Context splits into a value, an identifier source and a walker
+   :id: ARCH_CONTEXT
+   :realises: FEAT_CONTEXT_IDENTITY, FEAT_CONTEXT_PARTS, FEAT_CONTEXT_LINEAGE, FEAT_CONTEXT_STABLE_CONTENT, FEAT_CONTEXT_DECLARED_TYPE
+   :uses: COMP_CONTEXT_VALUE, COMP_IDENTIFIER_SOURCE, COMP_LINEAGE_WALKER
+   :statement: Agconflo shall allocate context handling to the context value, the identifier source and the lineage walker.
+
+   Three components, each answerable for requirements the other two cannot
+   guarantee:
+
+   - The context value answers for ``FEAT_CONTEXT_PARTS``,
+     ``FEAT_CONTEXT_STABLE_CONTENT`` and ``FEAT_CONTEXT_DECLARED_TYPE``. All
+     three are true or false of one value taken alone.
+   - The identifier source answers for ``FEAT_CONTEXT_IDENTITY``. Uniqueness is
+     a relation between contexts, and no value can guarantee it about itself.
+   - The lineage walker answers for ``FEAT_CONTEXT_LINEAGE``. Ancestry is a
+     traversal over many values that share parts, and it fails in ways that a
+     single value does not.
+
+   Folding the walker into the value was the obvious alternative, and it lost on
+   allocation rather than on taste. The walker's component requirements - a
+   shared ancestor reported once, nesting of any depth - have failure modes that
+   belong to no single value, and a component requirement needs one subject that
+   owns its behaviour.
+
+   The decisions this is built against are named here rather than linked:
+
+   - ``DEC_CONTEXT_API``: content is reached only through operations - the
+     rendered content, the parts, the ancestry - and never through a public text
+     field. That keeps rendering free to become lazy later, and it is why stable
+     content is a requirement on a computation rather than on a stored string.
+   - ``DEC_COMPOSITION_BY_REFERENCE``: a composed value holds ordered references
+     to its parts and the join that combines them, never a flattened copy.
+   - ``DEC_IDENTITY_PER_ACTIVATION`` is why identifiers come from a separate
+     source: they are issued when an activation produces a context, and an
+     activation belongs to a run rather than to any value. Until the engine
+     exists, one source stands for one run.
+   - ``DEC_NO_CONTENT_ADDRESSING``: the source generates identifiers and never
+     derives one from content, and nothing compares content to decide identity.
+   - ``DEC_CONTEXT_TYPING``: the declared type travels on the value, so it cannot
+     be erased once the wiring has been checked.
+   - ``DEC_METADATA_TRANSFORMED`` is recorded as an absence. No component here
+     carries metadata, because it has no requirement to answer to until Transform
+     nodes exist, and behind the API it can be added later without breaking any
+     caller.
