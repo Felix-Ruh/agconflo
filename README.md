@@ -76,6 +76,7 @@ sh .githooks/pre-commit                                        # everything the 
 ( cd docs && ../tools/ubc check --deny warning )               # lint the requirements project
 sh scripts/docs-selftest.sh                                    # prove the metamodel's rules still fire
 sh scripts/cypher-gates.sh                                     # run each Cypher gate, proved first
+sh scripts/cypher-gates.sh --report                            # print the review reports
 tools/ubc query cypher --project docs 'MATCH (n) RETURN n.id'  # query the needs graph
 ```
 
@@ -90,9 +91,9 @@ execute it directly.
 
 It scans staged changes for credentials — this repository is public, so a leak is permanent — then
 checks and format-checks the requirements project, runs the Cypher gates, runs the metamodel
-self-test, then `cargo fmt --check`, `clippy -D warnings` and the tests. Both toolchains degrade rather than block: a
-missing `ubc` or a missing `cargo` skips its own gate with a message rather than failing the commit, and
-the Rust steps are also skipped while the workspace has no crates in it.
+self-test, then `cargo fmt --check`, `clippy -D warnings` and the tests. Both toolchains degrade
+rather than block: a missing `ubc` or a missing `cargo` skips its own gate with a message rather than
+failing the commit, and the Rust steps are also skipped while the workspace has no crates in it.
 
 The self-test is the one step restricted to commits that can affect it — the metamodel, the fixtures,
 the driver, or the pinned `ubc` version. It costs around a quarter of a second per fixture, and it is
@@ -101,9 +102,10 @@ safe to filter precisely because each fixture is checked as a one-file project, 
 
 Every `ubc` step except the self-test is licensed through ubCode's free open-source grant, which is
 determined from the repository's remote and needs network access — the answer is then cached for a
-few days. `ubc format` and the Cypher gates need the grant at any size; `ubc check` has a five-file
-free tier, and **`docs/` is past it**, so all three now depend on it. In practice that means a machine which has been offline longer than the cached answer
-lives gets **no local documentation checking at all** — it is told so plainly, and the commit proceeds.
+few days. `ubc format` and the Cypher queries need the grant at any size; `ubc check` has a five-file
+free tier, and **`docs/` is past it**, so all of them now depend on it. In practice that means a
+machine which has been offline longer than the cached answer lives gets **no local documentation
+checking at all** — it is told so plainly, and the commit proceeds.
 
 An unavailable grant is reported with the same exit code as a real defect, so the hook tells the two
 apart by the message rather than sending you to fix documentation that is fine. CI has the grant, runs
@@ -251,6 +253,12 @@ Every gate needs `docs-selftest/fixtures/gate_<name>.rst`, and the runner proves
 trusting it on `docs/`: every need there whose id contains `_BAD_` must be reported, and no other may
 be. The controls matter as much as the offenders — the first version of the subject-agreement gate
 reported five valid requirements and missed one wrong one.
+
+A question whose honest answer is sometimes "yes" is a **report** instead:
+`scripts/reports/<name>.cypher` with a fixture `report_<name>.rst`, proved the same way, whose rows in
+`docs/` are printed for a person to read rather than failing anything.
+`sh scripts/cypher-gates.sh --report` runs them. The hook does not, since output nobody asked for on
+every commit is output nobody reads; CI does, so a report whose query has stopped working fails there.
 
 ## Licence
 

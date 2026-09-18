@@ -31,4 +31,6 @@ because a wrongly shaped rule is silently ignored rather than rejected.
    tests/context
    decisions/context
    decisions/toolchain
+   decisions/requirements
    evidence/toolchain
+   evidence/requirements
