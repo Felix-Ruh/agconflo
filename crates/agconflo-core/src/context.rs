@@ -20,6 +20,7 @@ impl ContextType {
     ///
     /// Which characters a name may hold is left to the workflow format, which
     /// is why the error is open to further kinds.
+    // @A declared type that refuses an empty name,IMPL_CONTEXT_TYPE,impl,[CREQ_VALUE_DECLARED_TYPE]
     pub fn new(name: &str) -> Result<Self, InvalidTypeName> {
         if name.is_empty() {
             return Err(InvalidTypeName::Empty);
@@ -95,6 +96,7 @@ impl Context {
     /// Takes the source rather than an identifier: identifiers can be copied,
     /// so accepting one would let a single identifier label two contexts.
     /// Refused only when the source has run out, and then nothing is created.
+    // @Text held byte for byte,IMPL_CONTEXT_TEXT,impl,[CREQ_VALUE_TEXT_EXACT]
     pub fn text(
         source: &mut IdSource,
         declared_type: ContextType,
@@ -113,6 +115,7 @@ impl Context {
     /// be none at all. The composition's type is `declared_type`, whatever the
     /// parts' types are. Refused only when the source has run out, and then
     /// nothing is created.
+    // @Composing by reference under a declared type,IMPL_CONTEXT_COMPOSE,impl,[CREQ_VALUE_PARTS_BY_REFERENCE, CREQ_VALUE_DECLARED_TYPE]
     pub fn compose<'a>(
         source: &mut IdSource,
         declared_type: ContextType,
@@ -148,6 +151,7 @@ impl Context {
 
     /// The parts of a composed context, in the order they were given, each the
     /// context itself. A text context has none.
+    // @Parts returned as the originals,IMPL_CONTEXT_PARTS,impl,[CREQ_VALUE_PARTS_BY_REFERENCE]
     pub fn parts(&self) -> &[Context] {
         match &self.0.content {
             Content::Text(_) => &[],
@@ -162,6 +166,7 @@ impl Context {
     /// composition comes back as its parts' content in order, joined by its
     /// separator, computed on each read; that is why this is a `Cow` rather than
     /// a `&str`, which would need a stored copy to point into.
+    // @Text rendered exactly and parts joined,IMPL_CONTEXT_RENDER,impl,[CREQ_VALUE_TEXT_EXACT, CREQ_VALUE_RENDER_JOINED]
     pub fn render(&self) -> Cow<'_, str> {
         match &self.0.content {
             Content::Text(text) => Cow::Borrowed(text),
@@ -229,6 +234,7 @@ impl fmt::Debug for Context {
 /// A part is taken apart here only when this was its last holder, which is
 /// exactly when `Arc::into_inner` hands it over. A part still held anywhere
 /// else is left whole.
+// @A deep chain released without recursion,IMPL_CONTEXT_RELEASE,impl,[CREQ_VALUE_PARTS_BY_REFERENCE]
 impl Drop for Node {
     fn drop(&mut self) {
         let Content::Composed { parts, .. } = &mut self.content else {

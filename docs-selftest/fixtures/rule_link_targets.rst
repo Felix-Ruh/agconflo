@@ -78,3 +78,8 @@ Fixture: rule_link_targets
    :supported_by: DEC_TARGETS
    :supersedes: EVD_TARGETS
    :statement: Agconflo shall reject a decision wired to the wrong kind of need.
+
+.. impl:: Implements a feature requirement, skipping the component level
+   :id: IMPL_WRONG_TARGET
+   :implements: FEAT_WRONG_PARENT
+   :code_url: https://example.invalid/src/lib.rs#L1

@@ -66,6 +66,11 @@ error[needs.schema_definition_violation]
     note: Choosing how a behaviour will be shown to hold is what makes this a level of its own; the pattern decides which grammar the statement is held to.
 error[needs.schema_definition_violation]
   --> (need)
+      fixtures/rule_mandatory_fields.rst:48:4
+  IMPL_NO_FIELDS:impl-must-have-a-code-url: "code_url" is a required property (impl-must-have-a-code-url[44]/required)
+    note: An implementation that does not say where its code is traces a requirement to nowhere. codelinks fills this from the marker's own location - measured visible to this rule, and missing when that is switched off - so an implementation without it was either written by hand or produced by a configuration that no longer records where code is.
+error[needs.schema_definition_violation]
+  --> (need)
       fixtures/rule_mandatory_fields.rst:18:4
   STKH_NO_FIELDS:stkh-req-must-have-a-statement-and-a-stakeholder: "statement" is a required property (stkh-req-must-have-a-statement-and-a-stakeholder[6]/required)
     note: A goal with no owner cannot be prioritised or retired, and the obligation must be in the statement field because a need's body is invisible to validation.
@@ -84,4 +89,4 @@ error[needs.schema_definition_violation]
       fixtures/rule_mandatory_fields.rst:38:4
   TEST_NO_FIELDS:test-case-must-have-a-kind-and-a-coverage: "coverage" is a required property (test-case-must-have-a-kind-and-a-coverage[11]/required)
     note: The kind carries the testing policy - property-based, positive, or error-path - and coverage says whether this case settles its requirement or only part of it.
-Found 17 error(s).
+Found 18 error(s).

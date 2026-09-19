@@ -185,6 +185,65 @@ against.
    ``impl`` need with an ``implements`` relationship to that component
    requirement, queryable in Cypher; the built-in ``links`` carried nothing.
 
+.. evd:: A code location filled in by codelinks is visible to schema rules
+   :id: EVD_CODELINKS_URL_VISIBLE
+   :evd_kind: measurement
+   :observed_on: 2026-09-19
+   :observation: On ubc 0.35.0 an implementation produced from a code marker satisfied a rule requiring code_url while set_local_url filled it, and failed the same rule once set_local_url was off.
+
+   Taken in a two-file project - one document and one Rust file, inside the
+   unlicensed free tier - with ``local_url_field`` naming ``code_url``. A
+   hand-written implementation with no ``code_url`` failed the rule under both
+   settings, which shows the rule was live. A second rule requiring a field no
+   implementation had fired on the code-derived one under both settings, which
+   shows rules reach needs produced from code at all.
+
+   It matters because a need's body is invisible to the same validation
+   (``EVD_CONTENT_INVISIBLE``). Had a filled-in location been invisible too, a
+   rule requiring it would have failed every real implementation.
+
+.. evd:: A remote code URL pairs the checked-out commit with the working tree
+   :id: EVD_CODELINKS_REMOTE_URL
+   :evd_kind: measurement
+   :observed_on: 2026-09-19
+   :observation: On ubc 0.35.0 a remote_url_pattern of blob/{commit}/{path}#L{line} gave HEAD's full commit, the path from the git root and the marker's line in the working tree, so an uncommitted edit moved the line against an unchanged commit.
+
+   Taken in a scratch git repository shaped like this one, with the URL
+   revealed by a rule designed to fail and print it. A marker on line 3 of a
+   committed file gave that file's path from the repository root and ``#L3``.
+   After two lines were added above it without committing, the same commit was
+   paired with ``#L5``, which on the host names a different line; a new,
+   untracked file was given a link into a commit that does not contain it.
+
+   In CI the checkout is the commit itself, so the two agree, and the value is
+   recomputed at every index and never committed.
+
+.. evd:: Traced Rust files do not count toward the unlicensed tier
+   :id: EVD_CODELINKS_FREE_TIER
+   :evd_kind: measurement
+   :observed_on: 2026-09-19
+   :observation: On ubc 0.35.0 a project with four documents and six traced Rust files checked without a licence, six documents with the same Rust files did not, and a project extending the configuration indexed no code needs without a src-trace directive.
+
+   Taken outside this repository, where the open-source grant does not apply.
+   The refusal named six files to index, which is the documents alone. The
+   extending project was one fixture checked the way ``docs-selftest`` checks
+   each of its own: it exited 0 and printed nothing, since only a src-trace
+   directive brings code needs into a project.
+
+.. evd:: Need-id references keep only the first call site
+   :id: EVD_NEED_ID_REFS_KEEP_FIRST
+   :evd_kind: measurement
+   :observed_on: 2026-09-19
+   :observation: On ubc 0.35.0 two need-id references to one requirement, in two Rust files, gave it the location of the first alone, with no diagnostic about the second.
+
+   The location was written to the requirement's URL field and revealed by a
+   rule designed to fail and print it. As a control, removing the first reference
+   gave the second file's location, so the second had been read and dropped
+   rather than never found.
+
+   A one-line marker makes a need of its own for each place instead, so two
+   places are two needs, each with its location.
+
 .. evd:: An empty external needs file is legal and a missing one is not
    :id: EVD_EXTERNAL_ZERO_NEEDS
    :evd_kind: measurement

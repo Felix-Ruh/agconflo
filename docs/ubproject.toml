@@ -91,9 +91,9 @@ id_regex = "^[A-Z]+_[A-Z0-9_]+$"
 # NOT enforced by ubc, though: measured, a feat_req carrying the id
 # STKH_MISPLACED passes every built-in check. Enforcement is a schema rule.
 #
-# `impl` and `test_run` are deliberately absent. Nothing can create them until
-# codelinks points at the crates and test results are imported, and a coverage
-# rule naming a type nobody can author would fire on every need in the project.
+# `test_run` is deliberately absent: nothing can create one until test results
+# are imported. A type is declared together with whatever produces it, as
+# `impl` is with the code markers of the [codelinks] section below.
 # -----------------------------------------------------------------------------
 
 [[needs.types]]
@@ -178,6 +178,20 @@ directive = "evd"
 title = "Evidence"
 prefix = "EVD_"
 
+[[needs.types]]
+# Where a component requirement is met in code. Not meant to be written in a
+# document: each one is produced from a one-line marker in the Rust source,
+# which keeps the trace beside the code it describes rather than in prose that
+# drifts from it. Decided by `code_url`, which says where that code is, and by
+# `implements`, which says what it answers for. Only the fixtures in
+# docs-selftest/ write one by hand, because a diagnostic raised in Rust source
+# carries an absolute path that no golden file could hold.
+#
+# The id comes from the marker, so nothing but the rules checks it.
+directive = "impl"
+title = "Implementation"
+prefix = "IMPL_"
+
 # -----------------------------------------------------------------------------
 # Links.
 #
@@ -228,6 +242,16 @@ description = "The single component answerable for this requirement."
 outgoing = "verifies"
 incoming = "verified by"
 description = "The requirement this test case checks."
+
+# Its own link rather than ubc's built-in `links`, which a code marker would fill
+# by default. `links` belongs to no level, which is exactly why docs-selftest's
+# dead-link fixture uses it: giving it a meaning here would tie that fixture to
+# the implementation level. Measured: a marker's last field can populate a
+# custom list link instead (EVD_CODELINKS_CUSTOM_LINK).
+[needs.links.implements]
+outgoing = "implements"
+incoming = "implemented by"
+description = "The component requirement this code answers for."
 
 # The two links below are the exception to that direction, and it is justified by
 # the rule's own reason rather than in spite of it. Links point up the V so they
@@ -355,6 +379,20 @@ description = "Where this component lives in the workspace."
 nullable = true
 schema = { type = "string" }
 
+[needs.fields.code_url]
+# Where an implementation is, filled in by codelinks from the marker's own
+# location rather than written by anyone. Measured: a value filled in this way
+# is visible to schema validation, where a need's body is not
+# (EVD_CODELINKS_URL_VISIBLE), so a rule can require it.
+#
+# It holds a permalink into the repository at the commit being checked; the
+# [codelinks] section at the end of this file says why that and not a local
+# file URL. Left a free string, since a pattern here would be a rule with a
+# fixture of its own, guarding a value only codelinks writes.
+description = "Where this implementation lives in the source."
+nullable = true
+schema = { type = "string" }
+
 [needs.fields.test_kind]
 # The testing policy, made checkable. Every expected failure mode gets an
 # error-path case asserting WHICH error occurs and what happens next, because a
@@ -430,3 +468,63 @@ schema = { type = "string", pattern = "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
 description = "The date this was observed, as YYYY-MM-DD."
 nullable = true
 schema = { type = "string", pattern = "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
+
+# -----------------------------------------------------------------------------
+# Code.
+#
+# codelinks reads one-line markers from the Rust source and turns each into an
+# `impl` need, which docs/code/<crate>.rst brings into the graph with a
+# `src-trace` directive. A marker is an ordinary comment:
+#
+#     // @<title>,<IMPL id>,impl,[<component requirement ids>]
+#
+# ONE-LINE MARKERS ONLY. `@need-ids:` references are switched off: two call
+# sites referencing one need keep only the first, with no diagnostic, where two
+# markers both survive with their own locations (EVD_NEED_ID_REFS_KEEP_FIRST).
+#
+# The include glob must begin with `**/`. It is NOT relative to `src_dir`:
+# measured, a pattern written relative to it matched nothing and the check
+# stayed green with no code traced at all (EVD_CODELINKS_INCLUDE). This one
+# also keeps a crate-local target/ and every other crate out.
+#
+# `code_url` is a permalink into the repository at the commit being checked:
+# the same on every machine, and valid once pushed. `{commit}` is HEAD and
+# `{line}` comes from the working tree, so an uncommitted edit points a link at
+# the wrong line until it is committed; CI checks a clean tree, where they
+# agree (EVD_CODELINKS_REMOTE_URL). The value is computed at every index and
+# never committed. A local file URL was the alternative, and it names one
+# machine's absolute path.
+#
+# docs-selftest/ inherits all of this through `extend`, harmlessly: code needs
+# appear only where a src-trace directive asks for them, and the Rust files do
+# not count toward the unlicensed five-file tier the fixtures rely on
+# (EVD_CODELINKS_FREE_TIER).
+# -----------------------------------------------------------------------------
+
+[codelinks]
+set_remote_url = true
+remote_url_field = "code_url"
+
+[codelinks.projects.agconflo-core]
+remote_url_pattern = "https://github.com/Felix-Ruh/agconflo/blob/{commit}/{path}#L{line}"
+
+[codelinks.projects.agconflo-core.source_discover]
+src_dir = "../crates"
+include = ["**/agconflo-core/src/**/*.rs"]
+comment_type = "rust"
+
+[codelinks.projects.agconflo-core.analyse]
+get_oneline_needs = true
+get_need_id_refs = false
+
+[codelinks.projects.agconflo-core.analyse.oneline_comment_style]
+start_sequence = "@"
+end_sequence = "\n"
+field_split_char = ","
+# `implements` in the place of the default `links`: see [needs.links.implements].
+needs_fields = [
+    { name = "title", type = "str" },
+    { name = "id", type = "str" },
+    { name = "type", type = "str", default = "impl" },
+    { name = "implements", type = "list[str]", default = [] },
+]

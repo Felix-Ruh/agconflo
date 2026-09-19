@@ -8,7 +8,8 @@
     "type-test-case": { "properties": { "type": { "const": "test_case" } } },
     "type-requirement": { "properties": { "type": { "enum": ["feat_req", "comp_req"] } } },
     "type-dec": { "properties": { "type": { "const": "dec" } } },
-    "type-evd": { "properties": { "type": { "const": "evd" } } }
+    "type-evd": { "properties": { "type": { "const": "evd" } } },
+    "type-impl": { "properties": { "type": { "const": "impl" } } }
   },
   "schemas": [
     {
@@ -518,6 +519,35 @@
           "supersedes": {
             "contains": { "local": { "$ref": "#/$defs/type-dec" } },
             "minContains": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "impl-id-must-start-with-impl",
+      "severity": "violation",
+      "message": "An id whose prefix disagrees with its type makes every id-based reading of the graph unreliable. An implementation's id is typed into a code marker, where nothing else checks it.",
+      "select": { "$ref": "#/$defs/type-impl" },
+      "validate": { "local": { "properties": { "id": { "pattern": "^IMPL_" } } } }
+    },
+    {
+      "id": "impl-must-have-a-code-url",
+      "severity": "violation",
+      "message": "An implementation that does not say where its code is traces a requirement to nowhere. codelinks fills this from the marker's own location - measured visible to this rule, and missing when that is switched off - so an implementation without it was either written by hand or produced by a configuration that no longer records where code is.",
+      "select": { "$ref": "#/$defs/type-impl" },
+      "validate": { "local": { "required": ["code_url"] } }
+    },
+    {
+      "id": "impl-must-implement-a-comp-req",
+      "severity": "violation",
+      "message": "Code answers for component requirements, the level that names the one component responsible. Pointing it at a feature requirement skips that level, and at a component says where without saying what. Presence and purity, as in the network rules above.",
+      "select": { "$ref": "#/$defs/type-impl" },
+      "validate": {
+        "network": {
+          "implements": {
+            "contains": { "local": { "$ref": "#/$defs/type-comp-req" } },
+            "minContains": 1,
+            "items": { "local": { "$ref": "#/$defs/type-comp-req" } }
           }
         }
       }

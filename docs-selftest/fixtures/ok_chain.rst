@@ -89,3 +89,11 @@ Fixture: ok_chain
    A decision keeps its obligation in statement, so it IS held to the wording
    rules - one hiding behind "the simpler option" is refused. This pair also
    wires both new link types, which is what makes their declarations guarded.
+
+.. impl:: The store rejects an unwired parameter
+   :id: IMPL_CHAIN
+   :implements: CREQ_CHAIN
+   :code_url: https://example.invalid/crates/agconflo-core/src/store.rs#L1
+
+   Written by hand only because this is a fixture. A real implementation comes
+   from a marker in the Rust source, which fills in code_url itself.
