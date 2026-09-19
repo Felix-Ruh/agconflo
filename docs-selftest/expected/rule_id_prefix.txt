@@ -31,6 +31,11 @@ error[needs.schema_definition_violation]
     note: An id whose prefix disagrees with its type makes every id-based reading of the graph unreliable.
 error[needs.schema_definition_violation]
   --> (need)
+      fixtures/rule_id_prefix.rst:61:4
+  WRONG_IMPL:id: "WRONG_IMPL" does not match "^IMPL_" (impl-id-must-start-with-impl[43]/properties/id/pattern)
+    note: An id whose prefix disagrees with its type makes every id-based reading of the graph unreliable. An implementation's id is typed into a code marker, where nothing else checks it.
+error[needs.schema_definition_violation]
+  --> (need)
       fixtures/rule_id_prefix.rst:14:4
   WRONG_STKH:id: "WRONG_STKH" does not match "^STKH_" (stkh-req-id-must-start-with-stkh[0]/properties/id/pattern)
     note: An id whose prefix disagrees with its type makes every id-based reading of the graph unreliable. ubc does not enforce [[needs.types]].prefix itself.
@@ -39,4 +44,4 @@ error[needs.schema_definition_violation]
       fixtures/rule_id_prefix.rst:43:4
   WRONG_TEST:id: "WRONG_TEST" does not match "^TEST_" (test-case-id-must-start-with-test[5]/properties/id/pattern)
     note: An id whose prefix disagrees with its type makes every id-based reading of the graph unreliable.
-Found 8 error(s).
+Found 9 error(s).

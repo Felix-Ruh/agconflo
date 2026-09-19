@@ -91,9 +91,10 @@ id_regex = "^[A-Z]+_[A-Z0-9_]+$"
 # NOT enforced by ubc, though: measured, a feat_req carrying the id
 # STKH_MISPLACED passes every built-in check. Enforcement is a schema rule.
 #
-# `impl` and `test_run` are deliberately absent. Nothing can create them until
-# codelinks points at the crates and test results are imported, and a coverage
-# rule naming a type nobody can author would fire on every need in the project.
+# `test_run` is deliberately absent: nothing can create one until test results
+# are imported. `impl` is declared a commit ahead of the code markers that
+# produce it, so its rules and fixtures are reviewed on their own first, and
+# both land together.
 # -----------------------------------------------------------------------------
 
 [[needs.types]]
@@ -178,6 +179,20 @@ directive = "evd"
 title = "Evidence"
 prefix = "EVD_"
 
+[[needs.types]]
+# Where a component requirement is met in code. Not meant to be written in a
+# document: each one is produced from a one-line marker in the Rust source,
+# which keeps the trace beside the code it describes rather than in prose that
+# drifts from it. Decided by `code_url`, which says where that code is, and by
+# `implements`, which says what it answers for. Only the fixtures in
+# docs-selftest/ write one by hand, because a diagnostic raised in Rust source
+# carries an absolute path that no golden file could hold.
+#
+# The id comes from the marker, so nothing but the rules checks it.
+directive = "impl"
+title = "Implementation"
+prefix = "IMPL_"
+
 # -----------------------------------------------------------------------------
 # Links.
 #
@@ -228,6 +243,16 @@ description = "The single component answerable for this requirement."
 outgoing = "verifies"
 incoming = "verified by"
 description = "The requirement this test case checks."
+
+# Its own link rather than ubc's built-in `links`, which a code marker would fill
+# by default. `links` belongs to no level, which is exactly why docs-selftest's
+# dead-link fixture uses it: giving it a meaning here would tie that fixture to
+# the implementation level. Measured: a marker's last field can populate a
+# custom list link instead (EVD_CODELINKS_CUSTOM_LINK).
+[needs.links.implements]
+outgoing = "implements"
+incoming = "implemented by"
+description = "The component requirement this code answers for."
 
 # The two links below are the exception to that direction, and it is justified by
 # the rule's own reason rather than in spite of it. Links point up the V so they
@@ -352,6 +377,19 @@ schema = { type = "string", enum = ["user", "agent", "maintainer"] }
 # names: an enum would have to be edited in lockstep with the workspace members
 # in Cargo.toml, for no gain over a rule that can check it later.
 description = "Where this component lives in the workspace."
+nullable = true
+schema = { type = "string" }
+
+[needs.fields.code_url]
+# Where an implementation is, filled in by codelinks from the marker's own
+# location rather than written by anyone. Measured: a value filled in this way
+# is visible to schema validation, where a need's body is not
+# (EVD_CODELINKS_URL_VISIBLE), so a rule can require it.
+#
+# A free string for now. Whether it holds a local file URL or a link into the
+# repository is decided with the codelinks configuration, once real values
+# exist to judge; a pattern here would be a rule with its own fixture.
+description = "Where this implementation lives in the source."
 nullable = true
 schema = { type = "string" }
 

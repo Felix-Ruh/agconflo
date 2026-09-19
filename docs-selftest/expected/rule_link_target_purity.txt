@@ -17,6 +17,10 @@ error[needs.schema_network_violation]
   FEAT_PURITY:derived_from/COMP_PURITY: "stkh_req" was expected (feat-req-must-derive-from-a-stkh-req[12]/local_fail)
 error[needs.schema_network_violation]
   --> (need)
+      fixtures/rule_link_target_purity.rst:56:4
+  IMPL_PURITY:implements/COMP_PURITY: "comp_req" was expected (impl-must-implement-a-comp-req[45]/local_fail)
+error[needs.schema_network_violation]
+  --> (need)
       fixtures/rule_link_target_purity.rst:50:4
   TEST_PURITY:verifies/COMP_PURITY: "comp" is not one of "feat_req" or "comp_req" (test-case-must-verify-a-requirement[18]/local_fail)
-Found 5 error(s).
+Found 6 error(s).

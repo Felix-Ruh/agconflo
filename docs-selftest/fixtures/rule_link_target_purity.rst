@@ -52,3 +52,8 @@ Fixture: rule_link_target_purity
    :verifies: CREQ_PURITY, COMP_PURITY
    :test_kind: positive
    :coverage: full
+
+.. impl:: Implements a component requirement and a component
+   :id: IMPL_PURITY
+   :implements: CREQ_PURITY, COMP_PURITY
+   :code_url: https://example.invalid/src/lib.rs#L1

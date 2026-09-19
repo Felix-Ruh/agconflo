@@ -49,10 +49,18 @@ error[needs.schema_network_violation]
   FEAT_WRONG_PARENT:derived_from: Too few valid links of type 'derived_from' (0 < 1) / nok: COMP_TARGETS (feat-req-must-derive-from-a-stkh-req[12]/contains_too_few)
 error[needs.schema_network_violation]
   --> (need)
+      fixtures/rule_link_targets.rst:82:4
+  IMPL_WRONG_TARGET:implements/FEAT_WRONG_PARENT: "comp_req" was expected (impl-must-implement-a-comp-req[45]/local_fail)
+error[needs.schema_network_violation]
+  --> (need)
+      fixtures/rule_link_targets.rst:82:4
+  IMPL_WRONG_TARGET:implements: Too few valid links of type 'implements' (0 < 1) / nok: FEAT_WRONG_PARENT (impl-must-implement-a-comp-req[45]/contains_too_few)
+error[needs.schema_network_violation]
+  --> (need)
       fixtures/rule_link_targets.rst:56:4
   TEST_WRONG_TARGET:verifies/COMP_TARGETS: "comp" is not one of "feat_req" or "comp_req" (test-case-must-verify-a-requirement[18]/local_fail)
 error[needs.schema_network_violation]
   --> (need)
       fixtures/rule_link_targets.rst:56:4
   TEST_WRONG_TARGET:verifies: Too few valid links of type 'verifies' (0 < 1) / nok: COMP_TARGETS (test-case-must-verify-a-requirement[18]/contains_too_few)
-Found 14 error(s).
+Found 16 error(s).

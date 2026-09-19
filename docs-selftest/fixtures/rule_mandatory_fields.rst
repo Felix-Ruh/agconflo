@@ -2,11 +2,11 @@
 Fixture: rule_mandatory_fields
 ==============================
 
-.. One need of every type with its mandatory fields missing, covering all six
+.. One need of every type with its mandatory fields missing, covering all nine
    mandatory-field rules. Ids and links are correct throughout, so the only
    defect in each need is the absent field - and `required` reports one
    diagnostic per missing FIELD, not one per need, which is why the golden file
-   holds seventeen lines for eight needs.
+   holds eighteen lines for nine needs.
 
    As in rule_id_prefix, the needs link to each other: a link rule checks its
    target's TYPE, which is right here even though the targets are themselves
@@ -44,3 +44,7 @@ Fixture: rule_mandatory_fields
 
 .. evd:: No observation, kind or date
    :id: EVD_NO_FIELDS
+
+.. impl:: No code url
+   :id: IMPL_NO_FIELDS
+   :implements: CREQ_NO_FIELDS

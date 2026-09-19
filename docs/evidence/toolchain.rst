@@ -185,6 +185,23 @@ against.
    ``impl`` need with an ``implements`` relationship to that component
    requirement, queryable in Cypher; the built-in ``links`` carried nothing.
 
+.. evd:: A code location filled in by codelinks is visible to schema rules
+   :id: EVD_CODELINKS_URL_VISIBLE
+   :evd_kind: measurement
+   :observed_on: 2026-09-19
+   :observation: On ubc 0.35.0 an implementation produced from a code marker satisfied a rule requiring code_url while set_local_url filled it, and failed the same rule once set_local_url was off.
+
+   Taken in a two-file project - one document and one Rust file, inside the
+   unlicensed free tier - with ``local_url_field`` naming ``code_url``. A
+   hand-written implementation with no ``code_url`` failed the rule under both
+   settings, which shows the rule was live. A second rule requiring a field no
+   implementation had fired on the code-derived one under both settings, which
+   shows rules reach needs produced from code at all.
+
+   It matters because a need's body is invisible to the same validation
+   (``EVD_CONTENT_INVISIBLE``). Had a filled-in location been invisible too, a
+   rule requiring it would have failed every real implementation.
+
 .. evd:: An empty external needs file is legal and a missing one is not
    :id: EVD_EXTERNAL_ZERO_NEEDS
    :evd_kind: measurement
