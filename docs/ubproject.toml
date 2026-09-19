@@ -92,9 +92,8 @@ id_regex = "^[A-Z]+_[A-Z0-9_]+$"
 # STKH_MISPLACED passes every built-in check. Enforcement is a schema rule.
 #
 # `test_run` is deliberately absent: nothing can create one until test results
-# are imported. `impl` is declared a commit ahead of the code markers that
-# produce it, so its rules and fixtures are reviewed on their own first, and
-# both land together.
+# are imported. A type is declared together with whatever produces it, as
+# `impl` is with the code markers of the [codelinks] section below.
 # -----------------------------------------------------------------------------
 
 [[needs.types]]

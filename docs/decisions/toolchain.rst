@@ -2,12 +2,11 @@
 Decisions about the requirements toolchain
 ==========================================
 
-How the requirements project itself is built and validated, and how the test
-results it imports are produced. Two of these look like metamodel decisions
-rather than tooling ones, and they are filed here because both were forced by
-measured tool behaviour: the obligation moved out of the body because the tool
-cannot see a body, and every rule needs a fixture because the tool ignores a
-malformed one.
+How the requirements project itself is built and validated, and how code and
+test results reach it. Two of these look like metamodel decisions rather than
+tooling ones, and they are filed here because both were forced by measured tool
+behaviour: the obligation moved out of the body because the tool cannot see a
+body, and every rule needs a fixture because the tool ignores a malformed one.
 
 .. dec:: The toolchain is ubc alone
    :id: DEC_NO_PYTHON
@@ -112,3 +111,33 @@ malformed one.
    ``cargo test`` instead and says so, as it stands down for a missing ubc: the
    hook is a convenience and must not block a clone that has not run setup. CI
    has no such fallback, and CI is the authority.
+
+.. dec:: Code is traced by one-line markers
+   :id: DEC_IMPL_FROM_MARKERS
+   :dec_status: accepted
+   :decided_on: 2026-09-19
+   :supported_by: EVD_NEED_ID_REFS_KEEP_FIRST, EVD_CODELINKS_CUSTOM_LINK
+   :statement: Agconflo's requirements project shall produce every implementation need from a one-line marker in the Rust source.
+
+   A one-line marker makes a need of its own for each place that meets a
+   requirement, so a requirement met in two places has two implementations,
+   each with its own location. The alternative, a reference in the source to a
+   need written in a document, gives that need the first place alone and says
+   nothing about the second. A trace that silently loses a place is worse than
+   none, because it looks complete.
+
+   The marker fills a link of its own, ``implements``, where ubc's default is
+   ``links``: that one belongs to no level here, and a marker was measured
+   able to fill another.
+
+   Two costs are accepted. A marker is a comment, which the compiler never
+   reads: it can stay behind when the code beneath it moves, and only review
+   catches that. And its identifier is typed by hand to a convention - the
+   module, then what the code does there - that nothing enforces beyond its
+   prefix.
+
+   A requirement with no marker naming it is not an error, since code is
+   written after its requirement. Which ones have none is a review report,
+   ``scripts/reports/unimplemented.cypher``, and never a gate: a gate there
+   would refuse every commit from the one that writes a requirement to the one
+   that writes its code.
