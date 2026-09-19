@@ -88,12 +88,24 @@ requirement whose subject is anything else.
    - **An instance names a node type that was not supplied.** Its parameters are
      then unknowable, so every other check on that instance is vacuous rather
      than passing - which is the reason this is reported rather than skipped.
-   - **The defect is reported once per consumer rather than once per name.** The
-     report then grows with the graph instead of with the mistake.
+   - **Several broken wires collapse into one defect.** Deduplicating by the name
+     that failed to resolve is the tidy-looking version of this, and it leaves
+     every wire but one unnamed. A defect is one thing wrong with one definition
+     and carries one place, so five parameters bound to a deleted instance are
+     five defects and five wires to repoint.
 
    Must pass unreported: a binding from an instance to itself, which is a cycle
    of length one and legal (``DEC_BACK_EDGES_ALLOWED``), and two instances of the
    same node type, which share a declaration and nothing else.
+
+   Not yet answered, and left open rather than guessed at: a binding naming a
+   parameter the declaration does not carry, a designated output naming an
+   instance that is not there, and two instances sharing one name, so that a
+   binding to it resolves to both. This requirement covers a name that resolves
+   to nothing, and each of those is a name resolving to the wrong number of
+   things. They belong with loading a workflow, where names are read; until then
+   the only thing asserted about them is that they do not stop the walk
+   (``CREQ_VALIDATOR_EVERY_DEFECT``).
 
 .. comp_req:: A binding across two context types is a defect
    :id: CREQ_VALIDATOR_TYPES_AGREE
@@ -112,15 +124,22 @@ requirement whose subject is anything else.
      after trimming makes two distinct types compare as one, and the node that
      receives the wrong context produces a confident wrong answer rather than
      failing.
-   - **An unknown type name is treated as agreeing.** A name nothing declares
-     would then silently satisfy every binding it appears in.
-   - **The check is skipped when either end is already defective.** The author
-     then fixes one defect and discovers the next, which is what reporting
-     everything together exists to prevent.
+   - **A wire whose producer has no declaration is reported as a mismatch.** The
+     producing instance names a node type the definition does not carry, so its
+     output has no declared type at all; comparing against a stand-in for one -
+     an empty name, a default - makes every wire out of that instance disagree.
+     The missing type is already reported, and a second defect about the same
+     wire sends the author to change a type that is not wrong.
+   - **The check is skipped because something else about the wire was reported.**
+     An instance with an unbound required parameter still declares types on the
+     parameters that are bound, so a walk that moves on after an instance's first
+     defect hides every disagreement below it. The author then fixes one defect
+     and discovers the next, which is what reporting everything together exists
+     to prevent.
 
-   Must pass unreported: a binding between two parameters of the same declared
-   type on different node types, and one output bound to many parameters, which
-   the model allows.
+   Must pass unreported: a binding whose output and parameter declare the same
+   context type on two different node types, and one output bound by many
+   parameters, which the model allows.
 
 .. comp_req:: A signature without exactly one output is a defect
    :id: CREQ_VALIDATOR_ONE_OUTPUT

@@ -31,6 +31,7 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    components/context
    components/wiring
    tests/context
+   tests/wiring
    code/agconflo-core
    decisions/context
    decisions/workflow
