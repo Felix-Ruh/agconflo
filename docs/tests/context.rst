@@ -61,7 +61,8 @@ be shown to pass.
    Code that copies or clones a source fails to compile, and the compiler's
    error names the missing capability rather than something incidental. A
    compile failure for any other reason would pass a naive version of this test,
-   so the error itself is what is asserted.
+   so the error itself is what is asserted - and the same lines without the
+   copy must compile, so that the refusal is about the copy.
 
 .. test_case:: An identifier cannot be forged
    :id: TEST_ID_CANNOT_BE_FORGED
@@ -70,8 +71,11 @@ be shown to pass.
    :coverage: full
 
    Code that builds an identifier other than by asking a source fails to
-   compile, and the compiler's error names the private constructor. As above,
-   the error is asserted, not merely the failure.
+   compile, by each route a derive or an impl could open: the constructor, a
+   default, a conversion from a number, and parsing. The constructor's refusal
+   names it as private, and each other refusal names what is missing. As above,
+   the error is asserted, not merely the failure, and an identifier obtained
+   through a context must compile, so that each refusal is about its route.
 
 .. test_case:: Text reads back as it was given
    :id: TEST_CONTEXT_TEXT_ROUND_TRIPS

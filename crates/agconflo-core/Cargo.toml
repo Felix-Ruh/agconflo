@@ -7,6 +7,9 @@ license.workspace = true
 authors.workspace = true
 readme.workspace = true
 
+[dev-dependencies]
+proptest = { workspace = true }
+
 # `unsafe_code = "forbid"` and clippy's `all` group, from the workspace. Without
 # this table a member crate inherits none of them, silently.
 [lints]

@@ -194,10 +194,11 @@ being infallible is a design choice, and it gets asserted like any other.
 
    Failure modes:
 
-   - **An empty type name.** Refused when the context is created, reported as an
-     invalid type name rather than as a generic failure, and no context exists
-     afterwards. A type keys global contexts and validates wiring, and an empty
-     key does neither.
+   - **An empty type name.** Refused when the name itself is made, before any
+     context can be declared with it, and reported as an invalid type name
+     rather than as a generic failure. Nothing carrying the name exists
+     afterwards, context or otherwise. A type keys global contexts and validates
+     wiring, and an empty key does neither.
 
    Deliberately not restricted further. Which characters a type name may hold
    is a question for the workflow format, and deciding it here would be guessing
