@@ -118,10 +118,14 @@ fn exhaustion_is_permanent() {
         assert_eq!(source.issue(), Err(SourceExhausted));
     }
 
-    // Creating a context is a request for an identifier too, and is refused
-    // the same way rather than creating something with no identity.
-    let refused = Context::text(&mut source, ContextType::new("note").unwrap(), "text");
-    assert_eq!(refused.map(|context| context.id()), Err(SourceExhausted));
+    // Creating a context is a request for an identifier too, whether from text
+    // or by composing, and is refused the same way rather than creating
+    // something with no identity.
+    let note = ContextType::new("note").unwrap();
+    let text = Context::text(&mut source, note.clone(), "text");
+    assert_eq!(text.map(|context| context.id()), Err(SourceExhausted));
+    let composed = Context::compose(&mut source, note, [], "");
+    assert_eq!(composed.map(|context| context.id()), Err(SourceExhausted));
     assert_eq!(source.issue(), Err(SourceExhausted));
 }
 

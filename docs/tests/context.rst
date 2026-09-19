@@ -146,8 +146,10 @@ be shown to pass.
    :test_kind: property
    :coverage: partial
 
-   For any list of contexts, repeats and mixed types included, the parts of
-   their composition carry exactly the given identifiers in the given order.
+   For any list of contexts, text and composed alike, repeats and mixed types
+   included, the parts of their composition carry exactly the given identifiers
+   in the given order. Composed contexts must be among them, since the defect
+   this rules out flattens a composed part into a copy of its text.
    Identifiers are unique, so an equal identifier is the original and not a
    copy.
 

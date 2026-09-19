@@ -6,6 +6,7 @@
 
 mod context;
 mod id;
+mod lineage;
 
 #[cfg(test)]
 mod compile_fail;
