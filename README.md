@@ -41,33 +41,36 @@ those are blocked outright, along with direct pushes to it.
 ### Prerequisites
 
 - **Git.** On Windows, [Git for Windows](https://git-scm.com/download/win) — it supplies the POSIX
-  `sh`, `curl` and `sha256sum` that the setup script and the commit hook need, so nothing else has to
-  be installed for them.
+  `sh`, `curl`, `unzip` and `sha256sum` that the setup scripts and the commit hook need, so nothing
+  else has to be installed for them.
 - **Rust**, via [rustup](https://rustup.rs). `rust-toolchain.toml` pins the channel and components,
   so the right ones are installed on first use.
 
 The documentation toolchain is [ubCode](https://ubcode.useblocks.com/) (`ubc`) and nothing else — no
-Python, no Sphinx, no Java. Setup fetches it.
+Python, no Sphinx, no Java. The tests run under [cargo-nextest](https://nexte.st/), because it writes
+the JUnit report that stable `cargo test` cannot. Setup fetches both.
 
 ### Setup
 
-Two steps, once per clone, in either order:
+Three steps, once per clone, in any order:
 
 ```
 sh scripts/get-ubc.sh
+sh scripts/get-nextest.sh
 git config core.hooksPath .githooks
 ```
 
-`get-ubc.sh` downloads one pinned version of `ubc` (~90 MB) into `tools/`, verifies its SHA-256, and
-refuses to install anything that does not match. `tools/` is gitignored, and is deliberately *not*
-added to `PATH`: `ubc` is always invoked by path. Re-running the script is free — an already-correct
-binary is left alone — and `--force` reinstalls anyway.
+Each script downloads one pinned version into `tools/` — `ubc` (~90 MB) and `cargo-nextest` — verifies
+its SHA-256, and refuses to install anything that does not match. `tools/` is gitignored, and is
+deliberately *not* added to `PATH`: both are always invoked by path. Re-running a script is free — an
+already-correct binary is left alone — and `--force` reinstalls anyway.
 
 `core.hooksPath` is local configuration and so cannot be committed, which is why every clone sets it
 for itself. Until it is set, the hook does not run at all.
 
 The order really does not matter: with the hook enabled but `ubc` not yet installed, the
-documentation gate skips itself and tells you the command to fix that.
+documentation gate skips itself and tells you the command to fix that, and without nextest the tests
+run under `cargo test` instead, with a message saying so.
 
 ### Running the checks by hand
 
@@ -78,7 +81,11 @@ sh scripts/docs-selftest.sh                                    # prove the metam
 sh scripts/cypher-gates.sh                                     # run each Cypher gate, proved first
 sh scripts/cypher-gates.sh --report                            # print the review reports
 tools/ubc query cypher --project docs 'MATCH (n) RETURN n.id'  # query the needs graph
+tools/cargo-nextest nextest run --workspace --all-targets      # the tests, as the gates run them
 ```
+
+The tests write a JUnit report to `target/nextest/default/junit.xml`, and a test still running after
+20 s is killed and fails; both are set in `.config/nextest.toml`.
 
 `ubc check` is run from `docs/` because that is the project root; from the repository root it stops
 with "No configuration file found". Under Git Bash on Windows, `tools/ubc` resolves to
@@ -91,9 +98,10 @@ execute it directly.
 
 It scans staged changes for credentials — this repository is public, so a leak is permanent — then
 checks and format-checks the requirements project, runs the Cypher gates, runs the metamodel
-self-test, then `cargo fmt --check`, `clippy -D warnings` and the tests. Both toolchains degrade
-rather than block: a missing `ubc` or a missing `cargo` skips its own gate with a message rather than
-failing the commit, and the Rust steps are also skipped while the workspace has no crates in it.
+self-test, then `cargo fmt --check`, `clippy -D warnings` and the tests under nextest. Both toolchains
+degrade rather than block: a missing `ubc` or a missing `cargo` skips its own gate with a message
+rather than failing the commit, a missing nextest falls back to `cargo test`, and the Rust steps are
+skipped while the workspace has no crates in it.
 
 The self-test is the one step restricted to commits that can affect it — the metamodel, the fixtures,
 the driver, or the pinned `ubc` version. It costs around a quarter of a second per fixture, and it is

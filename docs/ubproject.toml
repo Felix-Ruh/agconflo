@@ -349,8 +349,8 @@ schema = { type = "string", enum = ["user", "agent", "maintainer"] }
 
 [needs.fields.crate]
 # Where a component lives. Left as a free string rather than an enum of crate
-# names: the workspace has no members yet, and an enum would have to be edited
-# in lockstep with Cargo.toml for no gain over a rule that can check it later.
+# names: an enum would have to be edited in lockstep with the workspace members
+# in Cargo.toml, for no gain over a rule that can check it later.
 description = "Where this component lives in the workspace."
 nullable = true
 schema = { type = "string" }

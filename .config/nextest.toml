@@ -1,0 +1,22 @@
+# cargo-nextest configuration, read by the pre-commit hook and CI alike.
+#
+# nextest runs the tests here rather than `cargo test` for one reason: the JUnit
+# report below, which is how test results reach the requirements graph. Stable
+# `cargo test` refuses to write one (EVD_STABLE_NO_JUNIT).
+
+[profile.default]
+# Every test runs even after one fails, so the report records every outcome
+# rather than stopping at the first.
+fail-fast = false
+
+# A test still running after 20 s is killed and reported as a timeout failure
+# (EVD_NEXTEST_TIMEOUT). TEST_LINEAGE_DIAMONDS_ARE_LINEAR depends on this: a
+# walker following paths instead of contexts never finishes, so without a limit
+# it would hang the run instead of failing it. The slowest test here takes under
+# a second, which leaves a wide margin for a cold CI runner.
+slow-timeout = { period = "10s", terminate-after = 2 }
+
+[profile.default.junit]
+# Relative to the profile's directory, so the report lands at
+# target/nextest/default/junit.xml.
+path = "junit.xml"

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = []
+members = ["crates/agconflo-core"]
 
 # Shared metadata. Member crates opt in with `field.workspace = true`.
 [workspace.package]

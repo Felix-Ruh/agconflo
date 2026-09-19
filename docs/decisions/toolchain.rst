@@ -2,11 +2,12 @@
 Decisions about the requirements toolchain
 ==========================================
 
-How the requirements project itself is built and validated. Two of these look
-like metamodel decisions rather than tooling ones, and they are filed here
-because both were forced by measured tool behaviour: the obligation moved out of
-the body because the tool cannot see a body, and every rule needs a fixture
-because the tool ignores a malformed one.
+How the requirements project itself is built and validated, and how the test
+results it imports are produced. Two of these look like metamodel decisions
+rather than tooling ones, and they are filed here because both were forced by
+measured tool behaviour: the obligation moved out of the body because the tool
+cannot see a body, and every rule needs a fixture because the tool ignores a
+malformed one.
 
 .. dec:: The toolchain is ubc alone
    :id: DEC_NO_PYTHON
@@ -83,3 +84,31 @@ because the tool ignores a malformed one.
    a rule that no golden file mentions. The cost is real and worth naming: changing
    a rule means re-blessing golden files and reading the resulting diff carefully,
    because blessing without reading turns a broken rule into an expectation.
+
+.. dec:: Tests run under nextest
+   :id: DEC_TESTS_UNDER_NEXTEST
+   :dec_status: accepted
+   :decided_on: 2026-09-19
+   :supported_by: EVD_STABLE_NO_JUNIT, EVD_NEXTEST_TEST_PATHS, EVD_NEXTEST_TIMEOUT
+   :statement: Agconflo's tests shall run under one pinned version of cargo-nextest in both the commit hook and continuous integration.
+
+   The ascending half of the V needs every test's outcome in the graph, and a
+   runner's report is where outcomes come from. Stable ``cargo test`` will not
+   write one. nextest writes JUnit naming each test by its module path, which is
+   what lets a test case's identifier be its test's path with no annotation to
+   drift.
+
+   Its time limit is part of the decision rather than a setting beside it. A
+   defect that makes a test never finish would otherwise hang the run instead
+   of failing it, and one test case here can only fail that way.
+
+   Two costs are accepted. nextest does not run documentation tests
+   (``EVD_NEXTEST_NO_DOCTESTS``), so a compile-time refusal is an ordinary test
+   and no rustdoc example is written as a test. And the runner is one more
+   pinned download, fetched and verified by ``scripts/get-nextest.sh`` as ubc is
+   by its own script.
+
+   Where nextest is not installed, the commit hook runs the tests under
+   ``cargo test`` instead and says so, as it stands down for a missing ubc: the
+   hook is a convenience and must not block a clone that has not run setup. CI
+   has no such fallback, and CI is the authority.
