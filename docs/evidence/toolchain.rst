@@ -13,9 +13,9 @@ stale: nearly all of it was taken against one pinned version of one tool.
    :observation: ubc provides the needs model, schema validation, code links and diagram rendering with no Python packages.
 
    Read from the tool's own documentation and changelog rather than run, which is
-   why this is the weakest of the four and labelled as such. It replaces the build
-   engine, the needs model, schema validation, the code-link extractor and diagram
-   rendering, the last of those without a Java runtime.
+   why this is the weakest of the first four and labelled as such. It replaces the
+   build engine, the needs model, schema validation, the code-link extractor and
+   diagram rendering, the last of those without a Java runtime.
 
    One capability has no equivalent and the decision beside this one accepts it:
    there is nothing corresponding to the test-report importer, so bringing test
@@ -54,11 +54,38 @@ stale: nearly all of it was taken against one pinned version of one tool.
    :observed_on: 2026-08-17
    :observation: A not keyword directly under validate.local reported nothing, where the same keyword inside allOf reported six violations.
 
-   The sharpest of the four, because it is an exact A and B. The rule forbade every
-   decision from having an identifier beginning with its own prefix, which all six
-   of them violate. Placed one way it found nothing; wrapped in a composition
-   keyword it found all six.
+   The sharpest of the first four, because it is an exact A and B. The rule forbade
+   every decision from having an identifier beginning with its own prefix, which
+   all six of them violate. Placed one way it found nothing; wrapped in a
+   composition keyword it found all six.
 
    One wrapper is the entire difference between a rule that enforces and a rule
    that is decoration, and nothing reports the difference. This is the failure the
    fixture harness exists to catch.
+
+.. evd:: Two misshapen rule forms still pass silently on 0.35.0
+   :id: EVD_UBC035_RULE_SHAPES
+   :evd_kind: measurement
+   :observed_on: 2026-09-19
+   :observation: On ubc 0.35.0 a misspelled keyword and a keyword of the wrong kind still pass silently, while a composite keyword under validate.local now fails the check.
+
+   Taken when the pin moved from 0.31.2b1 to 0.35.0, as an A and B: the same
+   probe rules against both binaries, each appended alone to the real rules and
+   checked over the real project, with a control rule that fired on all twelve
+   decisions under both versions.
+
+   A misspelled keyword and a keyword of the wrong kind for the field - a
+   minimum on a string - pass silently on both, exit 0 and nothing printed. A
+   composite keyword placed directly under ``validate.local``, silent on
+   0.31.2b1, is now reported as an unknown key that fails the check, and with it
+   ubc stops applying every rule in the file: the control placed beside it fired
+   on nothing. A rule about a need's body matches nothing on either version and
+   is reported on both as a configuration warning that fails the check.
+
+   That last result corrects the observation of ``EVD_CONTENT_INVISIBLE``, which
+   says such a rule reported nothing. It reported no violation, and the body is
+   still invisible to validation, so the decision resting on it stands - but the
+   gate did not stay green.
+
+   The fixture harness is still needed for the two shapes that pass silently,
+   and for any rule of the right shape that matches the wrong thing.

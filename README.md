@@ -58,7 +58,7 @@ sh scripts/get-ubc.sh
 git config core.hooksPath .githooks
 ```
 
-`get-ubc.sh` downloads one pinned version of `ubc` (~66 MB) into `tools/`, verifies its SHA-256, and
+`get-ubc.sh` downloads one pinned version of `ubc` (~90 MB) into `tools/`, verifies its SHA-256, and
 refuses to install anything that does not match. `tools/` is gitignored, and is deliberately *not*
 added to `PATH`: `ubc` is always invoked by path. Re-running the script is free — an already-correct
 binary is left alone — and `--force` reinstalls anyway.
@@ -224,10 +224,15 @@ from the other side, as a reference to a document that does not exist.
 `docs-selftest/` holds deliberately invalid needs. Each fixture breaks one rule on purpose, and
 `docs-selftest/expected/` records the exact diagnostics that break must produce.
 
-It exists because a wrongly shaped rule in `ubc` is **not rejected — it is silently ignored**, and the
-project goes green. Four ways to do that have been measured: a composite keyword in the wrong place, a
-misspelled keyword, a keyword of the wrong kind for the field, and any rule about a need's body. So a
-rule that has never been seen to fail cannot be assumed to work.
+It exists because a wrongly shaped rule in `ubc` can be **silently ignored**, leaving the project green.
+Of the four shapes measured, two still do that on the pinned version — a misspelled keyword, and a
+keyword of the wrong kind for the field — while a composite keyword in the wrong place is now rejected,
+and a rule about a need's body is reported as a configuration warning. A rule of the right shape can
+also simply match the wrong thing, which nothing reports at all. So a rule that has never been seen to
+fail cannot be assumed to work.
+
+A rule's `message` is printed under each finding as a note, so it appears in the golden files too:
+editing a message moves its fixture's golden, and that diff is read like any other.
 
 After deliberately changing a rule, or bumping the pinned `ubc`:
 

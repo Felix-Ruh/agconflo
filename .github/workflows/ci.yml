@@ -97,8 +97,8 @@ jobs:
       # hashing it 0.2 s, so a cache would save nothing worth having - while
       # a cache hit would skip the script's SHA-256 verification entirely.
       # Running it every time makes this step a canary for the pinned
-      # pre-release artefact being rebuilt or replaced upstream, which is
-      # precisely the event the pin exists to detect.
+      # artefact being rebuilt or replaced upstream, which is precisely the
+      # event the pin exists to detect.
       - name: Install the pinned ubc
         run: sh scripts/get-ubc.sh
 

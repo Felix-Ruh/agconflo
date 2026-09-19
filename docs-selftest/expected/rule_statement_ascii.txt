@@ -1,22 +1,27 @@
 # exit: 1
-[needs.schema_definition_violation]
+error[needs.schema_definition_violation]
   --> (need)
       fixtures/rule_statement_ascii.rst:23:4
   STKH_ASCII_NBSP:statement: "Agconflo shall record every context that a node consumed." does not match "^[A-Z][A-Za-z' -]* shall .+\.$" (stkh-req-statement-must-oblige-with-shall[20]/properties/statement/pattern)
-[needs.schema_definition_violation]
+    note: A stakeholder requirement states a goal rather than system behaviour, so it gets no EARS pattern - but it still has to oblige rather than describe.
+error[needs.schema_definition_violation]
   --> (need)
       fixtures/rule_statement_ascii.rst:23:4
   STKH_ASCII_NBSP:statement: {"pattern":"[^\\x00-\\x7F]"} is not allowed for "Agconflo shall record every context that a node consumed." (statement-must-use-only-plain-ascii-characters[32]/allOf/0/properties/statement/not)
-[needs.schema_definition_violation]
+    note: A non-ASCII lookalike defeats every anchored rule below while looking correct on screen. The worst case measured: a non-breaking space between 'shall' and the response, which reads as a perfectly valid statement and is rejected by the grammar with nothing visible to fix. A typographic apostrophe is the same trap one step milder - the subject slot admits the ASCII one, so the message shows a pattern that appears to allow exactly what the statement appears to contain. This is a whitelist rather than a list of known offenders because the next lookalike is always worse than the last; a zero-width space would not even occupy a column. The bound stops at ASCII rather than at printable ASCII on purpose: a tab is expanded to spaces by the parser and so is visible, and a newline has its own rule with a better message. Cost, accepted: no micro sign, degree sign or inequality in a statement - write microseconds, degrees and at most.
+error[needs.schema_definition_violation]
   --> (need)
       fixtures/rule_statement_ascii.rst:33:4
   STKH_ASCII_RESPONSE:statement: {"pattern":"[^\\x00-\\x7F]"} is not allowed for "Agconflo shall record every context that a node’s parameters bound." (statement-must-use-only-plain-ascii-characters[32]/allOf/0/properties/statement/not)
-[needs.schema_definition_violation]
+    note: A non-ASCII lookalike defeats every anchored rule below while looking correct on screen. The worst case measured: a non-breaking space between 'shall' and the response, which reads as a perfectly valid statement and is rejected by the grammar with nothing visible to fix. A typographic apostrophe is the same trap one step milder - the subject slot admits the ASCII one, so the message shows a pattern that appears to allow exactly what the statement appears to contain. This is a whitelist rather than a list of known offenders because the next lookalike is always worse than the last; a zero-width space would not even occupy a column. The bound stops at ASCII rather than at printable ASCII on purpose: a tab is expanded to spaces by the parser and so is visible, and a newline has its own rule with a better message. Cost, accepted: no micro sign, degree sign or inequality in a statement - write microseconds, degrees and at most.
+error[needs.schema_definition_violation]
   --> (need)
       fixtures/rule_statement_ascii.rst:28:4
   STKH_ASCII_SUBJECT:statement: "Agconflo’s run log shall record every context that a node consumed." does not match "^[A-Z][A-Za-z' -]* shall .+\.$" (stkh-req-statement-must-oblige-with-shall[20]/properties/statement/pattern)
-[needs.schema_definition_violation]
+    note: A stakeholder requirement states a goal rather than system behaviour, so it gets no EARS pattern - but it still has to oblige rather than describe.
+error[needs.schema_definition_violation]
   --> (need)
       fixtures/rule_statement_ascii.rst:28:4
   STKH_ASCII_SUBJECT:statement: {"pattern":"[^\\x00-\\x7F]"} is not allowed for "Agconflo’s run log shall record every context that a node consumed." (statement-must-use-only-plain-ascii-characters[32]/allOf/0/properties/statement/not)
+    note: A non-ASCII lookalike defeats every anchored rule below while looking correct on screen. The worst case measured: a non-breaking space between 'shall' and the response, which reads as a perfectly valid statement and is rejected by the grammar with nothing visible to fix. A typographic apostrophe is the same trap one step milder - the subject slot admits the ASCII one, so the message shows a pattern that appears to allow exactly what the statement appears to contain. This is a whitelist rather than a list of known offenders because the next lookalike is always worse than the last; a zero-width space would not even occupy a column. The bound stops at ASCII rather than at printable ASCII on purpose: a tab is expanded to spaces by the parser and so is visible, and a newline has its own rule with a better message. Cost, accepted: no micro sign, degree sign or inequality in a statement - write microseconds, degrees and at most.
 Found 5 error(s).

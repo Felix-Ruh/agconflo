@@ -1,5 +1,5 @@
 # exit: 1
-[needs.duplicate]
+warning[needs.duplicate]
   --> (need)
       fixtures/duplicate_id.rst:10:4
   --> (need)

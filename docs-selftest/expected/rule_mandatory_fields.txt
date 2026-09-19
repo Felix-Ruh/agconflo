@@ -1,70 +1,87 @@
 # exit: 1
-[needs.schema_definition_violation]
+error[needs.schema_definition_violation]
   --> (need)
       fixtures/rule_mandatory_fields.rst:25:4
   ARCH_NO_FIELDS:feat-arch-must-have-a-statement: "statement" is a required property (feat-arch-must-have-a-statement[8]/required)
-[needs.schema_definition_violation]
+    note: An architecture decision that cannot be stated in one sentence is not yet a decision.
+error[needs.schema_definition_violation]
   --> (need)
       fixtures/rule_mandatory_fields.rst:30:4
   COMP_NO_FIELDS:comp-must-name-its-crate: "crate" is a required property (comp-must-name-its-crate[9]/required)
-[needs.schema_definition_violation]
+    note: A component that is not anchored somewhere in the workspace cannot be traced to code.
+error[needs.schema_definition_violation]
   --> (need)
       fixtures/rule_mandatory_fields.rst:33:4
   CREQ_NO_FIELDS:comp-req-must-have-a-statement-and-a-pattern: "statement" is a required property (comp-req-must-have-a-statement-and-a-pattern[10]/required)
-[needs.schema_definition_violation]
+    note: The statement's grammatical subject is what distinguishes a component requirement from a restatement of its parent.
+error[needs.schema_definition_violation]
   --> (need)
       fixtures/rule_mandatory_fields.rst:33:4
   CREQ_NO_FIELDS:comp-req-must-have-a-statement-and-a-pattern: "ears_pattern" is a required property (comp-req-must-have-a-statement-and-a-pattern[10]/required)
-[needs.schema_definition_violation]
+    note: The statement's grammatical subject is what distinguishes a component requirement from a restatement of its parent.
+error[needs.schema_definition_violation]
   --> (need)
       fixtures/rule_mandatory_fields.rst:42:4
   DEC_NO_FIELDS:dec-must-have-a-statement-a-status-and-a-date: "statement" is a required property (dec-must-have-a-statement-a-status-and-a-date[37]/required)
-[needs.schema_definition_violation]
+    note: A decision with no status presents itself as current whether or not it is, and this project has reversed itself more than once - the Python toolchain, the obligation living in a need's body, the detailed-design level. The date is when the choice was taken, which is not when it was committed, and it is what orders a supersedes chain when the chain itself is incomplete.
+error[needs.schema_definition_violation]
   --> (need)
       fixtures/rule_mandatory_fields.rst:42:4
   DEC_NO_FIELDS:dec-must-have-a-statement-a-status-and-a-date: "dec_status" is a required property (dec-must-have-a-statement-a-status-and-a-date[37]/required)
-[needs.schema_definition_violation]
+    note: A decision with no status presents itself as current whether or not it is, and this project has reversed itself more than once - the Python toolchain, the obligation living in a need's body, the detailed-design level. The date is when the choice was taken, which is not when it was committed, and it is what orders a supersedes chain when the chain itself is incomplete.
+error[needs.schema_definition_violation]
   --> (need)
       fixtures/rule_mandatory_fields.rst:42:4
   DEC_NO_FIELDS:dec-must-have-a-statement-a-status-and-a-date: "decided_on" is a required property (dec-must-have-a-statement-a-status-and-a-date[37]/required)
-[needs.schema_definition_violation]
+    note: A decision with no status presents itself as current whether or not it is, and this project has reversed itself more than once - the Python toolchain, the obligation living in a need's body, the detailed-design level. The date is when the choice was taken, which is not when it was committed, and it is what orders a supersedes chain when the chain itself is incomplete.
+error[needs.schema_definition_violation]
   --> (need)
       fixtures/rule_mandatory_fields.rst:45:4
   EVD_NO_FIELDS:evd-must-have-an-observation-a-kind-and-a-date: "observation" is a required property (evd-must-have-an-observation-a-kind-and-a-date[38]/required)
-[needs.schema_definition_violation]
+    note: The kind is the same question as how the finding could be re-checked, and the date is what lets it be retired. Nearly all evidence here was measured against one pinned ubc, so an undated observation is one nobody can trust or refute later.
+error[needs.schema_definition_violation]
   --> (need)
       fixtures/rule_mandatory_fields.rst:45:4
   EVD_NO_FIELDS:evd-must-have-an-observation-a-kind-and-a-date: "evd_kind" is a required property (evd-must-have-an-observation-a-kind-and-a-date[38]/required)
-[needs.schema_definition_violation]
+    note: The kind is the same question as how the finding could be re-checked, and the date is what lets it be retired. Nearly all evidence here was measured against one pinned ubc, so an undated observation is one nobody can trust or refute later.
+error[needs.schema_definition_violation]
   --> (need)
       fixtures/rule_mandatory_fields.rst:45:4
   EVD_NO_FIELDS:evd-must-have-an-observation-a-kind-and-a-date: "observed_on" is a required property (evd-must-have-an-observation-a-kind-and-a-date[38]/required)
-[needs.schema_definition_violation]
+    note: The kind is the same question as how the finding could be re-checked, and the date is what lets it be retired. Nearly all evidence here was measured against one pinned ubc, so an undated observation is one nobody can trust or refute later.
+error[needs.schema_definition_violation]
   --> (need)
       fixtures/rule_mandatory_fields.rst:21:4
   FEAT_NO_FIELDS:feat-req-must-have-a-statement-a-pattern-and-a-verification-method: "statement" is a required property (feat-req-must-have-a-statement-a-pattern-and-a-verification-method[7]/required)
-[needs.schema_definition_violation]
+    note: Choosing how a behaviour will be shown to hold is what makes this a level of its own; the pattern decides which grammar the statement is held to.
+error[needs.schema_definition_violation]
   --> (need)
       fixtures/rule_mandatory_fields.rst:21:4
   FEAT_NO_FIELDS:feat-req-must-have-a-statement-a-pattern-and-a-verification-method: "ears_pattern" is a required property (feat-req-must-have-a-statement-a-pattern-and-a-verification-method[7]/required)
-[needs.schema_definition_violation]
+    note: Choosing how a behaviour will be shown to hold is what makes this a level of its own; the pattern decides which grammar the statement is held to.
+error[needs.schema_definition_violation]
   --> (need)
       fixtures/rule_mandatory_fields.rst:21:4
   FEAT_NO_FIELDS:feat-req-must-have-a-statement-a-pattern-and-a-verification-method: "verification_method" is a required property (feat-req-must-have-a-statement-a-pattern-and-a-verification-method[7]/required)
-[needs.schema_definition_violation]
+    note: Choosing how a behaviour will be shown to hold is what makes this a level of its own; the pattern decides which grammar the statement is held to.
+error[needs.schema_definition_violation]
   --> (need)
       fixtures/rule_mandatory_fields.rst:18:4
   STKH_NO_FIELDS:stkh-req-must-have-a-statement-and-a-stakeholder: "statement" is a required property (stkh-req-must-have-a-statement-and-a-stakeholder[6]/required)
-[needs.schema_definition_violation]
+    note: A goal with no owner cannot be prioritised or retired, and the obligation must be in the statement field because a need's body is invisible to validation.
+error[needs.schema_definition_violation]
   --> (need)
       fixtures/rule_mandatory_fields.rst:18:4
   STKH_NO_FIELDS:stkh-req-must-have-a-statement-and-a-stakeholder: "stakeholder" is a required property (stkh-req-must-have-a-statement-and-a-stakeholder[6]/required)
-[needs.schema_definition_violation]
+    note: A goal with no owner cannot be prioritised or retired, and the obligation must be in the statement field because a need's body is invisible to validation.
+error[needs.schema_definition_violation]
   --> (need)
       fixtures/rule_mandatory_fields.rst:38:4
   TEST_NO_FIELDS:test-case-must-have-a-kind-and-a-coverage: "test_kind" is a required property (test-case-must-have-a-kind-and-a-coverage[11]/required)
-[needs.schema_definition_violation]
+    note: The kind carries the testing policy - property-based, positive, or error-path - and coverage says whether this case settles its requirement or only part of it.
+error[needs.schema_definition_violation]
   --> (need)
       fixtures/rule_mandatory_fields.rst:38:4
   TEST_NO_FIELDS:test-case-must-have-a-kind-and-a-coverage: "coverage" is a required property (test-case-must-have-a-kind-and-a-coverage[11]/required)
+    note: The kind carries the testing policy - property-based, positive, or error-path - and coverage says whether this case settles its requirement or only part of it.
 Found 17 error(s).

@@ -17,7 +17,7 @@
 # POSIX script that git runs through it, so depending on it costs nothing new
 # and one tested code path beats two.
 #
-# The binary is 58-66 MB depending on platform and is NEVER committed; tools/ is
+# The binary is 79-91 MB depending on platform and is NEVER committed; tools/ is
 # gitignored.
 
 set -eu
@@ -25,48 +25,58 @@ set -eu
 # -----------------------------------------------------------------------------
 # The pin.
 #
-# 0.31.2b1 is a PRE-RELEASE, and that is forced rather than chosen: `ubc query
-# cypher` is a design commitment for this project and openCypher only arrived in
-# 0.31.1b1. Newest stable (0.30.3) offers `query filter` alone. Revisit when
-# 0.31.x goes stable.
+# The newest release, pre-releases included, checked 2026-09-19. The download
+# host has no index, so that question is answered by the vendor's public
+# repository instead:
+#
+#     gh api repos/useblocks/ubcode-pub/releases --jq '.[].tag_name'
+#
+# The pin was a pre-release, 0.31.2b1, until this version, and that was forced
+# rather than chosen: `ubc query cypher` is a design commitment here and
+# openCypher only arrived in 0.31.1b1. 0.32.0 was the first stable release to
+# carry it.
 #
 # THE SAME VERSION HAS THREE SPELLINGS. This is the trap in any "is it already
 # installed?" check, so both forms we need are recorded literally rather than
-# derived from one another:
+# derived from one another. For a stable release two of them coincide, which is
+# exactly when deriving one from the other would appear to work - and a
+# pre-release, where they differ, is how 0.31.2b1 was spelled:
 #
-#     git tag                  v0.31.2b1
-#     URL path and filename    0.31.2b1              <- VERSION
-#     `ubc --version` output   ubc 0.31.2-beta.1     <- VERSION_STRING
+#     git tag                  v0.35.0      (v0.31.2b1)
+#     URL path and filename    0.35.0       (0.31.2b1)            <- VERSION
+#     `ubc --version` output   ubc 0.35.0   (ubc 0.31.2-beta.1)   <- VERSION_STRING
 # -----------------------------------------------------------------------------
 
-VERSION='0.31.2b1'
-VERSION_STRING='ubc 0.31.2-beta.1'
+VERSION='0.35.0'
+VERSION_STRING='ubc 0.35.0'
 BASE_URL='https://download.useblocks.com/ubc'
 
 # -----------------------------------------------------------------------------
 # Checksums.
 #
 # useblocks publishes no checksum file - .sha256, .sha256sum, SHA256SUMS and
-# checksums.txt all return 403 next to the binary (probed 2026-08-16). So these
-# hashes were computed from a first download rather than obtained from the
-# vendor.
+# checksums.txt all return 403 next to the binary (probed 2026-08-16, and again
+# for 0.35.0 on 2026-09-19), and the vendor's GitHub releases carry no assets.
+# So these hashes were computed from a first download rather than obtained from
+# the vendor.
 #
 # BE CLEAR ABOUT WHAT THAT DOES AND DOES NOT BUY. It is trust-on-first-use: it
 # PINS the artefact - a silently replaced or truncated download is caught, and
 # every later clone provably gets the same bytes this project was developed
 # against. It does NOT authenticate the artefact against useblocks. The real
-# risk it addresses is mundane: a pre-release artefact being rebuilt or removed
-# under a URL we depend on.
+# risk it addresses is mundane: an artefact being rebuilt or removed under a URL
+# we depend on - likeliest for a pre-release, possible for any.
 #
 # Only the platforms this project actually uses are pinned: windows-x64 (the
 # development machine) and linux-x64 (CI, when it arrives). Adding another means
 # downloading it once and recording its hash here - deliberately a manual step,
 # because an unverified platform would defeat the point of the check. Note that
-# darwin-x64 is not published at all (403): there is no Intel-Mac build.
+# darwin-x64 is not published at all (403, still so for 0.35.0): there is no
+# Intel-Mac build.
 # -----------------------------------------------------------------------------
 
-SHA256_WINDOWS_X64='3dfefa2f33b29182db7cf1ccd3c1114a7f8e05bf902d9578a6d2988c9ba27550'  # 69,082,112 bytes
-SHA256_LINUX_X64='d7121814e8747bedbacc8f0aa89eb908482cc02d98568563c7e658c5df193e61'    # 60,413,416 bytes
+SHA256_WINDOWS_X64='06f355b83997f05d4b4fb11affeaa31218e6fd538070ed49f7562e8f0e38b803'  # 91,182,592 bytes
+SHA256_LINUX_X64='210a464476f535bfd75cd12cbe77eb8a21cbaa36d6a76f74ff2d6b5eb24e45ea'    # 79,051,448 bytes
 
 FORCE=0
 if [ "${1:-}" = '--force' ]; then
@@ -99,13 +109,13 @@ case "$os $arch" in
         PLATFORM='windows-x64'
         EXPECTED_SHA="$SHA256_WINDOWS_X64"
         SUFFIX='.exe'
-        SIZE_HINT='66 MB'
+        SIZE_HINT='91 MB'
         ;;
     'Linux x86_64')
         PLATFORM='linux-x64'
         EXPECTED_SHA="$SHA256_LINUX_X64"
         SUFFIX=''
-        SIZE_HINT='58 MB'
+        SIZE_HINT='79 MB'
         ;;
     *)
         cat >&2 <<EOF
@@ -196,8 +206,8 @@ get-ubc: SHA-256 mismatch for $file_name - refusing to install.
 
 The pinned artefact is not the one this project was built against. Do not work
 around this by editing the hash: find out why it changed first. The likely
-causes are a rebuilt or replaced pre-release artefact upstream, or a corrupt or
-intercepted download.
+causes are a rebuilt or replaced artefact upstream, or a corrupt or intercepted
+download.
 EOF
     exit 1
 fi

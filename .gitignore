@@ -30,7 +30,7 @@ needs.parquet
 .ub_cache/
 
 # --- tools -------------------------------------------------------------------
-# Downloaded by scripts/get-ubc.sh. The `ubc` binary is ~66 MB, which is both
+# Downloaded by scripts/get-ubc.sh. The `ubc` binary is ~90 MB, which is both
 # far too large to commit and pointless to: it is pinned by version and SHA-256
 # in that script, so any clone can reproduce exactly these bytes.
 /tools/

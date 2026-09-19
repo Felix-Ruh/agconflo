@@ -20,7 +20,7 @@
 # The rules that constrain these types - mandatory fields per level, link
 # targets, link purity, requirement wording - live in schemas.json. Every one of
 # them is proved to fire by a fixture in docs-selftest/, because a wrongly shaped
-# rule is silently ignored rather than rejected.
+# rule can be silently ignored rather than rejected.
 #
 # Coverage rules are deliberately absent, and this list named one for a while by
 # mistake. A coverage rule fires on every need that has not been built out yet,
@@ -51,11 +51,12 @@ version = "0.0.0"
 #
 # JSON carries no comments, so schemas.json cannot explain itself. Two
 # conventions make up for that. Each rule's `id` is a self-explanatory sentence,
-# because it is the only text `ubc check` prints - the `message` field is NOT
-# displayed, so it holds the reasoning for a reader of the file rather than for
-# the person who tripped the rule. And every rule has a fixture in
-# docs-selftest/ that violates it, which is the working documentation of what it
-# actually catches.
+# because it is named in every finding `ubc check` prints. The `message` field
+# holds the reasoning, and on the pinned 0.35.0 it is printed too, as a note
+# under each finding - so it is read by whoever tripped the rule, and it appears
+# in the self-test's golden files, where editing one moves its fixture's golden.
+# And every rule has a fixture in docs-selftest/ that violates it, which is the
+# working documentation of what it actually catches.
 schema_definitions_from_json = "schemas.json"
 
 # `id_required` DEFAULTS TO FALSE, which is the trap here: left alone, a need
