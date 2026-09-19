@@ -283,15 +283,15 @@ else
 fi
 
 # --- rust --------------------------------------------------------------------
-# The Rust gate is written now and skipped until the first crate lands, so it
-# does not have to be remembered and retrofitted once there is finally code for
-# it to be wrong about.
+# Written before the first crate existed and skipped until it did, so that it
+# never had to be remembered and retrofitted; each step was tripped once when
+# agconflo-core landed, to see that it could fail.
 #
-# The skip is necessary, not defensive: cargo refuses to operate on a workspace
-# with no members. Measured against this very repository — `cargo fmt --all
-# --check` exits 1 with "Failed to find targets", and clippy and test both exit
-# 101. An unguarded gate would therefore block every commit until the first
-# crate existed.
+# The empty-workspace skip stays, and it is necessary rather than defensive:
+# cargo refuses to operate on a workspace with no members. Measured against this
+# very repository - `cargo fmt --all --check` exits 1 with "Failed to find
+# targets", and clippy and test both exit 101. Without it, emptying the
+# workspace would block every commit.
 #
 # The probe reads cargo's own answer rather than guessing from the directory
 # layout. `cargo metadata --no-deps` emits compact JSON, so an empty workspace
@@ -328,9 +328,30 @@ else
     cargo clippy --workspace --all-targets -- -D warnings ||
         fail "clippy reported findings"
 
-    echo "pre-commit: cargo test --workspace --all-targets"
-    cargo test --workspace --all-targets --quiet ||
-        fail "tests failed"
+    # The tests run under nextest, whose configuration in .config/nextest.toml
+    # writes the JUnit report and kills a test that hangs. It is resolved by
+    # path from tools/, like ubc, and probed by running it, since `[ -x ]`
+    # answers yes for a binary that group policy then refuses.
+    #
+    # Without it the tests still run, under `cargo test`, rather than being
+    # skipped: a hook that tests nothing locally is worse than one that tests
+    # without a time limit. The message says what is missing, and CI runs
+    # nextest regardless.
+    NEXTEST="$(pwd)/tools/cargo-nextest"
+    [ -x "$NEXTEST" ] || NEXTEST="$NEXTEST.exe"
+
+    if [ -x "$NEXTEST" ] && "$NEXTEST" nextest --version >/dev/null 2>&1; then
+        echo "pre-commit: cargo nextest run --workspace --all-targets"
+        "$NEXTEST" nextest run --workspace --all-targets ||
+            fail "tests failed"
+    else
+        echo "pre-commit: nextest is not installed or will not run - using cargo test instead,"
+        echo "pre-commit: which has no time limit and writes no JUnit report."
+        echo "pre-commit: install it with 'sh scripts/get-nextest.sh'"
+        echo "pre-commit: cargo test --workspace --all-targets"
+        cargo test --workspace --all-targets --quiet ||
+            fail "tests failed"
+    fi
 fi
 
 # --- deliberately absent -----------------------------------------------------

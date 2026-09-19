@@ -201,3 +201,31 @@ against.
 
    So an import can be wired before the first test has run, but its file has to
    exist from then on.
+
+.. evd:: Stable cargo test cannot write a JUnit report
+   :id: EVD_STABLE_NO_JUNIT
+   :evd_kind: measurement
+   :observed_on: 2026-09-19
+   :observation: On cargo 1.96.0 stable, cargo test refused the junit output format as accepted only on the nightly compiler with unstable options, and ran no test.
+
+   Run in this workspace as ``cargo test --lib -- --format junit``. It exited
+   101 before running anything, with the error that the format "is only
+   accepted on the nightly compiler with -Z unstable-options". Test results
+   reach the requirements graph through a report of this kind, so on stable
+   Rust the built-in runner cannot supply them.
+
+.. evd:: nextest fails a test that never finishes
+   :id: EVD_NEXTEST_TIMEOUT
+   :evd_kind: measurement
+   :observed_on: 2026-09-19
+   :observation: Under a slow-timeout of 10 s terminating after two periods, nextest 0.9.145 killed a test that could not finish at 20.0 s, exited 100, and recorded a failure of type test timeout in its JUnit report.
+
+   Taken with the configuration in ``.config/nextest.toml``, after disabling the
+   lineage walker's record of contexts already visited, so that the stack of 64
+   diamonds is walked along every one of its two to the 64 paths. Without a
+   limit that case never ends; the same walk run outside nextest was still
+   running when it was killed after 45 s.
+
+   With ``fail-fast`` off, the rest of the run was still reported: 16 passed and
+   2 failed, the other two lineage cases catching the same defect as repeated
+   ancestors.
