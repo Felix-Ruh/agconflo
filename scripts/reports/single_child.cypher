@@ -12,6 +12,11 @@
 // true come first. Nothing subtler is attempted: this Cypher has no measure of
 // textual similarity, and a threshold nobody can justify is worse than none.
 //
+// It is blind to one shape, and knowing that is what keeps it honest: an
+// `unwanted` requirement carries what distinguishes it in its trigger, before
+// the `shall`, so two of them differing only there compare as different
+// responses. The signal reads on the response alone; the reading is a person's.
+//
 // Covers every level joined by derived_from, which is where a requirement
 // refines another; feat_arch and comp are not requirements and are left out.
 MATCH (c)-[:derived_from]->(p)

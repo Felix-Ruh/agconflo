@@ -93,8 +93,9 @@ and what it turned down.
    back edge closing a loop.
 
    The consequence for validation is that the control graph is derived rather than
-   read, and a node that no derived or explicit edge can reach is unreachable -
-   which a validator can see, and which no author intended.
+   read, so which nodes are reachable is a question the definition answers by
+   itself. What follows from an unreachable node - refuse it, report it, ignore it
+   - is a requirement's business rather than this decision's.
 
 .. dec:: Routing a context is not scheduling a node
    :id: DEC_ROUTING_SEPARATE_FROM_CONTROL

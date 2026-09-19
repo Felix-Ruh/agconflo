@@ -27,6 +27,7 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    stakeholder/execution
    stakeholder/process
    features/context
+   features/wiring
    components/context
    tests/context
    code/agconflo-core
