@@ -17,7 +17,7 @@ grammar and requirement smells. Exact counts are deliberately not repeated here 
 prose that restates a number goes stale the first time the number changes, and
 nothing checks it. The invariant is worth stating instead: every one of those
 rules is guarded by a fixture in ``docs-selftest/`` that fails without it,
-because a wrongly shaped rule is silently ignored rather than rejected.
+because a wrongly shaped rule can be silently ignored rather than rejected.
 
 .. toctree::
    :maxdepth: 2

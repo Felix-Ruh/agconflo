@@ -10,12 +10,15 @@
 #     sh scripts/docs-selftest.sh            check every fixture
 #     sh scripts/docs-selftest.sh --bless    rewrite every golden file
 #
-# WHY THIS EXISTS. A wrongly shaped schema rule is not rejected by ubc, it is
-# silently ignored - measured four ways: a composite keyword placed directly
-# under validate.local, a misspelled keyword, a keyword of the wrong kind for the
-# field's type, and any rule about a need's body. All four leave the project
-# green. So a rule that has never been seen to fail cannot be assumed to work,
-# and "the schema checks passed" means nothing without this.
+# WHY THIS EXISTS. A wrongly shaped schema rule can be silently ignored by ubc,
+# leaving the project green. Re-measured on 0.35.0 (EVD_UBC035_RULE_SHAPES): a
+# misspelled keyword and a keyword of the wrong kind for the field's type are
+# still ignored without a word; a composite keyword placed directly under
+# validate.local is now rejected, and takes every other rule in the file down
+# with it; a rule about a need's body is reported as a configuration warning.
+# And a rule of the right shape can still match the wrong thing. So a rule that
+# has never been seen to fail cannot be assumed to work, and "the schema checks
+# passed" means nothing without this.
 #
 # --bless is for after a deliberate rule change or a ubc version bump. It
 # rewrites ALL golden files, never one: if an unrelated fixture has drifted, that
@@ -144,10 +147,12 @@ for fixture in "$selftest"/fixtures/*.rst; do
     esac
 
     # The exit code is recorded as well as the output, because the two can move
-    # independently. Every diagnostic these fixtures provoke is a WARNING, so
-    # `--deny warning` is the only thing making them a gate: if that ever
-    # loosened, all of them would still print exactly the same text and quietly
-    # exit 0. This line is what catches that.
+    # independently. Schema-rule violations are errors, but the built-in checks
+    # these fixtures provoke - an enum, the id pattern, a dead link, an unknown
+    # directive - are WARNINGS, and for those `--deny warning` is the only thing
+    # making them a gate: if it ever loosened, they would still print exactly the
+    # same text and quietly exit 0. This line is what catches that. On the pinned
+    # 0.35.0 each finding names its severity, which is how this was seen.
     actual="# exit: $status
 $actual"
 

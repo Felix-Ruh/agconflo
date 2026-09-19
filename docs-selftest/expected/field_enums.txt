@@ -1,29 +1,29 @@
 # exit: 1
-[needs.invalid_field_value]
+warning[needs.invalid_field_value]
   --> (need)
       fixtures/field_enums.rst:37:4
   DEC_BAD_STATUS:dec_status: "maybe" is not one of "accepted", "superseded" or "rejected" (dec_status/enum)
-[needs.invalid_field_value]
+warning[needs.invalid_field_value]
   --> (need)
       fixtures/field_enums.rst:43:4
   EVD_BAD_KIND:evd_kind: "hearsay" is not one of "measurement", "prototype" or 2 other candidates (evd_kind/enum)
-[needs.invalid_field_value]
+warning[needs.invalid_field_value]
   --> (need)
       fixtures/field_enums.rst:23:4
   FEAT_BAD_ENUMS:ears_pattern: "whenever" is not one of "ubiquitous", "state" or 4 other candidates (ears_pattern/enum)
-[needs.invalid_field_value]
+warning[needs.invalid_field_value]
   --> (need)
       fixtures/field_enums.rst:23:4
   FEAT_BAD_ENUMS:stakeholder: "shareholder" is not one of "user", "agent" or "maintainer" (stakeholder/enum)
-[needs.invalid_field_value]
+warning[needs.invalid_field_value]
   --> (need)
       fixtures/field_enums.rst:23:4
   FEAT_BAD_ENUMS:verification_method: "vibes" is not one of "test", "analysis" or 2 other candidates (verification_method/enum)
-[needs.invalid_field_value]
+warning[needs.invalid_field_value]
   --> (need)
       fixtures/field_enums.rst:31:4
   TEST_BAD_ENUMS:coverage: "mostly" is not one of "full" or "partial" (coverage/enum)
-[needs.invalid_field_value]
+warning[needs.invalid_field_value]
   --> (need)
       fixtures/field_enums.rst:31:4
   TEST_BAD_ENUMS:test_kind: "smoke" is not one of "property", "positive" or "error_path" (test_kind/enum)

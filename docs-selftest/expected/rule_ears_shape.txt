@@ -1,26 +1,32 @@
 # exit: 1
-[needs.schema_definition_violation]
+error[needs.schema_definition_violation]
   --> (need)
       fixtures/rule_ears_shape.rst:58:4
   FEAT_EARS_COMPLEX:statement: "While a loop is active, Agconflo shall end the iteration." does not match "^While [^,]+, when [^,]+, [A-Z][A-Za-z' -]* shall .+\.$" (ears-complex-statement-must-match-its-grammar[27]/properties/statement/pattern)
-[needs.schema_definition_violation]
+    note: While <state>, when <trigger>, <subject> shall <response>. The lowercase 'when' is deliberate: it is the second clause of one sentence.
+error[needs.schema_definition_violation]
   --> (need)
       fixtures/rule_ears_shape.rst:30:4
   FEAT_EARS_EVENT:statement: "Agconflo shall bind contexts when an activation begins." does not match "^When [^,]+, [A-Z][A-Za-z' -]* shall .+\.$" (ears-event-statement-must-match-its-grammar[23]/properties/statement/pattern)
-[needs.schema_definition_violation]
+    note: When <trigger>, <subject> shall <response>.
+error[needs.schema_definition_violation]
   --> (need)
       fixtures/rule_ears_shape.rst:44:4
   FEAT_EARS_OPTIONAL:statement: "Agconflo shall order fragments by their cached prefix." does not match "^Where [^,]+, [A-Z][A-Za-z' -]* shall .+\.$" (ears-optional-statement-must-match-its-grammar[25]/properties/statement/pattern)
-[needs.schema_definition_violation]
+    note: Where <feature is included>, <subject> shall <response>.
+error[needs.schema_definition_violation]
   --> (need)
       fixtures/rule_ears_shape.rst:37:4
   FEAT_EARS_STATE:statement: "Agconflo shall treat a node parked on a human gate as live." does not match "^While [^,]+, [A-Z][A-Za-z' -]* shall .+\.$" (ears-state-statement-must-match-its-grammar[24]/properties/statement/pattern)
-[needs.schema_definition_violation]
+    note: While <state>, <subject> shall <response>.
+error[needs.schema_definition_violation]
   --> (need)
       fixtures/rule_ears_shape.rst:23:4
   FEAT_EARS_UBIQUITOUS:statement: "Agconflo records the provenance of every context." does not match "^[A-Z][A-Za-z' -]* shall .+\.$" (ears-ubiquitous-statement-must-match-its-grammar[22]/properties/statement/pattern)
-[needs.schema_definition_violation]
+    note: Selects on the ears_pattern value rather than the type: if a requirement is labelled ubiquitous, it must read like one, whichever level carries it.
+error[needs.schema_definition_violation]
   --> (need)
       fixtures/rule_ears_shape.rst:51:4
   FEAT_EARS_UNWANTED:statement: "If a join receives contexts from two activations, Agconflo shall withhold it." does not match "^If [^,]+, then [A-Z][A-Za-z' -]* shall .+\.$" (ears-unwanted-statement-must-match-its-grammar[26]/properties/statement/pattern)
+    note: If <trigger>, then <subject> shall <response>. The 'then' is required, which is what separates this pattern from a state-driven one.
 Found 6 error(s).

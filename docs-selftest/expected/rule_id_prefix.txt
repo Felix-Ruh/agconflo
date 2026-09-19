@@ -1,34 +1,42 @@
 # exit: 1
-[needs.schema_definition_violation]
+error[needs.schema_definition_violation]
   --> (need)
       fixtures/rule_id_prefix.rst:26:4
   WRONG_ARCH:id: "WRONG_ARCH" does not match "^ARCH_" (feat-arch-id-must-start-with-arch[2]/properties/id/pattern)
-[needs.schema_definition_violation]
+    note: An id whose prefix disagrees with its type makes every id-based reading of the graph unreliable.
+error[needs.schema_definition_violation]
   --> (need)
       fixtures/rule_id_prefix.rst:32:4
   WRONG_COMP:id: "WRONG_COMP" does not match "^COMP_" (comp-id-must-start-with-comp[3]/properties/id/pattern)
-[needs.schema_definition_violation]
+    note: An id whose prefix disagrees with its type makes every id-based reading of the graph unreliable.
+error[needs.schema_definition_violation]
   --> (need)
       fixtures/rule_id_prefix.rst:36:4
   WRONG_CREQ:id: "WRONG_CREQ" does not match "^CREQ_" (comp-req-id-must-start-with-creq[4]/properties/id/pattern)
-[needs.schema_definition_violation]
+    note: An id whose prefix disagrees with its type makes every id-based reading of the graph unreliable. CREQ_ and not COMP_, which belongs to the component itself.
+error[needs.schema_definition_violation]
   --> (need)
       fixtures/rule_id_prefix.rst:49:4
   WRONG_DEC:id: "WRONG_DEC" does not match "^DEC_" (dec-id-must-start-with-dec[35]/properties/id/pattern)
-[needs.schema_definition_violation]
+    note: An id whose prefix disagrees with its type makes every id-based reading of the graph unreliable, and ubc does not enforce [[needs.types]].prefix itself.
+error[needs.schema_definition_violation]
   --> (need)
       fixtures/rule_id_prefix.rst:55:4
   WRONG_EVD:id: "WRONG_EVD" does not match "^EVD_" (evd-id-must-start-with-evd[36]/properties/id/pattern)
-[needs.schema_definition_violation]
+    note: An id whose prefix disagrees with its type makes every id-based reading of the graph unreliable.
+error[needs.schema_definition_violation]
   --> (need)
       fixtures/rule_id_prefix.rst:19:4
   WRONG_FEAT:id: "WRONG_FEAT" does not match "^FEAT_" (feat-req-id-must-start-with-feat[1]/properties/id/pattern)
-[needs.schema_definition_violation]
+    note: An id whose prefix disagrees with its type makes every id-based reading of the graph unreliable.
+error[needs.schema_definition_violation]
   --> (need)
       fixtures/rule_id_prefix.rst:14:4
   WRONG_STKH:id: "WRONG_STKH" does not match "^STKH_" (stkh-req-id-must-start-with-stkh[0]/properties/id/pattern)
-[needs.schema_definition_violation]
+    note: An id whose prefix disagrees with its type makes every id-based reading of the graph unreliable. ubc does not enforce [[needs.types]].prefix itself.
+error[needs.schema_definition_violation]
   --> (need)
       fixtures/rule_id_prefix.rst:43:4
   WRONG_TEST:id: "WRONG_TEST" does not match "^TEST_" (test-case-id-must-start-with-test[5]/properties/id/pattern)
+    note: An id whose prefix disagrees with its type makes every id-based reading of the graph unreliable.
 Found 8 error(s).

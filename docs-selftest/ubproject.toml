@@ -12,13 +12,12 @@
 # the query is needed at all. scripts/cypher-gates.sh reads them by a naming
 # convention instead.
 #
-# WHY A WHOLE DIRECTORY OF BROKEN NEEDS EXISTS. A wrongly shaped schema rule is
-# not rejected by ubc, it is silently ignored - measured four ways: a composite
-# keyword placed directly under validate.local, a misspelled keyword, a keyword
-# of the wrong kind for the field's type, and any rule about a need's body. All
-# four leave the project green. So a rule that has never been seen to fail
-# cannot be assumed to work, and "the schema checks passed" means nothing on its
-# own.
+# WHY A WHOLE DIRECTORY OF BROKEN NEEDS EXISTS. A wrongly shaped schema rule can
+# be silently ignored by ubc - two of the four shapes measured still are on
+# 0.35.0, see EVD_UBC035_RULE_SHAPES and scripts/docs-selftest.sh - and a rule
+# of the right shape can match the wrong thing. So a rule that has never been
+# seen to fail cannot be assumed to work, and "the schema checks passed" means
+# nothing on its own.
 #
 # THIS IS A SEPARATE PROJECT, AND A SIBLING OF docs/ RATHER THAN A CHILD OF IT.
 # Source include patterns are recursive, so a docs/selftest/ would sweep every
