@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/agconflo-core"]
+members = ["crates/agconflo-core", "crates/junit-to-needs"]
 
 # Shared metadata. Member crates opt in with `field.workspace = true`.
 [workspace.package]
@@ -16,6 +16,15 @@ readme = "README.md"
 # Testing policy: property-based tests wherever a property can be stated,
 # alongside positive tests and error-path ("negative") tests.
 proptest = "1.11"
+
+# junit-to-needs: nextest's own JUnit model reads the report, and serde_json
+# writes the needs file. chrono and uuid are what quick-junit's setters take,
+# needed only by tests that vary a report's timestamps and run id.
+quick-junit = "0.8.0"
+serde_json = "1.0.151"
+thiserror = "2.0.20"
+chrono = { version = "0.4.45", default-features = false, features = ["std"] }
+uuid = "1.17.0"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

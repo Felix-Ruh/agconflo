@@ -288,3 +288,40 @@ against.
    With ``fail-fast`` off, the rest of the run was still reported: 16 passed and
    2 failed, the other two lineage cases catching the same defect as repeated
    ancestors.
+
+.. evd:: nextest writes no test case for an ignored test
+   :id: EVD_NEXTEST_IGNORED_ABSENT
+   :evd_kind: measurement
+   :observed_on: 2026-09-19
+   :observation: cargo-nextest 0.9.145 counted an ignored test as skipped in its run summary and wrote no testcase element for it in the JUnit report, whose own skipped count was zero.
+
+   Taken in a throwaway workspace whose one crate held a passing test, a failing
+   one, an ignored one, a ``should_panic`` test that did not panic, a test
+   inside a ``tests`` module, an integration test and a test in a binary
+   target. Both failures were written as ``failure``; neither was an ``error``.
+
+   So a run read from this report was never skipped: a test that did not run is
+   absent from the report rather than recorded as not having run. An importer
+   therefore has two outcomes to record, not three.
+
+   The binary target's test was named with ``classname``
+   ``<crate>::bin/<binary>``, which carries a slash - a character no identifier
+   in this project may hold. The two naming rules of
+   ``EVD_NEXTEST_TEST_PATHS`` held again: the test in the ``tests`` module kept
+   that segment, and the integration test was named by its file.
+
+.. evd:: The version in an external needs file is not checked
+   :id: EVD_EXTERNAL_VERSION_FREE
+   :evd_kind: measurement
+   :observed_on: 2026-09-19
+   :observation: On ubc 0.35.0 an external needs file imported the same need under a current_version of 0.0.0, 9.9.9 or the empty string, and a file with no current_version key failed the check.
+
+   Wired as in ``EVD_EXTERNAL_ZERO_NEEDS``, with one ``test_case`` verifying a
+   real component requirement, and this project's own version being 0.0.0. Under
+   each of the first three the case appeared in Cypher with its ``verifies``
+   relationship. Without the key the check failed with ``needs.external``,
+   saying the file is not valid needs JSON and that the source contributed no
+   needs.
+
+   So a file written by a tool can carry one fixed version instead of following
+   the project's, which would otherwise change the file on every release.

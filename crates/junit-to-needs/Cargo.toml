@@ -1,0 +1,26 @@
+[package]
+name = "junit-to-needs"
+description = "Turns cargo-nextest's JUnit report into test_run needs for Agconflo's requirements graph."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+readme.workspace = true
+# Development tooling for this repository, not part of the engine.
+publish = false
+
+[dependencies]
+quick-junit = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+chrono = { workspace = true }
+proptest = { workspace = true }
+uuid = { workspace = true }
+
+# `unsafe_code = "forbid"` and clippy's `all` group, from the workspace. Without
+# this table a member crate inherits none of them, silently.
+[lints]
+workspace = true
