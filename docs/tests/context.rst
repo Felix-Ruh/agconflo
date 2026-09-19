@@ -16,15 +16,17 @@ part.
 
 A case's id is meant to be the path of the Rust test that implements it,
 uppercased, with ``::`` written as ``_``, so a result can be matched to its case
-without an annotation that could drift. The paths assumed here are
-``<module>::<case>`` in ``agconflo-core``, with the modules ``id``, ``context``
-and ``lineage``. What the test runner actually reports as a test's path has not
-been measured yet, so these ids may be renamed once it has, before any result is
-imported against them.
+without an annotation that could drift. The paths here are ``<module>::<case>``
+in ``agconflo-core``, with the modules ``id``, ``context`` and ``lineage``. The
+test runner reports a unit test by its full module path, so these ids hold as
+written only for tests that are bare test functions in those modules, not
+inside a ``tests`` module - measured, and recorded as
+``EVD_NEXTEST_TEST_PATHS``.
 
 The compile-time refusals below must run as ordinary tests rather than as
-documentation tests. The test runner does not run documentation tests, and a
-case that never produces a result can never be shown to pass.
+documentation tests. The test runner does not run documentation tests
+(``EVD_NEXTEST_NO_DOCTESTS``), and a case that never produces a result can never
+be shown to pass.
 
 .. test_case:: The source never issues an identifier twice
    :id: TEST_ID_NEVER_REPEATS
