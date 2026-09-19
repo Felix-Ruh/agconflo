@@ -29,6 +29,7 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    features/context
    features/wiring
    components/context
+   components/wiring
    tests/context
    code/agconflo-core
    decisions/context

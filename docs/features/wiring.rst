@@ -151,3 +151,68 @@ nothing about it prevents a run; and a cycle is not a defect at all
    The pair is what "well enough that a model can correct itself" resolves to for
    this feature. Anything further - a suggested fix, a diff - is deliberately not
    claimed here.
+
+.. feat_arch:: Validation splits into a validator and a defect
+   :id: ARCH_WIRING
+   :realises: FEAT_WIRING_REQUIRED_BOUND, FEAT_WIRING_BINDING_RESOLVES, FEAT_WIRING_TYPES_AGREE, FEAT_WIRING_ONE_DESIGNATED_OUTPUT, FEAT_WIRING_ALL_DEFECTS, FEAT_WIRING_DEFECT_LOCATED
+   :uses: COMP_WIRING_VALIDATOR, COMP_WIRING_DEFECT
+   :statement: Agconflo shall allocate workflow validation to the wiring validator and the wiring defect.
+
+   Two components, each answerable for what the other cannot guarantee:
+
+   - The wiring validator answers for all four defect classes and for
+     ``FEAT_WIRING_ALL_DEFECTS``. Each class is a relation between a definition
+     and the node types it names, and whether the walk continues after finding
+     one is a property of the walk, which no value can promise about itself.
+   - The wiring defect answers for ``FEAT_WIRING_DEFECT_LOCATED``. What a defect
+     says about itself is true or false of one defect, independently of how many
+     were found or of what found them.
+
+   Splitting the defect from the validator is the division worth arguing. Folding
+   them together would put "every defect is reported" and "a defect says where it
+   is" on one subject, and they fail separately: a validator that stops at the
+   first defect reports each of them perfectly, and one that finds all ten can
+   describe every one as a type mismatch with no location. A component requirement
+   needs one subject that owns its behaviour, and these are two behaviours.
+
+   **A third component was drafted and dropped, and the reason is worth keeping.**
+   The workflow definition looked like the natural owner of
+   ``FEAT_WIRING_ONE_DESIGNATED_OUTPUT``: a signature is a property of one
+   definition taken alone, so a definition could refuse to be assembled without
+   exactly one output. That allocation contradicts ``FEAT_WIRING_ALL_DEFECTS``.
+   A workflow with a malformed signature *and* three unbound parameters would
+   report the signature alone, because assembly would fail before any wiring was
+   examined - and the author would fix one defect, resubmit, and only then learn
+   about the others. Two round trips is precisely what that requirement exists to
+   prevent, so the signature is checked by the validator with everything else, and
+   a definition carries whatever it was given.
+
+   **The node types are not a component either, deliberately.** They are the other
+   layer (``DEC_TWO_LAYERS``): a declaration this feature reads and checks a
+   definition against, never something it defines or owns. No requirement here is
+   about what a type declares - only about a definition disagreeing with one - so
+   a component for them would own no behaviour. When loading a workflow lands, the
+   catalogue that resolves a type name may well become one, with requirements of
+   its own about a name that resolves to nothing.
+
+   So the workflow definition and the node type declarations are this feature's
+   inputs rather than its parts. They are data, and in Rust the type system is the
+   detailed design of data - which is the same reason this project has no design
+   level below the component requirement.
+
+   The decisions this is built against are named here rather than linked:
+
+   - ``DEC_TWO_LAYERS``: an instance is checked against its type, which is what
+     gives the validator something to check against at all.
+   - ``DEC_DECLARED_PARAMETERS``: the three lists a type declares are what
+     "required", "optional" and "global" mean in a defect message.
+   - ``DEC_BINDING_BY_PORT``: both ends of a binding are names in the definition,
+     so every check here is possible without running anything.
+   - ``DEC_WORKFLOW_SIGNATURE``: entry parameters and one designated output are
+     what make a definition's shape declarable, and therefore checkable.
+   - ``DEC_BACK_EDGES_ALLOWED``: a cycle is legal, so nothing here looks for a
+     topological order, and reachability is asked from the entry nodes.
+   - ``DEC_IMPLIED_CONTROL_EDGES`` and ``DEC_ROUTING_SEPARATE_FROM_CONTROL`` are
+     recorded as an absence: the control graph they describe is derived rather
+     than stored, and no requirement of this feature reads it. The validator
+     examines bindings, which is the other graph.
