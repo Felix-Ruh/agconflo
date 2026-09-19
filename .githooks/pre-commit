@@ -32,8 +32,8 @@ fail() {
 # --- secrets -----------------------------------------------------------------
 # This repository is public from its first commit, so a leaked key is leaked
 # permanently: the history is world-readable and a later removal does not undo
-# it. While the workspace is still empty this is the only step that does real
-# work, and it stays the most important one afterwards.
+# it. It was the only step doing real work while the workspace was empty, and
+# it stays the most important one now that it is not.
 #
 # `.githooks/` is excluded from the content scan because this file necessarily
 # contains the very patterns it searches for, and would otherwise reject its own
