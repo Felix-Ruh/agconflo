@@ -211,17 +211,21 @@ requirement whose subject is anything else.
      it is refused for its signature alone - which is worth pinning, because it
      is the case where two requirements could quietly both fire.
 
-.. comp_req:: A defect says where it is
+.. comp_req:: A defect carries its place as a value
    :id: CREQ_DEFECT_NAMES_PLACE
    :derived_from: FEAT_WIRING_DEFECT_LOCATED
    :allocated_to: COMP_WIRING_DEFECT
    :ears_pattern: ubiquitous
-   :statement: Wiring defect shall name the place in the definition that it concerns.
+   :statement: Wiring defect shall carry the place it concerns as a value rather than only in its message.
 
-   What a defect says about itself, independently of how many were found. The
-   place is the node instance and the parameter for a binding defect, and the
-   definition itself for a signature defect - so "where" is part of the value
-   rather than a sentence about it.
+   What a defect says about itself, independently of how many were found, and
+   what this adds to its parent: the parent asks that the place be named, and a
+   validator that names it in well-written prose satisfies that. This asks that
+   the place be readable without reading the prose.
+
+   The place is the node instance and the parameter for a binding defect, and the
+   definition itself for a signature defect - the distinction the parent leaves to
+   this level, because the classes of defect are here.
 
    Failure modes:
 

@@ -139,12 +139,21 @@ nothing about it prevents a run; and a cycle is not a defect at all
    :derived_from: STKH_MACHINE_AUTHORING
    :ears_pattern: ubiquitous
    :verification_method: test
-   :statement: Agconflo shall name the node instance and the parameter that each reported wiring defect concerns.
+   :statement: Agconflo shall name the place in a workflow that each reported wiring defect concerns.
 
    The other half of a correctable report, and separable from the half above. A
    validator can report all ten defects and describe each as a type mismatch
    without saying which wire it is about, leaving the author to search the graph
    for the ten places it might be.
+
+   "Place" rather than the node and the parameter, deliberately, and it was
+   generalised to that after being written the specific way round. Most defects
+   here concern a wire, and a wire is a node instance and one of its parameters,
+   but a signature defect concerns the definition itself and no node in it. A
+   requirement demanding an instance for every defect would oblige a validator to
+   invent one and send the author to a node that has nothing to do with it -
+   which is a failure mode its own component requirement lists. Which place each
+   class of defect names is settled one level down, where the classes are.
 
    It can be false while its parent holds for the same reason its sibling can: the
    errors are reported, and what makes them actionable is missing. A human reading
