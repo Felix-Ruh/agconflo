@@ -205,6 +205,13 @@ unknown name — a well-formed query matching nothing still exits 0. **Pass `--s
 rows yourself.** A gate asserting "no need violates this" is otherwise indistinguishable from one
 whose query could never match.
 
+**`-c 'source.include=[…]'` resolves against the current directory, not against `--project`.** From
+the repository root, `query cypher --project docs-selftest -c 'source.include=["fixtures/x.rst"]'`
+matches zero needs and prints `[]` with exit 0, while the same command run from inside
+`docs-selftest/` finds all of them. A scoped query is therefore run from inside its project, as
+`scripts/cypher-gates.sh` does, and a scoped gate needs a planted offender to prove it matched
+anything at all.
+
 **Cypher's regex is not `schemas.json`'s regex.** `=~` matches the whole value, so
 `n.statement =~ "shall"` returns nothing where `n.statement =~ ".*shall.*"` returns all 17
 stakeholder requirements. `\b` does not work either: `n.id =~ ".*\bSELF.*"` matches zero needs
