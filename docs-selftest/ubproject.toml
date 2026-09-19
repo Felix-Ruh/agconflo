@@ -51,3 +51,18 @@ extend = "../docs/ubproject.toml"
 
 [project]
 name = "Agconflo metamodel self-test"
+
+# THE ONE THING NOT INHERITED, and it has to be switched off explicitly.
+#
+# The real project imports docs/test-runs.json as external needs. Inherited
+# here, that path resolves against docs/ and the runs are loaded into EVERY
+# fixture, where the test cases they execute do not exist: measured, each
+# one-file check gained 38 errors and 19 warnings of dead links, and their
+# diagnostics named the JSON by an ABSOLUTE path, which no golden file could
+# hold on two operating systems.
+#
+# An empty array clears the inherited list - measured, `ubc config` then reports
+# none and the fixtures check clean again. Removing these two lines reddens all
+# 27 fixtures at once, which is the standing proof that it is load-bearing.
+[needs]
+external_needs = []

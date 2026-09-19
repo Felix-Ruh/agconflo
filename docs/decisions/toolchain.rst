@@ -141,3 +141,52 @@ body, and every rule needs a fixture because the tool ignores a malformed one.
    ``scripts/reports/unimplemented.cypher``, and never a gate: a gate there
    would refuse every commit from the one that writes a requirement to the one
    that writes its code.
+
+.. dec:: Test results are committed, and verified rather than rewritten
+   :id: DEC_RUNS_COMMITTED
+   :dec_status: accepted
+   :decided_on: 2026-09-19
+   :supported_by: EVD_EXTERNAL_ZERO_NEEDS, EVD_EXTERNAL_MISSING_WARNS
+   :statement: Agconflo's requirements project shall keep its test results in a file committed to the repository.
+
+   Forced rather than preferred. A wired external needs file that is absent is
+   reported, and every gate here checks at a level that makes that report fail
+   the build, so results produced only when the project is checked would leave
+   a fresh clone unable to check its documentation until it had built and run
+   the tests. An empty file is legal, which is what let the import be wired
+   before there was anything to import.
+
+   The cost is a file that must be kept current, and it is paid by a gate that
+   compares and never writes: ``scripts/import-test-runs.sh --check`` runs in
+   the commit hook and in continuous integration, and a stale file fails both.
+   Rewriting is a person's command, and the diff is read like the golden files
+   are, for the same reason - a gate that repaired its own subject would report
+   success over something nobody had looked at.
+
+   What keeps this bearable is that the file changes only when an outcome or an
+   identity changes, which is the decision below.
+
+.. dec:: Only the latest run of each test case is kept
+   :id: DEC_LATEST_RUN_ONLY
+   :dec_status: accepted
+   :decided_on: 2026-09-19
+   :supported_by: EVD_NEXTEST_TEST_PATHS, EVD_NEXTEST_IGNORED_ABSENT
+   :statement: Agconflo's requirements project shall record the latest run of each test case and no earlier one.
+
+   The graph answers "does this requirement's test pass", which is a question
+   about now. A history would answer it too, and at a price: a report carries a
+   run identifier, a timestamp per test and a duration per test, all different
+   between two runs of the same tests, so a file recording them would change on
+   every commit and its diff would say nothing. Git already holds the history,
+   with better tooling than a needs file could offer.
+
+   So one run per test case, rewritten in place, holding only the case it ran
+   and the outcome. The metamodel enforces the shape - a run executes at most
+   one test case - and the importer emits nothing else.
+
+   A test that did not run has no run at all rather than one saying so, because
+   the runner writes nothing for a test it skipped. A renamed test is louder:
+   its run names a test case that does not exist, and the check fails on that
+   dead link until the case is renamed to match. A deleted test is quieter - its
+   case simply has no run - which is a question for a query rather than an
+   error, for the same reason coverage is never gated here.

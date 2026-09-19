@@ -510,6 +510,33 @@ nullable = true
 schema = { type = "string", pattern = "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
 
 # -----------------------------------------------------------------------------
+# Test results.
+#
+# test-runs.json holds one `test_run` per test, written by
+# scripts/import-test-runs.sh from the report nextest leaves at
+# target/nextest/default/junit.xml. The file is COMMITTED, and both gates check
+# that it still matches what the tests produce without ever rewriting it.
+#
+# Committed rather than produced when the project is checked: an absent file is
+# reported as a warning, which fails at the `--deny warning` every gate here
+# uses and passes at `--deny error` (EVD_EXTERNAL_MISSING_WARNS), so on demand
+# would mean a fresh clone could not check its documentation until it had built
+# and run the tests. An empty one is legal, which is what lets the import be
+# wired before any test has run.
+#
+# It is not a source document: `source.include` is `*.rst`, so this JSON is read
+# only through this entry and counts toward nothing else.
+#
+# `base_url` is required - without it the check reports a gating warning - and
+# is where a reader is sent for a run: the file itself, since a run has no page
+# of its own.
+# -----------------------------------------------------------------------------
+
+[[needs.external_needs]]
+json_path = "test-runs.json"
+base_url = "https://github.com/Felix-Ruh/agconflo/blob/main/docs/test-runs.json"
+
+# -----------------------------------------------------------------------------
 # Code.
 #
 # codelinks reads one-line markers from the Rust source and turns each into an

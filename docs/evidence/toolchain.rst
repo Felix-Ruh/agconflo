@@ -261,6 +261,26 @@ against.
    So an import can be wired before the first test has run, but its file has to
    exist from then on.
 
+   How loudly it has to exist is sharpened by ``EVD_EXTERNAL_MISSING_WARNS``,
+   taken later against the same version: the diagnostic is a warning rather
+   than an error, so the deny level decides whether it stops anything.
+
+.. evd:: A missing external needs file is a warning, not an error
+   :id: EVD_EXTERNAL_MISSING_WARNS
+   :evd_kind: measurement
+   :observed_on: 2026-09-19
+   :observation: On ubc 0.35.0 a wired external needs file that was deleted produced one needs.external warning: the check exited 1 by default and under --deny warning, and exited 0 under --deny error.
+
+   Taken by deleting ``docs/test-runs.json`` from the wired project and running
+   the check at each deny level in turn, then restoring it. The message says the
+   file could not be opened and that the source contributed no needs.
+
+   It matters because every gate here passes ``--deny warning``, so the file is
+   effectively mandatory - but that is the gates' doing rather than the tool's,
+   and a project checking at ``--deny error`` would import nothing and say so
+   only in passing. The decision to commit the file rests on this being loud
+   where it is read, not on it being an error.
+
 .. evd:: Stable cargo test cannot write a JUnit report
    :id: EVD_STABLE_NO_JUNIT
    :evd_kind: measurement

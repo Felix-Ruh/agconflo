@@ -97,6 +97,17 @@ jobs:
         if: steps.probe.outputs.empty == 'false'
         run: ./tools/cargo-nextest nextest run --workspace --all-targets
 
+      # The committed test runs must still match the report those tests just
+      # wrote. It verifies and never rewrites, so a stale file fails here
+      # rather than being quietly corrected into the branch.
+      #
+      # In the rust job rather than the docs one because it needs the report,
+      # and therefore a test run; the docs job checks the same file's needs
+      # through `ubc check`, which is a different question.
+      - name: Check the committed test runs
+        if: steps.probe.outputs.empty == 'false'
+        run: sh scripts/import-test-runs.sh --check
+
   docs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10

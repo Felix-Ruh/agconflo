@@ -82,6 +82,8 @@ sh scripts/cypher-gates.sh                                     # run each Cypher
 sh scripts/cypher-gates.sh --report                            # print the review reports
 tools/ubc query cypher --project docs 'MATCH (n) RETURN n.id'  # query the needs graph
 tools/cargo-nextest nextest run --workspace --all-targets      # the tests, as the gates run them
+sh scripts/import-test-runs.sh --check                         # are the committed test results current?
+sh scripts/import-test-runs.sh                                 # rewrite them, then read the diff
 ```
 
 The tests write a JUnit report to `target/nextest/default/junit.xml`, and a test still running after
@@ -221,6 +223,7 @@ docs/tests/               per feature: how each of those requirements is checked
 docs/code/                per crate: where each component requirement is met, traced from its source
 docs/decisions/           choices made, grouped by what they are about
 docs/evidence/            measurements the decisions rest on
+docs/test-runs.json       the latest run of each test case, written by the importer
 ```
 
 Requirements are grouped by subject, and **the grouping is enforced**. Once any toctree exists, `ubc`
@@ -273,6 +276,29 @@ A question whose honest answer is sometimes "yes" is a **report** instead:
 `docs/` are printed for a person to read rather than failing anything.
 `sh scripts/cypher-gates.sh --report` runs them. The hook does not, since output nobody asked for on
 every commit is output nobody reads; CI does, so a report whose query has stopped working fails there.
+
+### Test results in the graph
+
+`docs/test-runs.json` holds one `test_run` need per test — the test case it ran and whether it
+passed — so that a requirement's status can be asked of the graph rather than of a log. It is
+written by `crates/junit-to-needs` from the report nextest leaves at
+`target/nextest/default/junit.xml`, and a test is matched to its case by name alone: the case's id is
+`TEST_` followed by the test's path uppercased, so a renamed test breaks the build as a dead link
+rather than going quietly unrecorded.
+
+The file is **committed**, because an external needs file that is wired but absent is reported as a
+warning — which fails at the `--deny warning` every gate here uses — so producing it on demand would
+leave a fresh clone unable to check its documentation until it had built and run the tests. Both gates then check that it is current, and **neither ever rewrites it**,
+just as `cargo fmt --check` and the golden files never fix their own subject. Rewriting is a command
+you run, and the diff is one you read:
+
+```
+sh scripts/import-test-runs.sh
+```
+
+It records only what changes when an outcome changes. A report also carries a run identifier, a
+timestamp per test and a duration per test, all different between two runs of the same tests; keeping
+them would dirty the file on every run and say nothing. The history is in git.
 
 ## Licence
 

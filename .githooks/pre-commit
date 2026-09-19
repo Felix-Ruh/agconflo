@@ -344,6 +344,18 @@ else
         echo "pre-commit: cargo nextest run --workspace --all-targets"
         "$NEXTEST" nextest run --workspace --all-targets ||
             fail "tests failed"
+
+        # docs/test-runs.json must still match the report those tests just
+        # wrote, or the graph would answer for outcomes that are no longer
+        # true. It VERIFIES AND NEVER REWRITES, like `cargo fmt --check`: a
+        # gate that fixed its own subject would pass over a file nobody read.
+        #
+        # Only reachable here, and deliberately: the fallback below runs the
+        # tests under `cargo test`, which writes no report at all
+        # (EVD_STABLE_NO_JUNIT), so there would be nothing to compare against.
+        echo "pre-commit: test runs up to date"
+        sh scripts/import-test-runs.sh --check ||
+            fail "the committed test runs are stale; rewrite them with 'sh scripts/import-test-runs.sh', review the diff, and stage it"
     else
         echo "pre-commit: nextest is not installed or will not run - using cargo test instead,"
         echo "pre-commit: which has no time limit and writes no JUnit report."

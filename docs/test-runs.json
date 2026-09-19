@@ -1,0 +1,180 @@
+{
+  "current_version": "",
+  "versions": {
+    "": {
+      "needs": {
+        "RUN_CONTEXT_DEEP_NESTING_DROPS": {
+          "executes": [
+            "TEST_CONTEXT_DEEP_NESTING_DROPS"
+          ],
+          "id": "RUN_CONTEXT_DEEP_NESTING_DROPS",
+          "test_outcome": "passed",
+          "title": "agconflo-core context::deep_nesting_drops",
+          "type": "test_run"
+        },
+        "RUN_CONTEXT_DEEP_NESTING_RENDERS": {
+          "executes": [
+            "TEST_CONTEXT_DEEP_NESTING_RENDERS"
+          ],
+          "id": "RUN_CONTEXT_DEEP_NESTING_RENDERS",
+          "test_outcome": "passed",
+          "title": "agconflo-core context::deep_nesting_renders",
+          "type": "test_run"
+        },
+        "RUN_CONTEXT_EMPTY_TYPE_REFUSED": {
+          "executes": [
+            "TEST_CONTEXT_EMPTY_TYPE_REFUSED"
+          ],
+          "id": "RUN_CONTEXT_EMPTY_TYPE_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-core context::empty_type_refused",
+          "type": "test_run"
+        },
+        "RUN_CONTEXT_PARTS_ARE_ORIGINALS": {
+          "executes": [
+            "TEST_CONTEXT_PARTS_ARE_ORIGINALS"
+          ],
+          "id": "RUN_CONTEXT_PARTS_ARE_ORIGINALS",
+          "test_outcome": "passed",
+          "title": "agconflo-core context::parts_are_originals",
+          "type": "test_run"
+        },
+        "RUN_CONTEXT_PARTS_EDGE_CASES": {
+          "executes": [
+            "TEST_CONTEXT_PARTS_EDGE_CASES"
+          ],
+          "id": "RUN_CONTEXT_PARTS_EDGE_CASES",
+          "test_outcome": "passed",
+          "title": "agconflo-core context::parts_edge_cases",
+          "type": "test_run"
+        },
+        "RUN_CONTEXT_READS_ARE_IDENTICAL": {
+          "executes": [
+            "TEST_CONTEXT_READS_ARE_IDENTICAL"
+          ],
+          "id": "RUN_CONTEXT_READS_ARE_IDENTICAL",
+          "test_outcome": "passed",
+          "title": "agconflo-core context::reads_are_identical",
+          "type": "test_run"
+        },
+        "RUN_CONTEXT_RENDER_EDGE_CASES": {
+          "executes": [
+            "TEST_CONTEXT_RENDER_EDGE_CASES"
+          ],
+          "id": "RUN_CONTEXT_RENDER_EDGE_CASES",
+          "test_outcome": "passed",
+          "title": "agconflo-core context::render_edge_cases",
+          "type": "test_run"
+        },
+        "RUN_CONTEXT_RENDER_IS_JOINED_PARTS": {
+          "executes": [
+            "TEST_CONTEXT_RENDER_IS_JOINED_PARTS"
+          ],
+          "id": "RUN_CONTEXT_RENDER_IS_JOINED_PARTS",
+          "test_outcome": "passed",
+          "title": "agconflo-core context::render_is_joined_parts",
+          "type": "test_run"
+        },
+        "RUN_CONTEXT_TEXT_EDGE_CASES": {
+          "executes": [
+            "TEST_CONTEXT_TEXT_EDGE_CASES"
+          ],
+          "id": "RUN_CONTEXT_TEXT_EDGE_CASES",
+          "test_outcome": "passed",
+          "title": "agconflo-core context::text_edge_cases",
+          "type": "test_run"
+        },
+        "RUN_CONTEXT_TEXT_ROUND_TRIPS": {
+          "executes": [
+            "TEST_CONTEXT_TEXT_ROUND_TRIPS"
+          ],
+          "id": "RUN_CONTEXT_TEXT_ROUND_TRIPS",
+          "test_outcome": "passed",
+          "title": "agconflo-core context::text_round_trips",
+          "type": "test_run"
+        },
+        "RUN_CONTEXT_TYPE_IS_DECLARED": {
+          "executes": [
+            "TEST_CONTEXT_TYPE_IS_DECLARED"
+          ],
+          "id": "RUN_CONTEXT_TYPE_IS_DECLARED",
+          "test_outcome": "passed",
+          "title": "agconflo-core context::type_is_declared",
+          "type": "test_run"
+        },
+        "RUN_ID_CANNOT_BE_FORGED": {
+          "executes": [
+            "TEST_ID_CANNOT_BE_FORGED"
+          ],
+          "id": "RUN_ID_CANNOT_BE_FORGED",
+          "test_outcome": "passed",
+          "title": "agconflo-core id::cannot_be_forged",
+          "type": "test_run"
+        },
+        "RUN_ID_EXHAUSTION_IS_PERMANENT": {
+          "executes": [
+            "TEST_ID_EXHAUSTION_IS_PERMANENT"
+          ],
+          "id": "RUN_ID_EXHAUSTION_IS_PERMANENT",
+          "test_outcome": "passed",
+          "title": "agconflo-core id::exhaustion_is_permanent",
+          "type": "test_run"
+        },
+        "RUN_ID_NEVER_REPEATS": {
+          "executes": [
+            "TEST_ID_NEVER_REPEATS"
+          ],
+          "id": "RUN_ID_NEVER_REPEATS",
+          "test_outcome": "passed",
+          "title": "agconflo-core id::never_repeats",
+          "type": "test_run"
+        },
+        "RUN_ID_SOURCE_CANNOT_BE_COPIED": {
+          "executes": [
+            "TEST_ID_SOURCE_CANNOT_BE_COPIED"
+          ],
+          "id": "RUN_ID_SOURCE_CANNOT_BE_COPIED",
+          "test_outcome": "passed",
+          "title": "agconflo-core id::source_cannot_be_copied",
+          "type": "test_run"
+        },
+        "RUN_LINEAGE_DEEP_NESTING_WALKS": {
+          "executes": [
+            "TEST_LINEAGE_DEEP_NESTING_WALKS"
+          ],
+          "id": "RUN_LINEAGE_DEEP_NESTING_WALKS",
+          "test_outcome": "passed",
+          "title": "agconflo-core lineage::deep_nesting_walks",
+          "type": "test_run"
+        },
+        "RUN_LINEAGE_DIAMONDS_ARE_LINEAR": {
+          "executes": [
+            "TEST_LINEAGE_DIAMONDS_ARE_LINEAR"
+          ],
+          "id": "RUN_LINEAGE_DIAMONDS_ARE_LINEAR",
+          "test_outcome": "passed",
+          "title": "agconflo-core lineage::diamonds_are_linear",
+          "type": "test_run"
+        },
+        "RUN_LINEAGE_EDGE_CASES": {
+          "executes": [
+            "TEST_LINEAGE_EDGE_CASES"
+          ],
+          "id": "RUN_LINEAGE_EDGE_CASES",
+          "test_outcome": "passed",
+          "title": "agconflo-core lineage::edge_cases",
+          "type": "test_run"
+        },
+        "RUN_LINEAGE_REACHES_EACH_ONCE": {
+          "executes": [
+            "TEST_LINEAGE_REACHES_EACH_ONCE"
+          ],
+          "id": "RUN_LINEAGE_REACHES_EACH_ONCE",
+          "test_outcome": "passed",
+          "title": "agconflo-core lineage::reaches_each_once",
+          "type": "test_run"
+        }
+      }
+    }
+  }
+}
