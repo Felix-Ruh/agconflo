@@ -15,9 +15,12 @@ where did every byte come from?"* has an exact answer.
 
 ## Status
 
-**Pre-alpha. The engine is not implemented yet.** What exists today is the development process around
-it: a requirements project under `docs/` with a validated metamodel behind it, a commit gate, and
-continuous integration. The design is well developed; the code is not.
+**Pre-alpha. There is no workflow engine yet** — no nodes, no graph execution, no LLM calls. What
+exists is the development process around it and the first slice of code through it: a requirements
+project under `docs/` with a validated metamodel behind it, a commit gate, continuous integration,
+and `agconflo-core`, which implements the `Context` value itself — identity, composition by
+reference, and lineage — traced from its requirements to the code and back from the tests that check
+it. The design is well developed; the code has just begun.
 
 Expect the public API to change without warning. Breaking changes, yes; force-pushes to `main`, no —
 those are blocked outright, along with direct pushes to it.
@@ -82,6 +85,8 @@ sh scripts/cypher-gates.sh                                     # run each Cypher
 sh scripts/cypher-gates.sh --report                            # print the review reports
 tools/ubc query cypher --project docs 'MATCH (n) RETURN n.id'  # query the needs graph
 tools/cargo-nextest nextest run --workspace --all-targets      # the tests, as the gates run them
+sh scripts/import-test-runs.sh --check                         # are the committed test results current?
+sh scripts/import-test-runs.sh                                 # rewrite them, then read the diff
 ```
 
 The tests write a JUnit report to `target/nextest/default/junit.xml`, and a test still running after
@@ -163,18 +168,26 @@ commit conventions and what to stop and ask about — are in [AGENTS.md](AGENTS.
 
 ### The requirements metamodel
 
-A descending chain from what someone wants to the code that does it, plus two types that sit beside it
-rather than on it:
+A descending chain from what someone wants to the code that does it, and back up from the tests that
+check it, plus the types that sit beside that chain rather than on it:
 
 ```
-stkh_req -> feat_req -> feat_arch -> comp_req -> Rust
-                            |            |
-                          comp <---------+          test_case verifies either requirement level
+stkh_req -> feat_req -> feat_arch -> comp_req <- impl    where code meets a requirement
+                ^           |            ^
+                |         comp <---------+
+                |                        |
+                +------- test_case ------+              a case verifies either requirement level
+                              ^
+                          test_run                      the latest run of the case it ran
 
-dec -> evd                                          a decision, and the measurement it rests on
+dec -> evd                                              a decision, and the measurement it rests on
  |
- +-- supersedes -> dec                              a decision this one replaced
+ +-- supersedes -> dec                                  a decision this one replaced
 ```
+
+`impl` and `test_run` are the two nobody writes: an implementation comes from a one-line marker in
+the Rust source, and a run is imported from the test runner's report. Both are described in their own
+sections below.
 
 Each level exists because it carries a decision the level above cannot: `stkh_req` says whose goal it
 is, `feat_req` says how the behaviour will be verified, `feat_arch` names the components a feature
@@ -221,6 +234,7 @@ docs/tests/               per feature: how each of those requirements is checked
 docs/code/                per crate: where each component requirement is met, traced from its source
 docs/decisions/           choices made, grouped by what they are about
 docs/evidence/            measurements the decisions rest on
+docs/test-runs.json       the latest run of each test case, written by the importer
 ```
 
 Requirements are grouped by subject, and **the grouping is enforced**. Once any toctree exists, `ubc`
@@ -273,6 +287,48 @@ A question whose honest answer is sometimes "yes" is a **report** instead:
 `docs/` are printed for a person to read rather than failing anything.
 `sh scripts/cypher-gates.sh --report` runs them. The hook does not, since output nobody asked for on
 every commit is output nobody reads; CI does, so a report whose query has stopped working fails there.
+
+### Code in the graph
+
+Where a component requirement is met is recorded beside the code that meets it, as a one-line comment
+on the item doing the work:
+
+```rust
+// @Each ancestor walked once,IMPL_LINEAGE_WALK,impl,[CREQ_WALKER_EACH_ONCE]
+```
+
+`ubc` reads those markers into the graph as `impl` needs — `docs/code/agconflo-core.rst` is what asks
+for them — and fills each one's `code_url` with a permalink to its line at the commit being checked.
+Nothing is written by hand, so the trace cannot drift from the code the way prose would. One
+requirement may be met in several places, and each place carries its own marker.
+
+A marker naming a requirement that does not exist is a dead link and fails the build. A requirement
+that no marker names is **not** an error — code is written after its requirement — and appears in the
+`unimplemented` review report instead. `untested` and `unrun` ask the same question of test cases and
+of runs; all three are printed by `sh scripts/cypher-gates.sh --report` and gate nothing.
+
+### Test results in the graph
+
+`docs/test-runs.json` holds one `test_run` need per test — the test case it ran and whether it
+passed — so that a requirement's status can be asked of the graph rather than of a log. It is
+written by `crates/junit-to-needs` from the report nextest leaves at
+`target/nextest/default/junit.xml`, and a test is matched to its case by name alone: the case's id is
+`TEST_` followed by the test's path uppercased, so a renamed test breaks the build as a dead link
+rather than going quietly unrecorded.
+
+The file is **committed**, because an external needs file that is wired but absent is reported as a
+warning — which fails at the `--deny warning` every gate here uses — so producing it on demand would
+leave a fresh clone unable to check its documentation until it had built and run the tests. Both gates then check that it is current, and **neither ever rewrites it**,
+just as `cargo fmt --check` and the golden files never fix their own subject. Rewriting is a command
+you run, and the diff is one you read:
+
+```
+sh scripts/import-test-runs.sh
+```
+
+It records only what changes when an outcome changes. A report also carries a run identifier, a
+timestamp per test and a duration per test, all different between two runs of the same tests; keeping
+them would dirty the file on every run and say nothing. The history is in git.
 
 ## Licence
 

@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Written by cargo-nextest 0.9.145 for a throwaway crate named probe-core, with the suite for its binary target removed and the run's test count lowered to match. It holds a passing test, a failing one, a should_panic test that did not panic, a test inside a tests module and an integration test. -->
+<testsuites name="nextest-run" tests="5" skipped="0" failures="2" errors="0" uuid="0cbffdc9-e252-4c80-8482-b8e0bbda2775" timestamp="2026-09-19T22:46:45.615+02:00" time="0.026">
+    <testsuite name="probe-core" tests="4" skipped="0" errors="0" failures="2">
+        <testcase name="context::tests::nested" classname="probe-core" timestamp="2026-09-19T22:46:45.615+02:00" time="0.008"/>
+        <testcase name="context::fails" classname="probe-core" timestamp="2026-09-19T22:46:45.615+02:00" time="0.011">
+            <failure message="thread &apos;context::fails&apos; (34968) panicked at probe-core\src\context.rs:4:14" type="test failure with exit code 101">thread &apos;context::fails&apos; (34968) panicked at probe-core\src\context.rs:4:14:
+assertion `left == right` failed: deliberate
+  left: 2
+ right: 3
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace</failure>
+            <system-out>
+running 1 test
+test context::fails ... FAILED
+
+failures:
+
+failures:
+    context::fails
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+</system-out>
+            <system-err>
+thread &apos;context::fails&apos; (34968) panicked at probe-core\src\context.rs:4:14:
+assertion `left == right` failed: deliberate
+  left: 2
+ right: 3
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+</system-err>
+        </testcase>
+        <testcase name="context::passes" classname="probe-core" timestamp="2026-09-19T22:46:45.615+02:00" time="0.019"/>
+        <testcase name="context::should_panic_but_does_not" classname="probe-core" timestamp="2026-09-19T22:46:45.615+02:00" time="0.022">
+            <failure message="note: test did not panic as expected at probe-core\src\context.rs:10:4" type="test failure with exit code 101">note: test did not panic as expected at probe-core\src\context.rs:10:4</failure>
+            <system-out>
+running 1 test
+test context::should_panic_but_does_not - should panic ... FAILED
+
+failures:
+
+---- context::should_panic_but_does_not stdout ----
+note: test did not panic as expected at probe-core\src\context.rs:10:4
+
+failures:
+    context::should_panic_but_does_not
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+    </testsuite>
+    <testsuite name="probe-core::integ" tests="1" skipped="0" errors="0" failures="0">
+        <testcase name="in_integration" classname="probe-core::integ" timestamp="2026-09-19T22:46:45.615+02:00" time="0.015"/>
+    </testsuite>
+</testsuites>

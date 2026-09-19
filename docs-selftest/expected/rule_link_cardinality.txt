@@ -1,11 +1,20 @@
 # exit: 1
 error[needs.schema_definition_violation]
   --> (need)
-      fixtures/rule_link_cardinality.rst:40:4
+      fixtures/rule_link_cardinality.rst:45:4
   CREQ_TWO_COMPS:allocated_to: ["COMP_FIRST","COMP_SECOND"] has more than 1 item (comp-req-must-be-allocated-to-at-most-one-comp[17]/properties/allocated_to/maxItems)
     note: Two components answerable for one requirement means neither is. Written as maxItems because minItems does NOT fire when the link is absent - the lower bound comes from the network rule above.
+error[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_link_cardinality.rst:70:4
+  RUN_TWO_CASES:executes: ["TEST_CARDINALITY_FIRST","TEST_CARDINALITY_SECOND"] has more than 1 item (test-run-must-execute-at-most-one-test-case[49]/properties/executes/maxItems)
+    note: A run is the latest run of ONE test case, which is what lets the imported file be rewritten in place rather than grown. A run covering two cases makes latest-wins meaningless, since either case could have moved it. Written as maxItems for the reason given on the allocation rule above: minItems does not fire when the link is absent, and the lower bound comes from the network rule before this one.
 error[needs.schema_network_violation]
   --> (need)
-      fixtures/rule_link_cardinality.rst:47:4
+      fixtures/rule_link_cardinality.rst:52:4
   CREQ_NO_ALLOC:allocated_to: Too few valid links of type 'allocated_to' (0 < 1) (comp-req-must-be-allocated-to-a-comp[16]/contains_too_few)
-Found 2 error(s).
+error[needs.schema_network_violation]
+  --> (need)
+      fixtures/rule_link_cardinality.rst:75:4
+  RUN_NO_CASE:executes: Too few valid links of type 'executes' (0 < 1) (test-run-must-execute-a-test-case[48]/contains_too_few)
+Found 4 error(s).

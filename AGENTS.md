@@ -34,6 +34,12 @@ with the alternatives and concretely why each lost. A plan that ends in a list o
 hands back the work it existed to do. Where a decision genuinely cannot be made from what is in the
 repository, that is a stop-and-ask, not a bullet list.
 
+**Decide what can be measured, and say what you decided.** Nearly every choice here is settled by
+reading a file, running a query or running an experiment, and doing that is the work. Asking about
+one instead spends a round trip to arrive where the measurement already was. Present the decision
+and the evidence for it; a reader who disagrees can say so, and that is cheaper than a question
+nobody needed.
+
 ### The plan format
 
 - **Lead with anything that changes scope**, or that might be cut. A fact discovered while
@@ -265,7 +271,7 @@ changing an enum value is a change that needs its own fixture, not a neutral edi
   rather than a workaround;
 - a golden file moves that was not predicted;
 - a requirement cannot be written without inventing a new `stkh_req` parent;
-- the work needs a decision the plan has not pinned;
+- the work needs a decision the plan has not pinned **and that no measurement can settle**;
 - anything is about to be pushed, opened or merged.
 
 ## Never

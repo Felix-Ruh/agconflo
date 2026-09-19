@@ -62,8 +62,10 @@ repository asserts that the files contradict.
 
 - **Anything requiring action on their part goes in the final message, or in a question.** Text
   written between tool calls is not read.
-- **Use the question tool whenever they have to act or decide** — not only to choose between
-  options, but for a value to supply, a confirmation to click, a command to run.
+- **Use the question tool only for what is genuinely theirs to decide** — pushing, opening or
+  merging; a value only they have; a confirmation to click; a preference this repository does not
+  record. A choice the files, a query or an experiment can settle is yours to settle and report,
+  and putting it to them instead hands back the work you were asked to do.
 - **Do not start background pollers or scheduled wake-ups** to wait on something long. Hand it
   over, say what to look for, and stop.
 - **Long or expensive commands get interrupted.** Consider the cost before running one.

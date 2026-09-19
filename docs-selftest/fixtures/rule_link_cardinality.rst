@@ -17,6 +17,11 @@ Fixture: rule_link_cardinality
    fail through different mechanisms, so leaving one unpinned would let it decay
    quietly.
 
+   `executes` is bounded the same way and for the same reason, so both of its
+   halves are pinned here too: a run of two test cases, which would make "the
+   latest run of one case" meaningless because either case could have moved it,
+   and a run of none.
+
 .. stkh_req:: A parent
    :id: STKH_CARDINALITY
    :stakeholder: user
@@ -49,3 +54,24 @@ Fixture: rule_link_cardinality
    :derived_from: FEAT_CARDINALITY
    :ears_pattern: ubiquitous
    :statement: Some component shall be answerable for this requirement.
+
+.. test_case:: A case, used below as one of two executed by one run
+   :id: TEST_CARDINALITY_FIRST
+   :verifies: FEAT_CARDINALITY
+   :test_kind: positive
+   :coverage: partial
+
+.. test_case:: A second case, used the same way
+   :id: TEST_CARDINALITY_SECOND
+   :verifies: FEAT_CARDINALITY
+   :test_kind: positive
+   :coverage: partial
+
+.. test_run:: One run for two test cases
+   :id: RUN_TWO_CASES
+   :executes: TEST_CARDINALITY_FIRST, TEST_CARDINALITY_SECOND
+   :test_outcome: passed
+
+.. test_run:: A run of no test case at all
+   :id: RUN_NO_CASE
+   :test_outcome: passed

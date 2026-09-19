@@ -261,6 +261,26 @@ against.
    So an import can be wired before the first test has run, but its file has to
    exist from then on.
 
+   How loudly it has to exist is sharpened by ``EVD_EXTERNAL_MISSING_WARNS``,
+   taken later against the same version: the diagnostic is a warning rather
+   than an error, so the deny level decides whether it stops anything.
+
+.. evd:: A missing external needs file is a warning, not an error
+   :id: EVD_EXTERNAL_MISSING_WARNS
+   :evd_kind: measurement
+   :observed_on: 2026-09-19
+   :observation: On ubc 0.35.0 a wired external needs file that was deleted produced one needs.external warning: the check exited 1 by default and under --deny warning, and exited 0 under --deny error.
+
+   Taken by deleting ``docs/test-runs.json`` from the wired project and running
+   the check at each deny level in turn, then restoring it. The message says the
+   file could not be opened and that the source contributed no needs.
+
+   It matters because every gate here passes ``--deny warning``, so the file is
+   effectively mandatory - but that is the gates' doing rather than the tool's,
+   and a project checking at ``--deny error`` would import nothing and say so
+   only in passing. The decision to commit the file rests on this being loud
+   where it is read, not on it being an error.
+
 .. evd:: Stable cargo test cannot write a JUnit report
    :id: EVD_STABLE_NO_JUNIT
    :evd_kind: measurement
@@ -288,3 +308,55 @@ against.
    With ``fail-fast`` off, the rest of the run was still reported: 16 passed and
    2 failed, the other two lineage cases catching the same defect as repeated
    ancestors.
+
+.. evd:: nextest writes no test case for an ignored test
+   :id: EVD_NEXTEST_IGNORED_ABSENT
+   :evd_kind: measurement
+   :observed_on: 2026-09-19
+   :observation: cargo-nextest 0.9.145 counted an ignored test as skipped in its run summary and wrote no testcase element for it in the JUnit report, whose own skipped count was zero.
+
+   Taken in a throwaway workspace whose one crate held a passing test, a failing
+   one, an ignored one, a ``should_panic`` test that did not panic, a test
+   inside a ``tests`` module, an integration test and a test in a binary
+   target. Both failures were written as ``failure``; neither was an ``error``.
+
+   So a run read from this report was never skipped: a test that did not run is
+   absent from the report rather than recorded as not having run. An importer
+   therefore has two outcomes to record, not three.
+
+   The binary target's test was named with ``classname``
+   ``<crate>::bin/<binary>``, which carries a slash - a character no identifier
+   in this project may hold. The two naming rules of
+   ``EVD_NEXTEST_TEST_PATHS`` held again: the test in the ``tests`` module kept
+   that segment, and the integration test was named by its file.
+
+.. evd:: The version in an external needs file is not checked
+   :id: EVD_EXTERNAL_VERSION_FREE
+   :evd_kind: measurement
+   :observed_on: 2026-09-19
+   :observation: On ubc 0.35.0 an external needs file imported the same need under a current_version of 0.0.0, 9.9.9 or the empty string, and a file with no current_version key failed the check.
+
+   Wired as in ``EVD_EXTERNAL_ZERO_NEEDS``, with one ``test_case`` verifying a
+   real component requirement, and this project's own version being 0.0.0. Under
+   each of the first three the case appeared in Cypher with its ``verifies``
+   relationship. Without the key the check failed with ``needs.external``,
+   saying the file is not valid needs JSON and that the source contributed no
+   needs.
+
+   So a file written by a tool can carry one fixed version instead of following
+   the project's, which would otherwise change the file on every release.
+
+.. evd:: Schema rules reach needs imported from a file
+   :id: EVD_RULES_REACH_IMPORTED_RUNS
+   :evd_kind: measurement
+   :observed_on: 2026-09-19
+   :observation: On ubc 0.35.0 three rules written for test runs fired on runs imported from JSON: a missing outcome, an id without its prefix, and a run executing a component requirement rather than a test case.
+
+   Taken with the importer's own output for this workspace's 19 tests, wired as
+   an external source with a ``base_url`` and then altered by hand in three
+   places. Unaltered, the same file checked clean, which is what makes the three
+   failures mean something.
+
+   It matters because every fixture in ``docs-selftest/`` is a document, while
+   every real run arrives as JSON. Without this, the rules would be known to
+   hold only for needs nobody will write by hand.

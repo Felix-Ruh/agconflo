@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="19" skipped="0" failures="0" errors="0" uuid="4a832668-c96e-408c-9bef-001aa8e7502c" timestamp="2026-09-19T22:39:41.473+02:00" time="0.900">
+    <testsuite name="agconflo-core" tests="19" skipped="0" errors="0" failures="0">
+        <testcase name="context::render_edge_cases" classname="agconflo-core" timestamp="2026-09-19T22:39:41.473+02:00" time="0.017"/>
+        <testcase name="context::text_edge_cases" classname="agconflo-core" timestamp="2026-09-19T22:39:41.473+02:00" time="0.020"/>
+        <testcase name="context::empty_type_refused" classname="agconflo-core" timestamp="2026-09-19T22:39:41.473+02:00" time="0.026"/>
+        <testcase name="lineage::edge_cases" classname="agconflo-core" timestamp="2026-09-19T22:39:41.474+02:00" time="0.030"/>
+        <testcase name="lineage::diamonds_are_linear" classname="agconflo-core" timestamp="2026-09-19T22:39:41.474+02:00" time="0.033"/>
+        <testcase name="context::reads_are_identical" classname="agconflo-core" timestamp="2026-09-19T22:39:41.473+02:00" time="0.035"/>
+        <testcase name="id::exhaustion_is_permanent" classname="agconflo-core" timestamp="2026-09-19T22:39:41.474+02:00" time="0.037"/>
+        <testcase name="context::parts_edge_cases" classname="agconflo-core" timestamp="2026-09-19T22:39:41.473+02:00" time="0.049"/>
+        <testcase name="context::type_is_declared" classname="agconflo-core" timestamp="2026-09-19T22:39:41.474+02:00" time="0.055"/>
+        <testcase name="context::text_round_trips" classname="agconflo-core" timestamp="2026-09-19T22:39:41.473+02:00" time="0.055"/>
+        <testcase name="context::parts_are_originals" classname="agconflo-core" timestamp="2026-09-19T22:39:41.473+02:00" time="0.059"/>
+        <testcase name="lineage::reaches_each_once" classname="agconflo-core" timestamp="2026-09-19T22:39:41.474+02:00" time="0.084"/>
+        <testcase name="context::render_is_joined_parts" classname="agconflo-core" timestamp="2026-09-19T22:39:41.474+02:00" time="0.096"/>
+        <testcase name="context::deep_nesting_renders" classname="agconflo-core" timestamp="2026-09-19T22:39:41.473+02:00" time="0.102"/>
+        <testcase name="context::deep_nesting_drops" classname="agconflo-core" timestamp="2026-09-19T22:39:41.473+02:00" time="0.116"/>
+        <testcase name="lineage::deep_nesting_walks" classname="agconflo-core" timestamp="2026-09-19T22:39:41.474+02:00" time="0.159"/>
+        <testcase name="id::never_repeats" classname="agconflo-core" timestamp="2026-09-19T22:39:41.474+02:00" time="0.630"/>
+        <testcase name="id::source_cannot_be_copied" classname="agconflo-core" timestamp="2026-09-19T22:39:41.474+02:00" time="0.688"/>
+        <testcase name="id::cannot_be_forged" classname="agconflo-core" timestamp="2026-09-19T22:39:41.474+02:00" time="0.899"/>
+    </testsuite>
+</testsuites>

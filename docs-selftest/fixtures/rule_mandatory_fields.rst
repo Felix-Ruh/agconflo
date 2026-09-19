@@ -48,3 +48,7 @@ Fixture: rule_mandatory_fields
 .. impl:: No code url
    :id: IMPL_NO_FIELDS
    :implements: CREQ_NO_FIELDS
+
+.. test_run:: No outcome
+   :id: RUN_NO_FIELDS
+   :executes: TEST_NO_FIELDS

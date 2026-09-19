@@ -62,3 +62,8 @@ Fixture: rule_id_prefix
    :id: WRONG_IMPL
    :implements: WRONG_CREQ
    :code_url: https://example.invalid/src/lib.rs#L1
+
+.. test_run:: A run not called RUN
+   :id: WRONG_RUN
+   :executes: WRONG_TEST
+   :test_outcome: passed

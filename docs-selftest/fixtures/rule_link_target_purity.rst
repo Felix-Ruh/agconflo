@@ -18,6 +18,9 @@ Fixture: rule_link_target_purity
    cardinality and its purity can never be observed on its own. Its `items` branch
    is guarded instead by the wholly-wrong single target in rule_link_targets.
 
+   `executes` is absent for exactly that reason too: a run executes at most one
+   test case, so a mixed list trips cardinality before purity can be seen alone.
+
 .. stkh_req:: A valid parent
    :id: STKH_PURITY
    :stakeholder: user
