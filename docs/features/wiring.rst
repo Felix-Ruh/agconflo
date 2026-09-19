@@ -13,9 +13,12 @@ three of the four is a validator that reports success on a workflow that cannot
 run - and "invalid" in the parent goal is exactly the word that has to be spelled
 out somewhere.
 
-The other two are about the report rather than the verdict. An agent is a first
-class author here, and an agent correcting one defect per round trip is a
-different tool from one that sees them all at once.
+Two are about the report rather than the verdict. An agent is a first class
+author here, and an agent correcting one defect per round trip is a different
+tool from one that sees them all at once.
+
+The last is about the answer when nothing is wrong, and it is written down
+because the four above are all satisfied by a validator that refuses everything.
 
 Each was checked by hand against the question no rule can ask: could this be
 false while its parent is true? The body of each says how.
@@ -152,18 +155,43 @@ nothing about it prevents a run; and a cycle is not a defect at all
    this feature. Anything further - a suggested fix, a diff - is deliberately not
    claimed here.
 
+.. feat_req:: A well-formed workflow is accepted
+   :id: FEAT_WIRING_ACCEPTS_WELL_FORMED
+   :derived_from: STKH_WIRING_CHECKED
+   :ears_pattern: ubiquitous
+   :verification_method: test
+   :statement: Agconflo shall accept a workflow that carries none of the defects it refuses a workflow for.
+
+   The requirement every control is written against, and the one a reader is
+   most likely to think unnecessary.
+
+   It can be false while its parent holds, and trivially: a validator that
+   refuses every workflow rejects every invalid one, before any node runs,
+   exactly as asked. The four requirements above are satisfied by it too - each
+   says what must be refused, and none says what must not be. Over-blocking is
+   invisible to all of them.
+
+   It is what makes the defect classes exact rather than merely sufficient, and
+   it is why the cases that must pass are named in each component requirement's
+   body: an unbound optional parameter, a cycle, a node nothing reaches, a
+   declared global that no binding carries. Each of those is well formed, and
+   each is the kind of thing a validator written to be strict refuses by
+   accident.
+
 .. feat_arch:: Validation splits into a validator and a defect
    :id: ARCH_WIRING
-   :realises: FEAT_WIRING_REQUIRED_BOUND, FEAT_WIRING_BINDING_RESOLVES, FEAT_WIRING_TYPES_AGREE, FEAT_WIRING_ONE_DESIGNATED_OUTPUT, FEAT_WIRING_ALL_DEFECTS, FEAT_WIRING_DEFECT_LOCATED
+   :realises: FEAT_WIRING_REQUIRED_BOUND, FEAT_WIRING_BINDING_RESOLVES, FEAT_WIRING_TYPES_AGREE, FEAT_WIRING_ONE_DESIGNATED_OUTPUT, FEAT_WIRING_ALL_DEFECTS, FEAT_WIRING_DEFECT_LOCATED, FEAT_WIRING_ACCEPTS_WELL_FORMED
    :uses: COMP_WIRING_VALIDATOR, COMP_WIRING_DEFECT
    :statement: Agconflo shall allocate workflow validation to the wiring validator and the wiring defect.
 
    Two components, each answerable for what the other cannot guarantee:
 
-   - The wiring validator answers for all four defect classes and for
-     ``FEAT_WIRING_ALL_DEFECTS``. Each class is a relation between a definition
-     and the node types it names, and whether the walk continues after finding
-     one is a property of the walk, which no value can promise about itself.
+   - The wiring validator answers for all four defect classes, for
+     ``FEAT_WIRING_ALL_DEFECTS`` and for ``FEAT_WIRING_ACCEPTS_WELL_FORMED``.
+     Each class is a relation between a definition and the node types it names;
+     whether the walk continues after finding one is a property of the walk,
+     which no value can promise about itself; and what is *not* reported is a
+     property of the same walk.
    - The wiring defect answers for ``FEAT_WIRING_DEFECT_LOCATED``. What a defect
      says about itself is true or false of one defect, independently of how many
      were found or of what found them.
