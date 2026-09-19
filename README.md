@@ -218,6 +218,7 @@ docs/stakeholder/         what people want: context, authoring, execution, and t
 docs/features/            per feature: its feature requirements, then its architecture
 docs/components/          per feature: its components, then the requirements allocated to them
 docs/tests/               per feature: how each of those requirements is checked
+docs/code/                per crate: where each component requirement is met, traced from its source
 docs/decisions/           choices made, grouped by what they are about
 docs/evidence/            measurements the decisions rest on
 ```

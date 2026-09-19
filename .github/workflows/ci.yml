@@ -117,11 +117,10 @@ jobs:
       # resolved, but findings outside <path> are dropped silently. Measured on
       # a two-directory probe project - `ubc check inside` printed "No errors
       # found" and exited 0 while a needs.id_regex warning sat in
-      # outside/bad.rst. That is harmless while the project root is docs/ and
-      # the argument selects everything, and actively dangerous from the moment
-      # [codelinks] points at ../crates: every diagnostic in Rust source would
-      # be filtered away by an argument that looks like it merely names the
-      # project. .githooks/pre-commit avoids it the same way.
+      # outside/bad.rst. It matters most for the diagnostics codelinks raises
+      # in Rust source, which a path argument would filter away while looking
+      # as though it merely named the project. .githooks/pre-commit avoids it
+      # the same way, and says how a broken marker was seen to fail this form.
       - name: ubc check
         id: check
         working-directory: docs

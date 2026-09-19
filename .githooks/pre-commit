@@ -67,8 +67,8 @@ fi
 # round trip to fix after a push. Measured on this repository: 80 ms with a cold
 # index, 41 ms with a warm one. That is free next to the cargo gate below, which
 # is why it runs first - and why it is deliberately NOT restricted to commits
-# that touch docs/. The needs graph is cross-file, and once [codelinks] points
-# at ../crates a Rust source change can break it too.
+# that touch docs/. The needs graph is cross-file, and [codelinks] reads the
+# markers in ../crates, so a Rust source change can break it too.
 #
 # `ubc` is not on PATH: it lives in the gitignored tools/, downloaded by
 # scripts/get-ubc.sh, so it is resolved by path. That is deliberate rather than
@@ -156,11 +156,11 @@ else
     # project is still resolved, but findings outside <path> are dropped
     # silently. Measured on a two-directory probe project - `ubc check inside`
     # printed "No errors found" and exited 0 while a needs.id_regex warning sat
-    # in outside/bad.rst. Harmless today, because the project root is docs/
-    # itself and the argument selects everything; actively dangerous from the
-    # moment [codelinks] points at ../crates, when every diagnostic in Rust
-    # source would be filtered away by an argument that looks like it merely
-    # names the project. Hence the subshell cd instead.
+    # in outside/bad.rst. It matters most for the diagnostics codelinks raises
+    # in Rust source, which a path argument would filter away while looking as
+    # though it merely named the project. Hence the subshell cd instead - and a
+    # broken marker is seen to fail this form: a dead requirement id, a wrong
+    # target type, a wrong id prefix and a missing target each exit 1.
     #
     # The output is captured rather than left to the terminal because it is the
     # only thing separating a real defect from an unavailable licence - see

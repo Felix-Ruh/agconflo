@@ -13,6 +13,7 @@ use std::fmt;
 /// Deliberately without an ordering. Nothing promises that a later context
 /// carries a larger identifier, and an `Ord` would invite code to assume it.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+// @Identifiers only a source can make,IMPL_ID_CONTEXT_ID,impl,[CREQ_SOURCE_SOLE_ISSUER]
 pub struct ContextId(u64);
 
 /// Issues context identifiers, never the same one twice.
@@ -22,6 +23,7 @@ pub struct ContextId(u64);
 /// jointly. Two sources created separately would do the same, and preventing
 /// that belongs to whatever owns a run once the engine has one.
 #[derive(Debug)]
+// @A source that cannot be copied,IMPL_ID_SOURCE,impl,[CREQ_SOURCE_NO_REPEAT]
 pub struct IdSource {
     /// The next identifier to issue, or `None` once the last has been issued.
     next: Option<u64>,
@@ -45,6 +47,7 @@ impl IdSource {
     /// Issues the next identifier, or refuses once every identifier has been
     /// issued. The refusal is permanent: wrapping round would reissue the first
     /// identifier without a word, which is the defect this exists to rule out.
+    // @Issuing each identifier once,IMPL_ID_ISSUE,impl,[CREQ_SOURCE_NO_REPEAT]
     pub(crate) fn issue(&mut self) -> Result<ContextId, SourceExhausted> {
         let id = self.next.ok_or(SourceExhausted)?;
         self.next = id.checked_add(1);

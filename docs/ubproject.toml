@@ -386,9 +386,10 @@ schema = { type = "string" }
 # is visible to schema validation, where a need's body is not
 # (EVD_CODELINKS_URL_VISIBLE), so a rule can require it.
 #
-# A free string for now. Whether it holds a local file URL or a link into the
-# repository is decided with the codelinks configuration, once real values
-# exist to judge; a pattern here would be a rule with its own fixture.
+# It holds a permalink into the repository at the commit being checked; the
+# [codelinks] section at the end of this file says why that and not a local
+# file URL. Left a free string, since a pattern here would be a rule with a
+# fixture of its own, guarding a value only codelinks writes.
 description = "Where this implementation lives in the source."
 nullable = true
 schema = { type = "string" }
@@ -468,3 +469,63 @@ schema = { type = "string", pattern = "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
 description = "The date this was observed, as YYYY-MM-DD."
 nullable = true
 schema = { type = "string", pattern = "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
+
+# -----------------------------------------------------------------------------
+# Code.
+#
+# codelinks reads one-line markers from the Rust source and turns each into an
+# `impl` need, which docs/code/<crate>.rst brings into the graph with a
+# `src-trace` directive. A marker is an ordinary comment:
+#
+#     // @<title>,<IMPL id>,impl,[<component requirement ids>]
+#
+# ONE-LINE MARKERS ONLY. `@need-ids:` references are switched off: two call
+# sites referencing one need keep only the first, with no diagnostic, where two
+# markers both survive with their own locations (EVD_NEED_ID_REFS_KEEP_FIRST).
+#
+# The include glob must begin with `**/`. It is NOT relative to `src_dir`:
+# measured, a pattern written relative to it matched nothing and the check
+# stayed green with no code traced at all (EVD_CODELINKS_INCLUDE). This one
+# also keeps a crate-local target/ and every other crate out.
+#
+# `code_url` is a permalink into the repository at the commit being checked:
+# the same on every machine, and valid once pushed. `{commit}` is HEAD and
+# `{line}` comes from the working tree, so an uncommitted edit points a link at
+# the wrong line until it is committed; CI checks a clean tree, where they
+# agree (EVD_CODELINKS_REMOTE_URL). The value is computed at every index and
+# never committed. A local file URL was the alternative, and it names one
+# machine's absolute path.
+#
+# docs-selftest/ inherits all of this through `extend`, harmlessly: code needs
+# appear only where a src-trace directive asks for them, and the Rust files do
+# not count toward the unlicensed five-file tier the fixtures rely on
+# (EVD_CODELINKS_FREE_TIER).
+# -----------------------------------------------------------------------------
+
+[codelinks]
+set_remote_url = true
+remote_url_field = "code_url"
+
+[codelinks.projects.agconflo-core]
+remote_url_pattern = "https://github.com/Felix-Ruh/agconflo/blob/{commit}/{path}#L{line}"
+
+[codelinks.projects.agconflo-core.source_discover]
+src_dir = "../crates"
+include = ["**/agconflo-core/src/**/*.rs"]
+comment_type = "rust"
+
+[codelinks.projects.agconflo-core.analyse]
+get_oneline_needs = true
+get_need_id_refs = false
+
+[codelinks.projects.agconflo-core.analyse.oneline_comment_style]
+start_sequence = "@"
+end_sequence = "\n"
+field_split_char = ","
+# `implements` in the place of the default `links`: see [needs.links.implements].
+needs_fields = [
+    { name = "title", type = "str" },
+    { name = "id", type = "str" },
+    { name = "type", type = "str", default = "impl" },
+    { name = "implements", type = "list[str]", default = [] },
+]

@@ -21,6 +21,7 @@ impl Context {
     /// the same identifiers and a walk across both would take different
     /// contexts for one; keeping a run to one source belongs to whatever owns
     /// the run.
+    // @Each ancestor walked once,IMPL_LINEAGE_WALK,impl,[CREQ_WALKER_EACH_ONCE]
     pub fn lineage(&self) -> Vec<&Context> {
         let mut seen = HashSet::new();
         let mut ancestry = Vec::new();

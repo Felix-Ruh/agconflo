@@ -35,6 +35,11 @@
 # id_required, id_regex and schemas.json itself, so a rule cannot drift out of
 # coverage by being edited in one file and not the other.
 #
+# It inherits the [codelinks] configuration too, and that is harmless: code
+# needs appear only where a src-trace directive asks for them, which no fixture
+# does, and the Rust files it traces do not count toward the unlicensed
+# five-file tier (EVD_CODELINKS_FREE_TIER).
+#
 # Measured: relative paths inside the extended file resolve against THAT file,
 # so the inherited `schema_definitions_from_json` will point at docs/, not here.
 #

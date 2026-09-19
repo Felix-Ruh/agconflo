@@ -29,6 +29,7 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    features/context
    components/context
    tests/context
+   code/agconflo-core
    decisions/context
    decisions/toolchain
    decisions/requirements
