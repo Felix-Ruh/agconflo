@@ -21,10 +21,14 @@ warning[needs.invalid_field_value]
   FEAT_BAD_ENUMS:verification_method: "vibes" is not one of "test", "analysis" or 2 other candidates (verification_method/enum)
 warning[needs.invalid_field_value]
   --> (need)
+      fixtures/field_enums.rst:49:4
+  RUN_BAD_OUTCOME:test_outcome: "flaky" is not one of "passed" or "failed" (test_outcome/enum)
+warning[needs.invalid_field_value]
+  --> (need)
       fixtures/field_enums.rst:31:4
   TEST_BAD_ENUMS:coverage: "mostly" is not one of "full" or "partial" (coverage/enum)
 warning[needs.invalid_field_value]
   --> (need)
       fixtures/field_enums.rst:31:4
   TEST_BAD_ENUMS:test_kind: "smoke" is not one of "property", "positive" or "error_path" (test_kind/enum)
-Found 7 warning(s).
+Found 8 warning(s).

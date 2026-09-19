@@ -325,3 +325,18 @@ against.
 
    So a file written by a tool can carry one fixed version instead of following
    the project's, which would otherwise change the file on every release.
+
+.. evd:: Schema rules reach needs imported from a file
+   :id: EVD_RULES_REACH_IMPORTED_RUNS
+   :evd_kind: measurement
+   :observed_on: 2026-09-19
+   :observation: On ubc 0.35.0 three rules written for test runs fired on runs imported from JSON: a missing outcome, an id without its prefix, and a run executing a component requirement rather than a test case.
+
+   Taken with the importer's own output for this workspace's 19 tests, wired as
+   an external source with a ``base_url`` and then altered by hand in three
+   places. Unaltered, the same file checked clean, which is what makes the three
+   failures mean something.
+
+   It matters because every fixture in ``docs-selftest/`` is a document, while
+   every real run arrives as JSON. Without this, the rules would be known to
+   hold only for needs nobody will write by hand.

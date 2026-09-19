@@ -83,3 +83,8 @@ Fixture: rule_link_targets
    :id: IMPL_WRONG_TARGET
    :implements: FEAT_WRONG_PARENT
    :code_url: https://example.invalid/src/lib.rs#L1
+
+.. test_run:: Executes a requirement rather than the case that checks it
+   :id: RUN_WRONG_TARGET
+   :executes: CREQ_WRONG_PARENT
+   :test_outcome: passed

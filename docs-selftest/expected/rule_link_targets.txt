@@ -57,10 +57,18 @@ error[needs.schema_network_violation]
   IMPL_WRONG_TARGET:implements: Too few valid links of type 'implements' (0 < 1) / nok: FEAT_WRONG_PARENT (impl-must-implement-a-comp-req[45]/contains_too_few)
 error[needs.schema_network_violation]
   --> (need)
+      fixtures/rule_link_targets.rst:87:4
+  RUN_WRONG_TARGET:executes/CREQ_WRONG_PARENT: "test_case" was expected (test-run-must-execute-a-test-case[48]/local_fail)
+error[needs.schema_network_violation]
+  --> (need)
+      fixtures/rule_link_targets.rst:87:4
+  RUN_WRONG_TARGET:executes: Too few valid links of type 'executes' (0 < 1) / nok: CREQ_WRONG_PARENT (test-run-must-execute-a-test-case[48]/contains_too_few)
+error[needs.schema_network_violation]
+  --> (need)
       fixtures/rule_link_targets.rst:56:4
   TEST_WRONG_TARGET:verifies/COMP_TARGETS: "comp" is not one of "feat_req" or "comp_req" (test-case-must-verify-a-requirement[18]/local_fail)
 error[needs.schema_network_violation]
   --> (need)
       fixtures/rule_link_targets.rst:56:4
   TEST_WRONG_TARGET:verifies: Too few valid links of type 'verifies' (0 < 1) / nok: COMP_TARGETS (test-case-must-verify-a-requirement[18]/contains_too_few)
-Found 16 error(s).
+Found 18 error(s).

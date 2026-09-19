@@ -45,3 +45,8 @@ Fixture: field_enums
    :evd_kind: hearsay
    :observed_on: 2026-08-18
    :observation: This evidence exists to hold the evd_kind value set in a golden file.
+
+.. test_run:: An outcome outside its value set
+   :id: RUN_BAD_OUTCOME
+   :executes: TEST_BAD_ENUMS
+   :test_outcome: flaky

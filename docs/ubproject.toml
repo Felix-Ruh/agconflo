@@ -91,9 +91,9 @@ id_regex = "^[A-Z]+_[A-Z0-9_]+$"
 # NOT enforced by ubc, though: measured, a feat_req carrying the id
 # STKH_MISPLACED passes every built-in check. Enforcement is a schema rule.
 #
-# `test_run` is deliberately absent: nothing can create one until test results
-# are imported. A type is declared together with whatever produces it, as
-# `impl` is with the code markers of the [codelinks] section below.
+# A type is declared together with whatever produces it: `impl` with the code
+# markers of the [codelinks] section below, and `test_run` with the importer in
+# crates/junit-to-needs that writes one for each test in a runner's report.
 # -----------------------------------------------------------------------------
 
 [[needs.types]]
@@ -192,6 +192,24 @@ directive = "impl"
 title = "Implementation"
 prefix = "IMPL_"
 
+[[needs.types]]
+# The latest run of one test case: how it went the last time it ran.
+#
+# NOT A HISTORY, deliberately. One run per test case, rewritten in place, so the
+# imported file changes only when an outcome or an identity changes and its diff
+# is worth reading. Git holds the history - which is also why a run carries
+# neither timestamp nor duration: those differ between two runs of the same
+# tests, so recording them would change the file on every run while saying
+# nothing.
+#
+# Never written by hand outside docs-selftest/. Each one is imported from the
+# runner's report by crates/junit-to-needs, which names it after the test case
+# it ran. Decided by `test_outcome`, and by `executes`, which says which case
+# that was.
+directive = "test_run"
+title = "Test Run"
+prefix = "RUN_"
+
 # -----------------------------------------------------------------------------
 # Links.
 #
@@ -252,6 +270,15 @@ description = "The requirement this test case checks."
 outgoing = "implements"
 incoming = "implemented by"
 description = "The component requirement this code answers for."
+
+# Its own link rather than `verifies`, which a test case carries to the
+# requirement it checks. A run checks nothing: it says how one case fared the
+# last time it ran, and the two would be indistinguishable in a query if they
+# shared a link name.
+[needs.links.executes]
+outgoing = "executes"
+incoming = "executed by"
+description = "The test case this run executed."
 
 # The two links below are the exception to that direction, and it is justified by
 # the rule's own reason rather than in spite of it. Links point up the V so they
@@ -412,6 +439,19 @@ schema = { type = "string", enum = ["property", "positive", "error_path"] }
 description = "Whether this case verifies its requirement fully or in part."
 nullable = true
 schema = { type = "string", enum = ["full", "partial"] }
+
+[needs.fields.test_outcome]
+# How the last run of a test case went.
+#
+# TWO VALUES, measured rather than chosen. nextest writes no entry at all into
+# its report for a test it skipped (EVD_NEXTEST_IGNORED_ABSENT), so nothing the
+# importer reads can have been skipped, and a third value nothing produces would
+# be fiction that every query has to allow for. An importer meeting an outcome
+# it cannot map - a skipped test, or one retried until it passed - refuses the
+# report and says which test, rather than choosing a value here.
+description = "How the last run of this test case went."
+nullable = true
+schema = { type = "string", enum = ["passed", "failed"] }
 
 [needs.fields.dec_status]
 # Whether a decision is still current. Load-bearing rather than decorative: this

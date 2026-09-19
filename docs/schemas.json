@@ -9,7 +9,8 @@
     "type-requirement": { "properties": { "type": { "enum": ["feat_req", "comp_req"] } } },
     "type-dec": { "properties": { "type": { "const": "dec" } } },
     "type-evd": { "properties": { "type": { "const": "evd" } } },
-    "type-impl": { "properties": { "type": { "const": "impl" } } }
+    "type-impl": { "properties": { "type": { "const": "impl" } } },
+    "type-test-run": { "properties": { "type": { "const": "test_run" } } }
   },
   "schemas": [
     {
@@ -551,6 +552,42 @@
           }
         }
       }
+    },
+    {
+      "id": "test-run-id-must-start-with-run",
+      "severity": "violation",
+      "message": "An id whose prefix disagrees with its type makes every id-based reading of the graph unreliable. A run's id is written by the importer from the id of the test case it ran, so this also catches an importer that has stopped naming them that way.",
+      "select": { "$ref": "#/$defs/type-test-run" },
+      "validate": { "local": { "properties": { "id": { "pattern": "^RUN_" } } } }
+    },
+    {
+      "id": "test-run-must-have-an-outcome",
+      "severity": "violation",
+      "message": "A run that does not say how it went is the one thing a run is for. The value set is held by the field's own enum, which is why this rule only asks that it is there.",
+      "select": { "$ref": "#/$defs/type-test-run" },
+      "validate": { "local": { "required": ["test_outcome"] } }
+    },
+    {
+      "id": "test-run-must-execute-a-test-case",
+      "severity": "violation",
+      "message": "An outcome belongs to a test case or to nothing. Pointing a run at a requirement claims the requirement itself was executed, which no runner can do. Presence and purity, as in the network rules above.",
+      "select": { "$ref": "#/$defs/type-test-run" },
+      "validate": {
+        "network": {
+          "executes": {
+            "contains": { "local": { "$ref": "#/$defs/type-test-case" } },
+            "minContains": 1,
+            "items": { "local": { "$ref": "#/$defs/type-test-case" } }
+          }
+        }
+      }
+    },
+    {
+      "id": "test-run-must-execute-at-most-one-test-case",
+      "severity": "violation",
+      "message": "A run is the latest run of ONE test case, which is what lets the imported file be rewritten in place rather than grown. A run covering two cases makes latest-wins meaningless, since either case could have moved it. Written as maxItems for the reason given on the allocation rule above: minItems does not fire when the link is absent, and the lower bound comes from the network rule before this one.",
+      "select": { "$ref": "#/$defs/type-test-run" },
+      "validate": { "local": { "properties": { "executes": { "maxItems": 1 } } } }
     }
   ]
 }

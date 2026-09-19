@@ -97,3 +97,12 @@ Fixture: ok_chain
 
    Written by hand only because this is a fixture. A real implementation comes
    from a marker in the Rust source, which fills in code_url itself.
+
+.. test_run:: The unwired parameter case last passed
+   :id: RUN_CHAIN
+   :executes: TEST_CHAIN
+   :test_outcome: passed
+
+   Written by hand for the same reason. A real run is imported from the test
+   runner's report, and is the latest run of that one case rather than a
+   history of it.
