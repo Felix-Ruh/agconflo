@@ -189,6 +189,32 @@ jobs:
           cat "$RUNNER_TEMP/cypher.json"
           grep -q 'STKH_EXPLICIT_CONTEXT' "$RUNNER_TEMP/cypher.json"
 
+      # Phase 4's exit criterion, kept as a standing check: at least one
+      # component requirement must be joined all the way from the code that
+      # meets it to the outcome of the test that checks it. Every hop is an
+      # inner match, so a row can only exist with every column populated.
+      #
+      # Asserted on the output rather than the exit code, as the probe above
+      # is, and on the SHAPE rather than on any particular requirement - a
+      # permalink into this repository, an implementation from a marker, and a
+      # passing outcome - so that renaming a requirement does not fail it while
+      # losing the trace still does. An empty result is the failure this exists
+      # to catch, and grep reports one as exit 1.
+      - name: Exit criterion, a requirement traced end to end
+        id: trace
+        run: |
+          ./tools/ubc query cypher --project docs --strict -f json '
+            MATCH (c:comp_req)<-[:implements]-(i:impl)
+            MATCH (t:test_case)-[:verifies]->(c)
+            MATCH (r:test_run)-[:executes]->(t)
+            RETURN c.id AS requirement, i.id AS code, i.code_url AS at,
+                   t.id AS test_case, r.test_outcome AS outcome
+            ORDER BY requirement, test_case' > "$RUNNER_TEMP/trace.json"
+          cat "$RUNNER_TEMP/trace.json"
+          grep -q '"code": "IMPL_' "$RUNNER_TEMP/trace.json"
+          grep -q '"at": "https://github.com/Felix-Ruh/agconflo/blob/' "$RUNNER_TEMP/trace.json"
+          grep -q '"outcome": "passed"' "$RUNNER_TEMP/trace.json"
+
       # ubCode prints "Not determined to be an open source project" both for a
       # genuine licence denial and for any failure to reach github.com. Measured
       # two ways: blackholing HTTPS through a proxy, and running in a container
@@ -199,9 +225,9 @@ jobs:
       # intentionally not restored here, because caching it would hide the very
       # thing this job exists to measure.
       #
-      # All five ubc steps are covered, not just the Cypher probe: `format`, the
-      # Cypher gates and the reports are gated at any size and `check` above
-      # five files, so any of them can fail for this reason. `check` and
+      # Every ubc step is covered, not just the Cypher probe: `format`, the
+      # Cypher gates, the reports and the trace query are gated at any size and
+      # `check` above five files, so any of them can fail for this reason. `check` and
       # `format` report it with exit 1 - the same code they use for a real
       # defect - and the Cypher runner exits 1 for both as well. The cost of
       # the wider condition is that a genuine diagnostic or formatting
@@ -213,7 +239,8 @@ jobs:
           || steps.format.outcome == 'failure'
           || steps.gates.outcome == 'failure'
           || steps.reports.outcome == 'failure'
-          || steps.licence.outcome == 'failure')
+          || steps.licence.outcome == 'failure'
+          || steps.trace.outcome == 'failure')
         run: |
           echo '--- can this runner reach github.com? ---'
           curl -sS -o /dev/null -w "https://github.com/$GITHUB_REPOSITORY -> HTTP %{http_code}\n" \
