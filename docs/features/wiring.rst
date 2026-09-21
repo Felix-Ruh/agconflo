@@ -228,9 +228,12 @@ nothing about it prevents a run; and a cycle is not a defect at all
    layer (``DEC_TWO_LAYERS``): a declaration this feature reads and checks a
    definition against, never something it defines or owns. No requirement here is
    about what a type declares - only about a definition disagreeing with one - so
-   a component for them would own no behaviour. When loading a workflow lands, the
-   catalogue that resolves a type name may well become one, with requirements of
-   its own about a name that resolves to nothing.
+   a component for them would own no behaviour. Loading a workflow does not change
+   that for a name that resolves to nothing: an instance of a type no document
+   declares still reads, and is reported here with everything else
+   (``DEC_TYPES_IN_OWN_DOCUMENTS``). What a catalogue of types would own instead
+   is a name declared twice across documents, which only something reading several
+   documents can see.
 
    So the workflow definition and the node type declarations are this feature's
    inputs rather than its parts. They are data, and in Rust the type system is the

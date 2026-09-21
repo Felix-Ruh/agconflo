@@ -53,7 +53,9 @@ instance that is not there, and two instances sharing one name.
 ``CREQ_VALIDATOR_BINDING_RESOLVES`` records all three as not yet answered, so
 which defect each earns is unsettled, and a case asserting one would be inventing
 a requirement rather than checking one. What is settled is that none of them may
-stop the walk, and that is what the case asserts.
+stop the walk, and that is what the case asserts. The third can no longer be read
+from a document, where every name is a table key (``DEC_NAMES_AS_KEYS``), but the
+model can still be given it, which is why the case keeps it.
 
 .. test_case:: Every unbound required parameter is reported
    :id: TEST_WIRING_EVERY_UNBOUND_REQUIRED_IS_REPORTED
