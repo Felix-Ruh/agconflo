@@ -13,7 +13,7 @@ weight than it did there: a strict reader and a regenerating writer are both the
 natural first implementation, each refuses or drops something legitimate, and no
 case derived from the failure modes alone would notice.
 
-Four failure modes have no case named after them, because the shape that catches
+Eight failure modes have no case named after them, because the shape that catches
 each is part of a broader case under the same requirement. They are named here so
 the derivation can be audited rather than taken on trust:
 
@@ -27,6 +27,16 @@ the derivation can be audited rather than taken on trust:
   renamed instance is written twice" are both caught by
   ``TEST_WRITER_REMOVALS_LEAVE_NOTHING_BEHIND``, which is about one definition
   losing things, and would be split in three by filing each under its own failure.
+- ``CREQ_READER_FAULT_LOCATED``'s "the column counts bytes" is caught by
+  ``TEST_READER_FAULTS_CARRY_THEIR_PLACE``, one of whose documents puts a
+  character wider than one byte before the fault on its line.
+- ``CREQ_WRITER_KEEPS_UNREAD``'s "a changed value loses the comment beside it" is
+  caught by ``TEST_WRITER_UNREAD_KEYS_SURVIVE_A_CHANGE``, whose repointed binding
+  carries a comment of its own.
+- ``CREQ_WRITER_KEEPS_UNREAD``'s "a value is written although it has not changed"
+  and "line endings are rewritten" are both caught by
+  ``TEST_WRITER_UNCHANGED_DOCUMENT_IS_BYTE_IDENTICAL``, which writes back a
+  document quoting its strings as literals, once with each line ending.
 
 A case's id is the path of the Rust test that implements it, uppercased, with
 ``::`` written as ``_``. The paths are ``<module>::<case>`` in ``agconflo-core``,
@@ -145,6 +155,11 @@ together.
    the message beside it and passes every test that checks only that a line was
    given.
 
+   One of the four puts a character wider than one byte before the fault on its
+   line. The library's spans are in bytes and its message counts characters
+   (``EVD_TOML_EDIT_SPANS``), so a column taken from the span alone is past the
+   message's there, and right on every line written in ASCII.
+
 .. test_case:: An empty context type name is a fault in the text
    :id: TEST_READER_EMPTY_CONTEXT_TYPE_IS_A_FAULT
    :verifies: CREQ_READER_FAULT_LOCATED
@@ -168,7 +183,9 @@ together.
 
    For any text, and for any valid document with bytes deleted, inserted or
    swapped, reading returns either a definition or a refusal with a place, and
-   never ends the run.
+   never ends the run. Where the parser is what refused the text, the place is the
+   line and column its own message gives, since a caller sees the two side by
+   side.
 
    Arbitrary text alone would almost never parse far enough to reach a value the
    reader interprets, which is where an ``unwrap`` sits; mutating a valid document
@@ -266,10 +283,12 @@ together.
    read from it - an instance added, removed or renamed, a binding added, repointed
    or removed, the output changed or removed - writing the changed definition into
    the document and reading it back gives the changed name, instances, bindings
-   and output.
+   and output - the instances and bindings compared under their names, since the
+   document keeps its own order (``DEC_DOCUMENT_KEEPS_ITS_ORDER``).
 
-   Adding and removing whole instances is the one kind of edit not yet measured
-   (``EVD_TOML_EDIT_KEEPS_COMMENTS``), so the generator must reach both.
+   The generator must reach adding and removing whole instances, since those are
+   the edits that write or delete a table rather than a value
+   (``EVD_TOML_EDIT_WHOLE_TABLES``).
 
 .. test_case:: Removals leave nothing behind
    :id: TEST_WRITER_REMOVALS_LEAVE_NOTHING_BEHIND
@@ -292,12 +311,16 @@ together.
    :test_kind: positive
    :coverage: partial
 
-   A document carrying comments, keys the model does not name, blank lines and
-   uneven spacing is read and written back with nothing changed, and the text is
-   identical byte for byte.
+   A document carrying comments, keys the model does not name, blank lines,
+   uneven spacing and strings quoted as literals is read and written back with
+   nothing changed, and the text is identical byte for byte - once with LF line
+   endings and once with CRLF.
 
    A regenerating writer fails this on its first comment, and passes every test
-   that compares what was read back rather than the text.
+   that compares what was read back rather than the text. So do two subtler ones
+   (``EVD_TOML_EDIT_ASSIGNING_LOSES_FORMAT``, ``EVD_TOML_EDIT_WRITES_LF``): a
+   writer that sets every value it holds, equal or not, turns ``'sink'`` into
+   ``"sink"``, and one that hands on the library's text turns every CRLF into LF.
 
 .. test_case:: A change keeps the keys and comments around it
    :id: TEST_WRITER_UNREAD_KEYS_SURVIVE_A_CHANGE
@@ -313,6 +336,10 @@ together.
    a writer rewriting an instance's table whole keeps every other instance intact
    and loses exactly those - and a document where only other instances carry
    them would never show it.
+
+   The binding that changes carries a comment after its value, too. Assigning the
+   new value drops it (``EVD_TOML_EDIT_ASSIGNING_LOSES_FORMAT``), and it is the one
+   comment a writer changing exactly the right value can still lose.
 
 .. test_case:: Every unwritable shape is named and nothing is written
    :id: TEST_WRITER_UNWRITABLE_SHAPES_ALL_NAMED

@@ -1,0 +1,13 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 350c7a8223410e3274e10315669158d4ecc5dc068dd286c3d8f9ce169d9e31a1 # shrinks to names = ["a", "b"]
+cc 4398e489372352fe910c50cfbec4d9a203c6ecaa6915157f07a16ac575971619 # shrinks to written = Written { name: "", output: None, dotted: false, instances: [WrittenInstance { name: "fetch", node_type: "source", entry: None, bindings: [], header: false, bindings_header: false }] }
+cc b2e14b34eae76290ddc0635b4239179ee9168ba80f5ee6b067d2aeb9fedf47cf # shrinks to written = Written { name: "", output: None, dotted: false, instances: [WrittenInstance { name: "x-1", node_type: "source", entry: None, bindings: [], header: false, bindings_header: false }] }
+cc 31f91fa279e36448de7c126099125cc4c9ddff154c2d11b32a0f42908721480f # shrinks to written = Written { name: "", output: None, dotted: false, instances: [] }
+cc 1fe9ffc02baa677dfb98e318416fe6e2cc32804338ffb1e0a783771bcc3182a1 # shrinks to written = Written { name: "", output: None, dotted: false, instances: [] }
+cc 2a0f9d0e18ac383be1481bb76487cf2d41fd1326cdccf96ec73c3ffac153eb82 # shrinks to text = "name = \"\"\noutput = 1979-05-27\n"
+cc 16cc9a924ade775f4aaad9d877ef97767262e2042cd101ba13052a12370c4a13 # shrinks to text = "\"𞹑\"𑯰"

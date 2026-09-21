@@ -124,6 +124,10 @@ anything else.
    - **The line or column is counted from zero.** The library's own message counts
      from one, and a value one lower than the message beside it sends an author to
      the line above the fault.
+   - **The column counts bytes.** The library locates a fault by a span of bytes
+     and its message counts the column in characters (``EVD_TOML_EDIT_SPANS``). On
+     a line holding a character wider than one byte, a column taken from the span
+     alone is past the one the message gives.
    - **The document is not named.** Given four documents, a fault at line 12 of one
      of them is a fault in none in particular.
    - **A value the model refuses is not treated as a fault in the text.** A context
@@ -205,13 +209,18 @@ anything else.
    parent is the half of a change an edit in place forgets. Reading back is how it
    is checked, and a match with removals included is what the read has to find.
 
+   A match by name, not by position. Instances and bindings keep the order the
+   document gives them, and one the definition adds goes after the others
+   (``DEC_DOCUMENT_KEEPS_ITS_ORDER``), so the document read back holds exactly the
+   definition's instances and bindings, each compared under its name.
+
    Failure modes:
 
    - **Only what exists is updated.** An edit that rewrites the tables already in
      the document writes a repointed binding, and never writes an instance that
-     was added or removes one that was deleted. Adding and removing a whole table in
-     place is also the one kind of edit not yet measured
-     (``EVD_TOML_EDIT_KEEPS_COMMENTS``).
+     was added or removes one that was deleted. Both are edits the library makes in
+     place (``EVD_TOML_EDIT_WHOLE_TABLES``), so leaving them out is the writer's
+     failure rather than the format's.
    - **A removed binding or output stays behind.** The document then reads back
      with a wire or a designation the definition no longer has.
    - **A renamed instance is written twice.** Its new table is added and its old
@@ -243,9 +252,27 @@ anything else.
      The keys on that instance that the model does not name go with it, while every
      other instance keeps its own - which is why a test changing nothing would not
      see it.
+   - **A changed value loses the comment beside it.** Assigning a new value drops
+     the comment after the old one (``EVD_TOML_EDIT_ASSIGNING_LOSES_FORMAT``), so a
+     writer changing exactly the right value still loses what annotated it.
+   - **A value is written although it has not changed.** A value written anew is
+     quoted the default way, so ``'sink'`` comes back as ``"sink"``
+     (``EVD_TOML_EDIT_ASSIGNING_LOSES_FORMAT``), and a document asked to change
+     nothing changes.
+   - **Line endings are rewritten.** The library writes every line ending as LF
+     (``EVD_TOML_EDIT_WRITES_LF``), so a document saved on Windows comes back with
+     every line changed.
+
+   What belongs to an instance goes with it when the definition removes it: its
+   keys, the ones the model does not name included, and the comments above it and
+   at the end of its line, which the library holds as part of it
+   (``EVD_TOML_EDIT_WHOLE_TABLES``).
+   None of that is carried by the definition, and none of it has anywhere left to
+   stay. A renamed instance is, as far as a definition can say, one removed and
+   one added, so it keeps none of them either.
 
    Must keep: a document written back with nothing changed is the same text, byte
-   for byte.
+   for byte, whichever line endings it was written with.
 
 .. comp_req:: A shape the format cannot hold is refused before writing
    :id: CREQ_WRITER_UNWRITABLE_REFUSED

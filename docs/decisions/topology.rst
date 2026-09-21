@@ -8,8 +8,9 @@ These are the choices the loading slice is written against.
 
 Unlike the decisions about what a workflow is, the first two here rest on
 measurements, and ``evidence/topology`` holds them. Each was taken against a
-named release, so re-opening either starts with re-measuring it. The last two are
-judgements that follow from decisions already taken.
+named release, so re-opening either starts with re-measuring it. The next two are
+judgements that follow from decisions already taken. The last rests on
+measurements again, taken when the writer was about to be built on them.
 
 .. dec:: Topology is stored as TOML
    :id: DEC_TOPOLOGY_IN_TOML
@@ -79,9 +80,10 @@ judgements that follow from decisions already taken.
    the order written only when the parser is built with its ``preserve_order``
    feature and read into an order-keeping map. Without the feature the order is
    alphabetical and nothing says so (``EVD_TOML_ORDER_NEEDS_FEATURE``). An
-   implementation has to pin the feature, and a test has to read back a
-   declaration written out of alphabetical order, because nothing else would
-   notice.
+   implementation reading through ``toml`` has to pin the feature - one reading
+   through toml_edit has none to pin (``EVD_TOML_EDIT_KEEPS_ORDER``) - and either
+   way a test has to read back a declaration written out of alphabetical order,
+   because nothing else would notice.
 
    Arrays of tables, each entry carrying a ``name``, were the alternative. They
    keep order for free, and a repeated name passes the parser - which would need a
@@ -131,3 +133,39 @@ judgements that follow from decisions already taken.
 
    An array of outputs was the alternative. It keeps writable a defect the format
    can simply rule out.
+
+.. dec:: A document keeps its own order
+   :id: DEC_DOCUMENT_KEEPS_ITS_ORDER
+   :dec_status: accepted
+   :decided_on: 2026-09-21
+   :supported_by: EVD_TOML_EDIT_TABLES_KEEP_PLACE, EVD_TOML_EDIT_WHOLE_TABLES
+   :statement: Agconflo shall keep the order a workflow document gives its instances and bindings when writing a definition into it.
+
+   An instance or binding the document already holds stays where it is written,
+   and one the definition adds is appended after the others. So a definition
+   written into a document and read back has the same instances and bindings, but
+   in the document's order rather than its own, and "reads back as itself"
+   (``FEAT_TOPOLOGY_WRITES``) compares them by name.
+
+   Following the definition's order was the alternative, and it cannot be done
+   in general. TOML writes a table's own keys before any of its sub-tables, so an
+   instance written inline under ``[instances]`` always comes before one written
+   as an ``[instances.x]`` header, whatever order a definition asks for - and
+   reordering the keys of a document does not move the header tables it already
+   holds (``EVD_TOML_EDIT_TABLES_KEEP_PLACE``). The order could only ever be
+   followed for some documents, which makes it a promise nothing could rely on.
+
+   Placing an added instance after the one before it in the definition, rather
+   than at the end, was the narrower alternative. It can be done where a document
+   writes every instance the same way (``EVD_TOML_EDIT_TABLES_KEEP_PLACE``), and
+   not where it mixes the two. What it buys is where a new block lands in the
+   text, which an editor with its own view of the graph does not need and a person
+   can move.
+
+   Nothing is lost by it. Instances and bindings are keyed by name
+   (``DEC_NAMES_AS_KEYS``), and neither order carries meaning: which node runs
+   when follows from the control graph, which the bindings imply
+   (``DEC_IMPLIED_CONTROL_EDGES``), rather than from where a node is written, and
+   a binding names its parameter. The order that does carry meaning is a node type's
+   parameters (``DEC_DECLARED_PARAMETERS``), and those are in type documents,
+   which are not written here.
