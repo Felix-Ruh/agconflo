@@ -7,11 +7,22 @@ anything in it runs. Every requirement here derives from a goal in
 ``stakeholder/execution`` or ``stakeholder/authoring``, and each is written
 against the decisions in ``decisions/workflow`` rather than re-opening them.
 
-Four of them name a defect class and say the workflow is refused for it. They
+Eight of them name a defect class and say the workflow is refused for it. They
 are separate requirements rather than one, because a validator that catches
-three of the four is a validator that reports success on a workflow that cannot
+seven of the eight is a validator that reports success on a workflow that cannot
 run - and "invalid" in the parent goal is exactly the word that has to be spelled
 out somewhere.
+
+The first four were written with the validator. The other four came later, and
+between them they say one thing: every name a workflow uses picks out exactly
+one thing. A binding names the parameter it fills as well as the instance it
+comes from, a workflow names its output, and a name given to two instances, or
+a parameter bound twice, picks out two. Three of them were recorded as open when
+the validator was first written; the fourth, a parameter bound twice, was taken
+to be outside the model, which can hold it all the same. Each was run through the
+validator before being specified here. The first two passed without a word, and
+the other two passed, reported one defect twice, or were judged by whichever
+copy came first, depending on what surrounded them.
 
 Two are about the report rather than the verdict. An agent is a first class
 author here, and an agent correcting one defect per round trip is a different
@@ -113,6 +124,86 @@ nothing about it prevents a run; and a cycle is not a defect at all
    It is checked here rather than at invocation because a workflow with no
    declared result is malformed whether or not anything ever calls it.
 
+.. feat_req:: A binding must fill a declared parameter
+   :id: FEAT_WIRING_PARAMETER_DECLARED
+   :derived_from: STKH_WIRING_CHECKED
+   :ears_pattern: unwanted
+   :verification_method: test
+   :statement: If a binding names a parameter that the node type of its instance does not declare, then Agconflo shall reject that workflow.
+
+   A binding has two ends, and ``FEAT_WIRING_BINDING_RESOLVES`` resolves one of
+   them: the instance whose output it carries. This is the other - the parameter
+   it fills, which the consuming instance's node type declares
+   (``DEC_DECLARED_PARAMETERS``), or does not.
+
+   It can be false while its parent holds, and the way it can is the commonest
+   typo there is. A binding to ``hnit`` on a node whose type declares an optional
+   ``hint`` fills nothing: every required parameter is bound, every source
+   resolves, every wire with a declared type at both ends agrees on it - and the
+   node runs without the context its author wired to it. Nothing crashes, and
+   nothing is refused. A typo in a required parameter is half caught already, as a
+   parameter left unbound, but that report names the parameter that is missing
+   and not the binding that was meant for it.
+
+   A requested global type is not a parameter. A node reads it by declaration
+   rather than through a wire, so a binding spelled like one fills nothing either.
+
+.. feat_req:: A designated output must be an instance
+   :id: FEAT_WIRING_OUTPUT_RESOLVES
+   :derived_from: STKH_WORKFLOW_AS_NODE
+   :ears_pattern: unwanted
+   :verification_method: test
+   :statement: If the output a workflow designates names no instance of that workflow, then Agconflo shall reject that workflow.
+
+   A caller wires to a workflow's signature (``DEC_WORKFLOW_SIGNATURE``), and
+   the designated output is the result it binds to. A designation naming an
+   instance the workflow does not have is a result that will never be produced.
+
+   It can be false while its parent holds, and while
+   ``FEAT_WIRING_ONE_DESIGNATED_OUTPUT`` holds as well: exactly one output is
+   designated, which is what that requirement counts, and it names an instance
+   that was renamed or deleted. The workflow can be invoked and every node in it
+   can run, and the caller receives nothing - or whatever an engine picks to
+   stand in for it, which is the failure that requirement was written against.
+
+.. feat_req:: An instance name is given once
+   :id: FEAT_WIRING_INSTANCE_NAMED_ONCE
+   :derived_from: STKH_WIRING_CHECKED
+   :ears_pattern: unwanted
+   :verification_method: test
+   :statement: If two node instances of a workflow share one name, then Agconflo shall reject that workflow.
+
+   A binding reaches an instance by its name (``DEC_BINDING_BY_PORT``), and so
+   does a designated output. A name given to two instances reaches both, and a
+   wire to it has no one output to carry.
+
+   It can be false while its parent holds. A document cannot hold the shape -
+   every name there is a table key, and a repeated key is not TOML
+   (``DEC_NAMES_AS_KEYS``) - but a definition built by other means can, and an
+   agent changing a workflow through tool calls changes the model rather than a
+   document (``DEC_TOPOLOGY_IN_TOML``). Resolving the name to the first instance
+   carrying it is what a lookup does by default, and the validator was measured
+   doing it: a wire to the shared name was judged against whichever instance came
+   first, so swapping two instances changed the verdict.
+
+.. feat_req:: A parameter is bound once
+   :id: FEAT_WIRING_PARAMETER_BOUND_ONCE
+   :derived_from: STKH_WIRING_CHECKED
+   :ears_pattern: unwanted
+   :verification_method: test
+   :statement: If a node instance binds one parameter more than once, then Agconflo shall reject that workflow.
+
+   A parameter binds to exactly one output (``DEC_BINDING_BY_PORT``). Two
+   bindings for one parameter are two answers to which output a node receives
+   there, and nothing in the definition says which is meant.
+
+   It can be false while its parent holds: both bindings can resolve and both can
+   agree on the context type, so every check of a wire finds nothing wrong with
+   either - and a node run from it would receive one of two contexts, chosen by
+   whatever an engine happened to do first. Like a shared instance name, the
+   shape cannot be written in a document (``DEC_NAMES_AS_KEYS``) and can be built
+   by other means.
+
 .. feat_req:: Every defect is reported together
    :id: FEAT_WIRING_ALL_DEFECTS
    :derived_from: STKH_MACHINE_AUTHORING
@@ -176,9 +267,9 @@ nothing about it prevents a run; and a cycle is not a defect at all
 
    It can be false while its parent holds, and trivially: a validator that
    refuses every workflow rejects every invalid one, before any node runs,
-   exactly as asked. The four requirements above are satisfied by it too - each
-   says what must be refused, and none says what must not be. Over-blocking is
-   invisible to all of them.
+   exactly as asked. The eight that name a defect class are satisfied by it too -
+   each says what must be refused, and none says what must not be. Over-blocking
+   is invisible to all of them.
 
    It is what makes the defect classes exact rather than merely sufficient, and
    it is why the cases that must pass are named in each component requirement's
@@ -189,15 +280,16 @@ nothing about it prevents a run; and a cycle is not a defect at all
 
 .. feat_arch:: Validation splits into a validator and a defect
    :id: ARCH_WIRING
-   :realises: FEAT_WIRING_REQUIRED_BOUND, FEAT_WIRING_BINDING_RESOLVES, FEAT_WIRING_TYPES_AGREE, FEAT_WIRING_ONE_DESIGNATED_OUTPUT, FEAT_WIRING_ALL_DEFECTS, FEAT_WIRING_DEFECT_LOCATED, FEAT_WIRING_ACCEPTS_WELL_FORMED
+   :realises: FEAT_WIRING_REQUIRED_BOUND, FEAT_WIRING_BINDING_RESOLVES, FEAT_WIRING_TYPES_AGREE, FEAT_WIRING_ONE_DESIGNATED_OUTPUT, FEAT_WIRING_PARAMETER_DECLARED, FEAT_WIRING_OUTPUT_RESOLVES, FEAT_WIRING_INSTANCE_NAMED_ONCE, FEAT_WIRING_PARAMETER_BOUND_ONCE, FEAT_WIRING_ALL_DEFECTS, FEAT_WIRING_DEFECT_LOCATED, FEAT_WIRING_ACCEPTS_WELL_FORMED
    :uses: COMP_WIRING_VALIDATOR, COMP_WIRING_DEFECT
    :statement: Agconflo shall allocate workflow validation to the wiring validator and the wiring defect.
 
    Two components, each answerable for what the other cannot guarantee:
 
-   - The wiring validator answers for all four defect classes, for
+   - The wiring validator answers for all eight defect classes, for
      ``FEAT_WIRING_ALL_DEFECTS`` and for ``FEAT_WIRING_ACCEPTS_WELL_FORMED``.
-     Each class is a relation between a definition and the node types it names;
+     Each class is a question about one definition, asked of its own names and
+     of the node types it carries;
      whether the walk continues after finding one is a property of the walk,
      which no value can promise about itself; and what is *not* reported is a
      property of the same walk.
@@ -247,7 +339,11 @@ nothing about it prevents a run; and a cycle is not a defect at all
    - ``DEC_DECLARED_PARAMETERS``: the three lists a type declares are what
      "required", "optional" and "global" mean in a defect message.
    - ``DEC_BINDING_BY_PORT``: both ends of a binding are names in the definition,
-     so every check here is possible without running anything.
+     so every check here is possible without running anything - and a parameter
+     binds to exactly one output, which is what makes binding it twice a defect.
+   - ``DEC_NAMES_AS_KEYS``: why a shared instance name and a parameter bound
+     twice reach the validator only in a definition built by other means than
+     reading a document.
    - ``DEC_WORKFLOW_SIGNATURE``: entry parameters and one designated output are
      what make a definition's shape declarable, and therefore checkable.
    - ``DEC_BACK_EDGES_ALLOWED``: a cycle is legal, so nothing here looks for a
