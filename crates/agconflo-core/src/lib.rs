@@ -19,6 +19,7 @@ mod lineage;
 mod reader;
 mod wiring;
 mod workflow;
+mod writer;
 
 #[cfg(test)]
 mod compile_fail;
@@ -32,3 +33,4 @@ pub use reader::{
 };
 pub use wiring::validate_wiring;
 pub use workflow::{Binding, NodeInstance, NodeType, Parameter, WorkflowDefinition};
+pub use writer::{UnwritableDefinition, UnwritableShape, write_workflow};

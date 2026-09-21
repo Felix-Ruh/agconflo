@@ -488,6 +488,60 @@
           "test_outcome": "passed",
           "title": "agconflo-core wiring::well_formed_definitions_pass",
           "type": "test_run"
+        },
+        "RUN_WRITER_EVERY_CHANGE_READS_BACK": {
+          "executes": [
+            "TEST_WRITER_EVERY_CHANGE_READS_BACK"
+          ],
+          "id": "RUN_WRITER_EVERY_CHANGE_READS_BACK",
+          "test_outcome": "passed",
+          "title": "agconflo-core writer::every_change_reads_back",
+          "type": "test_run"
+        },
+        "RUN_WRITER_REMOVALS_LEAVE_NOTHING_BEHIND": {
+          "executes": [
+            "TEST_WRITER_REMOVALS_LEAVE_NOTHING_BEHIND"
+          ],
+          "id": "RUN_WRITER_REMOVALS_LEAVE_NOTHING_BEHIND",
+          "test_outcome": "passed",
+          "title": "agconflo-core writer::removals_leave_nothing_behind",
+          "type": "test_run"
+        },
+        "RUN_WRITER_UNCHANGED_DOCUMENT_IS_BYTE_IDENTICAL": {
+          "executes": [
+            "TEST_WRITER_UNCHANGED_DOCUMENT_IS_BYTE_IDENTICAL"
+          ],
+          "id": "RUN_WRITER_UNCHANGED_DOCUMENT_IS_BYTE_IDENTICAL",
+          "test_outcome": "passed",
+          "title": "agconflo-core writer::unchanged_document_is_byte_identical",
+          "type": "test_run"
+        },
+        "RUN_WRITER_UNREAD_KEYS_SURVIVE_A_CHANGE": {
+          "executes": [
+            "TEST_WRITER_UNREAD_KEYS_SURVIVE_A_CHANGE"
+          ],
+          "id": "RUN_WRITER_UNREAD_KEYS_SURVIVE_A_CHANGE",
+          "test_outcome": "passed",
+          "title": "agconflo-core writer::unread_keys_survive_a_change",
+          "type": "test_run"
+        },
+        "RUN_WRITER_UNWRITABLE_SHAPES_ALL_NAMED": {
+          "executes": [
+            "TEST_WRITER_UNWRITABLE_SHAPES_ALL_NAMED"
+          ],
+          "id": "RUN_WRITER_UNWRITABLE_SHAPES_ALL_NAMED",
+          "test_outcome": "passed",
+          "title": "agconflo-core writer::unwritable_shapes_all_named",
+          "type": "test_run"
+        },
+        "RUN_WRITER_WIRING_DEFECTS_ARE_WRITTEN": {
+          "executes": [
+            "TEST_WRITER_WIRING_DEFECTS_ARE_WRITTEN"
+          ],
+          "id": "RUN_WRITER_WIRING_DEFECTS_ARE_WRITTEN",
+          "test_outcome": "passed",
+          "title": "agconflo-core writer::wiring_defects_are_written",
+          "type": "test_run"
         }
       }
     }

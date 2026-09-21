@@ -1,0 +1,9 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc cd52708841c8dd1479fa505823d834297cbf70499462ca1443b501d583530642 # shrinks to shapes = [([0], false)], target = 0, binding = 0, pick = 0
+cc 17f086764936954807d1644c7643704801661fe6b91322532f62cf4d8a09eef2 # shrinks to written = Written { name: "", output: None, dotted: false, instances: [WrittenInstance { name: "x-1", node_type: "source", entry: None, bindings: [], header: false, bindings_header: false }] }, changes = [Remove(0)]
+cc aeb1b841acc8846b8adedd115160b3b0d941807df7e6bd099656732cd7063d61 # shrinks to written = Written { name: "", output: Some("elsewhere"), dotted: false, instances: [] }, changes = [NoOutput]

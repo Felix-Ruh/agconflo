@@ -201,18 +201,15 @@ pub fn read_node_types(document: &str, text: &str) -> Result<NodeTypeDocument, R
 pub struct WorkflowDocument {
     pub(crate) document: String,
     pub(crate) toml: DocumentMut,
+    /// Whether the text read ended its lines in CRLF, which toml_edit does not
+    /// keep (`EVD_TOML_EDIT_WRITES_LF`).
+    pub(crate) crlf: bool,
 }
 
 impl WorkflowDocument {
     /// The name the caller gave this document when handing it over.
     pub fn document(&self) -> &str {
         &self.document
-    }
-}
-
-impl fmt::Display for WorkflowDocument {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.toml)
     }
 }
 
@@ -270,6 +267,7 @@ pub fn read_workflow(
     let document = WorkflowDocument {
         document: document.to_owned(),
         toml: parsed.into_mut(),
+        crlf: text.contains("\r\n"),
     };
     Ok((definition, document))
 }
