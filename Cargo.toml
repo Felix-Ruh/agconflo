@@ -13,6 +13,12 @@ readme = "README.md"
 
 # Shared dependency versions. Member crates opt in with `dep.workspace = true`.
 [workspace.dependencies]
+# agconflo-core reads and writes workflow documents with toml_edit alone: one
+# parse gives both the values read and the document the writer edits in place.
+# Pinned exactly, because DEC_TOPOLOGY_IN_TOML rests on measurements of this
+# release - moving it means re-measuring first.
+toml_edit = "=0.25.15"
+
 # Testing policy: property-based tests wherever a property can be stated,
 # alongside positive tests and error-path ("negative") tests.
 proptest = "1.11"

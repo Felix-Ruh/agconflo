@@ -201,6 +201,33 @@
           "title": "agconflo-core lineage::reaches_each_once",
           "type": "test_run"
         },
+        "RUN_READER_EMPTY_CONTEXT_TYPE_IS_A_FAULT": {
+          "executes": [
+            "TEST_READER_EMPTY_CONTEXT_TYPE_IS_A_FAULT"
+          ],
+          "id": "RUN_READER_EMPTY_CONTEXT_TYPE_IS_A_FAULT",
+          "test_outcome": "passed",
+          "title": "agconflo-core reader::empty_context_type_is_a_fault",
+          "type": "test_run"
+        },
+        "RUN_READER_PARAMETER_ORDER_IS_KEPT": {
+          "executes": [
+            "TEST_READER_PARAMETER_ORDER_IS_KEPT"
+          ],
+          "id": "RUN_READER_PARAMETER_ORDER_IS_KEPT",
+          "test_outcome": "passed",
+          "title": "agconflo-core reader::parameter_order_is_kept",
+          "type": "test_run"
+        },
+        "RUN_READER_THREE_LISTS_KEPT_APART": {
+          "executes": [
+            "TEST_READER_THREE_LISTS_KEPT_APART"
+          ],
+          "id": "RUN_READER_THREE_LISTS_KEPT_APART",
+          "test_outcome": "passed",
+          "title": "agconflo-core reader::three_lists_kept_apart",
+          "type": "test_run"
+        },
         "RUN_WIRING_AGREEING_WIRES_PASS": {
           "executes": [
             "TEST_WIRING_AGREEING_WIRES_PASS"

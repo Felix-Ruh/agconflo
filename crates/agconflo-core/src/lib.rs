@@ -15,6 +15,7 @@ mod context;
 mod defect;
 mod id;
 mod lineage;
+mod reader;
 mod wiring;
 mod workflow;
 
@@ -24,5 +25,6 @@ mod compile_fail;
 pub use context::{Context, ContextType, InvalidTypeName};
 pub use defect::WiringDefect;
 pub use id::{ContextId, IdSource, SourceExhausted};
+pub use reader::{FaultKind, NodeTypeDocument, ReadFault, read_node_types};
 pub use wiring::validate_wiring;
 pub use workflow::{Binding, NodeInstance, NodeType, Parameter, WorkflowDefinition};
