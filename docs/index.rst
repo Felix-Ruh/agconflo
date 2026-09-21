@@ -35,7 +35,9 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    code/agconflo-core
    decisions/context
    decisions/workflow
+   decisions/topology
    decisions/toolchain
    decisions/requirements
    evidence/toolchain
    evidence/requirements
+   evidence/topology
