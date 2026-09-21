@@ -16,11 +16,12 @@ where did every byte come from?"* has an exact answer.
 ## Status
 
 **Pre-alpha. There is no workflow engine yet** — no nodes, no graph execution, no LLM calls. What
-exists is the development process around it and the first slice of code through it: a requirements
+exists is the development process around it and the first slices of code through it: a requirements
 project under `docs/` with a validated metamodel behind it, a commit gate, continuous integration,
-and `agconflo-core`, which implements the `Context` value itself — identity, composition by
-reference, and lineage — traced from its requirements to the code and back from the tests that check
-it. The design is well developed; the code has just begun.
+and `agconflo-core`. That implements the `Context` value itself — identity, composition by
+reference, and lineage — and the static side of a workflow: checking its wiring before anything
+runs, and reading it from TOML documents and writing it back without losing what the reader did not
+understand. Each is traced from its requirements to the code and back from the tests that check it.
 
 Expect the public API to change without warning. Breaking changes, yes; force-pushes to `main`, no —
 those are blocked outright, along with direct pushes to it.
