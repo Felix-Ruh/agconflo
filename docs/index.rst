@@ -34,6 +34,7 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    components/topology
    tests/context
    tests/wiring
+   tests/topology
    code/agconflo-core
    decisions/context
    decisions/workflow
