@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 
 use crate::defect::WiringDefect;
-use crate::workflow::{Binding, NodeInstance, NodeType, WorkflowDefinition};
+use crate::workflow::{Binding, NodeInstance, NodeType, Parameter, WorkflowDefinition};
 
 /// Every wiring defect `definition` carries, and nothing at all for one that
 /// carries none.
@@ -35,6 +35,7 @@ pub fn validate_wiring(definition: &WorkflowDefinition) -> Vec<WiringDefect> {
         check_instance(instance, &declarations, &instances, &mut defects);
     }
     check_signature(definition, &mut defects);
+    check_output_resolves(definition, &instances, &mut defects);
 
     defects
 }
@@ -120,12 +121,18 @@ fn check_required_bound(
     }
 }
 
-/// Every binding names an instance the definition carries.
+/// Every binding fills a parameter its instance's type declares, and names an
+/// instance the definition carries.
 ///
 /// One defect per binding rather than one per name that failed to resolve.
 /// Deduplicating by the name is the tidy-looking version of this and leaves
 /// every wire but one unnamed: five parameters bound to a deleted instance are
 /// five wires to repoint.
+///
+/// Both ends are looked at whatever the other turned out to be. A binding to an
+/// undeclared parameter from an instance that is not there is two fixes, the
+/// parameter renamed and the source repointed, and a walk moving on after the
+/// first leaves the second for the next round trip.
 // @Every binding's source resolved,IMPL_WIRING_BINDING_SOURCE,impl,[CREQ_VALIDATOR_BINDING_RESOLVES]
 fn check_bindings(
     instance: &NodeInstance,
@@ -135,6 +142,7 @@ fn check_bindings(
     defects: &mut Vec<WiringDefect>,
 ) {
     for binding in &instance.bindings {
+        let parameter = declared_parameter(instance, declaration, binding, defects);
         let Some(source) = instances.get(binding.source.as_str()) else {
             defects.push(WiringDefect::UnresolvedInstance {
                 instance: instance.name.clone(),
@@ -143,15 +151,44 @@ fn check_bindings(
             });
             continue;
         };
-        check_binding_type(
-            instance,
-            declaration,
-            binding,
-            source,
-            declarations,
-            defects,
-        );
+        if let Some(parameter) = parameter {
+            check_binding_type(instance, parameter, binding, source, declarations, defects);
+        }
     }
+}
+
+/// The parameter `binding` fills, as its instance's type declares it - or
+/// nothing, and a defect saying so, where the type declares no parameter by
+/// that name.
+///
+/// Both lists are searched, required and optional, and nothing else is. A
+/// requested global is a context type read by declaration rather than a
+/// parameter, so a binding spelled like one fills nothing
+/// (`DEC_DECLARED_PARAMETERS`).
+///
+/// Only an instance whose declaration resolved gets here, and that is the only
+/// kind whose parameters are knowable: for one of a type nobody supplied,
+/// "undeclared" would be invented, and its missing type is in the report
+/// already.
+// @Every bound parameter declared by its instance's type,IMPL_WIRING_PARAMETER_DECLARED,impl,[CREQ_VALIDATOR_PARAMETER_DECLARED]
+fn declared_parameter<'d>(
+    instance: &NodeInstance,
+    declaration: &'d NodeType,
+    binding: &Binding,
+    defects: &mut Vec<WiringDefect>,
+) -> Option<&'d Parameter> {
+    let declared = declaration
+        .required
+        .iter()
+        .chain(&declaration.optional)
+        .find(|parameter| parameter.name == binding.parameter);
+    if declared.is_none() {
+        defects.push(WiringDefect::UndeclaredParameter {
+            instance: instance.name.clone(),
+            parameter: binding.parameter.clone(),
+        });
+    }
+    declared
 }
 
 /// The type declared for a parameter and the type declared for the output wired
@@ -162,14 +199,14 @@ fn check_bindings(
 /// node handed the wrong context produces a confident wrong answer rather than
 /// failing.
 ///
-/// Two ends are passed over rather than compared, and each is deliberate. A
-/// binding naming a parameter no declaration carries is one of the shapes
-/// recorded as not yet answered, so classifying it here would pin behaviour no
-/// requirement asks for. And a producer of a node type the definition does not
-/// carry has no declared output at all: its missing type is already in the
-/// report, and comparing against a stand-in for one - an empty name, a default -
-/// would make every wire out of it disagree and send the author to change a type
-/// that is not wrong.
+/// Two ends are never compared, and each is deliberate. A parameter the type
+/// does not declare has no declared type, so its binding never gets here: it is
+/// reported as undeclared, and a disagreement with a stand-in type would be
+/// invented. And a producer of a node type the definition does not carry has no
+/// declared output at all: its missing type is already in the report, and
+/// comparing against a stand-in for one - an empty name, a default - would make
+/// every wire out of it disagree and send the author to change a type that is
+/// not wrong.
 ///
 /// The check is reached for every binding of every instance, including one whose
 /// instance already carries an unbound-parameter defect. A walk that moved on
@@ -177,19 +214,13 @@ fn check_bindings(
 // @Both ends of a wire declare one context type,IMPL_WIRING_TYPES_AGREE,impl,[CREQ_VALIDATOR_TYPES_AGREE]
 fn check_binding_type(
     instance: &NodeInstance,
-    declaration: &NodeType,
+    parameter: &Parameter,
     binding: &Binding,
     source: &NodeInstance,
     declarations: &HashMap<&str, &NodeType>,
     defects: &mut Vec<WiringDefect>,
 ) {
-    let declared = declaration
-        .required
-        .iter()
-        .chain(&declaration.optional)
-        .find(|parameter| parameter.name == binding.parameter);
-    let (Some(parameter), Some(producer)) = (declared, declarations.get(source.node_type.as_str()))
-    else {
+    let Some(producer) = declarations.get(source.node_type.as_str()) else {
         return;
     };
 
@@ -223,6 +254,33 @@ fn check_signature(definition: &WorkflowDefinition, defects: &mut Vec<WiringDefe
         defects.push(WiringDefect::SignatureOutputs {
             definition: definition.name.clone(),
             designated,
+        });
+    }
+}
+
+/// The one output a definition designates names one of its instances.
+///
+/// Only one: a definition designating several is refused for that by the check
+/// above, and which of them was meant is what its author decides first.
+/// Resolving each as well would name the definition once per designation, and a
+/// document cannot hold several (`DEC_ONE_OUTPUT_KEY`).
+///
+/// Reported as a signature defect of its own rather than as designating
+/// nothing, because a count of nought loses the name the author typed - the one
+/// thing tying the defect to what has to be changed.
+// @The one designated output resolved,IMPL_WIRING_OUTPUT_RESOLVES,impl,[CREQ_VALIDATOR_OUTPUT_RESOLVES]
+fn check_output_resolves(
+    definition: &WorkflowDefinition,
+    instances: &HashMap<&str, &NodeInstance>,
+    defects: &mut Vec<WiringDefect>,
+) {
+    let [output] = definition.designated_outputs.as_slice() else {
+        return;
+    };
+    if !instances.contains_key(output.as_str()) {
+        defects.push(WiringDefect::UnresolvedOutput {
+            definition: definition.name.clone(),
+            unresolved: output.clone(),
         });
     }
 }
@@ -372,6 +430,25 @@ fn unresolved(instance: &str, parameter: &str, source: &str) -> WiringDefect {
     }
 }
 
+/// A binding to a parameter its instance's type does not declare, as the report
+/// names it.
+#[cfg(test)]
+fn undeclared(instance: &str, parameter: &str) -> WiringDefect {
+    WiringDefect::UndeclaredParameter {
+        instance: instance.to_owned(),
+        parameter: parameter.to_owned(),
+    }
+}
+
+/// The one designated output naming no instance, as the report names it.
+#[cfg(test)]
+fn unresolved_output(output: &str) -> WiringDefect {
+    WiringDefect::UnresolvedOutput {
+        definition: DEFINITION_NAME.to_owned(),
+        unresolved: output.to_owned(),
+    }
+}
+
 #[cfg(test)]
 proptest! {
     /// Each instance is of a type of its own, declaring required parameters,
@@ -458,6 +535,78 @@ proptest! {
 
         let report = validate_wiring(&definition(node_types, instances, &["c0"]));
         prop_assert_eq!(report, expected);
+    }
+
+    /// Each instance is of a type of its own declaring required parameters,
+    /// optional parameters and requested globals in any number, or of a type
+    /// nobody supplied, and binds names from one pool: every name either list
+    /// could declare, names spelled like the globals, and a name nothing
+    /// declares. Declared and undeclared names therefore sit side by side on one
+    /// instance, which is where a check reading one list short, or reading the
+    /// globals as parameters, gets some of them wrong and not all.
+    ///
+    /// What the report should say is worked out from which names each shape
+    /// declares, a different computation from the walk under test. Only
+    /// undeclared-parameter defects are compared: every binding is wired to an
+    /// instance that resolves and agrees on its type, and the unbound
+    /// parameters beside them are another case's business.
+    #[test]
+    fn every_undeclared_parameter_is_reported(
+        shapes in vec(
+            (0..=2usize, 0..=2usize, 0..=2usize, any::<bool>(), vec(0..7usize, 0..=5)),
+            1..=4,
+        )
+    ) {
+        const POOL: [&str; 7] = ["r0", "r1", "o0", "o1", "g0", "g1", "stray"];
+        let mut node_types = vec![node_type("source", &[], "note")];
+        let mut instances = vec![instance("s", "source", &[])];
+        let mut expected = Vec::new();
+
+        for (node, (required, optional, globals, supplied, picks)) in shapes.iter().enumerate() {
+            let name = format!("n{node}");
+            let required = &POOL[..*required];
+            let optional = &POOL[2..2 + optional];
+            let declared_type = if *supplied {
+                let typed = |names: &[&'static str]| -> Vec<(&str, &str)> {
+                    names.iter().map(|&name| (name, "note")).collect()
+                };
+                let name = format!("t{node}");
+                node_types.push(
+                    node_type(&name, &typed(required), "note")
+                        .with_optional(&typed(optional))
+                        .with_globals(&POOL[4..4 + globals]),
+                );
+                name
+            } else {
+                "not-supplied".to_owned()
+            };
+
+            // Each name at most once, in the order first picked: a parameter
+            // bound twice is another requirement's shape.
+            let mut bound: Vec<&str> = Vec::new();
+            for &pick in picks {
+                if !bound.contains(&POOL[pick]) {
+                    bound.push(POOL[pick]);
+                }
+            }
+            for &parameter in &bound {
+                let is_declared =
+                    required.contains(&parameter) || optional.contains(&parameter);
+                if *supplied && !is_declared {
+                    expected.push(undeclared(&name, parameter));
+                }
+            }
+            let bindings: Vec<(&str, &str)> =
+                bound.iter().map(|&parameter| (parameter, "s")).collect();
+            instances.push(instance(&name, &declared_type, &bindings));
+        }
+
+        let report = validate_wiring(&definition(node_types, instances, &["s"]));
+        let found: Vec<WiringDefect> = report
+            .into_iter()
+            .filter(|defect| matches!(defect, WiringDefect::UndeclaredParameter { .. }))
+            .collect();
+        prop_assert_eq!(found, expected);
     }
 
     /// One wire between two declared type names, the second derived from the
@@ -628,21 +777,33 @@ fn malformed_definition_still_reports() {
         node_type("sink", &[("input", "note")], "note"),
     ];
 
+    let mut declared_both_ways = node_type("both", &[("input", "note")], "note");
+    declared_both_ways.optional = crate::workflow::parameters(&[("input", "diff")]);
+
     let malformed = [
-        // A binding naming a parameter that no declaration carries.
+        // Two node types sharing one name within the definition.
         definition(
-            types.clone(),
+            vec![
+                node_type("source", &[], "note"),
+                node_type("sink", &[("input", "note")], "note"),
+                node_type("sink", &[("other", "diff")], "diff"),
+            ],
             vec![
                 instance("a", "source", &[]),
-                instance("b", "sink", &[("input", "a"), ("nonesuch", "a")]),
+                instance("b", "sink", &[("input", "a")]),
             ],
             &["b"],
         ),
-        // A designated output naming an instance that is not there.
+        // One parameter declared as both required and optional, bound and
+        // unbound.
         definition(
-            types.clone(),
-            vec![instance("a", "source", &[])],
-            &["nowhere"],
+            vec![node_type("source", &[], "note"), declared_both_ways],
+            vec![
+                instance("a", "source", &[]),
+                instance("b", "both", &[("input", "a")]),
+                instance("c", "both", &[]),
+            ],
+            &["b"],
         ),
         // Two instances sharing one name, so that a binding to it resolves to
         // both.
@@ -666,10 +827,10 @@ fn malformed_definition_still_reports() {
 
     for workflow in &malformed {
         // Not ending the run is the whole assertion, and deliberately the whole
-        // of it: which defect three of these earn is recorded as not yet
-        // answered, and asserting a class here would pin behaviour no
-        // requirement asks for. The report is read rather than discarded, so a
-        // defect that cannot say anything fails this.
+        // of it: which defect the first two earn is recorded as still open, and
+        // asserting a class here would pin behaviour no requirement asks for.
+        // The report is read rather than discarded, so a defect that cannot say
+        // anything fails this.
         for defect in validate_wiring(workflow) {
             assert!(!defect.to_string().is_empty(), "{defect:?} says nothing");
         }
@@ -898,6 +1059,124 @@ fn legal_signatures_pass() {
         &["b"],
     );
     assert_eq!(validate_wiring(&feeding), Vec::new());
+}
+
+#[test]
+fn undeclared_parameter_is_reported() {
+    let types = vec![
+        node_type("source", &[], "note"),
+        node_type("differ", &[], "diff"),
+        node_type("lenient", &[("input", "note")], "note")
+            .with_optional(&[("hint", "note")])
+            .with_globals(&["policy"]),
+    ];
+    let instances = vec![
+        instance("a", "source", &[]),
+        // What the undeclared bindings are wired from: an output no declared
+        // parameter shares, so comparing one against a stand-in type would
+        // report a disagreement nobody could fix.
+        instance("z", "differ", &[]),
+        // A typo of the optional parameter, and a binding spelled like the
+        // requested global. Nothing else about b is wrong.
+        instance(
+            "b",
+            "lenient",
+            &[("input", "a"), ("hnit", "z"), ("policy", "z")],
+        ),
+        // A typo of the required parameter, which leaves it unbound.
+        instance("c", "lenient", &[("inptu", "z")]),
+        // An undeclared parameter wired from an instance that is not there.
+        instance("d", "lenient", &[("input", "a"), ("stray", "ghost")]),
+    ];
+
+    // c and d are the two where one defect hides another: the unbound
+    // parameter says what is missing and not which binding was meant for it,
+    // and the unresolved source is a second fix beside the renamed parameter.
+    assert_eq!(
+        validate_wiring(&definition(types, instances, &["b"])),
+        vec![
+            undeclared("b", "hnit"),
+            undeclared("b", "policy"),
+            unbound("c", "input"),
+            undeclared("c", "inptu"),
+            undeclared("d", "stray"),
+            unresolved("d", "stray", "ghost"),
+        ]
+    );
+}
+
+#[test]
+fn declared_parameters_pass() {
+    // The optional parameter bound beside the required one: a check searching
+    // the required list alone reports it, and one searching the optional list
+    // alone reports the other.
+    let fed = definition(
+        vec![
+            node_type("source", &[], "note"),
+            node_type("lenient", &[("input", "note")], "note").with_optional(&[("hint", "note")]),
+        ],
+        vec![
+            instance("a", "source", &[]),
+            instance("b", "lenient", &[("input", "a"), ("hint", "a")]),
+        ],
+        &["b"],
+    );
+    assert_eq!(validate_wiring(&fed), Vec::new());
+}
+
+#[test]
+fn output_naming_nothing_is_reported() {
+    let types = vec![
+        node_type("source", &[], "note"),
+        node_type("sink", &[("input", "note")], "note"),
+    ];
+    let instances = vec![
+        instance("a", "source", &[]),
+        instance("b", "sink", &[("input", "a")]),
+    ];
+
+    // Sound wiring and one designation, so a count finds nothing wrong: the
+    // defect is the name, and it is echoed rather than counted as nought.
+    let renamed = definition(types.clone(), instances.clone(), &["nowhere"]);
+    assert_eq!(
+        validate_wiring(&renamed),
+        vec![unresolved_output("nowhere")]
+    );
+
+    // Two designations are refused for being two, and neither is resolved:
+    // resolving each would name the definition once per name.
+    let one_of_two = definition(types.clone(), instances.clone(), &["nowhere", "b"]);
+    assert_eq!(validate_wiring(&one_of_two), vec![signature_defect(2)]);
+    let neither = definition(types, instances, &["nowhere", "elsewhere"]);
+    assert_eq!(validate_wiring(&neither), vec![signature_defect(2)]);
+}
+
+#[test]
+fn resolving_outputs_pass() {
+    // An output naming an entry node.
+    let entered = definition(
+        vec![node_type("pass", &[("input", "note")], "note")],
+        vec![instance("start", "pass", &[]).into_entry()],
+        &["start"],
+    );
+    assert_eq!(validate_wiring(&entered), Vec::new());
+
+    // An output naming an instance whose name is not its type's. A check
+    // resolving the output against the node types passes every definition
+    // whose instances are named after their types, which is how short examples
+    // get written.
+    let named_apart = definition(
+        vec![
+            node_type("source", &[], "note"),
+            node_type("sink", &[("input", "note")], "note"),
+        ],
+        vec![
+            instance("fetch", "source", &[]),
+            instance("result", "sink", &[("input", "fetch")]),
+        ],
+        &["result"],
+    );
+    assert_eq!(validate_wiring(&named_apart), Vec::new());
 }
 
 #[test]

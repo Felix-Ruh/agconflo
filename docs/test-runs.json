@@ -363,6 +363,15 @@
           "title": "agconflo-core wiring::binding_to_missing_instance_is_reported",
           "type": "test_run"
         },
+        "RUN_WIRING_DECLARED_PARAMETERS_PASS": {
+          "executes": [
+            "TEST_WIRING_DECLARED_PARAMETERS_PASS"
+          ],
+          "id": "RUN_WIRING_DECLARED_PARAMETERS_PASS",
+          "test_outcome": "passed",
+          "title": "agconflo-core wiring::declared_parameters_pass",
+          "type": "test_run"
+        },
         "RUN_WIRING_DEGENERATE_DECLARATIONS_PASS": {
           "executes": [
             "TEST_WIRING_DEGENERATE_DECLARATIONS_PASS"
@@ -397,6 +406,15 @@
           "id": "RUN_WIRING_EVERY_UNBOUND_REQUIRED_IS_REPORTED",
           "test_outcome": "passed",
           "title": "agconflo-core wiring::every_unbound_required_is_reported",
+          "type": "test_run"
+        },
+        "RUN_WIRING_EVERY_UNDECLARED_PARAMETER_IS_REPORTED": {
+          "executes": [
+            "TEST_WIRING_EVERY_UNDECLARED_PARAMETER_IS_REPORTED"
+          ],
+          "id": "RUN_WIRING_EVERY_UNDECLARED_PARAMETER_IS_REPORTED",
+          "test_outcome": "passed",
+          "title": "agconflo-core wiring::every_undeclared_parameter_is_reported",
           "type": "test_run"
         },
         "RUN_WIRING_INSTANCE_OF_MISSING_TYPE_IS_REPORTED": {
@@ -435,6 +453,24 @@
           "title": "agconflo-core wiring::no_defect_is_reported_twice",
           "type": "test_run"
         },
+        "RUN_WIRING_OUTPUT_NAMING_NOTHING_IS_REPORTED": {
+          "executes": [
+            "TEST_WIRING_OUTPUT_NAMING_NOTHING_IS_REPORTED"
+          ],
+          "id": "RUN_WIRING_OUTPUT_NAMING_NOTHING_IS_REPORTED",
+          "test_outcome": "passed",
+          "title": "agconflo-core wiring::output_naming_nothing_is_reported",
+          "type": "test_run"
+        },
+        "RUN_WIRING_RESOLVING_OUTPUTS_PASS": {
+          "executes": [
+            "TEST_WIRING_RESOLVING_OUTPUTS_PASS"
+          ],
+          "id": "RUN_WIRING_RESOLVING_OUTPUTS_PASS",
+          "test_outcome": "passed",
+          "title": "agconflo-core wiring::resolving_outputs_pass",
+          "type": "test_run"
+        },
         "RUN_WIRING_SELF_BINDING_AND_SHARED_TYPES_PASS": {
           "executes": [
             "TEST_WIRING_SELF_BINDING_AND_SHARED_TYPES_PASS"
@@ -469,6 +505,15 @@
           "id": "RUN_WIRING_TYPE_NAMES_COMPARE_EXACTLY",
           "test_outcome": "passed",
           "title": "agconflo-core wiring::type_names_compare_exactly",
+          "type": "test_run"
+        },
+        "RUN_WIRING_UNDECLARED_PARAMETER_IS_REPORTED": {
+          "executes": [
+            "TEST_WIRING_UNDECLARED_PARAMETER_IS_REPORTED"
+          ],
+          "id": "RUN_WIRING_UNDECLARED_PARAMETER_IS_REPORTED",
+          "test_outcome": "passed",
+          "title": "agconflo-core wiring::undeclared_parameter_is_reported",
           "type": "test_run"
         },
         "RUN_WIRING_UNWIRED_INSTANCE_IS_REPORTED": {
