@@ -43,3 +43,233 @@ anything else.
    does not carry stays where it was. It answers for what it writes, for what it
    keeps, and for the shapes of the model it refuses to write because a document
    cannot hold them.
+
+.. comp_req:: A workflow document is read into a definition
+   :id: CREQ_READER_WORKFLOW
+   :derived_from: FEAT_TOPOLOGY_READS
+   :allocated_to: COMP_TOPOLOGY_READER
+   :ears_pattern: ubiquitous
+   :statement: Topology reader shall read a workflow document and a type catalogue into one workflow definition.
+
+   The document gives the definition its name, its instances - each with the type
+   it names, whether it is an entry node, and its bindings keyed by parameter - and
+   the one output it designates, if any. The catalogue gives it the node types its
+   instances are checked against, all of them, whether or not an instance names
+   them.
+
+   Failure modes:
+
+   - **A key the model does not name is refused.** Every document an editor has
+     annotated is then unreadable, which defeats the round trip the writer exists
+     for before the writer is ever reached (``FEAT_TOPOLOGY_KEEPS_UNREAD``). The
+     natural way to write a strict reader is exactly this one.
+   - **An absent output is read as something.** No designated output is an empty
+     list in the definition, and the validator's to report. Reading it as a
+     refusal reports the signature alone, and reading it as the last instance, or
+     the only one, designates an output the author never named.
+   - **An absent entry key is read as an entry node.** An instance is an entry
+     node only where the document says so. Defaulting the other way exempts every
+     instance's required parameters from being bound, and the validator then
+     passes a workflow that is not wired at all.
+
+   Must read: a document with no bindings anywhere, a document with no instances,
+   and a document whose instances carry keys the model does not name.
+
+.. comp_req:: A node type document keeps its parameters in order
+   :id: CREQ_READER_TYPES
+   :derived_from: FEAT_TOPOLOGY_READS
+   :allocated_to: COMP_TOPOLOGY_READER
+   :ears_pattern: ubiquitous
+   :statement: Topology reader shall read a node type document into declarations whose parameters keep the order they are written in.
+
+   A node assembles its inputs in the order its parameters are declared
+   (``DEC_DECLARED_PARAMETERS``), and every name is a table key
+   (``DEC_NAMES_AS_KEYS``). So the order of a table's keys is data here, not
+   presentation, and it is the one piece of data the obvious implementations lose.
+
+   Failure modes:
+
+   - **The order is lost without a word.** A sorted map loses it, and so does an
+     order-keeping map fed by a parser built without its order-preserving feature -
+     measured to hand keys on alphabetically and report nothing
+     (``EVD_TOML_ORDER_NEEDS_FEATURE``). Nothing downstream can notice: every
+     parameter is still there, and every node receives its inputs in the wrong
+     order.
+   - **The three lists are confused.** A requested global read as an optional
+     parameter, or an optional one as required, changes what the validator
+     demands of every instance of that type.
+
+   Must read: a type declaring no parameters of any kind, and a type whose
+   parameters are written out of alphabetical order - the only kind of order that
+   tells a sorting reader from a faithful one.
+
+.. comp_req:: A document that cannot be read is refused with its place
+   :id: CREQ_READER_FAULT_LOCATED
+   :derived_from: FEAT_TOPOLOGY_UNREADABLE_LOCATED
+   :allocated_to: COMP_TOPOLOGY_READER
+   :ears_pattern: unwanted
+   :statement: If a document cannot be read, then Topology reader shall refuse it with an error carrying the document's name and the line and column as values.
+
+   As values for the reason a wiring defect carries its place as one
+   (``CREQ_DEFECT_NAMES_PLACE``): the caller this is for is an agent correcting its
+   own document, and it reads fields rather than prose. The document's name is
+   whatever the caller gave it when handing it over, since which documents are read
+   is the caller's to decide (``DEC_TYPES_IN_OWN_DOCUMENTS``).
+
+   Failure modes:
+
+   - **The place is only in the message.** Both libraries measured already put it
+     there (``EVD_FORMATS_LOCATE_FAULTS``), so passing the library's message on
+     looks finished and leaves an agent parsing prose.
+   - **The line or column is counted from zero.** The library's own message counts
+     from one, and a value one lower than the message beside it sends an author to
+     the line above the fault.
+   - **The document is not named.** Given four documents, a fault at line 12 of one
+     of them is a fault in none in particular.
+   - **A value the model refuses is not treated as a fault in the text.** A context
+     type name has to be non-empty (``CREQ_VALUE_DECLARED_TYPE``), and an empty one
+     is a well-formed TOML string. Refusing it without a location, or accepting it
+     by some other route, are both wrong.
+   - **Reading panics instead of refusing.** An ``unwrap`` on a value the document
+     did not have ends the process, which reports nothing at all.
+
+   Must refuse, each with its place: text that is not TOML, a value of the wrong
+   type, a key the reader needs that is missing, a name repeated within one
+   document, and an empty context type name.
+
+.. comp_req:: Reading resolves no name
+   :id: CREQ_READER_NAMES_UNRESOLVED
+   :derived_from: FEAT_TOPOLOGY_WIRING_DEFECTS_READ
+   :allocated_to: COMP_TOPOLOGY_READER
+   :ears_pattern: ubiquitous
+   :statement: Topology reader shall read a workflow document without resolving any name it holds.
+
+   Every wiring defect but one is a name that resolves to nothing, or to something
+   that disagrees with where it is used. A reader that resolves no name therefore
+   cannot refuse for any of those, which makes this the mechanism behind its parent
+   rather than a restatement of it: the parent says wiring defects must not stop
+   reading, and this says what reading must not do for that to hold. The one
+   exception - no designated output - is an absent key rather than a name, and
+   ``CREQ_READER_WORKFLOW`` is where reading it as no output is required.
+
+   Failure modes:
+
+   - **An instance's type is looked up while reading.** The first unknown type
+     refuses the document, and the author learns of the second after fixing the
+     first - the round trip ``FEAT_WIRING_ALL_DEFECTS`` exists to prevent.
+   - **A binding's source is looked up while reading.** The same failure through a
+     different name.
+   - **Wires are typed while reading.** Building a typed wire needs both ends'
+     declarations, so a disagreement becomes a refusal in the text.
+
+   Must read, and then be reported in full by the validator: a document carrying
+   every wiring defect class at once.
+
+.. comp_req:: A type name declared twice is refused
+   :id: CREQ_CATALOGUE_DECLARED_ONCE
+   :derived_from: FEAT_TOPOLOGY_TYPE_DECLARED_ONCE
+   :allocated_to: COMP_TYPE_CATALOGUE
+   :ears_pattern: unwanted
+   :statement: If more than one node type document declares a type name, then Type catalogue shall refuse them naming that type and every document declaring it.
+
+   Every document declaring the name, because any of them may be the wrong one, and
+   more than two can declare it.
+
+   Failure modes:
+
+   - **The last declaration read wins.** A map insert replaces the earlier one
+     without a word - the behaviour measured in JSON for a repeated key
+     (``EVD_JSON_KEEPS_LAST_DUPLICATE``), rebuilt one level up.
+   - **The first one wins.** The same failure in the other direction, and the one
+     a map entry that keeps its existing value produces.
+   - **Identical declarations are merged.** Two byte-identical copies are harmless
+     today and drift apart tomorrow, which is why ``DEC_TYPES_IN_OWN_DOCUMENTS``
+     keeps one definition per type in the first place.
+   - **Only the first repeated name is reported.** With several names each declared
+     twice, the author fixes one and learns of the next.
+   - **Only the second document is named.** It may be the correct one.
+
+   Must hold, unrefused: two documents declaring different types, one document
+   declaring several, and a type no workflow uses.
+
+.. comp_req:: Every change is written, removals included
+   :id: CREQ_WRITER_WRITES
+   :derived_from: FEAT_TOPOLOGY_WRITES
+   :allocated_to: COMP_TOPOLOGY_WRITER
+   :ears_pattern: event
+   :statement: When Topology writer writes a definition into a workflow document, Topology writer shall make the document's name, instances, bindings and output match the definition, removing what the definition no longer holds.
+
+   Writing into a document rather than producing one: the writer edits in place so
+   that the requirement beside this can hold, and every change the definition
+   carries has to reach the document through that edit. What this adds to its
+   parent is the half of a change an edit in place forgets. Reading back is how it
+   is checked, and a match with removals included is what the read has to find.
+
+   Failure modes:
+
+   - **Only what exists is updated.** An edit that rewrites the tables already in
+     the document writes a repointed binding, and never writes an instance that
+     was added or removes one that was deleted. Adding and removing a whole table in
+     place is also the one kind of edit not yet measured
+     (``EVD_TOML_EDIT_KEEPS_COMMENTS``).
+   - **A removed binding or output stays behind.** The document then reads back
+     with a wire or a designation the definition no longer has.
+   - **A renamed instance is written twice.** Its new table is added and its old
+     one kept, so the document reads back with both.
+
+   Must write: a definition with an instance added, one removed, one renamed, a
+   binding repointed, a binding removed, and the output changed and removed - each
+   read back and compared with the definition that was written.
+
+.. comp_req:: Writing leaves what it did not read in place
+   :id: CREQ_WRITER_KEEPS_UNREAD
+   :derived_from: FEAT_TOPOLOGY_KEEPS_UNREAD
+   :allocated_to: COMP_TOPOLOGY_WRITER
+   :ears_pattern: event
+   :statement: When Topology writer writes a definition into the document it was read from, Topology writer shall leave every key and comment the definition does not carry in place.
+
+   In place rather than merely present: a comment moved away from the line it
+   describes has lost what it was for, and an editor's data attaches to what it
+   annotates.
+
+   Failure modes:
+
+   - **The document is regenerated from the definition.** Every comment goes -
+     measured (``EVD_TOML_EDIT_KEEPS_COMMENTS``) - and so does every key the
+     definition does not carry, since the definition has nowhere to hold one. It is
+     also the implementation that makes the requirement beside this easiest to
+     meet.
+   - **An instance's table is rewritten whole when one of its bindings changes.**
+     The keys on that instance that the model does not name go with it, while every
+     other instance keeps its own - which is why a test changing nothing would not
+     see it.
+
+   Must keep: a document written back with nothing changed is the same text, byte
+   for byte.
+
+.. comp_req:: A shape the format cannot hold is refused before writing
+   :id: CREQ_WRITER_UNWRITABLE_REFUSED
+   :derived_from: FEAT_TOPOLOGY_UNWRITABLE_REFUSED
+   :allocated_to: COMP_TOPOLOGY_WRITER
+   :ears_pattern: unwanted
+   :statement: If a definition holds a shape no workflow document can express, then Topology writer shall refuse to write it naming every such shape it holds.
+
+   The shapes are three: two instances sharing a name, a parameter bound twice on
+   one instance, and more than one designated output (``DEC_NAMES_AS_KEYS``,
+   ``DEC_ONE_OUTPUT_KEY``). Every one of them it holds is named, for the reason the
+   validator reports every defect: fixing one to learn of the next is a round trip.
+
+   Failure modes:
+
+   - **One of two same-named instances is written.** The document reads back
+     cleanly with one instance where the definition had two, and the other has
+     gone.
+   - **The first designated output is written.** The same loss for the signature.
+   - **The document is half edited when the refusal comes.** A refusal leaves the
+     document as it was, because a document partly written is one nobody asked for.
+   - **A wiring defect is refused as unwritable.** An instance of an unknown type,
+     a binding to an instance that is not there and no designated output can all be
+     written, and a writer that refuses them is acting as a validator it is not.
+
+   Must write, unrefused: a definition carrying every wiring defect a document can
+   express.
