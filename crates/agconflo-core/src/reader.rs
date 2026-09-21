@@ -94,7 +94,7 @@ impl ReadFault {
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum FaultKind {
-    /// The text is not TOML. A name written twice within one document is among
+    /// The text is not TOML. A name written twice within one table is among
     /// these, since every name is a table key (`DEC_NAMES_AS_KEYS`) and TOML
     /// forbids a key written twice.
     Syntax {
@@ -122,6 +122,13 @@ pub enum FaultKind {
         key: Vec<String>,
         /// Why the model refuses it.
         reason: InvalidTypeName,
+    },
+    /// A node type declares one parameter as both required and optional. The
+    /// two lists are two tables, so the parser sees no repeated key, and the
+    /// place is where the name repeats: whichever declaration is written later.
+    ParameterDeclaredTwice {
+        /// The later declaration, from the top of the document down.
+        key: Vec<String>,
     },
 }
 
@@ -152,6 +159,11 @@ impl fmt::Display for FaultKind {
             Self::InvalidContextType { key, reason } => {
                 write!(f, "'{}' is not a context type: {reason}", key.join("."))
             }
+            Self::ParameterDeclaredTwice { key } => write!(
+                f,
+                "'{}' is declared as both a required and an optional parameter",
+                key.join(".")
+            ),
         }
     }
 }
@@ -437,14 +449,77 @@ impl<'t> Reading<'t> {
         let key = ["types", name];
         let declaration = self.table(item, &key)?;
         let output = self.needed(item, declaration, &key, "output")?;
+        let required = self.parameters(declaration, &key, "required")?;
+        let optional = self.parameters(declaration, &key, "optional")?;
+        self.declared_once(declaration, &key, &required, &optional)?;
 
         Ok(NodeType {
             name: name.to_owned(),
-            required: self.parameters(declaration, &key, "required")?,
-            optional: self.parameters(declaration, &key, "optional")?,
+            required,
+            optional,
             globals: self.globals(declaration, &key)?,
             output: self.context_type(output, &[&key[..], &["output"]].concat())?,
         })
+    }
+
+    /// Nothing, or a fault for a parameter `declaration` lists as both
+    /// required and optional.
+    ///
+    /// The parser refuses a name written twice within one list, since it is a
+    /// repeated key, and cannot see one written once in each: the two lists are
+    /// two tables. Read as it stands, the validator would judge every wire into
+    /// that parameter by one declaration and ignore the other.
+    ///
+    /// The fault is placed where the name repeats, as the parser places a
+    /// repeated key: at whichever of the two declarations is written later. With
+    /// several such names, the one that repeats first in the text is reported.
+    /// Names are compared exactly, as they are everywhere else - `input` and
+    /// `Input` are two parameters.
+    // @A parameter declared in both lists refused where it repeats,IMPL_READER_DECLARED_ONCE,impl,[CREQ_READER_FAULT_LOCATED]
+    fn declared_once(
+        &self,
+        declaration: &dyn TableLike,
+        key: &[&str],
+        required: &[Parameter],
+        optional: &[Parameter],
+    ) -> Result<(), ReadFault> {
+        // A key read from a parsed document has a span - the test places an
+        // inline and a header spelling exactly. A missing one would still
+        // refuse the document, at its start at worst, rather than let the
+        // repetition through.
+        let written_at = |list: &str, name: &str| {
+            declaration
+                .get(list)
+                .and_then(Item::as_table_like)
+                .and_then(|table| table.get_key_value(name))
+                .and_then(|(written, _)| written.span())
+                .map(|span| span.start)
+        };
+
+        let repeated = optional
+            .iter()
+            .filter(|parameter| required.iter().any(|other| other.name == parameter.name))
+            .map(|parameter| {
+                let as_required = written_at("required", &parameter.name);
+                let as_optional = written_at("optional", &parameter.name);
+                let (list, at) = if as_optional > as_required {
+                    ("optional", as_optional)
+                } else {
+                    ("required", as_required)
+                };
+                (at, list, parameter.name.as_str())
+            })
+            .min_by_key(|&(at, ..)| at);
+
+        match repeated {
+            None => Ok(()),
+            Some((at, list, name)) => Err(self.fault(
+                at.map(|at| at..at),
+                FaultKind::ParameterDeclaredTwice {
+                    key: path(&[key, &[list, name]].concat()),
+                },
+            )),
+        }
     }
 
     /// The parameters listed under `list`, in the order they are written: each
@@ -1332,6 +1407,64 @@ node_type = \"differ\"
             definition: "renamed".to_owned(),
             unresolved: "nowhere".to_owned(),
         }]
+    );
+}
+
+#[test]
+fn parameter_declared_twice_is_a_fault() {
+    let key = |parts: &[&str]| parts.iter().map(|&part| part.to_owned()).collect();
+    let cases = [
+        // The required list first, inline: the repetition is in the optional
+        // one, after a parameter declared once.
+        (
+            "required-first.toml",
+            "[types.review]\noutput = \"note\"\nrequired = { input = \"note\" }\noptional = { hint = \"note\", input = \"diff\" }\n",
+            (4, 29),
+            key(&["types", "review", "optional", "input"]),
+        ),
+        // The optional list first, as header tables: now the repetition is in
+        // the required one, so a reader always pointing at one list is wrong in
+        // one of these two.
+        (
+            "optional-first.toml",
+            "[types.review]\noutput = \"note\"\n\n[types.review.optional]\ninput = \"diff\"\n\n[types.review.required]\ninput = \"note\"\n",
+            (8, 1),
+            key(&["types", "review", "required", "input"]),
+        ),
+        // Two names in both lists, in opposite orders: a repeats first in the
+        // text, though b comes first in the optional list.
+        (
+            "two-names.toml",
+            "[types.t]\noutput = \"note\"\noptional = { b = \"note\", a = \"note\" }\nrequired = { a = \"note\", b = \"note\" }\n",
+            (4, 14),
+            key(&["types", "t", "required", "a"]),
+        ),
+    ];
+
+    for (document, text, (line, column), key) in cases {
+        let fault = read_node_types(document, text).expect_err("it is refused");
+        assert_eq!(
+            (fault.document(), fault.line(), fault.column(), fault.kind()),
+            (
+                document,
+                line,
+                column,
+                &FaultKind::ParameterDeclaredTwice { key }
+            ),
+            "{fault}"
+        );
+    }
+
+    // Names differing only in case are two parameters. Comparing them loosely
+    // is the tidy-looking way to refuse the shape above, and it refuses this.
+    let read = read_node_types(
+        "cases.toml",
+        "[types.review]\noutput = \"note\"\nrequired = { input = \"note\" }\noptional = { Input = \"note\" }\n",
+    )
+    .expect("two parameters read");
+    assert_eq!(
+        read.node_types(),
+        [node_type("review", &[("input", "note")], "note").with_optional(&[("Input", "note")])]
     );
 }
 

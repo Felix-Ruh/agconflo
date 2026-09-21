@@ -291,6 +291,15 @@
           "title": "agconflo-core reader::faults_carry_their_place",
           "type": "test_run"
         },
+        "RUN_READER_PARAMETER_DECLARED_TWICE_IS_A_FAULT": {
+          "executes": [
+            "TEST_READER_PARAMETER_DECLARED_TWICE_IS_A_FAULT"
+          ],
+          "id": "RUN_READER_PARAMETER_DECLARED_TWICE_IS_A_FAULT",
+          "test_outcome": "passed",
+          "title": "agconflo-core reader::parameter_declared_twice_is_a_fault",
+          "type": "test_run"
+        },
         "RUN_READER_PARAMETER_ORDER_IS_KEPT": {
           "executes": [
             "TEST_READER_PARAMETER_ORDER_IS_KEPT"

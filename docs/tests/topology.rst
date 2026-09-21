@@ -188,8 +188,9 @@ together.
    refused with the document, the line and column of whichever declaration is
    written later, and the key naming that list and parameter - once with the
    required list written first as inline tables, and once with the optional list
-   written first as header tables. A document declaring ``input`` as required and
-   ``Input`` as optional reads, as two parameters.
+   written first as header tables. With two names in both lists, the one
+   repeating first in the text is the one reported. A document declaring
+   ``input`` as required and ``Input`` as optional reads, as two parameters.
 
    The parser cannot refuse the shape, since the two lists are two tables and a
    name in both is no repeated key, so the reader has to. Both
