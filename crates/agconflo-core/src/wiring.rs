@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 
 use crate::defect::WiringDefect;
-use crate::workflow::{NodeInstance, NodeType, WorkflowDefinition};
+use crate::workflow::{Binding, NodeInstance, NodeType, WorkflowDefinition};
 
 /// Every wiring defect `definition` carries, and nothing at all for one that
 /// carries none.
@@ -69,7 +69,7 @@ fn check_instance(
     };
 
     check_required_bound(instance, declaration, defects);
-    check_bindings(instance, instances, defects);
+    check_bindings(instance, declaration, declarations, instances, defects);
 }
 
 /// Every parameter the declaration requires carries a binding.
@@ -121,17 +121,77 @@ fn check_required_bound(
 // @Every binding's source resolved,IMPL_WIRING_BINDING_SOURCE,impl,[CREQ_VALIDATOR_BINDING_RESOLVES]
 fn check_bindings(
     instance: &NodeInstance,
+    declaration: &NodeType,
+    declarations: &HashMap<&str, &NodeType>,
     instances: &HashMap<&str, &NodeInstance>,
     defects: &mut Vec<WiringDefect>,
 ) {
     for binding in &instance.bindings {
-        if !instances.contains_key(binding.source.as_str()) {
+        let Some(source) = instances.get(binding.source.as_str()) else {
             defects.push(WiringDefect::UnresolvedInstance {
                 instance: instance.name.clone(),
                 parameter: binding.parameter.clone(),
                 unresolved: binding.source.clone(),
             });
-        }
+            continue;
+        };
+        check_binding_type(
+            instance,
+            declaration,
+            binding,
+            source,
+            declarations,
+            defects,
+        );
+    }
+}
+
+/// The type declared for a parameter and the type declared for the output wired
+/// to it are the same name, exactly.
+///
+/// Exactly, because every way of loosening the comparison - ignoring case,
+/// trimming, matching a prefix - makes two distinct types compare as one, and a
+/// node handed the wrong context produces a confident wrong answer rather than
+/// failing.
+///
+/// Two ends are passed over rather than compared, and each is deliberate. A
+/// binding naming a parameter no declaration carries is one of the shapes
+/// recorded as not yet answered, so classifying it here would pin behaviour no
+/// requirement asks for. And a producer of a node type the definition does not
+/// carry has no declared output at all: its missing type is already in the
+/// report, and comparing against a stand-in for one - an empty name, a default -
+/// would make every wire out of it disagree and send the author to change a type
+/// that is not wrong.
+///
+/// The check is reached for every binding of every instance, including one whose
+/// instance already carries an unbound-parameter defect. A walk that moved on
+/// after an instance's first defect would hide every disagreement below it.
+// @Both ends of a wire declare one context type,IMPL_WIRING_TYPES_AGREE,impl,[CREQ_VALIDATOR_TYPES_AGREE]
+fn check_binding_type(
+    instance: &NodeInstance,
+    declaration: &NodeType,
+    binding: &Binding,
+    source: &NodeInstance,
+    declarations: &HashMap<&str, &NodeType>,
+    defects: &mut Vec<WiringDefect>,
+) {
+    let declared = declaration
+        .required
+        .iter()
+        .chain(&declaration.optional)
+        .find(|parameter| parameter.name == binding.parameter);
+    let (Some(parameter), Some(producer)) = (declared, declarations.get(source.node_type.as_str()))
+    else {
+        return;
+    };
+
+    if producer.output != parameter.context_type {
+        defects.push(WiringDefect::ContextTypeDisagreement {
+            instance: instance.name.clone(),
+            parameter: binding.parameter.clone(),
+            expected: parameter.context_type.clone(),
+            produced: producer.output.clone(),
+        });
     }
 }
 
@@ -184,6 +244,18 @@ fn unbound(instance: &str, parameter: &str) -> WiringDefect {
     WiringDefect::RequiredParameterUnbound {
         instance: instance.to_owned(),
         parameter: parameter.to_owned(),
+    }
+}
+
+/// A wire whose two ends declare different context types, as the report names
+/// it.
+#[cfg(test)]
+fn disagreement(instance: &str, parameter: &str, expected: &str, produced: &str) -> WiringDefect {
+    WiringDefect::ContextTypeDisagreement {
+        instance: instance.to_owned(),
+        parameter: parameter.to_owned(),
+        expected: crate::workflow::context_type(expected),
+        produced: crate::workflow::context_type(produced),
     }
 }
 
@@ -284,6 +356,88 @@ proptest! {
         let report = validate_wiring(&definition(node_types, instances, &["c0"]));
         prop_assert_eq!(report, expected);
     }
+
+    /// One wire between two declared type names, the second derived from the
+    /// first by each way a comparison gets loosened: the same name, the same
+    /// name upper-cased, the same name with a leading or a trailing space, and
+    /// the same name with a character appended so that one is a prefix of the
+    /// other. Two unrelated random names would prove only that unrelated names
+    /// differ, which no comparison anyone would write gets wrong.
+    #[test]
+    fn type_names_compare_exactly(name in "[a-z]{1,6}", variation in 0..5usize) {
+        let produced = match variation {
+            0 => name.clone(),
+            1 => name.to_ascii_uppercase(),
+            2 => format!(" {name}"),
+            3 => format!("{name} "),
+            _ => format!("{name}x"),
+        };
+
+        let wired = definition(
+            vec![
+                node_type("source", &[], &produced),
+                node_type("sink", &[("input", &name)], &name),
+            ],
+            vec![
+                instance("a", "source", &[]),
+                instance("b", "sink", &[("input", "a")]),
+            ],
+            &["b"],
+        );
+        let report = validate_wiring(&wired);
+
+        if produced == name {
+            prop_assert_eq!(report, Vec::new());
+        } else {
+            prop_assert_eq!(report, vec![disagreement("b", "input", &name, &produced)]);
+        }
+    }
+}
+
+#[test]
+fn type_disagreement_is_reported() {
+    let crossed = definition(
+        vec![
+            node_type("differ", &[], "diff"),
+            node_type("summarise", &[("input", "summary")], "summary"),
+        ],
+        vec![
+            instance("a", "differ", &[]),
+            instance("b", "summarise", &[("input", "a")]),
+        ],
+        &["b"],
+    );
+
+    // Both names are asserted on, because what a reader has to act on is which
+    // type was expected and which arrived; a defect saying only that the two
+    // differ sends them back to the declarations to find out.
+    assert_eq!(
+        validate_wiring(&crossed),
+        vec![disagreement("b", "input", "summary", "diff")]
+    );
+}
+
+#[test]
+fn agreeing_wires_pass() {
+    let fanned = definition(
+        vec![
+            // One context type declared on two different node types.
+            node_type("source", &[], "note"),
+            node_type("pair", &[("left", "note"), ("right", "note")], "note"),
+        ],
+        vec![
+            instance("a", "source", &[]),
+            // One output bound by several parameters, and by several
+            // instances: fan-out, which the model allows
+            // (`DEC_BINDING_BY_PORT`). A check recording one consumer per
+            // output refuses this while comparing every name correctly.
+            instance("b", "pair", &[("left", "a"), ("right", "a")]),
+            instance("c", "pair", &[("left", "a"), ("right", "b")]),
+        ],
+        &["c"],
+    );
+
+    assert_eq!(validate_wiring(&fanned), Vec::new());
 }
 
 #[test]
@@ -360,14 +514,19 @@ fn instance_of_missing_type_is_reported() {
     let instances = vec![
         // Of a type nobody supplied, and carrying a broken wire of its own.
         instance("a", "not-supplied", &[("whatever", "ghost")]),
-        instance("b", "sink", &[]),
+        // Fed by it: its producer has no declared output type at all.
+        instance("b", "sink", &[("input", "a")]),
+        instance("c", "sink", &[]),
     ];
     let report = validate_wiring(&definition(types, instances, &["b"]));
 
     // Nothing else about that instance is reported, which is the half that can
     // regress quietly: without its declaration nothing about its parameters is
-    // knowable, so every other defect about it would be invented. The rest of
-    // the definition is still walked, so b's own defect is in the same report.
+    // knowable, so every other defect about it would be invented - and so would
+    // a disagreement about the wire it feeds, where comparing against a stand-in
+    // for the type it does not declare sends the author to change a type that is
+    // not wrong. The rest of the definition is still walked, so c's own defect
+    // is in the same report.
     assert_eq!(
         report,
         vec![
@@ -375,7 +534,7 @@ fn instance_of_missing_type_is_reported() {
                 instance: "a".to_owned(),
                 unresolved: "not-supplied".to_owned(),
             },
-            unbound("b", "input"),
+            unbound("c", "input"),
         ]
     );
 }

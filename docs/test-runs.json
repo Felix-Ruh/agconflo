@@ -192,6 +192,15 @@
           "title": "agconflo-core lineage::reaches_each_once",
           "type": "test_run"
         },
+        "RUN_WIRING_AGREEING_WIRES_PASS": {
+          "executes": [
+            "TEST_WIRING_AGREEING_WIRES_PASS"
+          ],
+          "id": "RUN_WIRING_AGREEING_WIRES_PASS",
+          "test_outcome": "passed",
+          "title": "agconflo-core wiring::agreeing_wires_pass",
+          "type": "test_run"
+        },
         "RUN_WIRING_BINDING_TO_MISSING_INSTANCE_IS_REPORTED": {
           "executes": [
             "TEST_WIRING_BINDING_TO_MISSING_INSTANCE_IS_REPORTED"
@@ -271,6 +280,24 @@
           "id": "RUN_WIRING_SIGNATURE_WITHOUT_ONE_OUTPUT_IS_REPORTED",
           "test_outcome": "passed",
           "title": "agconflo-core wiring::signature_without_one_output_is_reported",
+          "type": "test_run"
+        },
+        "RUN_WIRING_TYPE_DISAGREEMENT_IS_REPORTED": {
+          "executes": [
+            "TEST_WIRING_TYPE_DISAGREEMENT_IS_REPORTED"
+          ],
+          "id": "RUN_WIRING_TYPE_DISAGREEMENT_IS_REPORTED",
+          "test_outcome": "passed",
+          "title": "agconflo-core wiring::type_disagreement_is_reported",
+          "type": "test_run"
+        },
+        "RUN_WIRING_TYPE_NAMES_COMPARE_EXACTLY": {
+          "executes": [
+            "TEST_WIRING_TYPE_NAMES_COMPARE_EXACTLY"
+          ],
+          "id": "RUN_WIRING_TYPE_NAMES_COMPARE_EXACTLY",
+          "test_outcome": "passed",
+          "title": "agconflo-core wiring::type_names_compare_exactly",
           "type": "test_run"
         },
         "RUN_WIRING_UNWIRED_INSTANCE_IS_REPORTED": {

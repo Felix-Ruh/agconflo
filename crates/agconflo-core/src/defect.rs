@@ -2,6 +2,8 @@
 
 use std::fmt;
 
+use crate::ContextType;
+
 /// One thing wrong with one workflow definition.
 ///
 /// A value rather than a message. Every defect carries the place it concerns in
@@ -58,6 +60,22 @@ pub enum WiringDefect {
         /// The node type name that resolved to nothing, as it was written.
         unresolved: String,
     },
+    /// A binding joins an output to a parameter declared for another context
+    /// type (`CREQ_VALIDATOR_TYPES_AGREE`).
+    ///
+    /// Both type names are carried, because what a reader acts on is which type
+    /// was expected and which arrived; a defect saying only that the two differ
+    /// sends them back to the declarations to find out.
+    ContextTypeDisagreement {
+        /// The instance consuming the binding.
+        instance: String,
+        /// The parameter it fills.
+        parameter: String,
+        /// The context type that parameter is declared for.
+        expected: ContextType,
+        /// The context type the wired output is declared to produce.
+        produced: ContextType,
+    },
     /// The definition designates no output, or designates more than one
     /// (`CREQ_VALIDATOR_ONE_OUTPUT`). It concerns the definition itself, so it
     /// carries no instance and no parameter.
@@ -76,7 +94,8 @@ impl WiringDefect {
         match self {
             Self::RequiredParameterUnbound { instance, .. }
             | Self::UnresolvedInstance { instance, .. }
-            | Self::UnresolvedNodeType { instance, .. } => Some(instance),
+            | Self::UnresolvedNodeType { instance, .. }
+            | Self::ContextTypeDisagreement { instance, .. } => Some(instance),
             Self::SignatureOutputs { .. } => None,
         }
     }
@@ -86,7 +105,8 @@ impl WiringDefect {
     pub fn parameter(&self) -> Option<&str> {
         match self {
             Self::RequiredParameterUnbound { parameter, .. }
-            | Self::UnresolvedInstance { parameter, .. } => Some(parameter),
+            | Self::UnresolvedInstance { parameter, .. }
+            | Self::ContextTypeDisagreement { parameter, .. } => Some(parameter),
             Self::UnresolvedNodeType { .. } | Self::SignatureOutputs { .. } => None,
         }
     }
@@ -116,6 +136,17 @@ impl fmt::Display for WiringDefect {
             } => write!(
                 f,
                 "the node '{instance}' is of the type '{unresolved}', which this workflow does not carry"
+            ),
+            Self::ContextTypeDisagreement {
+                instance,
+                parameter,
+                expected,
+                produced,
+            } => write!(
+                f,
+                "'{parameter}' of the node '{instance}' is declared for '{}', and what is wired to it produces '{}'",
+                expected.as_str(),
+                produced.as_str()
             ),
             Self::SignatureOutputs {
                 definition,
