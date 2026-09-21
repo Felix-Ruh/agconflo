@@ -101,11 +101,22 @@ requirement whose subject is anything else.
    Not yet answered, and left open rather than guessed at: a binding naming a
    parameter the declaration does not carry, a designated output naming an
    instance that is not there, and two instances sharing one name, so that a
-   binding to it resolves to both. This requirement covers a name that resolves
-   to nothing, and each of those is a name resolving to the wrong number of
-   things. They belong with loading a workflow, where names are read; until then
-   the only thing asserted about them is that they do not stop the walk
-   (``CREQ_VALIDATOR_EVERY_DEFECT``).
+   binding to it resolves to both. None of them is what this requirement's
+   statement covers, which is a binding's source and an instance's type.
+
+   This note once said all three belonged with loading a workflow, where names are
+   read. One does. Every name in a document is a table key
+   (``DEC_NAMES_AS_KEYS``), so two instances sharing a name is refused by the
+   parser before any definition exists. The model can still hold that shape when a
+   definition is built by other means, so it stays open here. The other two are
+   not loading questions, for different reasons. A binding naming a parameter its
+   type does not declare can only be found against the declaration, which is the
+   validator's to read. A designated output naming no instance could be found
+   while reading, but it is a wiring defect of the same kind as a binding naming
+   none, and a reader refusing it would report it alone - the round trip
+   ``FEAT_WIRING_ALL_DEFECTS`` exists to prevent. Both are left to a later slice of
+   this feature. Until then the only thing asserted about any of the three is that
+   they do not stop the walk (``CREQ_VALIDATOR_EVERY_DEFECT``).
 
 .. comp_req:: A binding across two context types is a defect
    :id: CREQ_VALIDATOR_TYPES_AGREE
