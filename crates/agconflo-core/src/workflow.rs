@@ -142,6 +142,31 @@ pub(crate) fn node_type(name: &str, required: &[(&str, &str)], output: &str) -> 
     }
 }
 
+#[cfg(test)]
+impl NodeType {
+    /// The same declaration, also accepting `optional`.
+    pub(crate) fn with_optional(mut self, optional: &[(&str, &str)]) -> Self {
+        self.optional = parameters(optional);
+        self
+    }
+
+    /// The same declaration, also reading `globals` by declaration.
+    pub(crate) fn with_globals(mut self, globals: &[&str]) -> Self {
+        self.globals = globals.iter().map(|&name| context_type(name)).collect();
+        self
+    }
+}
+
+#[cfg(test)]
+impl NodeInstance {
+    /// The same instance, as an entry node: its parameters are the workflow's
+    /// own rather than wires.
+    pub(crate) fn into_entry(mut self) -> Self {
+        self.entry = true;
+        self
+    }
+}
+
 /// Parameters from `(name, context type)` pairs, in the order given.
 #[cfg(test)]
 pub(crate) fn parameters(declared: &[(&str, &str)]) -> Vec<Parameter> {

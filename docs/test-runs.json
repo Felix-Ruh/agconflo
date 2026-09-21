@@ -102,6 +102,15 @@
           "title": "agconflo-core context::type_is_declared",
           "type": "test_run"
         },
+        "RUN_DEFECT_ECHOES_AN_UNRESOLVED_NAME": {
+          "executes": [
+            "TEST_DEFECT_ECHOES_AN_UNRESOLVED_NAME"
+          ],
+          "id": "RUN_DEFECT_ECHOES_AN_UNRESOLVED_NAME",
+          "test_outcome": "passed",
+          "title": "agconflo-core defect::echoes_an_unresolved_name",
+          "type": "test_run"
+        },
         "RUN_DEFECT_SIGNATURE_NAMES_THE_DEFINITION": {
           "executes": [
             "TEST_DEFECT_SIGNATURE_NAMES_THE_DEFINITION"
@@ -183,6 +192,24 @@
           "title": "agconflo-core lineage::reaches_each_once",
           "type": "test_run"
         },
+        "RUN_WIRING_BINDING_TO_MISSING_INSTANCE_IS_REPORTED": {
+          "executes": [
+            "TEST_WIRING_BINDING_TO_MISSING_INSTANCE_IS_REPORTED"
+          ],
+          "id": "RUN_WIRING_BINDING_TO_MISSING_INSTANCE_IS_REPORTED",
+          "test_outcome": "passed",
+          "title": "agconflo-core wiring::binding_to_missing_instance_is_reported",
+          "type": "test_run"
+        },
+        "RUN_WIRING_DEGENERATE_DECLARATIONS_PASS": {
+          "executes": [
+            "TEST_WIRING_DEGENERATE_DECLARATIONS_PASS"
+          ],
+          "id": "RUN_WIRING_DEGENERATE_DECLARATIONS_PASS",
+          "test_outcome": "passed",
+          "title": "agconflo-core wiring::degenerate_declarations_pass",
+          "type": "test_run"
+        },
         "RUN_WIRING_EMPTY_DEFINITION_IS_REFUSED_FOR_ITS_SIGNATURE": {
           "executes": [
             "TEST_WIRING_EMPTY_DEFINITION_IS_REFUSED_FOR_ITS_SIGNATURE"
@@ -190,6 +217,33 @@
           "id": "RUN_WIRING_EMPTY_DEFINITION_IS_REFUSED_FOR_ITS_SIGNATURE",
           "test_outcome": "passed",
           "title": "agconflo-core wiring::empty_definition_is_refused_for_its_signature",
+          "type": "test_run"
+        },
+        "RUN_WIRING_EVERY_BROKEN_WIRE_IS_REPORTED": {
+          "executes": [
+            "TEST_WIRING_EVERY_BROKEN_WIRE_IS_REPORTED"
+          ],
+          "id": "RUN_WIRING_EVERY_BROKEN_WIRE_IS_REPORTED",
+          "test_outcome": "passed",
+          "title": "agconflo-core wiring::every_broken_wire_is_reported",
+          "type": "test_run"
+        },
+        "RUN_WIRING_EVERY_UNBOUND_REQUIRED_IS_REPORTED": {
+          "executes": [
+            "TEST_WIRING_EVERY_UNBOUND_REQUIRED_IS_REPORTED"
+          ],
+          "id": "RUN_WIRING_EVERY_UNBOUND_REQUIRED_IS_REPORTED",
+          "test_outcome": "passed",
+          "title": "agconflo-core wiring::every_unbound_required_is_reported",
+          "type": "test_run"
+        },
+        "RUN_WIRING_INSTANCE_OF_MISSING_TYPE_IS_REPORTED": {
+          "executes": [
+            "TEST_WIRING_INSTANCE_OF_MISSING_TYPE_IS_REPORTED"
+          ],
+          "id": "RUN_WIRING_INSTANCE_OF_MISSING_TYPE_IS_REPORTED",
+          "test_outcome": "passed",
+          "title": "agconflo-core wiring::instance_of_missing_type_is_reported",
           "type": "test_run"
         },
         "RUN_WIRING_LEGAL_SIGNATURES_PASS": {
@@ -201,6 +255,15 @@
           "title": "agconflo-core wiring::legal_signatures_pass",
           "type": "test_run"
         },
+        "RUN_WIRING_SELF_BINDING_AND_SHARED_TYPES_PASS": {
+          "executes": [
+            "TEST_WIRING_SELF_BINDING_AND_SHARED_TYPES_PASS"
+          ],
+          "id": "RUN_WIRING_SELF_BINDING_AND_SHARED_TYPES_PASS",
+          "test_outcome": "passed",
+          "title": "agconflo-core wiring::self_binding_and_shared_types_pass",
+          "type": "test_run"
+        },
         "RUN_WIRING_SIGNATURE_WITHOUT_ONE_OUTPUT_IS_REPORTED": {
           "executes": [
             "TEST_WIRING_SIGNATURE_WITHOUT_ONE_OUTPUT_IS_REPORTED"
@@ -208,6 +271,15 @@
           "id": "RUN_WIRING_SIGNATURE_WITHOUT_ONE_OUTPUT_IS_REPORTED",
           "test_outcome": "passed",
           "title": "agconflo-core wiring::signature_without_one_output_is_reported",
+          "type": "test_run"
+        },
+        "RUN_WIRING_UNWIRED_INSTANCE_IS_REPORTED": {
+          "executes": [
+            "TEST_WIRING_UNWIRED_INSTANCE_IS_REPORTED"
+          ],
+          "id": "RUN_WIRING_UNWIRED_INSTANCE_IS_REPORTED",
+          "test_outcome": "passed",
+          "title": "agconflo-core wiring::unwired_instance_is_reported",
           "type": "test_run"
         }
       }

@@ -12,9 +12,16 @@ use std::fmt;
 ///
 /// The place is not the same shape for every defect, and flattening it into one
 /// would be the defect this is written to avoid. A defect about a wire concerns
-/// a node instance and one of its parameters; a defect about the definition's
-/// signature concerns the definition and no node in it, and a variant that
-/// carried an instance anyway would send an author to a node that is not wrong.
+/// a node instance and one of its parameters; a defect about an instance whose
+/// node type is missing concerns that instance and no parameter, because its
+/// declaration is what is missing and its parameter list is therefore
+/// unknowable; a defect about the signature concerns the definition and no node
+/// in it. A variant that carried an instance or a parameter anyway would send an
+/// author to a place that is not wrong.
+///
+/// A name that resolved to nothing is carried as it was written, and is the one
+/// field that names something the definition does not have. It is the only thing
+/// tying the defect to what the author typed.
 ///
 /// `#[non_exhaustive]` because the classes are not finished: three shapes are
 /// recorded as not yet answered under `CREQ_VALIDATOR_BINDING_RESOLVES`, and
@@ -23,6 +30,34 @@ use std::fmt;
 #[non_exhaustive]
 // @A place carried as a value,IMPL_DEFECT_PLACE,impl,[CREQ_DEFECT_NAMES_PLACE]
 pub enum WiringDefect {
+    /// A required parameter of an instance carries no binding
+    /// (`CREQ_VALIDATOR_REQUIRED_BOUND`).
+    RequiredParameterUnbound {
+        /// The instance whose parameter is unwired.
+        instance: String,
+        /// The required parameter carrying no binding.
+        parameter: String,
+    },
+    /// A binding names an instance the definition does not carry
+    /// (`CREQ_VALIDATOR_BINDING_RESOLVES`).
+    UnresolvedInstance {
+        /// The instance consuming the binding.
+        instance: String,
+        /// The parameter it fills.
+        parameter: String,
+        /// The instance name that resolved to nothing, as it was written.
+        unresolved: String,
+    },
+    /// An instance names a node type the definition does not carry
+    /// (`CREQ_VALIDATOR_BINDING_RESOLVES`). It concerns the instance, whose
+    /// parameters are unknowable without the declaration, so it carries no
+    /// parameter.
+    UnresolvedNodeType {
+        /// The instance whose declaration is missing.
+        instance: String,
+        /// The node type name that resolved to nothing, as it was written.
+        unresolved: String,
+    },
     /// The definition designates no output, or designates more than one
     /// (`CREQ_VALIDATOR_ONE_OUTPUT`). It concerns the definition itself, so it
     /// carries no instance and no parameter.
@@ -39,6 +74,9 @@ impl WiringDefect {
     /// the definition itself.
     pub fn instance(&self) -> Option<&str> {
         match self {
+            Self::RequiredParameterUnbound { instance, .. }
+            | Self::UnresolvedInstance { instance, .. }
+            | Self::UnresolvedNodeType { instance, .. } => Some(instance),
             Self::SignatureOutputs { .. } => None,
         }
     }
@@ -47,7 +85,9 @@ impl WiringDefect {
     /// single parameter.
     pub fn parameter(&self) -> Option<&str> {
         match self {
-            Self::SignatureOutputs { .. } => None,
+            Self::RequiredParameterUnbound { parameter, .. }
+            | Self::UnresolvedInstance { parameter, .. } => Some(parameter),
+            Self::UnresolvedNodeType { .. } | Self::SignatureOutputs { .. } => None,
         }
     }
 }
@@ -55,6 +95,28 @@ impl WiringDefect {
 impl fmt::Display for WiringDefect {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::RequiredParameterUnbound {
+                instance,
+                parameter,
+            } => write!(
+                f,
+                "the node '{instance}' requires '{parameter}', and nothing is bound to it"
+            ),
+            Self::UnresolvedInstance {
+                instance,
+                parameter,
+                unresolved,
+            } => write!(
+                f,
+                "'{parameter}' of the node '{instance}' is bound to '{unresolved}', which this workflow does not carry"
+            ),
+            Self::UnresolvedNodeType {
+                instance,
+                unresolved,
+            } => write!(
+                f,
+                "the node '{instance}' is of the type '{unresolved}', which this workflow does not carry"
+            ),
             Self::SignatureOutputs {
                 definition,
                 designated,
@@ -72,7 +134,7 @@ impl fmt::Display for WiringDefect {
 #[cfg(test)]
 use crate::validate_wiring;
 #[cfg(test)]
-use crate::workflow::{DEFINITION_NAME, definition};
+use crate::workflow::{DEFINITION_NAME, definition, instance, node_type};
 
 #[test]
 fn signature_names_the_definition() {
@@ -89,5 +151,34 @@ fn signature_names_the_definition() {
     assert!(
         matches!(defect, WiringDefect::SignatureOutputs { definition, .. } if definition == DEFINITION_NAME),
         "it names the definition: {defect:?}"
+    );
+}
+
+#[test]
+fn echoes_an_unresolved_name() {
+    // The name resolves to nothing, which is exactly why it has to be echoed:
+    // it is the only thing tying the defect to what the author typed.
+    let broken_wire = definition(
+        vec![node_type("sink", &[("input", "note")], "note")],
+        vec![instance("b", "sink", &[("input", "deleted")])],
+        &["b"],
+    );
+    let report = validate_wiring(&broken_wire);
+    assert!(
+        matches!(
+            report.as_slice(),
+            [WiringDefect::UnresolvedInstance { unresolved, .. }] if unresolved == "deleted"
+        ),
+        "the instance name as it was written: {report:?}"
+    );
+
+    let missing_type = definition(Vec::new(), vec![instance("b", "not-supplied", &[])], &["b"]);
+    let report = validate_wiring(&missing_type);
+    assert!(
+        matches!(
+            report.as_slice(),
+            [WiringDefect::UnresolvedNodeType { unresolved, .. }] if unresolved == "not-supplied"
+        ),
+        "the type name as it was written: {report:?}"
     );
 }
