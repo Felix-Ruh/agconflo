@@ -118,10 +118,9 @@ requirement for when authoring lands.
    It can be false while its parent holds. Every document is data, and each is
    checked as it is read - the parser refuses any name repeated within it. The
    name declared in two of them still gets through, and whichever declaration is
-   read last replaces the
-   other without a word, which is what JSON was measured doing with a repeated key
-   (``EVD_JSON_KEEPS_LAST_DUPLICATE``). The workflow is then checked against a
-   declaration its author may not have meant, and passes.
+   read last replaces the other without a word, which is what JSON was measured
+   doing with a repeated key (``EVD_JSON_KEEPS_LAST_DUPLICATE``). The workflow is
+   then checked against a declaration its author may not have meant, and passes.
 
    Both documents are named because either could be the wrong one, and a report
    naming only the second sends the author to a document that may be correct.
@@ -195,3 +194,70 @@ requirement for when authoring lands.
    because an editor's data attaches to whatever it describes. A bindings table
    is the one place with no such keys: every key in it names a parameter, so every
    key in it is read.
+
+.. feat_arch:: Storage splits into a reader, a writer and a type catalogue
+   :id: ARCH_TOPOLOGY
+   :realises: FEAT_TOPOLOGY_READS, FEAT_TOPOLOGY_UNREADABLE_LOCATED, FEAT_TOPOLOGY_WIRING_DEFECTS_READ, FEAT_TOPOLOGY_TYPE_DECLARED_ONCE, FEAT_TOPOLOGY_WRITES, FEAT_TOPOLOGY_UNWRITABLE_REFUSED, FEAT_TOPOLOGY_KEEPS_UNREAD
+   :uses: COMP_TOPOLOGY_READER, COMP_TOPOLOGY_WRITER, COMP_TYPE_CATALOGUE
+   :statement: Agconflo shall allocate reading and writing a workflow to the topology reader, the topology writer and the type catalogue.
+
+   Three components, each answerable for what the others cannot guarantee:
+
+   - The topology reader answers for ``FEAT_TOPOLOGY_READS``,
+     ``FEAT_TOPOLOGY_UNREADABLE_LOCATED`` and
+     ``FEAT_TOPOLOGY_WIRING_DEFECTS_READ``. All three are about one document and
+     what becomes of its text, and the line between the last two - a fault in the
+     text refused, a fault in the workflow let through - is a line one component
+     has to draw, or two components draw it in different places.
+   - The type catalogue answers for ``FEAT_TOPOLOGY_TYPE_DECLARED_ONCE``: it
+     gathers the declarations of every node type document it is given into one set
+     keyed by type name, and refuses a name that two of them declare.
+   - The topology writer answers for ``FEAT_TOPOLOGY_WRITES``,
+     ``FEAT_TOPOLOGY_KEEPS_UNREAD`` and ``FEAT_TOPOLOGY_UNWRITABLE_REFUSED``: what
+     it writes, what it keeps, and what it will not write.
+
+   **Reading and writing are separate because they fail separately.** A reader can
+   be perfect while the writer regenerates the document and drops every comment;
+   a writer can keep every byte while the reader stops at the first unknown type.
+   One component owning both would carry requirements that no single piece of its
+   behaviour answers for, which is what an allocation exists to prevent.
+
+   **The catalogue is separate from the reader for the reason the wiring feature
+   separated the defect from the validator.** Everything the reader answers for is
+   true or false of one document; a type declared twice is true of a set and of no
+   document in it. Folding it into the reader would put a question about several
+   documents on a component whose other requirements are each about one, and a
+   reader correct on every document alone would then own a failure that only
+   appears when two are read together.
+
+   **The writer needs the document the definition was read from**, not only the
+   definition. Keeping what the reader did not read means editing that document
+   in place (``EVD_TOML_EDIT_KEEPS_COMMENTS``), because regenerating it from the
+   definition loses every comment and every key the definition does not carry.
+   How the reader hands the document on is the component requirements' business,
+   one level down.
+
+   **Nothing here validates.** A definition read from documents goes to the wiring
+   validator exactly as one built by hand does, and the reader's requirement to let
+   wiring defects through is what keeps that true. The model the reader produces
+   is the one ``workflow.rs`` already defines - data rather than a component, as
+   ``ARCH_WIRING`` argued - which is also why ``DEC_NAMES_AS_KEYS`` could leave it
+   unchanged.
+
+   **All three sit in agconflo-core.** A crate of their own would keep the core
+   free of a TOML dependency, and it was considered. It is not taken now because a
+   second traced crate is a tooling change rather than a requirements one: a second
+   ``[codelinks.projects]`` block in ``ubproject.toml``, a second
+   ``docs/code/<crate>.rst``, and an importer that today names exactly one crate.
+   That belongs in an ``infra/`` branch of its own, and the moment for it is when
+   a second crate - the MCP server - needs to read a workflow too.
+
+   The decisions this is built against are named here rather than linked:
+
+   - ``DEC_TOPOLOGY_IN_TOML``: what the reader reads and the writer writes.
+   - ``DEC_NAMES_AS_KEYS``: why a repeated name within one document is the
+     reader's fault in the text, and why the writer has shapes it cannot write.
+   - ``DEC_TYPES_IN_OWN_DOCUMENTS``: why there is a catalogue at all, and why an
+     unknown type is not the reader's to refuse.
+   - ``DEC_ONE_OUTPUT_KEY``: why a missing output reads, and why several cannot be
+     written.

@@ -31,6 +31,7 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    features/topology
    components/context
    components/wiring
+   components/topology
    tests/context
    tests/wiring
    code/agconflo-core
