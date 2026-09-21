@@ -1,4 +1,5 @@
-//! The engine core of Agconflo: contexts, their identity and their lineage.
+//! The engine core of Agconflo: contexts, their identity and their lineage,
+//! and whether a workflow's wiring is sound before any of it runs.
 //!
 //! Everything public is re-exported here from private modules. The modules are
 //! named to fit the test case ids in `docs/tests/`, which is a reason to keep
@@ -11,11 +12,17 @@
 //! does not exist fails the documentation check, in the commit hook and in CI.
 
 mod context;
+mod defect;
 mod id;
 mod lineage;
+mod wiring;
+mod workflow;
 
 #[cfg(test)]
 mod compile_fail;
 
 pub use context::{Context, ContextType, InvalidTypeName};
+pub use defect::WiringDefect;
 pub use id::{ContextId, IdSource, SourceExhausted};
+pub use wiring::validate_wiring;
+pub use workflow::{Binding, NodeInstance, NodeType, Parameter, WorkflowDefinition};

@@ -331,9 +331,22 @@ stop the walk, and that is what the case asserts.
    :test_kind: property
    :coverage: partial
 
-   For any definition, every reported defect of the three binding classes carries
-   the consuming instance and the parameter as values read from the defect
-   itself, and each names something the definition carries.
+   For any definition, every reported defect that concerns a wire - a required
+   parameter carrying no binding, a binding that resolves to nothing, and a
+   binding whose two ends declare different context types - carries the
+   consuming instance and the parameter as values read from the defect itself,
+   and each names something the definition carries.
+
+   The three are named here rather than counted off the requirements, because
+   ``CREQ_VALIDATOR_BINDING_RESOLVES`` covers two shapes and only one of them is
+   a wire. An instance of a node type that was not supplied concerns that
+   instance and no parameter at all: its declaration is what is missing, so its
+   parameter list is unknowable, and a defect per parameter would contradict the
+   single defect ``TEST_WIRING_INSTANCE_OF_MISSING_TYPE_IS_REPORTED`` asks for.
+   Filling the field anyway is the failure mode ``CREQ_DEFECT_NAMES_PLACE``
+   forbids in its other form, where a signature defect invents a parameter and
+   sends the author to a node that is not wrong. That case is where an instance
+   defect's place is checked.
 
    Read from the defect rather than from its rendering, deliberately. A place
    that can be recovered only by parsing a message is a place an agent correcting

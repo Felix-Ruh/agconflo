@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc cb261c13f4b07b4e8a93bf895d9a761dd0ba68986f526515db54b3347a5c72bb # shrinks to workflow = WorkflowDefinition { name: "workflow", node_types: [NodeType { name: "t0", required: [], optional: [], globals: [], output: ContextType("note") }, NodeType { name: "t1", required: [], optional: [], globals: [ContextType("policy")], output: ContextType("note") }], instances: [NodeInstance { name: "n0", node_type: "t1", entry: false, bindings: [] }], designated_outputs: [] }
