@@ -223,9 +223,12 @@ requirement whose subject is anything else.
    validator that names it in well-written prose satisfies that. This asks that
    the place be readable without reading the prose.
 
-   The place is the node instance and the parameter for a binding defect, and the
-   definition itself for a signature defect - the distinction the parent leaves to
-   this level, because the classes of defect are here.
+   The place is the node instance and the parameter for a defect about a wire;
+   the instance alone for a defect about an instance, which is one of a node type
+   the definition does not carry and whose parameter list is therefore
+   unknowable; and the definition itself for a signature defect. That is the
+   distinction the parent leaves to this level, because the classes of defect are
+   here.
 
    Failure modes:
 
