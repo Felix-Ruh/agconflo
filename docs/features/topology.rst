@@ -7,7 +7,8 @@ read from documents and written back to them. Every requirement here derives fro
 ``STKH_TOPOLOGY_AS_DATA`` or ``STKH_MACHINE_AUTHORING``, and each is written
 against the decisions in ``decisions/topology`` rather than re-opening them - the
 format is TOML, every name is a table key, node types live in documents of their
-own, and a workflow names its output with one optional key.
+own, a workflow names its output with one optional key, and a document keeps its
+own order when it is written.
 
 Three of them are about reading. One says a document is read at all, one says
 what happens to a document that cannot be, and one - the easiest to leave out -
@@ -138,6 +139,9 @@ requirement for when authoring lands.
    definition, no more and no less. The node types are named rather than written:
    they live in documents of their own (``DEC_TYPES_IN_OWN_DOCUMENTS``), which is
    why the statement lists what reads back instead of saying the definition does.
+   The instances and bindings come back in the document's order rather than the
+   definition's (``DEC_DOCUMENT_KEEPS_ITS_ORDER``), so "the same" means the same
+   under each name.
 
    It can be false while its parent holds. The parent's round trip is phrased as
    not losing what an editor did not understand, and a writer that leaves the
@@ -261,3 +265,5 @@ requirement for when authoring lands.
      unknown type is not the reader's to refuse.
    - ``DEC_ONE_OUTPUT_KEY``: why a missing output reads, and why several cannot be
      written.
+   - ``DEC_DOCUMENT_KEEPS_ITS_ORDER``: why the writer appends what it adds, and
+     why what it writes is compared by name.
