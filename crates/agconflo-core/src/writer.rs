@@ -368,6 +368,8 @@ impl std::error::Error for UnwritableDefinition {}
 // Bare functions named after their test cases, for the reason given in id.rs.
 
 #[cfg(test)]
+use crate::WiringDefect;
+#[cfg(test)]
 use crate::catalogue::{TypeCatalogue, node_type_document};
 #[cfg(test)]
 use crate::reader::{Pools, any_written, catalogue, read_workflow};
@@ -862,7 +864,8 @@ bindings = { input = \"a\" }
         read_workflow("w.toml", text, &catalogue).expect("it reads");
 
     // An instance of an unknown type, a binding to an instance that is not
-    // there, a wire whose ends disagree, and no output.
+    // there, a wire whose ends disagree, a binding to a parameter its type does
+    // not declare, and no output.
     definition
         .instances
         .push(instance("ghost", "not-declared", &[]));
@@ -871,10 +874,28 @@ bindings = { input = \"a\" }
         .push(instance("c", "sink", &[("input", "deleted")]));
     definition.instances.push(instance("d", "differ", &[]));
     definition.instances[1].bindings[0].source = "d".to_owned();
+    definition
+        .instances
+        .push(instance("u", "differ", &[("nonesuch", "a")]));
     definition.designated_outputs.clear();
     // The control's own control: the definition really is defective.
-    assert_eq!(validate_wiring(&definition).len(), 4);
+    assert_eq!(validate_wiring(&definition).len(), 5);
 
+    write_workflow(&mut document, &definition).expect("a wiring defect is written");
+    assert_eq!(
+        by_name(&read_back(&document, &catalogue)),
+        by_name(&definition)
+    );
+
+    // The output defect a document can hold instead of none: one naming no
+    // instance.
+    definition.designated_outputs = vec!["nowhere".to_owned()];
+    assert!(
+        validate_wiring(&definition)
+            .iter()
+            .any(|defect| matches!(defect, WiringDefect::UnresolvedOutput { .. })),
+        "the definition really designates nothing that is there"
+    );
     write_workflow(&mut document, &definition).expect("a wiring defect is written");
     assert_eq!(
         by_name(&read_back(&document, &catalogue)),

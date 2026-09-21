@@ -64,16 +64,16 @@ measurements again, taken when the writer was about to be built on them.
    :statement: Agconflo shall store each instance, binding, node type and parameter under its name as a table key.
 
    A name written twice is then a repeated key, and the parser refuses it at the
-   line and column where it repeats. Two instances sharing one name - the first of
-   the three shapes ``CREQ_VALIDATOR_BINDING_RESOLVES`` left open - cannot be read
-   from a document at all. Nor can a parameter bound twice, which
+   line and column where it repeats. Two instances sharing one name - one of the
+   shapes ``CREQ_VALIDATOR_BINDING_RESOLVES`` once left open - cannot be read from
+   a document at all. Nor can a parameter bound twice, which
    ``DEC_BINDING_BY_PORT`` already says cannot happen, nor a parameter declared
    twice by one node type.
 
    The in-memory model is unchanged and still holds lists, because a definition
-   built by other means can still carry any of those shapes. The wiring case that
-   holds a duplicated instance name to not stopping the walk stays for that
-   reason.
+   built by other means can still carry any of those shapes. The validator
+   reports the first two for that reason (``CREQ_VALIDATOR_INSTANCE_NAMED_ONCE``,
+   ``CREQ_VALIDATOR_PARAMETER_BOUND_ONCE``).
 
    One cost is not optional to pay. Parameters are ordered
    (``DEC_DECLARED_PARAMETERS``), and a table keyed by name hands its keys on in

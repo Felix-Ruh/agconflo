@@ -148,13 +148,16 @@ anything else.
    :ears_pattern: ubiquitous
    :statement: Topology reader shall read a workflow document without resolving any name it holds.
 
-   Every wiring defect but one is a name that resolves to nothing, or to something
-   that disagrees with where it is used. A reader that resolves no name therefore
-   cannot refuse for any of those, which makes this the mechanism behind its parent
-   rather than a restatement of it: the parent says wiring defects must not stop
-   reading, and this says what reading must not do for that to hold. The one
-   exception - no designated output - is an absent key rather than a name, and
-   ``CREQ_READER_WORKFLOW`` is where reading it as no output is required.
+   Every wiring defect a document can hold but one is a name that resolves to
+   nothing, or to something that disagrees with where it is used. A reader that
+   resolves no name therefore cannot refuse for any of those, which makes this the
+   mechanism behind its parent rather than a restatement of it: the parent says
+   wiring defects must not stop reading, and this says what reading must not do
+   for that to hold. The one exception - no designated output - is an absent key
+   rather than a name, and ``CREQ_READER_WORKFLOW`` is where reading it as no
+   output is required. The two wiring defects a document cannot hold, a name
+   several instances share and a parameter bound twice, are repeated keys, which
+   the parser refuses before anything is read (``DEC_NAMES_AS_KEYS``).
 
    Failure modes:
 
@@ -166,8 +169,10 @@ anything else.
    - **Wires are typed while reading.** Building a typed wire needs both ends'
      declarations, so a disagreement becomes a refusal in the text.
 
-   Must read, and then be reported in full by the validator: a document carrying
-   every wiring defect class at once.
+   Must read, and then be reported in full by the validator: documents carrying
+   between them every wiring defect class a document can hold. Two of them,
+   because designating no output and designating one that names no instance
+   cannot be written in one document.
 
 .. comp_req:: A type name declared twice is refused
    :id: CREQ_CATALOGUE_DECLARED_ONCE
@@ -297,6 +302,9 @@ anything else.
    - **A wiring defect is refused as unwritable.** An instance of an unknown type,
      a binding to an instance that is not there and no designated output can all be
      written, and a writer that refuses them is acting as a validator it is not.
+     Two wiring defects are unwritable shapes as well - a name two instances share
+     and a parameter bound twice - and those are refused for being unwritable, not
+     for being defects.
 
    Must write, unrefused: a definition carrying every wiring defect a document can
    express.

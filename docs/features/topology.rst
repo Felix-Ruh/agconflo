@@ -88,9 +88,10 @@ requirement for when authoring lands.
    :statement: Agconflo shall read a workflow document whose only faults are wiring defects.
 
    The control on the requirement above, and the line between them. An instance
-   of a type no document declares, a binding to an instance that is not there, a
-   wire whose ends declare different types, and no designated output at all are
-   all wiring defects: the text is fine, the workflow is wrong, and the validator
+   of a type no document declares, a binding to an instance that is not there or
+   to a parameter its type does not declare, a wire whose ends declare different
+   types, and a designated output naming no instance, or none at all, are all
+   wiring defects: the text is fine, the workflow is wrong, and the validator
    reports every one of them together.
 
    It can be false while its parent holds, and it is the easiest requirement in

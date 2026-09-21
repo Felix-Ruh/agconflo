@@ -101,9 +101,9 @@ pub struct NodeInstance {
 ///
 /// `designated_outputs` holds instance names, and holds as many as it was
 /// given. None and several are exactly the shapes `CREQ_VALIDATOR_ONE_OUTPUT`
-/// refuses, and a designation naming no instance is one of the three shapes
-/// `CREQ_VALIDATOR_BINDING_RESOLVES` records as not yet answered: all of them
-/// have to be representable here to be checkable there.
+/// refuses, and a designation naming no instance is what
+/// `CREQ_VALIDATOR_OUTPUT_RESOLVES` refuses: all of them have to be
+/// representable here to be checkable there.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WorkflowDefinition {
     /// What this definition is called, which is the place a signature defect

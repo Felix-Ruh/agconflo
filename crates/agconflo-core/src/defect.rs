@@ -17,17 +17,20 @@ use crate::ContextType;
 /// a node instance and one of its parameters; a defect about an instance whose
 /// node type is missing concerns that instance and no parameter, because its
 /// declaration is what is missing and its parameter list is therefore
-/// unknowable; a defect about the signature concerns the definition and no node
-/// in it. A variant that carried an instance or a parameter anyway would send an
-/// author to a place that is not wrong.
+/// unknowable; a name several instances share concerns that name and no
+/// parameter, since it is the one place such a defect can give; a defect about
+/// the signature concerns the definition and no node in it. A variant that
+/// carried an instance or a parameter anyway would send an author to a place
+/// that is not wrong.
 ///
 /// A name that resolved to nothing is carried as it was written, and is the one
 /// field that names something the definition does not have. It is the only thing
 /// tying the defect to what the author typed.
 ///
-/// `#[non_exhaustive]` because the classes are not finished: three shapes are
-/// recorded as not yet answered under `CREQ_VALIDATOR_BINDING_RESOLVES`, and
-/// each may earn a variant when workflow loading settles it.
+/// `#[non_exhaustive]` because the classes are not finished: the shapes still
+/// recorded as open under `CREQ_VALIDATOR_BINDING_RESOLVES` - declarations a
+/// definition carries twice, and a binding into an entry node - may each earn a
+/// variant of their own.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 // @A place carried as a value,IMPL_DEFECT_PLACE,impl,[CREQ_DEFECT_NAMES_PLACE]
@@ -60,6 +63,32 @@ pub enum WiringDefect {
         /// The node type name that resolved to nothing, as it was written.
         unresolved: String,
     },
+    /// A binding names a parameter that the node type of its instance declares
+    /// neither as required nor as optional
+    /// (`CREQ_VALIDATOR_PARAMETER_DECLARED`).
+    UndeclaredParameter {
+        /// The instance carrying the binding.
+        instance: String,
+        /// The parameter it names, as it was written.
+        parameter: String,
+    },
+    /// More than one instance carries one name
+    /// (`CREQ_VALIDATOR_INSTANCE_NAMED_ONCE`). Reported once for the name,
+    /// however many carry it, and nothing about any of them is reported
+    /// besides: a place naming several instances is no place.
+    RepeatedInstance {
+        /// The name the instances share.
+        instance: String,
+    },
+    /// An instance binds one parameter more than once
+    /// (`CREQ_VALIDATOR_PARAMETER_BOUND_ONCE`). Reported once for the
+    /// parameter, however many bindings it has.
+    RepeatedBinding {
+        /// The instance carrying the bindings.
+        instance: String,
+        /// The parameter bound more than once.
+        parameter: String,
+    },
     /// A binding joins an output to a parameter declared for another context
     /// type (`CREQ_VALIDATOR_TYPES_AGREE`).
     ///
@@ -85,6 +114,15 @@ pub enum WiringDefect {
         /// How many outputs it designates, where exactly one is required.
         designated: usize,
     },
+    /// The one output the definition designates names no instance of it
+    /// (`CREQ_VALIDATOR_OUTPUT_RESOLVES`). A signature defect, so it concerns
+    /// the definition and carries no instance, though it names one.
+    UnresolvedOutput {
+        /// The definition whose output names nothing.
+        definition: String,
+        /// The instance name that resolved to nothing, as it was written.
+        unresolved: String,
+    },
 }
 
 impl WiringDefect {
@@ -95,8 +133,11 @@ impl WiringDefect {
             Self::RequiredParameterUnbound { instance, .. }
             | Self::UnresolvedInstance { instance, .. }
             | Self::UnresolvedNodeType { instance, .. }
+            | Self::UndeclaredParameter { instance, .. }
+            | Self::RepeatedInstance { instance }
+            | Self::RepeatedBinding { instance, .. }
             | Self::ContextTypeDisagreement { instance, .. } => Some(instance),
-            Self::SignatureOutputs { .. } => None,
+            Self::SignatureOutputs { .. } | Self::UnresolvedOutput { .. } => None,
         }
     }
 
@@ -106,8 +147,13 @@ impl WiringDefect {
         match self {
             Self::RequiredParameterUnbound { parameter, .. }
             | Self::UnresolvedInstance { parameter, .. }
+            | Self::UndeclaredParameter { parameter, .. }
+            | Self::RepeatedBinding { parameter, .. }
             | Self::ContextTypeDisagreement { parameter, .. } => Some(parameter),
-            Self::UnresolvedNodeType { .. } | Self::SignatureOutputs { .. } => None,
+            Self::UnresolvedNodeType { .. }
+            | Self::RepeatedInstance { .. }
+            | Self::SignatureOutputs { .. }
+            | Self::UnresolvedOutput { .. } => None,
         }
     }
 }
@@ -137,6 +183,23 @@ impl fmt::Display for WiringDefect {
                 f,
                 "the node '{instance}' is of the type '{unresolved}', which this workflow does not carry"
             ),
+            Self::UndeclaredParameter {
+                instance,
+                parameter,
+            } => write!(
+                f,
+                "'{parameter}' is bound on the node '{instance}', and its type declares no such parameter"
+            ),
+            Self::RepeatedInstance { instance } => {
+                write!(f, "the name '{instance}' is given to more than one node")
+            }
+            Self::RepeatedBinding {
+                instance,
+                parameter,
+            } => write!(
+                f,
+                "'{parameter}' of the node '{instance}' is bound more than once, where one binding is allowed"
+            ),
             Self::ContextTypeDisagreement {
                 instance,
                 parameter,
@@ -154,6 +217,13 @@ impl fmt::Display for WiringDefect {
             } => write!(
                 f,
                 "the workflow '{definition}' designates {designated} outputs, where exactly one is required"
+            ),
+            Self::UnresolvedOutput {
+                definition,
+                unresolved,
+            } => write!(
+                f,
+                "the workflow '{definition}' designates '{unresolved}' as its output, which this workflow does not carry"
             ),
         }
     }
@@ -192,9 +262,13 @@ proptest! {
             match defect {
                 WiringDefect::RequiredParameterUnbound { .. }
                 | WiringDefect::UnresolvedInstance { .. }
+                | WiringDefect::UndeclaredParameter { .. }
+                | WiringDefect::RepeatedBinding { .. }
                 | WiringDefect::ContextTypeDisagreement { .. } => {}
                 WiringDefect::UnresolvedNodeType { .. }
-                | WiringDefect::SignatureOutputs { .. } => continue,
+                | WiringDefect::RepeatedInstance { .. }
+                | WiringDefect::SignatureOutputs { .. }
+                | WiringDefect::UnresolvedOutput { .. } => continue,
             }
 
             let (Some(named), Some(parameter)) = (defect.instance(), defect.parameter()) else {
@@ -249,6 +323,26 @@ fn signature_names_the_definition() {
         matches!(defect, WiringDefect::SignatureOutputs { definition, .. } if definition == DEFINITION_NAME),
         "it names the definition: {defect:?}"
     );
+
+    // An output naming no instance names an instance - the one that is not
+    // there - and still concerns the definition. Filing the name it carries as
+    // the instance the defect is about would send the author to a node that
+    // does not exist.
+    let renamed = definition(
+        vec![node_type("source", &[], "note")],
+        vec![instance("a", "source", &[])],
+        &["nowhere"],
+    );
+    let report = validate_wiring(&renamed);
+    let [defect] = report.as_slice() else {
+        panic!("an output naming no instance reports one defect: {report:?}");
+    };
+    assert_eq!(defect.instance(), None, "{defect:?}");
+    assert_eq!(defect.parameter(), None, "{defect:?}");
+    assert!(
+        matches!(defect, WiringDefect::UnresolvedOutput { definition, .. } if definition == DEFINITION_NAME),
+        "it names the definition: {defect:?}"
+    );
 }
 
 #[test]
@@ -277,5 +371,19 @@ fn echoes_an_unresolved_name() {
             [WiringDefect::UnresolvedNodeType { unresolved, .. }] if unresolved == "not-supplied"
         ),
         "the type name as it was written: {report:?}"
+    );
+
+    let renamed_output = definition(
+        vec![node_type("source", &[], "note")],
+        vec![instance("a", "source", &[])],
+        &["renamed"],
+    );
+    let report = validate_wiring(&renamed_output);
+    assert!(
+        matches!(
+            report.as_slice(),
+            [WiringDefect::UnresolvedOutput { unresolved, .. }] if unresolved == "renamed"
+        ),
+        "the output name as it was written: {report:?}"
     );
 }

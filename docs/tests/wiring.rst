@@ -12,13 +12,13 @@ two lists pull in opposite directions on purpose - one is the validator failing
 to report a defect, the other is the validator reporting one that is not there -
 and a set of cases derived from only one of them would leave the other free.
 
-That matters more here than in the feature before this one. Four of the seven
+That matters more here than in the feature before this one. Eight of the eleven
 requirements say what must be refused and none of those says what must not be, so
-a validator refusing everything satisfies all four and no case built from them
+a validator refusing everything satisfies all eight and no case built from them
 would notice. The positive cases and ``TEST_WIRING_WELL_FORMED_DEFINITIONS_PASS``
 are the half that does.
 
-Three failure modes have no case of their own, because each is an interaction
+Four failure modes have no case of their own, because each is an interaction
 between requirements and is asserted where that interaction happens. They are
 named here so the derivation can be audited rather than taken on trust:
 
@@ -33,6 +33,9 @@ named here so the derivation can be audited rather than taken on trust:
   ``TEST_WIRING_INSTANCE_OF_MISSING_TYPE_IS_REPORTED``, which is about one
   definition and one report, and would be split in two by filing half of it
   under each requirement.
+- ``CREQ_VALIDATOR_OUTPUT_RESOLVES``'s "a shared name is reported as naming
+  nothing" is asserted by ``TEST_WIRING_SHARED_INSTANCE_NAME_IS_REPORTED``, whose
+  definition designates the shared name as its output, for the same reason.
 
 A case's id is the path of the Rust test that implements it, uppercased, with
 ``::`` written as ``_``. The paths here are ``<module>::<case>`` in
@@ -46,16 +49,16 @@ cases as those two modules will have tests. Every test in the crate is imported 
 a ``test_run`` whose ``executes`` link names its case, so a test with no case here
 is a dead link that fails the build rather than a result nobody noticed.
 
-Three shapes are asserted on but not classified, and the distinction is the whole
-reason ``TEST_WIRING_MALFORMED_DEFINITION_STILL_REPORTS`` reads the way it does: a
-binding to a parameter no declaration carries, a designated output naming an
-instance that is not there, and two instances sharing one name.
-``CREQ_VALIDATOR_BINDING_RESOLVES`` records all three as not yet answered, so
-which defect each earns is unsettled, and a case asserting one would be inventing
-a requirement rather than checking one. What is settled is that none of them may
-stop the walk, and that is what the case asserts. The third can no longer be read
-from a document, where every name is a table key (``DEC_NAMES_AS_KEYS``), but the
-model can still be given it, which is why the case keeps it.
+Two shapes are asserted on but not classified, and the distinction is the whole
+reason ``TEST_WIRING_MALFORMED_DEFINITION_STILL_REPORTS`` reads the way it does:
+two node types sharing one name within a definition, and one parameter declared
+as both required and optional. ``CREQ_VALIDATOR_BINDING_RESOLVES`` records both as
+still open, so which defect each earns is unsettled, and a case asserting one
+would be inventing a requirement rather than checking one. What is settled is
+that neither may stop the walk, and that is what the case asserts. The three
+shapes it held before them are classified now, each by cases of its own below.
+The third shape still open, a binding into an entry node, is legal today and
+checked like any other binding, so no case singles it out.
 
 .. test_case:: Every unbound required parameter is reported
    :id: TEST_WIRING_EVERY_UNBOUND_REQUIRED_IS_REPORTED
@@ -235,16 +238,168 @@ model can still be given it, which is why the case keeps it.
    (``DEC_BACK_EDGES_ALLOWED``), where the designated output feeds the node that
    starts the next pass.
 
-.. test_case:: A definition with all four defect classes reports all of them
+.. test_case:: A binding to an undeclared parameter is reported
+   :id: TEST_WIRING_UNDECLARED_PARAMETER_IS_REPORTED
+   :verifies: CREQ_VALIDATOR_PARAMETER_DECLARED
+   :test_kind: error_path
+   :coverage: partial
+
+   On instances of a node type requiring one parameter, accepting another as
+   optional and requesting a global type, each of these bindings is reported as
+   one defect naming its instance and the parameter as it was written: a typo of
+   the optional parameter; a binding spelled like the requested global; a typo of
+   the required parameter, reported beside the required parameter it leaves
+   unbound; and an undeclared parameter bound to an instance that is not there,
+   reported beside that unresolved source.
+
+   The first is the case the requirement exists for: nothing else about it is
+   wrong, and it used to pass. The last two are what a walk moving on after one
+   defect gets wrong, each hiding a second fix behind the first. And no context
+   type disagreement is reported for any of them, although the instance they are
+   wired from produces a type no declared parameter has: an undeclared parameter
+   has no type to compare, and comparing against a stand-in for one invents a
+   disagreement.
+
+.. test_case:: Every undeclared parameter is reported
+   :id: TEST_WIRING_EVERY_UNDECLARED_PARAMETER_IS_REPORTED
+   :verifies: CREQ_VALIDATOR_PARAMETER_DECLARED
+   :test_kind: property
+   :coverage: partial
+
+   For any definition whose node types declare required parameters, optional
+   parameters and requested globals in any number, and whose instances bind names
+   drawn from a pool holding every declared parameter, a name spelled like a
+   requested global and a name nothing declares, the undeclared-parameter defects
+   are exactly the bindings whose name neither list declares, computed
+   independently by the test. Some instances are of a node type that was not
+   supplied, and nothing about them is reported as undeclared.
+
+   The pool puts declared and undeclared names side by side on one instance,
+   because a check reading the wrong list, or one list short, passes every
+   instance whose bindings are all of one kind.
+
+.. test_case:: Bindings to declared parameters pass
+   :id: TEST_WIRING_DECLARED_PARAMETERS_PASS
+   :verifies: CREQ_VALIDATOR_PARAMETER_DECLARED
+   :test_kind: positive
+   :coverage: partial
+
+   Nothing is reported for an instance binding its optional parameter as well as
+   its required one.
+
+   An optional parameter is the one a check searching the required list alone
+   reports, and bound beside a required one it is the shape where both lists have
+   to be searched.
+
+.. test_case:: An output naming no instance is reported
+   :id: TEST_WIRING_OUTPUT_NAMING_NOTHING_IS_REPORTED
+   :verifies: CREQ_VALIDATOR_OUTPUT_RESOLVES
+   :test_kind: error_path
+   :coverage: partial
+
+   A definition whose wiring is sound and whose one designated output names no
+   instance reports exactly one defect, naming the definition and echoing the
+   designated name. A definition designating two names, one of which names
+   nothing, and one designating two names of which neither names anything, each
+   report exactly the defect for designating two, and nothing about either name.
+
+   The first is the defect a count cannot see, and reporting it as designating
+   nothing would pass a test of the count while losing the name. The other two
+   are where resolving every designation reports the definition once per name.
+
+.. test_case:: Outputs that resolve pass
+   :id: TEST_WIRING_RESOLVING_OUTPUTS_PASS
+   :verifies: CREQ_VALIDATOR_OUTPUT_RESOLVES
+   :test_kind: positive
+   :coverage: partial
+
+   Nothing is reported for an output naming an entry node, nor for one naming an
+   instance whose name is not its node type's.
+
+   The second is what an output resolved against the node types rather than the
+   instances refuses, and such a check passes every definition whose instances
+   happen to be named after their types - which is how short examples get written.
+
+.. test_case:: A name several instances share is reported once
+   :id: TEST_WIRING_SHARED_INSTANCE_NAME_IS_REPORTED
+   :verifies: CREQ_VALIDATOR_INSTANCE_NAMED_ONCE
+   :test_kind: error_path
+   :coverage: partial
+
+   Four instances sharing one name - of two node types producing different
+   context types, of a type with a required parameter left unbound, and of a type
+   that was not supplied - are reported as exactly one defect naming that name. A
+   binding from the name into a parameter declared for one of the two context
+   types adds nothing, and nor does the designated output naming it; the rest of
+   the definition is still walked, so another instance's unbound parameter is in
+   the same report. The definition is checked twice, with the two instances
+   producing different types in either order and a different instance first each
+   time - the second time, the one with its parameter unbound - and the report is
+   the same both times.
+
+   Two orders, because a validator resolving the name to the first instance
+   carrying it passes exactly one of them, and one walking only that first
+   instance reports its unbound parameter in the second. What is not reported is
+   the rest of the case: the unbound parameter, the missing type, the
+   disagreement and an unresolved output are each what checking one instance as
+   if the name were its own produces, and each would name a node the author
+   cannot find.
+
+.. test_case:: Names of different kinds pass
+   :id: TEST_WIRING_NAMES_OF_DIFFERENT_KINDS_PASS
+   :verifies: CREQ_VALIDATOR_INSTANCE_NAMED_ONCE
+   :test_kind: positive
+   :coverage: partial
+
+   Nothing is reported for an instance named like its own node type, one named
+   like a parameter, and two instances of one node type under different names.
+
+   A check gathering every name in a definition into one set before looking for
+   repeats refuses the first two, and the first is how a definition with one
+   instance of each type is naturally written.
+
+.. test_case:: A parameter bound twice is reported once
+   :id: TEST_WIRING_PARAMETER_BOUND_TWICE_IS_REPORTED
+   :verifies: CREQ_VALIDATOR_PARAMETER_BOUND_ONCE
+   :test_kind: error_path
+   :coverage: partial
+
+   Each of these is reported as exactly one defect naming its instance and
+   parameter: a parameter bound to two instances that are not there; one bound
+   three times to one sound source; and one bound to two sound sources whose
+   context types disagree. An undeclared parameter bound twice is reported as
+   bound twice and as undeclared, once each.
+
+   Each shape catches a different wrong walk. Checking each binding reports the
+   first twice over and the third as a disagreement, and passes the second;
+   checking the first binding reports an unresolved source for the first;
+   reporting each binding beyond the first reports the second twice. The last
+   shape holds the one check that still runs on such a parameter, and a walk
+   skipping everything about a parameter bound twice loses it.
+
+.. test_case:: A parameter bound once on each instance passes
+   :id: TEST_WIRING_SINGLY_BOUND_PARAMETERS_PASS
+   :verifies: CREQ_VALIDATOR_PARAMETER_BOUND_ONCE
+   :test_kind: positive
+   :coverage: partial
+
+   Nothing is reported for one parameter name bound once on each of several
+   instances, nor for one output bound by two parameters of one instance.
+
+   A check counting parameter names across the definition refuses the first, and
+   one counting sources within an instance refuses the second - and each is a
+   graph drawn every day.
+
+.. test_case:: A definition with the first four defect classes reports all of them
    :id: TEST_WIRING_ALL_FOUR_CLASSES_REPORTED
    :verifies: CREQ_VALIDATOR_EVERY_DEFECT
    :test_kind: error_path
    :coverage: partial
 
-   A definition carrying one defect of each of the four classes at once - an
-   unbound required parameter, a binding to a name that is not there, a wire
-   across two context types, and no designated output - reports exactly four
-   defects, one of each class, each once.
+   A definition carrying one defect of each of the four classes the validator was
+   first written for - an unbound required parameter, a binding to a name that is
+   not there, a wire across two context types, and no designated output - reports
+   exactly four defects, one of each class, each once.
 
    Where the four sit is as much of the case as the count. The unbound parameter
    and the mismatched wire are on the same instance, so a walk that moves on once
@@ -255,6 +410,24 @@ model can still be given it, which is why the case keeps it.
 
    The author learns about the rest only after a second submission in either
    case, which is the round trip ``FEAT_WIRING_ALL_DEFECTS`` exists to prevent.
+
+.. test_case:: The name defects are reported with everything else
+   :id: TEST_WIRING_NAME_DEFECTS_REPORTED_TOGETHER
+   :verifies: CREQ_VALIDATOR_EVERY_DEFECT
+   :test_kind: error_path
+   :coverage: partial
+
+   A definition carrying a name two instances share, an undeclared parameter
+   bound twice on an instance whose required parameter is unbound, and an output
+   naming no instance reports exactly five defects, each once: the shared name,
+   the unbound parameter, the undeclared parameter, the parameter bound twice,
+   and the output.
+
+   The rules for a name that picks out two things each stop part of the walk on
+   purpose, and this is the case for a stop placed one step too wide. Three of the
+   five sit on one instance, so a walk leaving an instance once a binding repeats
+   reports fewer, and the shared name comes first, so one leaving the definition
+   once a name is shared reports one.
 
 .. test_case:: No defect is reported twice
    :id: TEST_WIRING_NO_DEFECT_IS_REPORTED_TWICE
@@ -270,23 +443,28 @@ model can still be given it, which is why the case keeps it.
    that touched it. Equality alone would let those through, and a report that
    grows without saying more is what an author paying per round trip reads.
 
+   The generator gives some instances a shared name and binds some parameters
+   more than once. Those are the two shapes in which checking each thing a name
+   picks out on its own reports it twice, and both were measured doing so before
+   the validator answered them.
+
 .. test_case:: A malformed definition is reported rather than fatal
    :id: TEST_WIRING_MALFORMED_DEFINITION_STILL_REPORTS
    :verifies: CREQ_VALIDATOR_EVERY_DEFECT
    :test_kind: error_path
    :coverage: partial
 
-   Each of these returns a report rather than ending the run: a binding naming a
-   parameter that no declaration carries; a designated output naming an instance
-   that is not there; two instances sharing one name; a binding naming an empty
-   instance name; a definition declaring node types it has no instances of.
+   Each of these returns a report rather than ending the run: two node types
+   sharing one name; one parameter declared as both required and optional; a
+   binding naming an empty instance name; a definition declaring node types it has
+   no instances of.
 
    Not ending the run is the whole assertion, and it is deliberately the whole of
    it. An index out of range, or an unwrap on a declaration that is not there,
    stops the walk at the first defect wearing different clothes, and a process
    that aborts reports nothing at all - so ``CREQ_VALIDATOR_EVERY_DEFECT`` is
-   what these shapes are held to. Which defect, if any, three of them earn is
-   recorded as not yet answered under ``CREQ_VALIDATOR_BINDING_RESOLVES``, and
+   what these shapes are held to. Which defect, if any, the first two earn is
+   recorded as still open under ``CREQ_VALIDATOR_BINDING_RESOLVES``, and
    asserting a class here would pin behaviour no requirement asks for and make
    the next slice's answer a regression.
 
@@ -310,8 +488,8 @@ model can still be given it, which is why the case keeps it.
    reaches, an unbound optional parameter, a declared global that no binding
    carries, and an output bound by several parameters. A generator producing only
    trees would pass against a validator that refuses every one of them, which
-   would make this the weakest case in the document rather than the control the
-   other sixteen are measured against.
+   would make this the weakest case in the document rather than the control every
+   other case here is measured against.
 
 .. test_case:: An empty definition is refused for its signature alone
    :id: TEST_WIRING_EMPTY_DEFINITION_IS_REFUSED_FOR_ITS_SIGNATURE
@@ -334,17 +512,21 @@ model can still be given it, which is why the case keeps it.
    :coverage: partial
 
    For any definition, every reported defect that concerns a wire - a required
-   parameter carrying no binding, a binding that resolves to nothing, and a
-   binding whose two ends declare different context types - carries the
+   parameter carrying no binding, a binding that resolves to nothing, a binding
+   whose two ends declare different context types, a binding to a parameter its
+   type does not declare, and a parameter bound more than once - carries the
    consuming instance and the parameter as values read from the defect itself,
    and each names something the definition carries.
 
-   The three are named here rather than counted off the requirements, because
+   The five are named here rather than counted off the requirements, because
    ``CREQ_VALIDATOR_BINDING_RESOLVES`` covers two shapes and only one of them is
-   a wire. An instance of a node type that was not supplied concerns that
-   instance and no parameter at all: its declaration is what is missing, so its
-   parameter list is unknowable, and a defect per parameter would contradict the
-   single defect ``TEST_WIRING_INSTANCE_OF_MISSING_TYPE_IS_REPORTED`` asks for.
+   a wire, and two of the classes about names are not wires either: a name
+   several instances share concerns an instance, and an output naming nothing
+   concerns the definition. An instance of a node type that was not supplied
+   concerns that instance and no parameter at all: its declaration is what is
+   missing, so its parameter list is unknowable, and a defect per parameter would
+   contradict the single defect ``TEST_WIRING_INSTANCE_OF_MISSING_TYPE_IS_REPORTED``
+   asks for.
    Filling the field anyway is the failure mode ``CREQ_DEFECT_NAMES_PLACE``
    forbids in its other form, where a signature defect invents a parameter and
    sends the author to a node that is not wrong. That case is where an instance
@@ -363,7 +545,8 @@ model can still be given it, which is why the case keeps it.
    :coverage: partial
 
    The defect reported for a definition designating no output names the
-   definition, and carries no node instance and no parameter.
+   definition, and carries no node instance and no parameter; and so does the
+   one reported for an output naming no instance.
 
    The absence is the assertion. A defect shaped so that every one of them has an
    instance forces a signature defect to name some node, and the author is then
@@ -377,7 +560,8 @@ model can still be given it, which is why the case keeps it.
 
    A defect reported for a binding to an instance that is not there carries that
    name as it was written, and so does one reported for an instance of a node
-   type that was not supplied.
+   type that was not supplied, and one reported for an output naming no
+   instance.
 
    The name resolves to nothing, which is exactly why it has to be echoed: it is
    the only thing tying the defect to what the author typed. A defect reporting

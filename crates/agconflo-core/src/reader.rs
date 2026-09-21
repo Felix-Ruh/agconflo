@@ -1250,8 +1250,9 @@ proptest! {
 #[test]
 fn every_wiring_defect_reads() {
     // An instance of a type no document declares, a binding to an instance that
-    // is not there, a wire whose ends declare different context types, and no
-    // output. Each is a name, or an absent key, and the text is fine.
+    // is not there, a wire whose ends declare different context types, a
+    // binding to a parameter its type does not declare, and no output. Each is
+    // a name, or an absent key, and the text is fine.
     let text = "\
 name = \"broken\"
 
@@ -1268,6 +1269,10 @@ bindings = { input = \"e\" }
 
 [instances.e]
 node_type = \"differ\"
+
+[instances.f]
+node_type = \"differ\"
+bindings = { nonesuch = \"e\" }
 ";
     let catalogue = TypeCatalogue::gather(vec![node_type_document(
         "types.toml",
@@ -1280,7 +1285,7 @@ node_type = \"differ\"
 
     let (definition, _) = read_workflow("broken.toml", text, &catalogue).expect("it reads");
 
-    // The point of the case: all four reach the validator together. A reader
+    // The point of the case: all five reach the validator together. A reader
     // that looked one name up would report that one alone.
     assert_eq!(
         validate_wiring(&definition),
@@ -1300,11 +1305,33 @@ node_type = \"differ\"
                 expected: context_type("note"),
                 produced: context_type("diff"),
             },
+            WiringDefect::UndeclaredParameter {
+                instance: "f".to_owned(),
+                parameter: "nonesuch".to_owned(),
+            },
             WiringDefect::SignatureOutputs {
                 definition: "broken".to_owned(),
                 designated: 0,
             },
         ]
+    );
+
+    // The one wiring defect that cannot share a document with those: an output
+    // naming no instance, where the first document has no output at all.
+    let text = "\
+name = \"renamed\"
+output = \"nowhere\"
+
+[instances.a]
+node_type = \"differ\"
+";
+    let (definition, _) = read_workflow("renamed.toml", text, &catalogue).expect("it reads");
+    assert_eq!(
+        validate_wiring(&definition),
+        vec![WiringDefect::UnresolvedOutput {
+            definition: "renamed".to_owned(),
+            unresolved: "nowhere".to_owned(),
+        }]
     );
 }
 
@@ -1314,10 +1341,10 @@ proptest! {
     /// binding parameters and sources only some of which exist, and designating
     /// an output that may be no instance at all, read as written.
     ///
-    /// The pools hold the two shapes the wiring feature records as not yet
-    /// answered - a binding to a parameter its type does not declare, and an
-    /// output naming no instance - since those are names too, and a reader
-    /// resolving them would decide their classification by refusing them.
+    /// The pools hold a binding to a parameter its type does not declare and an
+    /// output naming no instance, since those are names too, and a reader
+    /// resolving them would refuse a document for a defect the validator
+    /// reports beside every other.
     #[test]
     fn reading_resolves_nothing(written in any_written(Pools {
         types: &["source", "sink", "not-declared"],
