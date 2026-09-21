@@ -102,6 +102,15 @@
           "title": "agconflo-core context::type_is_declared",
           "type": "test_run"
         },
+        "RUN_DEFECT_SIGNATURE_NAMES_THE_DEFINITION": {
+          "executes": [
+            "TEST_DEFECT_SIGNATURE_NAMES_THE_DEFINITION"
+          ],
+          "id": "RUN_DEFECT_SIGNATURE_NAMES_THE_DEFINITION",
+          "test_outcome": "passed",
+          "title": "agconflo-core defect::signature_names_the_definition",
+          "type": "test_run"
+        },
         "RUN_ID_CANNOT_BE_FORGED": {
           "executes": [
             "TEST_ID_CANNOT_BE_FORGED"
@@ -172,6 +181,33 @@
           "id": "RUN_LINEAGE_REACHES_EACH_ONCE",
           "test_outcome": "passed",
           "title": "agconflo-core lineage::reaches_each_once",
+          "type": "test_run"
+        },
+        "RUN_WIRING_EMPTY_DEFINITION_IS_REFUSED_FOR_ITS_SIGNATURE": {
+          "executes": [
+            "TEST_WIRING_EMPTY_DEFINITION_IS_REFUSED_FOR_ITS_SIGNATURE"
+          ],
+          "id": "RUN_WIRING_EMPTY_DEFINITION_IS_REFUSED_FOR_ITS_SIGNATURE",
+          "test_outcome": "passed",
+          "title": "agconflo-core wiring::empty_definition_is_refused_for_its_signature",
+          "type": "test_run"
+        },
+        "RUN_WIRING_LEGAL_SIGNATURES_PASS": {
+          "executes": [
+            "TEST_WIRING_LEGAL_SIGNATURES_PASS"
+          ],
+          "id": "RUN_WIRING_LEGAL_SIGNATURES_PASS",
+          "test_outcome": "passed",
+          "title": "agconflo-core wiring::legal_signatures_pass",
+          "type": "test_run"
+        },
+        "RUN_WIRING_SIGNATURE_WITHOUT_ONE_OUTPUT_IS_REPORTED": {
+          "executes": [
+            "TEST_WIRING_SIGNATURE_WITHOUT_ONE_OUTPUT_IS_REPORTED"
+          ],
+          "id": "RUN_WIRING_SIGNATURE_WITHOUT_ONE_OUTPUT_IS_REPORTED",
+          "test_outcome": "passed",
+          "title": "agconflo-core wiring::signature_without_one_output_is_reported",
           "type": "test_run"
         }
       }
