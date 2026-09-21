@@ -165,7 +165,73 @@ impl fmt::Display for WiringDefect {
 #[cfg(test)]
 use crate::validate_wiring;
 #[cfg(test)]
+use crate::wiring::any_definition;
+#[cfg(test)]
 use crate::workflow::{DEFINITION_NAME, definition, instance, node_type};
+#[cfg(test)]
+use proptest::prelude::*;
+
+#[cfg(test)]
+proptest! {
+    /// Every defect that concerns a wire names its consumer and the parameter,
+    /// read from the defect itself rather than from its rendering. A place that
+    /// can be recovered only by parsing a message is a place an agent
+    /// correcting its own workflow cannot use, and the two are
+    /// indistinguishable to a human reading the output - which is how this
+    /// requirement would be lost without anyone noticing.
+    ///
+    /// Each also names something the definition carries: the instance is one of
+    /// its own, and the parameter is either declared by the type that instance
+    /// names or written in one of its bindings.
+    #[test]
+    fn names_instance_and_parameter(workflow in any_definition()) {
+        for defect in validate_wiring(&workflow) {
+            // Exhaustive on purpose, though the enum is `non_exhaustive`: a
+            // class added later has to be filed as concerning a wire or not
+            // concerning one, rather than escaping this property in silence.
+            match defect {
+                WiringDefect::RequiredParameterUnbound { .. }
+                | WiringDefect::UnresolvedInstance { .. }
+                | WiringDefect::ContextTypeDisagreement { .. } => {}
+                WiringDefect::UnresolvedNodeType { .. }
+                | WiringDefect::SignatureOutputs { .. } => continue,
+            }
+
+            let (Some(named), Some(parameter)) = (defect.instance(), defect.parameter()) else {
+                return Err(TestCaseError::fail(format!("{defect:?} names no place")));
+            };
+            let Some(instance) = workflow
+                .instances
+                .iter()
+                .find(|instance| instance.name == named)
+            else {
+                return Err(TestCaseError::fail(format!("{named} is not in the workflow")));
+            };
+
+            let declared = workflow
+                .node_types
+                .iter()
+                .find(|declared| declared.name == instance.node_type)
+                .is_some_and(|declared| {
+                    declared
+                        .required
+                        .iter()
+                        .chain(&declared.optional)
+                        .any(|declared| declared.name == parameter)
+                });
+            let wired = instance
+                .bindings
+                .iter()
+                .any(|binding| binding.parameter == parameter);
+            prop_assert!(
+                declared || wired,
+                "{:?} names a parameter {} does not carry",
+                defect,
+                named
+            );
+        }
+    }
+}
 
 #[test]
 fn signature_names_the_definition() {

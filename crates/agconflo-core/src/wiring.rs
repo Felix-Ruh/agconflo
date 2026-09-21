@@ -18,6 +18,14 @@ use crate::workflow::{Binding, NodeInstance, NodeType, WorkflowDefinition};
 /// requires that, and it is worth having anyway: a report whose order came from
 /// a hash map would make a duplicate defect hard to see and a test of the report
 /// flaky.
+///
+/// Nothing here returns early, and that is the requirement rather than a
+/// stylistic preference. A validator that stops at the first defect reports each
+/// of them perfectly and still turns ten defects into ten rounds of edit,
+/// revalidate and read, for an author that pays per round trip. The signature is
+/// checked with everything else for the same reason, rather than refusing the
+/// definition before its wiring is looked at.
+// @Every instance walked and everything collected,IMPL_WIRING_WALK,impl,[CREQ_VALIDATOR_EVERY_DEFECT, CREQ_VALIDATOR_ACCEPTS_WELL_FORMED]
 pub fn validate_wiring(definition: &WorkflowDefinition) -> Vec<WiringDefect> {
     let mut defects = Vec::new();
     let declarations = by_name(&definition.node_types, |declared| &declared.name);
@@ -229,6 +237,101 @@ use proptest::collection::vec;
 #[cfg(test)]
 use proptest::prelude::*;
 
+/// Definitions of every shape, sound and broken alike: node types that may or
+/// may not be declared, bindings that may or may not resolve, parameters that
+/// may or may not agree on a type, and nought, one or two designated outputs.
+///
+/// Two things are held fixed rather than generated, and neither is laxity. Each
+/// instance carries at most one binding per parameter, because a parameter binds
+/// to exactly one output (`DEC_BINDING_BY_PORT`) and a definition binding one
+/// twice is outside the model rather than a defective use of it. And instance
+/// names are distinct, because two instances sharing a name is one of the shapes
+/// recorded as not yet answered, which
+/// `TEST_WIRING_MALFORMED_DEFINITION_STILL_REPORTS` holds to the one thing that
+/// is settled about it.
+#[cfg(test)]
+pub(crate) fn any_definition() -> impl Strategy<Value = WorkflowDefinition> {
+    const CONTEXT_TYPES: [&str; 2] = ["note", "diff"];
+    const PARAMETERS: [&str; 3] = ["p0", "p1", "q0"];
+
+    let declarations = vec((0..=2usize, 0..=1usize, 0..=1usize, 0..2usize), 1..=3);
+    let nodes = vec(
+        (0..4usize, any::<bool>(), vec((0..3usize, 0..5usize), 0..=3)),
+        1..=4,
+    );
+    let designated = vec(0..5usize, 0..=2);
+
+    (declarations, nodes, designated).prop_map(|(declarations, nodes, designated)| {
+        let node_types: Vec<NodeType> = declarations
+            .iter()
+            .enumerate()
+            .map(|(declared, &(required, optional, globals, output))| {
+                let required: Vec<(&str, &str)> = PARAMETERS[..required]
+                    .iter()
+                    .enumerate()
+                    .map(|(p, &name)| (name, CONTEXT_TYPES[(declared + p) % 2]))
+                    .collect();
+                let optional: Vec<(&str, &str)> = PARAMETERS[2..2 + optional]
+                    .iter()
+                    .map(|&name| (name, CONTEXT_TYPES[declared % 2]))
+                    .collect();
+                let read: Vec<&str> = ["policy"][..globals].to_vec();
+                node_type(&format!("t{declared}"), &required, CONTEXT_TYPES[output])
+                    .with_optional(&optional)
+                    .with_globals(&read)
+            })
+            .collect();
+
+        let instances: Vec<NodeInstance> = nodes
+            .iter()
+            .enumerate()
+            .map(|(node, (declared, entry, bindings))| {
+                // A type index past the declarations names a type nobody
+                // supplied; a source index past the instances names a node the
+                // definition does not carry.
+                let declared = if *declared < declarations.len() {
+                    format!("t{declared}")
+                } else {
+                    "not-supplied".to_owned()
+                };
+                let mut bound: Vec<(&str, String)> = Vec::new();
+                for &(parameter, source) in bindings {
+                    let parameter = PARAMETERS[parameter];
+                    if bound.iter().any(|(filled, _)| *filled == parameter) {
+                        continue;
+                    }
+                    let source = if source < nodes.len() {
+                        format!("n{source}")
+                    } else {
+                        "ghost".to_owned()
+                    };
+                    bound.push((parameter, source));
+                }
+                let bound: Vec<(&str, &str)> = bound
+                    .iter()
+                    .map(|(parameter, source)| (*parameter, source.as_str()))
+                    .collect();
+                let built = instance(&format!("n{node}"), &declared, &bound);
+                if *entry { built.into_entry() } else { built }
+            })
+            .collect();
+
+        let designated: Vec<String> = designated
+            .iter()
+            .map(|&output| {
+                if output < nodes.len() {
+                    format!("n{output}")
+                } else {
+                    "ghost".to_owned()
+                }
+            })
+            .collect();
+        let designated: Vec<&str> = designated.iter().map(String::as_str).collect();
+
+        definition(node_types, instances, &designated)
+    })
+}
+
 /// The defect a definition designating `designated` outputs must report.
 #[cfg(test)]
 fn signature_defect(designated: usize) -> WiringDefect {
@@ -390,6 +493,185 @@ proptest! {
             prop_assert_eq!(report, Vec::new());
         } else {
             prop_assert_eq!(report, vec![disagreement("b", "input", &name, &produced)]);
+        }
+    }
+
+    /// A report that grows without saying more is what an author paying per
+    /// round trip reads.
+    ///
+    /// Equality alone is not the whole assertion: a defect reported once per
+    /// direction of a binding, or once per check that touched it, carries a
+    /// different message about the same wire and would pass it. So no place may
+    /// be named twice by defects of one class either.
+    #[test]
+    fn no_defect_is_reported_twice(workflow in any_definition()) {
+        let report = validate_wiring(&workflow);
+
+        for (position, defect) in report.iter().enumerate() {
+            for other in &report[position + 1..] {
+                prop_assert_ne!(defect, other, "the same defect twice");
+
+                let same_class = std::mem::discriminant(defect) == std::mem::discriminant(other);
+                let same_place = defect.instance() == other.instance()
+                    && defect.parameter() == other.parameter();
+                prop_assert!(
+                    !(same_class && same_place),
+                    "one place named twice by one class: {:?} and {:?}",
+                    defect,
+                    other
+                );
+            }
+        }
+    }
+
+    /// The control the other cases are measured against: a validator that
+    /// refuses every workflow satisfies every requirement that says what must be
+    /// refused, and only this one notices.
+    ///
+    /// The shapes a strict validator refuses by accident are built into every
+    /// generated definition rather than left to chance, because a generator
+    /// producing only trees would pass against exactly such a validator: a cycle
+    /// of two nodes, a pair of nodes no entry node reaches, an unbound optional
+    /// parameter, a declared global that no binding carries, an output bound by
+    /// several parameters, and an entry node whose required parameter is the
+    /// workflow's own rather than a wire.
+    #[test]
+    fn well_formed_definitions_pass(workflow in well_formed_definition()) {
+        prop_assert_eq!(validate_wiring(&workflow), Vec::new());
+    }
+}
+
+/// Definitions that are well formed by construction, varying in what is wired
+/// on top of a skeleton carrying every legal shape a strict validator refuses.
+#[cfg(test)]
+fn well_formed_definition() -> impl Strategy<Value = WorkflowDefinition> {
+    vec((0..2usize, any::<bool>()), 0..=3).prop_map(|extras| {
+        let node_types = vec![
+            node_type("seed_note", &[], "note"),
+            node_type("seed_diff", &[], "diff"),
+            node_type("pass_note", &[("input", "note")], "note"),
+            node_type("pass_diff", &[("input", "diff")], "diff"),
+            node_type("lenient", &[], "note")
+                .with_optional(&[("hint", "note")])
+                .with_globals(&["policy"]),
+        ];
+
+        let mut instances = vec![
+            instance("seed", "seed_note", &[]),
+            instance("seed_diff", "seed_diff", &[]),
+            // An entry node: its required parameter is the workflow's own.
+            instance("entry", "pass_note", &[]).into_entry(),
+            // A cycle of two, which no entry node reaches. Both are legal.
+            instance("loop_a", "pass_note", &[("input", "loop_b")]),
+            instance("loop_b", "pass_note", &[("input", "loop_a")]),
+            // One output bound by several parameters.
+            instance("fan_x", "pass_note", &[("input", "seed")]),
+            instance("fan_y", "pass_note", &[("input", "seed")]),
+            // An optional left unbound, and a declared global nothing carries.
+            instance("lax", "lenient", &[]),
+        ];
+
+        for (extra, &(kind, bind_optional)) in extras.iter().enumerate() {
+            instances.push(match kind {
+                0 => instance(&format!("x{extra}"), "pass_note", &[("input", "seed")]),
+                _ => instance(&format!("x{extra}"), "pass_diff", &[("input", "seed_diff")]),
+            });
+            if bind_optional {
+                // The same optional parameter, this time wired, and agreeing.
+                instances.push(instance(
+                    &format!("l{extra}"),
+                    "lenient",
+                    &[("hint", "seed")],
+                ));
+            }
+        }
+
+        definition(node_types, instances, &["fan_x"])
+    })
+}
+
+#[test]
+fn all_four_classes_reported() {
+    let types = vec![
+        node_type("source", &[], "note"),
+        node_type("differ", &[], "diff"),
+        node_type("pair", &[("left", "note"), ("right", "note")], "note"),
+        node_type("sink", &[("input", "note")], "note"),
+    ];
+    let instances = vec![
+        instance("a", "differ", &[]),
+        // Two defects on one instance: an unbound required parameter and a wire
+        // whose ends disagree. A walk that moves on once an instance has a
+        // defect reports three rather than four.
+        instance("b", "pair", &[("left", "a")]),
+        instance("c", "sink", &[("input", "ghost")]),
+    ];
+    // And no designated output, so a validator refusing the definition for its
+    // signature before examining any wiring reports one rather than four.
+    let broken = definition(types, instances, &[]);
+
+    assert_eq!(
+        validate_wiring(&broken),
+        vec![
+            unbound("b", "right"),
+            disagreement("b", "left", "note", "diff"),
+            unresolved("c", "input", "ghost"),
+            signature_defect(0),
+        ]
+    );
+}
+
+#[test]
+fn malformed_definition_still_reports() {
+    let types = vec![
+        node_type("source", &[], "note"),
+        node_type("sink", &[("input", "note")], "note"),
+    ];
+
+    let malformed = [
+        // A binding naming a parameter that no declaration carries.
+        definition(
+            types.clone(),
+            vec![
+                instance("a", "source", &[]),
+                instance("b", "sink", &[("input", "a"), ("nonesuch", "a")]),
+            ],
+            &["b"],
+        ),
+        // A designated output naming an instance that is not there.
+        definition(
+            types.clone(),
+            vec![instance("a", "source", &[])],
+            &["nowhere"],
+        ),
+        // Two instances sharing one name, so that a binding to it resolves to
+        // both.
+        definition(
+            types.clone(),
+            vec![
+                instance("a", "source", &[]),
+                instance("a", "sink", &[("input", "a")]),
+            ],
+            &["a"],
+        ),
+        // A binding naming an empty instance name.
+        definition(
+            types.clone(),
+            vec![instance("b", "sink", &[("input", "")])],
+            &["b"],
+        ),
+        // Node types the definition has no instances of.
+        definition(types, Vec::new(), &[]),
+    ];
+
+    for workflow in &malformed {
+        // Not ending the run is the whole assertion, and deliberately the whole
+        // of it: which defect three of these earn is recorded as not yet
+        // answered, and asserting a class here would pin behaviour no
+        // requirement asks for. The report is read rather than discarded, so a
+        // defect that cannot say anything fails this.
+        for defect in validate_wiring(workflow) {
+            assert!(!defect.to_string().is_empty(), "{defect:?} says nothing");
         }
     }
 }
