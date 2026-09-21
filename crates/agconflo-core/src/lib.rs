@@ -11,6 +11,7 @@
 //! checked with the rest of the graph, so a marker naming a requirement that
 //! does not exist fails the documentation check, in the commit hook and in CI.
 
+mod catalogue;
 mod context;
 mod defect;
 mod id;
@@ -22,6 +23,7 @@ mod workflow;
 #[cfg(test)]
 mod compile_fail;
 
+pub use catalogue::{RepeatedType, RepeatedTypes, TypeCatalogue};
 pub use context::{Context, ContextType, InvalidTypeName};
 pub use defect::WiringDefect;
 pub use id::{ContextId, IdSource, SourceExhausted};

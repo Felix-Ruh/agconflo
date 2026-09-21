@@ -3,6 +3,42 @@
   "versions": {
     "": {
       "needs": {
+        "RUN_CATALOGUE_DISTINCT_DECLARATIONS_HELD": {
+          "executes": [
+            "TEST_CATALOGUE_DISTINCT_DECLARATIONS_HELD"
+          ],
+          "id": "RUN_CATALOGUE_DISTINCT_DECLARATIONS_HELD",
+          "test_outcome": "passed",
+          "title": "agconflo-core catalogue::distinct_declarations_held",
+          "type": "test_run"
+        },
+        "RUN_CATALOGUE_EVERY_REPEATED_NAME_REPORTED": {
+          "executes": [
+            "TEST_CATALOGUE_EVERY_REPEATED_NAME_REPORTED"
+          ],
+          "id": "RUN_CATALOGUE_EVERY_REPEATED_NAME_REPORTED",
+          "test_outcome": "passed",
+          "title": "agconflo-core catalogue::every_repeated_name_reported",
+          "type": "test_run"
+        },
+        "RUN_CATALOGUE_IDENTICAL_COPIES_REFUSED": {
+          "executes": [
+            "TEST_CATALOGUE_IDENTICAL_COPIES_REFUSED"
+          ],
+          "id": "RUN_CATALOGUE_IDENTICAL_COPIES_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-core catalogue::identical_copies_refused",
+          "type": "test_run"
+        },
+        "RUN_CATALOGUE_REPEATED_NAME_NAMES_EVERY_DOCUMENT": {
+          "executes": [
+            "TEST_CATALOGUE_REPEATED_NAME_NAMES_EVERY_DOCUMENT"
+          ],
+          "id": "RUN_CATALOGUE_REPEATED_NAME_NAMES_EVERY_DOCUMENT",
+          "test_outcome": "passed",
+          "title": "agconflo-core catalogue::repeated_name_names_every_document",
+          "type": "test_run"
+        },
         "RUN_CONTEXT_DEEP_NESTING_DROPS": {
           "executes": [
             "TEST_CONTEXT_DEEP_NESTING_DROPS"
