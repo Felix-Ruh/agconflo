@@ -27,6 +27,8 @@ pub use catalogue::{RepeatedType, RepeatedTypes, TypeCatalogue};
 pub use context::{Context, ContextType, InvalidTypeName};
 pub use defect::WiringDefect;
 pub use id::{ContextId, IdSource, SourceExhausted};
-pub use reader::{FaultKind, NodeTypeDocument, ReadFault, read_node_types};
+pub use reader::{
+    FaultKind, NodeTypeDocument, ReadFault, WorkflowDocument, read_node_types, read_workflow,
+};
 pub use wiring::validate_wiring;
 pub use workflow::{Binding, NodeInstance, NodeType, Parameter, WorkflowDefinition};
