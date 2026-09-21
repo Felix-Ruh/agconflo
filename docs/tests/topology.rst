@@ -198,12 +198,15 @@ together.
    :coverage: partial
 
    A document with an instance of a type no document declares, a binding to an
-   instance that is not there, a wire whose ends declare different context types,
-   and no output reads, and the validator then reports all four.
+   instance that is not there, a binding to a parameter its type does not declare,
+   a wire whose ends declare different context types, and no output reads, and
+   the validator then reports all five. So does a second document, whose one
+   output names no instance, and the validator reports that. Two documents,
+   because no output and an output naming nothing cannot be written in one.
 
-   The second half is the point. A reader that looks one name up reports that
-   defect alone, and the author meets the other three after fixing it; the
-   assertion that all four reach the validator together is what separates a
+   The validator's half is the point. A reader that looks one name up reports
+   that defect alone, and the author meets the others after fixing it; the
+   assertion that every one reaches the validator together is what separates a
    reader that lets defects through from one that happens to let this document
    through.
 
@@ -218,10 +221,10 @@ together.
    from pools only partly present, and whose output names an instance that may not
    exist, reading succeeds.
 
-   The pools include the two shapes the wiring feature records as not yet answered
-   - a binding to a parameter its type does not declare, and an output naming no
-   instance - since those are names too, and a reader resolving them would decide
-   their classification by refusing them.
+   The pools include a binding to a parameter its type does not declare and an
+   output naming no instance, since those are names too, and a reader resolving
+   them would refuse a document for a defect the validator reports beside every
+   other.
 
 .. test_case:: A repeated type name names every document declaring it
    :id: TEST_CATALOGUE_REPEATED_NAME_NAMES_EVERY_DOCUMENT
@@ -362,8 +365,10 @@ together.
    :coverage: partial
 
    A definition with an instance of an unknown type, a binding to an instance that
-   is not there, a wire whose ends disagree and no designated output is written,
-   and reads back with the same name, instances, bindings and output.
+   is not there, a binding to a parameter its type does not declare, a wire whose
+   ends disagree and no designated output is written, and reads back with the same
+   name, instances, bindings and output. Then the same definition, designating an
+   output that names no instance, is written and reads back the same way.
 
    The control on the case above. A writer that refuses every definition refuses
    every unwritable one, and a writer that runs the validator first refuses these -
