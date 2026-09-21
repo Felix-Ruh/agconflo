@@ -28,6 +28,7 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    stakeholder/process
    features/context
    features/wiring
+   features/topology
    components/context
    components/wiring
    tests/context

@@ -120,6 +120,11 @@ serde 1.0.229.
    was compared with the input text after substituting that one value: equal.
    All three comments and every line's spacing survived.
 
+   The control, which is what makes that mean something: a document with three
+   comments read through serde into a structure and written again with toml
+   1.1.6 came back with none of them. A comment is not data serde carries, so a
+   writer that regenerates a document cannot keep one.
+
    One edit of one value was measured. Adding or removing a whole instance was
    not, and is the first thing to measure before the writer's behaviour is built
    on this.
