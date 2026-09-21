@@ -115,8 +115,9 @@ requirement whose subject is anything else.
      document cannot hold it, but a definition built by other means can, and the
      validator resolves the name to the first declaration carrying it.
    - **One parameter declared twice by one node type**, once as required and once
-     as optional. A definition built by other means can hold it, and the validator
-     reads the parameter as required.
+     as optional. A document cannot hold it - the reader refuses it
+     (``CREQ_READER_FAULT_LOCATED``) - but a definition built by other means can,
+     and the validator reads the parameter as required.
    - **A binding into an entry node.** An entry node's parameters are the
      workflow's own (``DEC_WORKFLOW_SIGNATURE``), so a wire into one gives a
      parameter two sources, the caller and the wire - and a loop closing back onto

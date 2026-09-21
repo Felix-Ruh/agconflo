@@ -68,7 +68,10 @@ measurements again, taken when the writer was about to be built on them.
    shapes ``CREQ_VALIDATOR_BINDING_RESOLVES`` once left open - cannot be read from
    a document at all. Nor can a parameter bound twice, which
    ``DEC_BINDING_BY_PORT`` already says cannot happen, nor a parameter declared
-   twice by one node type.
+   twice by one node type. Within one of a type's lists that is a repeated key;
+   across its required and optional lists, which are two tables, the parser sees
+   nothing wrong, and the reader refuses it instead
+   (``CREQ_READER_FAULT_LOCATED``).
 
    The in-memory model is unchanged and still holds lists, because a definition
    built by other means can still carry any of those shapes. The validator

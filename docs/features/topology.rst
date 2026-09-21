@@ -66,9 +66,12 @@ requirement for when authoring lands.
 
    A document cannot be read when it is not TOML, when a value has the wrong
    type, when a key the reader needs is missing, or when a name is repeated
-   within it - which, since every name is a table key (``DEC_NAMES_AS_KEYS``), is a
-   repeated key and not TOML at all. Each is a fault in the text rather than in
-   the workflow, and nothing further can be checked until it is fixed.
+   within it. Since every name is a table key (``DEC_NAMES_AS_KEYS``), a name
+   repeated within one table is a repeated key and not TOML at all. Of the names
+   written as keys, the one the parser cannot see repeated is a parameter a node
+   type declares under both its required and its optional list, which are two
+   tables, so the reader refuses that itself. Each is a fault in the text rather
+   than in the workflow, and nothing further can be checked until it is fixed.
 
    Naming the document matters as soon as there are several: a fault reported at
    line 12 of one of four documents is a fault in none of them in particular.

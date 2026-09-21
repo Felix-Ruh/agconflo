@@ -136,10 +136,21 @@ anything else.
      by some other route, are both wrong.
    - **Reading panics instead of refusing.** An ``unwrap`` on a value the document
      did not have ends the process, which reports nothing at all.
+   - **A parameter declared in both lists is read.** The required and optional
+     lists are two tables, so a name in both is no repeated key and the parser
+     passes it. Read as it stands, the validator judges every wire into the
+     parameter by its required declaration and ignores the other without a word
+     - measured, and the reason ``DEC_NAMES_AS_KEYS`` counts it among the names a
+     document cannot hold.
+   - **The repetition is placed at the first of the two.** The parser places a
+     repeated key where it repeats, and a reader always pointing at one list
+     sends the author to the declaration that came first whenever that list was
+     written first.
 
    Must refuse, each with its place: text that is not TOML, a value of the wrong
    type, a key the reader needs that is missing, a name repeated within one
-   document, and an empty context type name.
+   document - a parameter declared as both required and optional among them, at
+   whichever of the two is written later - and an empty context type name.
 
 .. comp_req:: Reading resolves no name
    :id: CREQ_READER_NAMES_UNRESOLVED

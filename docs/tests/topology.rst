@@ -13,7 +13,7 @@ weight than it did there: a strict reader and a regenerating writer are both the
 natural first implementation, each refuses or drops something legitimate, and no
 case derived from the failure modes alone would notice.
 
-Eight failure modes have no case named after them, because the shape that catches
+Nine failure modes have no case named after them, because the shape that catches
 each is part of a broader case under the same requirement. They are named here so
 the derivation can be audited rather than taken on trust:
 
@@ -30,6 +30,9 @@ the derivation can be audited rather than taken on trust:
 - ``CREQ_READER_FAULT_LOCATED``'s "the column counts bytes" is caught by
   ``TEST_READER_FAULTS_CARRY_THEIR_PLACE``, one of whose documents puts a
   character wider than one byte before the fault on its line.
+- ``CREQ_READER_FAULT_LOCATED``'s "the repetition is placed at the first of the
+  two" is caught by ``TEST_READER_PARAMETER_DECLARED_TWICE_IS_A_FAULT``, which
+  writes the two lists in both orders.
 - ``CREQ_WRITER_KEEPS_UNREAD``'s "a changed value loses the comment beside it" is
   caught by ``TEST_WRITER_UNREAD_KEYS_SURVIVE_A_CHANGE``, whose repointed binding
   carries a comment of its own.
@@ -174,6 +177,26 @@ together.
    refuses it (``CREQ_VALUE_DECLARED_TYPE``). The case is the join between the two:
    the model's refusal has to come out as a fault in the text with a place, rather
    than as a panic or an error that has lost where it came from.
+
+.. test_case:: A parameter declared in both lists is a fault in the text
+   :id: TEST_READER_PARAMETER_DECLARED_TWICE_IS_A_FAULT
+   :verifies: CREQ_READER_FAULT_LOCATED
+   :test_kind: error_path
+   :coverage: partial
+
+   A node type document declaring one parameter as both required and optional is
+   refused with the document, the line and column of whichever declaration is
+   written later, and the key naming that list and parameter - once with the
+   required list written first as inline tables, and once with the optional list
+   written first as header tables. A document declaring ``input`` as required and
+   ``Input`` as optional reads, as two parameters.
+
+   The parser cannot refuse the shape, since the two lists are two tables and a
+   name in both is no repeated key, so the reader has to. Both
+   orders, because a reader always pointing at one list is right in exactly one
+   of them. And the names differing in case are the control: comparing them
+   loosely is the tidy-looking way to refuse this, and it refuses two parameters
+   that are really different.
 
 .. test_case:: Any text is read or refused
    :id: TEST_READER_ANY_TEXT_IS_READ_OR_REFUSED
