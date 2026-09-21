@@ -14,7 +14,7 @@ and a set of cases derived from only one of them would leave the other free.
 
 That matters more here than in the feature before this one. Eight of the eleven
 requirements say what must be refused and none of those says what must not be, so
-a validator refusing everything satisfies all four and no case built from them
+a validator refusing everything satisfies all eight and no case built from them
 would notice. The positive cases and ``TEST_WIRING_WELL_FORMED_DEFINITIONS_PASS``
 are the half that does.
 
@@ -333,14 +333,17 @@ checked like any other binding, so no case singles it out.
    types adds nothing, and nor does the designated output naming it; the rest of
    the definition is still walked, so another instance's unbound parameter is in
    the same report. The definition is checked twice, with the two instances
-   producing different types in either order, and the report is the same both
-   times.
+   producing different types in either order and a different instance first each
+   time - the second time, the one with its parameter unbound - and the report is
+   the same both times.
 
-   Both orders, because a validator resolving the name to the first instance
-   carrying it passes exactly one of them. What is not reported is the rest of
-   the case: the unbound parameter, the missing type, the disagreement and an
-   unresolved output are each what checking one instance as if the name were its
-   own produces, and each would name a node the author cannot find.
+   Two orders, because a validator resolving the name to the first instance
+   carrying it passes exactly one of them, and one walking only that first
+   instance reports its unbound parameter in the second. What is not reported is
+   the rest of the case: the unbound parameter, the missing type, the
+   disagreement and an unresolved output are each what checking one instance as
+   if the name were its own produces, and each would name a node the author
+   cannot find.
 
 .. test_case:: Names of different kinds pass
    :id: TEST_WIRING_NAMES_OF_DIFFERENT_KINDS_PASS
@@ -387,7 +390,7 @@ checked like any other binding, so no case singles it out.
    one counting sources within an instance refuses the second - and each is a
    graph drawn every day.
 
-.. test_case:: A definition with all four defect classes reports all of them
+.. test_case:: A definition with the first four defect classes reports all of them
    :id: TEST_WIRING_ALL_FOUR_CLASSES_REPORTED
    :verifies: CREQ_VALIDATOR_EVERY_DEFECT
    :test_kind: error_path

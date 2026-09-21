@@ -17,9 +17,11 @@ use crate::ContextType;
 /// a node instance and one of its parameters; a defect about an instance whose
 /// node type is missing concerns that instance and no parameter, because its
 /// declaration is what is missing and its parameter list is therefore
-/// unknowable; a defect about the signature concerns the definition and no node
-/// in it. A variant that carried an instance or a parameter anyway would send an
-/// author to a place that is not wrong.
+/// unknowable; a name several instances share concerns that name and no
+/// parameter, since it is the one place such a defect can give; a defect about
+/// the signature concerns the definition and no node in it. A variant that
+/// carried an instance or a parameter anyway would send an author to a place
+/// that is not wrong.
 ///
 /// A name that resolved to nothing is carried as it was written, and is the one
 /// field that names something the definition does not have. It is the only thing
@@ -70,6 +72,23 @@ pub enum WiringDefect {
         /// The parameter it names, as it was written.
         parameter: String,
     },
+    /// More than one instance carries one name
+    /// (`CREQ_VALIDATOR_INSTANCE_NAMED_ONCE`). Reported once for the name,
+    /// however many carry it, and nothing about any of them is reported
+    /// besides: a place naming several instances is no place.
+    RepeatedInstance {
+        /// The name the instances share.
+        instance: String,
+    },
+    /// An instance binds one parameter more than once
+    /// (`CREQ_VALIDATOR_PARAMETER_BOUND_ONCE`). Reported once for the
+    /// parameter, however many bindings it has.
+    RepeatedBinding {
+        /// The instance carrying the bindings.
+        instance: String,
+        /// The parameter bound more than once.
+        parameter: String,
+    },
     /// A binding joins an output to a parameter declared for another context
     /// type (`CREQ_VALIDATOR_TYPES_AGREE`).
     ///
@@ -115,6 +134,8 @@ impl WiringDefect {
             | Self::UnresolvedInstance { instance, .. }
             | Self::UnresolvedNodeType { instance, .. }
             | Self::UndeclaredParameter { instance, .. }
+            | Self::RepeatedInstance { instance }
+            | Self::RepeatedBinding { instance, .. }
             | Self::ContextTypeDisagreement { instance, .. } => Some(instance),
             Self::SignatureOutputs { .. } | Self::UnresolvedOutput { .. } => None,
         }
@@ -127,8 +148,10 @@ impl WiringDefect {
             Self::RequiredParameterUnbound { parameter, .. }
             | Self::UnresolvedInstance { parameter, .. }
             | Self::UndeclaredParameter { parameter, .. }
+            | Self::RepeatedBinding { parameter, .. }
             | Self::ContextTypeDisagreement { parameter, .. } => Some(parameter),
             Self::UnresolvedNodeType { .. }
+            | Self::RepeatedInstance { .. }
             | Self::SignatureOutputs { .. }
             | Self::UnresolvedOutput { .. } => None,
         }
@@ -166,6 +189,16 @@ impl fmt::Display for WiringDefect {
             } => write!(
                 f,
                 "'{parameter}' is bound on the node '{instance}', and its type declares no such parameter"
+            ),
+            Self::RepeatedInstance { instance } => {
+                write!(f, "the name '{instance}' is given to more than one node")
+            }
+            Self::RepeatedBinding {
+                instance,
+                parameter,
+            } => write!(
+                f,
+                "'{parameter}' of the node '{instance}' is bound more than once, where one binding is allowed"
             ),
             Self::ContextTypeDisagreement {
                 instance,
@@ -230,8 +263,10 @@ proptest! {
                 WiringDefect::RequiredParameterUnbound { .. }
                 | WiringDefect::UnresolvedInstance { .. }
                 | WiringDefect::UndeclaredParameter { .. }
+                | WiringDefect::RepeatedBinding { .. }
                 | WiringDefect::ContextTypeDisagreement { .. } => {}
                 WiringDefect::UnresolvedNodeType { .. }
+                | WiringDefect::RepeatedInstance { .. }
                 | WiringDefect::SignatureOutputs { .. }
                 | WiringDefect::UnresolvedOutput { .. } => continue,
             }

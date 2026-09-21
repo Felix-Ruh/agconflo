@@ -1,7 +1,7 @@
 //! The wiring validator: one workflow definition compared against the node
 //! types it names, and everything wrong with it reported at once.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::defect::WiringDefect;
 use crate::workflow::{Binding, NodeInstance, NodeType, Parameter, WorkflowDefinition};
@@ -25,14 +25,30 @@ use crate::workflow::{Binding, NodeInstance, NodeType, Parameter, WorkflowDefini
 /// revalidate and read, for an author that pays per round trip. The signature is
 /// checked with everything else for the same reason, rather than refusing the
 /// definition before its wiring is looked at.
+///
+/// Two things are not looked behind, and neither is the walk stopping: an
+/// instance whose name another carries too, and the wires of a parameter bound
+/// more than once. Each is reported, and anything more said about it would name
+/// a place that picks out two things.
 // @Every instance walked and everything collected,IMPL_WIRING_WALK,impl,[CREQ_VALIDATOR_EVERY_DEFECT, CREQ_VALIDATOR_ACCEPTS_WELL_FORMED]
 pub fn validate_wiring(definition: &WorkflowDefinition) -> Vec<WiringDefect> {
     let mut defects = Vec::new();
     let declarations = by_name(&definition.node_types, |declared| &declared.name);
     let instances = by_name(&definition.instances, |instance| &instance.name);
+    let shared = repeated(
+        definition
+            .instances
+            .iter()
+            .map(|instance| instance.name.as_str()),
+    );
 
+    let mut reported = HashSet::new();
     for instance in &definition.instances {
-        check_instance(instance, &declarations, &instances, &mut defects);
+        if shared.contains(instance.name.as_str()) {
+            report_shared_name(instance, &mut reported, &mut defects);
+            continue;
+        }
+        check_instance(instance, &declarations, &instances, &shared, &mut defects);
     }
     check_signature(definition, &mut defects);
     check_output_resolves(definition, &instances, &mut defects);
@@ -42,17 +58,52 @@ pub fn validate_wiring(definition: &WorkflowDefinition) -> Vec<WiringDefect> {
 
 /// A lookup from a name to the first thing carrying it.
 ///
-/// First rather than last, and neither is asserted anywhere. Two instances
-/// sharing one name is one of the shapes `CREQ_VALIDATOR_BINDING_RESOLVES`
-/// records as not yet answered, so a name that resolves to two things has to
-/// resolve to something rather than stop the walk. Every instance is still
-/// walked, because the walk runs over the definition's list and not over this.
+/// Which one never matters for an instance: a name several instances share is
+/// reported on its own and resolved no further, so for instances this only
+/// answers whether a name is there at all. For node types it is the answer, and
+/// it is asserted nowhere. Two declarations sharing a name within a definition
+/// is recorded as still open under `CREQ_VALIDATOR_BINDING_RESOLVES`, so the name
+/// has to resolve to something rather than stop the walk.
 fn by_name<'a, T>(items: &'a [T], name: impl Fn(&'a T) -> &'a str) -> HashMap<&'a str, &'a T> {
     let mut by_name = HashMap::new();
     for item in items {
         by_name.entry(name(item)).or_insert(item);
     }
     by_name
+}
+
+/// The names that occur more than once among `names`.
+fn repeated<'a>(names: impl IntoIterator<Item = &'a str>) -> HashSet<&'a str> {
+    let mut seen = HashSet::new();
+    names
+        .into_iter()
+        .filter(|&name| !seen.insert(name))
+        .collect()
+}
+
+/// An instance whose name another instance carries too: the name is reported
+/// the first time it is met, and the instance is not looked at further.
+///
+/// A name reaching several instances is no place, so nothing about any of them
+/// can be said through it. Walking each as if the name were its own was
+/// measured reporting one defect twice word for word, and two defects at one
+/// place; walking the first alone judged a wire from the name by whichever
+/// instance happened to be written first. The author untangles the name and
+/// learns what is behind it from the next report.
+///
+/// Once per name, however many instances carry it: three sharing one are one
+/// name to change.
+// @A shared name reported once and nothing behind it checked,IMPL_WIRING_INSTANCE_NAMED_ONCE,impl,[CREQ_VALIDATOR_INSTANCE_NAMED_ONCE]
+fn report_shared_name<'a>(
+    instance: &'a NodeInstance,
+    reported: &mut HashSet<&'a str>,
+    defects: &mut Vec<WiringDefect>,
+) {
+    if reported.insert(instance.name.as_str()) {
+        defects.push(WiringDefect::RepeatedInstance {
+            instance: instance.name.clone(),
+        });
+    }
 }
 
 /// One instance against the declaration it names.
@@ -67,6 +118,7 @@ fn check_instance(
     instance: &NodeInstance,
     declarations: &HashMap<&str, &NodeType>,
     instances: &HashMap<&str, &NodeInstance>,
+    shared: &HashSet<&str>,
     defects: &mut Vec<WiringDefect>,
 ) {
     let Some(declaration) = declarations.get(instance.node_type.as_str()) else {
@@ -78,7 +130,14 @@ fn check_instance(
     };
 
     check_required_bound(instance, declaration, defects);
-    check_bindings(instance, declaration, declarations, instances, defects);
+    check_bindings(
+        instance,
+        declaration,
+        declarations,
+        instances,
+        shared,
+        defects,
+    );
 }
 
 /// Every parameter the declaration requires carries a binding.
@@ -133,16 +192,36 @@ fn check_required_bound(
 /// undeclared parameter from an instance that is not there is two fixes, the
 /// parameter renamed and the source repointed, and a walk moving on after the
 /// first leaves the second for the next round trip.
+///
+/// A parameter is looked at once, at its first binding, however many it has. A
+/// source several instances share resolves - to more than one thing, which is
+/// reported where the name is - and its type is not compared, since which of
+/// those instances would produce it is the question the author has to settle.
 // @Every binding's source resolved,IMPL_WIRING_BINDING_SOURCE,impl,[CREQ_VALIDATOR_BINDING_RESOLVES]
 fn check_bindings(
     instance: &NodeInstance,
     declaration: &NodeType,
     declarations: &HashMap<&str, &NodeType>,
     instances: &HashMap<&str, &NodeInstance>,
+    shared: &HashSet<&str>,
     defects: &mut Vec<WiringDefect>,
 ) {
+    let bound_twice = repeated(
+        instance
+            .bindings
+            .iter()
+            .map(|binding| binding.parameter.as_str()),
+    );
+    let mut looked_at = HashSet::new();
+
     for binding in &instance.bindings {
+        if !looked_at.insert(binding.parameter.as_str()) {
+            continue;
+        }
         let parameter = declared_parameter(instance, declaration, binding, defects);
+        if bound_more_than_once(instance, binding, &bound_twice, defects) {
+            continue;
+        }
         let Some(source) = instances.get(binding.source.as_str()) else {
             defects.push(WiringDefect::UnresolvedInstance {
                 instance: instance.name.clone(),
@@ -151,10 +230,39 @@ fn check_bindings(
             });
             continue;
         };
+        if shared.contains(binding.source.as_str()) {
+            continue;
+        }
         if let Some(parameter) = parameter {
             check_binding_type(instance, parameter, binding, source, declarations, defects);
         }
     }
+}
+
+/// Whether the parameter `binding` fills is bound more than once on its
+/// instance - and if it is, a defect saying so.
+///
+/// Its caller then checks none of that parameter's bindings for a source or a
+/// type. Each would be a check of a wire the author may be about to delete, and
+/// checking them was measured reporting one defect twice, two defects at one
+/// place, or - with both sources sound - nothing at all. Whether the parameter
+/// is declared is checked before this, since that does not depend on which
+/// binding is kept.
+// @A parameter bound twice reported once and none of its wires checked,IMPL_WIRING_PARAMETER_BOUND_ONCE,impl,[CREQ_VALIDATOR_PARAMETER_BOUND_ONCE]
+fn bound_more_than_once(
+    instance: &NodeInstance,
+    binding: &Binding,
+    bound_twice: &HashSet<&str>,
+    defects: &mut Vec<WiringDefect>,
+) -> bool {
+    let twice = bound_twice.contains(binding.parameter.as_str());
+    if twice {
+        defects.push(WiringDefect::RepeatedBinding {
+            instance: instance.name.clone(),
+            parameter: binding.parameter.clone(),
+        });
+    }
+    twice
 }
 
 /// The parameter `binding` fills, as its instance's type declares it - or
@@ -208,9 +316,10 @@ fn declared_parameter<'d>(
 /// every wire out of it disagree and send the author to change a type that is
 /// not wrong.
 ///
-/// The check is reached for every binding of every instance, including one whose
-/// instance already carries an unbound-parameter defect. A walk that moved on
-/// after an instance's first defect would hide every disagreement below it.
+/// The check is reached for every binding whose wire can be compared, including
+/// one whose instance already carries an unbound-parameter defect. A walk that
+/// moved on after an instance's first defect would hide every disagreement below
+/// it.
 // @Both ends of a wire declare one context type,IMPL_WIRING_TYPES_AGREE,impl,[CREQ_VALIDATOR_TYPES_AGREE]
 fn check_binding_type(
     instance: &NodeInstance,
@@ -267,7 +376,9 @@ fn check_signature(definition: &WorkflowDefinition, defects: &mut Vec<WiringDefe
 ///
 /// Reported as a signature defect of its own rather than as designating
 /// nothing, because a count of nought loses the name the author typed - the one
-/// thing tying the defect to what has to be changed.
+/// thing tying the defect to what has to be changed. A name several instances
+/// share does resolve, to more than one thing, and that is reported where the
+/// name is rather than here.
 // @The one designated output resolved,IMPL_WIRING_OUTPUT_RESOLVES,impl,[CREQ_VALIDATOR_OUTPUT_RESOLVES]
 fn check_output_resolves(
     definition: &WorkflowDefinition,
@@ -297,24 +408,38 @@ use proptest::prelude::*;
 
 /// Definitions of every shape, sound and broken alike: node types that may or
 /// may not be declared, bindings that may or may not resolve, parameters that
-/// may or may not agree on a type, and nought, one or two designated outputs.
+/// may or may not be declared or agree on a type, instance names that may be
+/// shared, parameters that may be bound more than once, and nought, one or two
+/// designated outputs that may or may not name an instance.
 ///
-/// Two things are held fixed rather than generated, and neither is laxity. Each
-/// instance carries at most one binding per parameter, because a parameter binds
-/// to exactly one output (`DEC_BINDING_BY_PORT`) and a definition binding one
-/// twice is outside the model rather than a defective use of it. And instance
-/// names are distinct, because two instances sharing a name is one of the shapes
-/// recorded as not yet answered, which
-/// `TEST_WIRING_MALFORMED_DEFINITION_STILL_REPORTS` holds to the one thing that
-/// is settled about it.
+/// The two sharing shapes were once held fixed, a parameter bound twice as
+/// outside the model and a shared name as unanswered. The model holds both, and
+/// they are the shapes where checking what a name picks out one thing at a time
+/// reports it twice - so a property of the report that never met them would
+/// prove nothing about them.
 #[cfg(test)]
 pub(crate) fn any_definition() -> impl Strategy<Value = WorkflowDefinition> {
     const CONTEXT_TYPES: [&str; 2] = ["note", "diff"];
     const PARAMETERS: [&str; 3] = ["p0", "p1", "q0"];
 
     let declarations = vec((0..=2usize, 0..=1usize, 0..=1usize, 0..2usize), 1..=3);
+    // Per node: its type, whether it is an entry node, its bindings, whether a
+    // parameter may be bound more than once, and an earlier node whose name it
+    // takes - an index at or past its own position keeps a name of its own.
+    //
+    // The range for that index is wide on purpose. Nothing behind a shared name
+    // is checked, so every definition sharing one hides the other classes on
+    // those nodes. Measured over 4000 definitions: with 0..6 a third of them
+    // shared a name, and the share carrying a disagreement fell from 13.8% to
+    // 6.8%; with 0..10 a fifth share one, and 8.4% carry a disagreement.
     let nodes = vec(
-        (0..4usize, any::<bool>(), vec((0..3usize, 0..5usize), 0..=3)),
+        (
+            0..4usize,
+            any::<bool>(),
+            vec((0..3usize, 0..5usize), 0..=3),
+            any::<bool>(),
+            0..10usize,
+        ),
         1..=4,
     );
     let designated = vec(0..5usize, 0..=2);
@@ -340,13 +465,26 @@ pub(crate) fn any_definition() -> impl Strategy<Value = WorkflowDefinition> {
             })
             .collect();
 
+        // A node taking an earlier node's name shares it, with that node and
+        // with any other that took it too.
+        let mut names: Vec<String> = Vec::new();
+        for (node, &(.., earlier)) in nodes.iter().enumerate() {
+            let name = if earlier < node {
+                names[earlier].clone()
+            } else {
+                format!("n{node}")
+            };
+            names.push(name);
+        }
+
         let instances: Vec<NodeInstance> = nodes
             .iter()
-            .enumerate()
-            .map(|(node, (declared, entry, bindings))| {
+            .zip(&names)
+            .map(|((declared, entry, bindings, repeats, _), name)| {
                 // A type index past the declarations names a type nobody
                 // supplied; a source index past the instances names a node the
-                // definition does not carry.
+                // definition does not carry, and so may one naming a node whose
+                // own name was taken from an earlier one.
                 let declared = if *declared < declarations.len() {
                     format!("t{declared}")
                 } else {
@@ -355,7 +493,7 @@ pub(crate) fn any_definition() -> impl Strategy<Value = WorkflowDefinition> {
                 let mut bound: Vec<(&str, String)> = Vec::new();
                 for &(parameter, source) in bindings {
                     let parameter = PARAMETERS[parameter];
-                    if bound.iter().any(|(filled, _)| *filled == parameter) {
+                    if !repeats && bound.iter().any(|(filled, _)| *filled == parameter) {
                         continue;
                     }
                     let source = if source < nodes.len() {
@@ -369,7 +507,7 @@ pub(crate) fn any_definition() -> impl Strategy<Value = WorkflowDefinition> {
                     .iter()
                     .map(|(parameter, source)| (*parameter, source.as_str()))
                     .collect();
-                let built = instance(&format!("n{node}"), &declared, &bound);
+                let built = instance(name, &declared, &bound);
                 if *entry { built.into_entry() } else { built }
             })
             .collect();
@@ -446,6 +584,23 @@ fn unresolved_output(output: &str) -> WiringDefect {
     WiringDefect::UnresolvedOutput {
         definition: DEFINITION_NAME.to_owned(),
         unresolved: output.to_owned(),
+    }
+}
+
+/// A name several instances share, as the report names it.
+#[cfg(test)]
+fn shared(name: &str) -> WiringDefect {
+    WiringDefect::RepeatedInstance {
+        instance: name.to_owned(),
+    }
+}
+
+/// A parameter bound more than once on one instance, as the report names it.
+#[cfg(test)]
+fn bound_twice(instance: &str, parameter: &str) -> WiringDefect {
+    WiringDefect::RepeatedBinding {
+        instance: instance.to_owned(),
+        parameter: parameter.to_owned(),
     }
 }
 
@@ -804,16 +959,6 @@ fn malformed_definition_still_reports() {
                 instance("c", "both", &[]),
             ],
             &["b"],
-        ),
-        // Two instances sharing one name, so that a binding to it resolves to
-        // both.
-        definition(
-            types.clone(),
-            vec![
-                instance("a", "source", &[]),
-                instance("a", "sink", &[("input", "a")]),
-            ],
-            &["a"],
         ),
         // A binding naming an empty instance name.
         definition(
@@ -1177,6 +1322,174 @@ fn resolving_outputs_pass() {
         &["result"],
     );
     assert_eq!(validate_wiring(&named_apart), Vec::new());
+}
+
+#[test]
+fn shared_instance_name_is_reported() {
+    let types = vec![
+        node_type("source", &[], "note"),
+        node_type("differ", &[], "diff"),
+        node_type("sink", &[("input", "note")], "note"),
+    ];
+    // Four instances named a, of the types given: two producing different
+    // context types, one with a required parameter unbound, one of a type
+    // nobody supplied. Then a wire from a into a parameter declared for one of
+    // those types, the output designating a, and c, whose own unbound parameter
+    // shows the walk goes on.
+    let sharing = |copies: [&str; 4]| {
+        let mut instances: Vec<NodeInstance> = copies
+            .iter()
+            .map(|&node_type| instance("a", node_type, &[]))
+            .collect();
+        instances.push(instance("b", "sink", &[("input", "a")]));
+        instances.push(instance("c", "sink", &[]));
+        definition(types.clone(), instances, &["a"])
+    };
+
+    // Two orders. The producers are swapped between them, so a validator
+    // resolving a to whichever producer comes first reports a disagreement for
+    // exactly one. And a different instance comes first in each - in the second
+    // the one with its parameter unbound - so one walking only the first
+    // instance carrying the name reports it there. Everything else absent from
+    // the report is what walking each instance as if the name were its own
+    // produces, each about a node the author cannot find.
+    for copies in [
+        ["differ", "source", "sink", "not-supplied"],
+        ["sink", "not-supplied", "source", "differ"],
+    ] {
+        assert_eq!(
+            validate_wiring(&sharing(copies)),
+            vec![shared("a"), unbound("c", "input")],
+            "with the instances named a in the order {copies:?}"
+        );
+    }
+}
+
+#[test]
+fn names_of_different_kinds_pass() {
+    let named_alike = definition(
+        vec![
+            node_type("source", &[], "note"),
+            node_type("sink", &[("input", "note")], "note"),
+        ],
+        vec![
+            // Named like its own node type.
+            instance("source", "source", &[]),
+            // Named like a parameter - the very one it is bound through.
+            instance("input", "source", &[]),
+            instance("sink", "sink", &[("input", "input")]),
+            // So each node type has two instances, under different names.
+            instance("other", "sink", &[("input", "source")]),
+        ],
+        &["sink"],
+    );
+
+    // A check gathering every name into one set before looking for repeats
+    // refuses this, and it is how a definition with one instance of each type
+    // is naturally written.
+    assert_eq!(validate_wiring(&named_alike), Vec::new());
+}
+
+#[test]
+fn parameter_bound_twice_is_reported() {
+    let types = vec![
+        node_type("source", &[], "note"),
+        node_type("differ", &[], "diff"),
+        node_type("sink", &[("input", "note")], "note"),
+    ];
+    let instances = vec![
+        instance("a", "source", &[]),
+        instance("z", "differ", &[]),
+        // Bound to two instances that are not there.
+        instance("b", "sink", &[("input", "g1"), ("input", "g2")]),
+        // Bound three times, to one sound source.
+        instance(
+            "c",
+            "sink",
+            &[("input", "a"), ("input", "a"), ("input", "a")],
+        ),
+        // Bound to two sound sources, the second disagreeing on its type.
+        instance("d", "sink", &[("input", "a"), ("input", "z")]),
+        // An undeclared parameter bound twice, beside a sound binding.
+        instance(
+            "e",
+            "sink",
+            &[("stray", "a"), ("input", "a"), ("stray", "a")],
+        ),
+    ];
+
+    // Checking each binding reports b twice and d as a disagreement, and
+    // passes c; checking only the first reports b's source; one defect per
+    // binding beyond the first reports c twice. And e keeps the one check that
+    // still runs on a parameter bound twice, which a walk skipping everything
+    // about it loses.
+    assert_eq!(
+        validate_wiring(&definition(types, instances, &["a"])),
+        vec![
+            bound_twice("b", "input"),
+            bound_twice("c", "input"),
+            bound_twice("d", "input"),
+            undeclared("e", "stray"),
+            bound_twice("e", "stray"),
+        ]
+    );
+}
+
+#[test]
+fn singly_bound_parameters_pass() {
+    let fanned = definition(
+        vec![
+            node_type("source", &[], "note"),
+            node_type("sink", &[("input", "note")], "note"),
+            node_type("pair", &[("left", "note"), ("right", "note")], "note"),
+        ],
+        vec![
+            instance("a", "source", &[]),
+            // One parameter name, bound once on each of several instances.
+            instance("b", "sink", &[("input", "a")]),
+            instance("c", "sink", &[("input", "a")]),
+            // One output bound by two parameters of one instance.
+            instance("d", "pair", &[("left", "a"), ("right", "a")]),
+        ],
+        &["d"],
+    );
+
+    // A check counting parameter names across the definition refuses b and c,
+    // and one counting sources within an instance refuses d.
+    assert_eq!(validate_wiring(&fanned), Vec::new());
+}
+
+#[test]
+fn name_defects_reported_together() {
+    let types = vec![
+        node_type("source", &[], "note"),
+        node_type("lenient", &[("input", "note")], "note").with_optional(&[("hint", "note")]),
+    ];
+    let instances = vec![
+        // A name two instances share, first in the definition.
+        instance("a", "source", &[]),
+        instance("a", "source", &[]),
+        instance("s", "source", &[]),
+        // On one instance: its required parameter unbound, and a typo of its
+        // optional one bound twice.
+        instance("b", "lenient", &[("hnit", "s"), ("hnit", "s")]),
+    ];
+    // And an output naming no instance.
+    let broken = definition(types, instances, &["nowhere"]);
+
+    // A walk leaving an instance once a binding repeats reports fewer than
+    // three for b, and one leaving the definition once a name is shared reports
+    // only the first.
+    assert_eq!(
+        validate_wiring(&broken),
+        vec![
+            shared("a"),
+            unbound("b", "input"),
+            undeclared("b", "hnit"),
+            bound_twice("b", "hnit"),
+            unresolved_output("nowhere"),
+        ]
+    );
 }
 
 #[test]

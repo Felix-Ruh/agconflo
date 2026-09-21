@@ -444,6 +444,24 @@
           "title": "agconflo-core wiring::malformed_definition_still_reports",
           "type": "test_run"
         },
+        "RUN_WIRING_NAMES_OF_DIFFERENT_KINDS_PASS": {
+          "executes": [
+            "TEST_WIRING_NAMES_OF_DIFFERENT_KINDS_PASS"
+          ],
+          "id": "RUN_WIRING_NAMES_OF_DIFFERENT_KINDS_PASS",
+          "test_outcome": "passed",
+          "title": "agconflo-core wiring::names_of_different_kinds_pass",
+          "type": "test_run"
+        },
+        "RUN_WIRING_NAME_DEFECTS_REPORTED_TOGETHER": {
+          "executes": [
+            "TEST_WIRING_NAME_DEFECTS_REPORTED_TOGETHER"
+          ],
+          "id": "RUN_WIRING_NAME_DEFECTS_REPORTED_TOGETHER",
+          "test_outcome": "passed",
+          "title": "agconflo-core wiring::name_defects_reported_together",
+          "type": "test_run"
+        },
         "RUN_WIRING_NO_DEFECT_IS_REPORTED_TWICE": {
           "executes": [
             "TEST_WIRING_NO_DEFECT_IS_REPORTED_TWICE"
@@ -460,6 +478,15 @@
           "id": "RUN_WIRING_OUTPUT_NAMING_NOTHING_IS_REPORTED",
           "test_outcome": "passed",
           "title": "agconflo-core wiring::output_naming_nothing_is_reported",
+          "type": "test_run"
+        },
+        "RUN_WIRING_PARAMETER_BOUND_TWICE_IS_REPORTED": {
+          "executes": [
+            "TEST_WIRING_PARAMETER_BOUND_TWICE_IS_REPORTED"
+          ],
+          "id": "RUN_WIRING_PARAMETER_BOUND_TWICE_IS_REPORTED",
+          "test_outcome": "passed",
+          "title": "agconflo-core wiring::parameter_bound_twice_is_reported",
           "type": "test_run"
         },
         "RUN_WIRING_RESOLVING_OUTPUTS_PASS": {
@@ -480,6 +507,15 @@
           "title": "agconflo-core wiring::self_binding_and_shared_types_pass",
           "type": "test_run"
         },
+        "RUN_WIRING_SHARED_INSTANCE_NAME_IS_REPORTED": {
+          "executes": [
+            "TEST_WIRING_SHARED_INSTANCE_NAME_IS_REPORTED"
+          ],
+          "id": "RUN_WIRING_SHARED_INSTANCE_NAME_IS_REPORTED",
+          "test_outcome": "passed",
+          "title": "agconflo-core wiring::shared_instance_name_is_reported",
+          "type": "test_run"
+        },
         "RUN_WIRING_SIGNATURE_WITHOUT_ONE_OUTPUT_IS_REPORTED": {
           "executes": [
             "TEST_WIRING_SIGNATURE_WITHOUT_ONE_OUTPUT_IS_REPORTED"
@@ -487,6 +523,15 @@
           "id": "RUN_WIRING_SIGNATURE_WITHOUT_ONE_OUTPUT_IS_REPORTED",
           "test_outcome": "passed",
           "title": "agconflo-core wiring::signature_without_one_output_is_reported",
+          "type": "test_run"
+        },
+        "RUN_WIRING_SINGLY_BOUND_PARAMETERS_PASS": {
+          "executes": [
+            "TEST_WIRING_SINGLY_BOUND_PARAMETERS_PASS"
+          ],
+          "id": "RUN_WIRING_SINGLY_BOUND_PARAMETERS_PASS",
+          "test_outcome": "passed",
+          "title": "agconflo-core wiring::singly_bound_parameters_pass",
           "type": "test_run"
         },
         "RUN_WIRING_TYPE_DISAGREEMENT_IS_REPORTED": {
