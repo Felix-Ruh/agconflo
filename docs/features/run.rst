@@ -223,3 +223,68 @@ and names the components they are divided between, which are defined in
    remains ready after the designated output has produced its context yields the
    same result, having spent activations on nodes nothing was waiting for -
    which under ``DEC_COMPLETION_IS_DESIGNATED_OUTPUT`` is not what a run is for.
+
+.. feat_arch:: Running splits into a run and a scheduler
+   :id: ARCH_RUN
+   :realises: FEAT_RUN_REFUSES_INVALID_WIRING, FEAT_RUN_ENTRY_SOURCE_EXACT, FEAT_RUN_WAITS_FOR_EVERY_BINDING, FEAT_RUN_BUDGET_STOPS, FEAT_RUN_QUIESCENCE_ENDS, FEAT_RUN_FAILURE_CARRIED, FEAT_RUN_COMPLETES_ON_DESIGNATED
+   :uses: COMP_WORKFLOW_RUN, COMP_RUN_SCHEDULER
+   :statement: Agconflo shall allocate running a workflow to the workflow run and the run scheduler.
+
+   Two components, each answerable for what the other cannot guarantee:
+
+   - The workflow run answers for what becomes of a run. Both refusals before it
+     starts, the budget it is held to, and each of the four ways it may end are
+     statements about one run's history, which nothing that reads a definition
+     can make.
+   - The run scheduler answers for which instance may activate and what that
+     activation carries. That is a question about a definition and the outputs
+     produced so far, with no history in it, and it fails in ways a run's
+     bookkeeping does not - the one measured failure of this slice
+     (``EVD_RUN_OPTIONAL_BY_ORDER``) is entirely inside it.
+
+   ``FEAT_RUN_QUIESCENCE_ENDS`` is the one requirement split across both, and the
+   split is the clearest statement of the division. That no instance can activate
+   is the scheduler's answer, reached by asking every instance. That the run
+   therefore ends, with no result, is the run's - and it depends on the
+   designated output having produced nothing, which the scheduler has no reason
+   to know.
+
+   A third component was planned and dropped, which is worth recording because
+   the reasoning is the test the other two passed. A node activation, as a value
+   beside the two in the shape of ``COMP_WIRING_DEFECT``, turns out to answer for
+   nothing: there is no requirement that is true or false of one activation taken
+   alone. What an activation carries cannot usefully be separated from deciding
+   that its instance is ready, because knowing every bound parameter has a
+   context is gathering them: the prototype answered both in one pass, and
+   splitting them would mean walking the same bindings twice to reach the same
+   answer. The wiring defect earns its place by exactly the opposite test - what
+   a defect says about itself is true independently of what found it.
+
+   The decisions this is built against are named here rather than linked:
+
+   - ``DEC_RUN_IS_DRIVEN``: the run hands its caller one activation at a time and
+     takes back a context or a failure. Neither component performs an activation,
+     which is what keeps a provider, a script and a runtime out of this feature.
+   - ``DEC_BINDING_IS_AWAITED``: a bound parameter is waited for whether it is
+     declared required or optional, so readiness is asked of what an instance
+     binds rather than of what its type requires.
+   - ``DEC_ARGUMENTS_PER_ENTRY``: an argument is addressed by the entry instance
+     and parameter it fills, so two entry instances declaring one name are two
+     parameters.
+   - ``DEC_RUN_REFUSED_BEFORE_IT_STARTS``: a workflow with a defect, and a
+     signature whose parameters do not each have exactly one source, are refusals
+     rather than endings.
+   - ``DEC_RUN_ENDS_ONE_WAY``: the four endings are closed, so the run has one
+     answer to what became of it.
+   - ``DEC_BUDGET_COUNTS_ACTIVATIONS``: the budget is a count the run keeps,
+     which it can keep exactly because every activation passes through it.
+   - ``DEC_COMPLETION_IS_DESIGNATED_OUTPUT``: completion and quiescence are both
+     questions about the designated output rather than about the graph.
+   - ``DEC_ACTIVATION_ONCE_PER_RUN``: no instance activates twice, so the
+     scheduler needs no activation tag and the run needs no epoch.
+
+   Two absences, recorded so they are not read as oversights. There is no run log
+   component: what a run records for provenance is ``STKH_PROVENANCE``'s business
+   and belongs to a feature that has a run to record. And no component supplies a
+   global context, because a node type declares the global types it reads and
+   nothing yet provides them.
