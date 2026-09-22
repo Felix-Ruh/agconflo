@@ -451,12 +451,21 @@ single requirement to verify.
    :test_kind: error_path
    :coverage: partial
 
-   A workflow in which the designated instance is not the last to produce, so
-   that returning the most recent context gives a different answer.
+   A workflow in which several instances have produced by the time it completes,
+   so that returning any produced context other than the designated instance's
+   gives a different answer.
+
+   This case was first written as a workflow whose designated instance is not
+   the last to produce, and that shape turned out to be unreachable: a run ends
+   as soon as the designated instance produces
+   (``CREQ_RUN_COMPLETES``), so that instance is always the last to have
+   produced. What is reachable, and what a careless run does, is returning some
+   other produced context - the first the run happens to hold, which in a linear
+   workflow is indistinguishable from the right answer.
 
    Without it, every case in this file passes against a run that returns
-   whatever was produced most recently, because in a linear workflow that is the
-   designated output.
+   whatever produced context comes to hand, because everywhere else the
+   designated one is the only candidate.
 
 .. test_case:: Well-formed workflows run to completion
    :id: TEST_RUN_WELL_FORMED_RUNS_COMPLETE

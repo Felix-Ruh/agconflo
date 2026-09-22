@@ -18,6 +18,8 @@ mod defect;
 mod id;
 mod lineage;
 mod reader;
+mod run;
+mod scheduler;
 mod wiring;
 mod workflow;
 mod writer;
@@ -32,6 +34,8 @@ pub use id::{ContextId, IdSource, SourceExhausted};
 pub use reader::{
     FaultKind, NodeTypeDocument, ReadFault, WorkflowDocument, read_node_types, read_workflow,
 };
+pub use run::{Arguments, NothingOutstanding, Run, RunEnding, StartRefusal, Step};
+pub use scheduler::Activation;
 pub use wiring::validate_wiring;
 pub use workflow::{Binding, NodeInstance, NodeType, Parameter, WorkflowDefinition};
 pub use writer::{UnwritableDefinition, UnwritableShape, write_workflow};
