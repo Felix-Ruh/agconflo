@@ -13,7 +13,7 @@ use std::marker::PhantomData;
 use crate::defect::WiringDefect;
 use crate::scheduler::{Activation, Produced, next_activation};
 use crate::workflow::WorkflowDefinition;
-use crate::{Context, validate_wiring};
+use crate::{Context, ContextType, validate_wiring};
 
 /// The contexts a run supplies to its workflow's entry parameters.
 ///
@@ -74,6 +74,25 @@ impl Arguments {
             .find(|a| a.instance == instance && a.parameter == parameter)
             .map(|a| &a.context)
     }
+
+    /// How many arguments were supplied for that instance's parameter.
+    ///
+    /// More than one is a fault to report rather than a value to choose between
+    /// (`CREQ_RUN_REFUSES_UNFILLED_SIGNATURE`), which is why they are all kept.
+    pub(crate) fn count_for(&self, instance: &str, parameter: &str) -> usize {
+        self.supplied
+            .iter()
+            .filter(|a| a.instance == instance && a.parameter == parameter)
+            .count()
+    }
+
+    /// Every argument supplied, in the order it was supplied: the instance and
+    /// parameter it fills, and the context filling it.
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (&str, &str, &Context)> {
+        self.supplied
+            .iter()
+            .map(|a| (a.instance.as_str(), a.parameter.as_str(), &a.context))
+    }
 }
 
 /// Why a run was not started.
@@ -92,23 +111,223 @@ pub enum StartRefusal {
     /// The workflow carries wiring defects, all of them
     /// (`CREQ_RUN_REFUSAL_NAMES_EVERY_DEFECT`).
     Wiring(Vec<WiringDefect>),
+    /// The workflow's wiring is sound and its entry parameters are not each
+    /// filled by exactly one context of their declared type
+    /// (`CREQ_RUN_REFUSES_UNFILLED_SIGNATURE`).
+    Signature(Vec<SignatureFault>),
 }
 
 impl fmt::Display for StartRefusal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Wiring(defects) => {
-                write!(f, "the workflow carries {} wiring defect", defects.len())?;
-                if defects.len() != 1 {
-                    write!(f, "s")?;
-                }
-                Ok(())
-            }
+        let (what, count) = match self {
+            Self::Wiring(defects) => ("wiring defect", defects.len()),
+            Self::Signature(faults) => ("signature fault", faults.len()),
+        };
+        write!(f, "the workflow carries {count} {what}")?;
+        if count != 1 {
+            write!(f, "s")?;
         }
+        Ok(())
     }
 }
 
 impl std::error::Error for StartRefusal {}
+
+/// One thing wrong with what a run was started with, rather than with the
+/// workflow itself.
+///
+/// A value rather than a message, for the same reason a wiring defect is one: an
+/// agent correcting its own call reads the place, not the prose. Every variant
+/// names the entry instance and the parameter it concerns, because an argument
+/// is addressed by that pair and never by a parameter name alone
+/// (`DEC_ARGUMENTS_PER_ENTRY`).
+///
+/// `#[non_exhaustive]`: an entry instance's signature is the part of the model
+/// still moving, and the shapes `components/wiring` records as open concern
+/// exactly it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum SignatureFault {
+    /// A required entry parameter that no argument fills. Measured reading as a
+    /// stuck run when nothing checked it (`EVD_RUN_MISSING_ARGUMENT_QUIESCES`).
+    ParameterUnfilled {
+        /// The entry instance whose parameter is unfilled.
+        instance: String,
+        /// The parameter no argument filled.
+        parameter: String,
+        /// The context type it is declared for.
+        expected: ContextType,
+    },
+    /// An argument whose context type is not the one the parameter is declared
+    /// for. The wiring validator refuses this between two instances and cannot
+    /// see it here, because there is no binding to look at.
+    ArgumentTypeDisagrees {
+        /// The entry instance the argument was addressed to.
+        instance: String,
+        /// The parameter it fills.
+        parameter: String,
+        /// The context type the declaration names.
+        expected: ContextType,
+        /// The context type the argument actually carries.
+        supplied: ContextType,
+    },
+    /// An entry parameter that also carries a binding, so it has two sources
+    /// and no ground to prefer either. Sound wiring - `components/wiring`
+    /// records it among the shapes still open - and what a loop closing back
+    /// onto an entry node draws.
+    ParameterAlsoBound {
+        /// The entry instance whose parameter is both supplied and wired.
+        instance: String,
+        /// The parameter with two sources.
+        parameter: String,
+    },
+    /// An entry parameter given more than one argument, which is the same fault
+    /// reached from the other side.
+    ParameterSuppliedTwice {
+        /// The entry instance whose parameter was supplied twice.
+        instance: String,
+        /// The parameter with two arguments.
+        parameter: String,
+    },
+    /// An argument addressed to an instance or a parameter the workflow has no
+    /// entry parameter for. Ignoring it is what makes a typo silent.
+    ArgumentMatchesNothing {
+        /// The instance the argument named.
+        instance: String,
+        /// The parameter it named.
+        parameter: String,
+    },
+}
+
+impl fmt::Display for SignatureFault {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ParameterUnfilled {
+                instance,
+                parameter,
+                expected,
+            } => write!(
+                f,
+                "{instance}.{parameter} is declared for {} and no argument fills it",
+                expected.as_str()
+            ),
+            Self::ArgumentTypeDisagrees {
+                instance,
+                parameter,
+                expected,
+                supplied,
+            } => write!(
+                f,
+                "{instance}.{parameter} is declared for {} and was given {}",
+                expected.as_str(),
+                supplied.as_str()
+            ),
+            Self::ParameterAlsoBound {
+                instance,
+                parameter,
+            } => write!(
+                f,
+                "{instance}.{parameter} is an entry parameter and is also wired"
+            ),
+            Self::ParameterSuppliedTwice {
+                instance,
+                parameter,
+            } => write!(f, "{instance}.{parameter} was given more than one argument"),
+            Self::ArgumentMatchesNothing {
+                instance,
+                parameter,
+            } => write!(
+                f,
+                "{instance}.{parameter} is not an entry parameter of this workflow"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for SignatureFault {}
+
+/// Every way the arguments fail to fill the workflow's entry parameters exactly
+/// once each.
+///
+/// Every entry parameter is looked at and every argument is looked at, so a
+/// caller with three faults learns three - the same reason the validator reports
+/// every wiring defect rather than the first.
+///
+/// The order is the definition's: its entry instances in the order it carries
+/// them, each instance's parameters as its node type declares them, and then the
+/// arguments that matched no parameter, in the order they were supplied.
+// @A run whose signature is not filled does not start,IMPL_RUN_SIGNATURE,impl,[CREQ_RUN_REFUSES_UNFILLED_SIGNATURE]
+fn signature_faults(definition: &WorkflowDefinition, arguments: &Arguments) -> Vec<SignatureFault> {
+    let mut faults = Vec::new();
+    let mut matched: Vec<(&str, &str)> = Vec::new();
+
+    for node in definition.instances.iter().filter(|node| node.entry) {
+        let Some(declared) = definition
+            .node_types
+            .iter()
+            .find(|declared| declared.name == node.node_type)
+        else {
+            continue;
+        };
+
+        let listed = (declared.required.iter().map(|p| (p, true)))
+            .chain(declared.optional.iter().map(|p| (p, false)));
+
+        for (parameter, required) in listed {
+            matched.push((&node.name, &parameter.name));
+
+            // A wire is a second source whatever else is there, and preferring
+            // either silently is the answer this refuses.
+            if node.bindings.iter().any(|b| b.parameter == parameter.name) {
+                faults.push(SignatureFault::ParameterAlsoBound {
+                    instance: node.name.clone(),
+                    parameter: parameter.name.clone(),
+                });
+                continue;
+            }
+
+            let supplied = arguments.count_for(&node.name, &parameter.name);
+            if supplied > 1 {
+                faults.push(SignatureFault::ParameterSuppliedTwice {
+                    instance: node.name.clone(),
+                    parameter: parameter.name.clone(),
+                });
+                continue;
+            }
+
+            match arguments.context_for(&node.name, &parameter.name) {
+                Some(context) if context.declared_type() != &parameter.context_type => {
+                    faults.push(SignatureFault::ArgumentTypeDisagrees {
+                        instance: node.name.clone(),
+                        parameter: parameter.name.clone(),
+                        expected: parameter.context_type.clone(),
+                        supplied: context.declared_type().clone(),
+                    });
+                }
+                Some(_) => {}
+                // An optional entry parameter may go unsupplied: refusing it
+                // would make a workflow unusable that is not wrong.
+                None if required => faults.push(SignatureFault::ParameterUnfilled {
+                    instance: node.name.clone(),
+                    parameter: parameter.name.clone(),
+                    expected: parameter.context_type.clone(),
+                }),
+                None => {}
+            }
+        }
+    }
+
+    for (instance, parameter, _) in arguments.iter() {
+        if !matched.contains(&(instance, parameter)) {
+            faults.push(SignatureFault::ArgumentMatchesNothing {
+                instance: instance.to_owned(),
+                parameter: parameter.to_owned(),
+            });
+        }
+    }
+
+    faults
+}
 
 /// Reporting an outcome when the run had offered no activation.
 ///
@@ -214,6 +433,11 @@ impl<'a, F> Run<'a, F> {
     /// validator answers when something asks, and a run is the first thing in
     /// this project that can be said to have started, so it is the first place
     /// a refusal can come before anything.
+    ///
+    /// The signature is checked second and only when the wiring is sound, since
+    /// an entry instance whose node type is missing has no parameter list to
+    /// check arguments against - the faults would be derived from a graph
+    /// already known to be broken.
     // @A run of a defective workflow does not start,IMPL_RUN_REFUSES_DEFECTS,impl,[CREQ_RUN_REFUSES_DEFECTS, CREQ_RUN_REFUSAL_NAMES_EVERY_DEFECT]
     pub fn start(
         definition: &'a WorkflowDefinition,
@@ -223,6 +447,11 @@ impl<'a, F> Run<'a, F> {
         let defects = validate_wiring(definition);
         if !defects.is_empty() {
             return Err(StartRefusal::Wiring(defects));
+        }
+
+        let faults = signature_faults(definition, &arguments);
+        if !faults.is_empty() {
+            return Err(StartRefusal::Signature(faults));
         }
 
         Ok(Self {
@@ -398,7 +627,9 @@ fn defective_workflow_is_refused() {
     // a caller can tell a workflow it must fix from a run that happened.
     let refusal = Run::<Infallible>::start(&broken, Arguments::new(), 10)
         .expect_err("a defective workflow does not start");
-    let StartRefusal::Wiring(defects) = refusal;
+    let StartRefusal::Wiring(defects) = refusal else {
+        panic!("a broken wire is a wiring defect, not a signature fault: {refusal:?}")
+    };
     assert!(!defects.is_empty());
 
     // No activation was offered, and nothing could have been: `start` handed
@@ -438,7 +669,9 @@ fn refusal_carries_every_defect() {
 
     let refusal = Run::<Infallible>::start(&broken, Arguments::new(), 10)
         .expect_err("a defective workflow does not start");
-    let StartRefusal::Wiring(defects) = refusal;
+    let StartRefusal::Wiring(defects) = refusal else {
+        panic!("every one of these is a wiring defect: {refusal:?}")
+    };
 
     // Compared against the validator's own report as a whole rather than
     // counted, so a run forwarding the right number of the wrong defects fails,
@@ -713,4 +946,258 @@ proptest! {
             other => prop_assert!(false, "a well-formed workflow completes, got {:?}", other),
         }
     }
+}
+
+/// The signature faults a refusal carries, or a panic naming what came instead.
+#[cfg(test)]
+fn signature(refusal: StartRefusal) -> Vec<SignatureFault> {
+    match refusal {
+        StartRefusal::Signature(faults) => faults,
+        other => panic!("expected a signature refusal, got {other:?}"),
+    }
+}
+
+/// One entry instance of a type requiring `seed` of `declared`, designated.
+#[cfg(test)]
+fn one_entry(declared: &str) -> WorkflowDefinition {
+    let types = vec![node_type("Entry", &[("seed", declared)], declared)];
+    let instances = vec![instance("e", "Entry", &[]).into_entry()];
+    definition(types, instances, &["e"])
+}
+
+#[cfg(test)]
+#[test]
+fn missing_argument_is_refused() {
+    let workflow = one_entry("note");
+
+    // Which answer came back is the assertion, not merely that the run did not
+    // complete: measured, this shape reads as a stuck run naming every waiting
+    // instance (EVD_RUN_MISSING_ARGUMENT_QUIESCES), and a weaker assertion
+    // passes against that.
+    let refusal = Run::<Infallible>::start(&workflow, Arguments::new(), 10)
+        .expect_err("a required entry parameter with no argument is refused");
+    assert_eq!(
+        signature(refusal),
+        vec![SignatureFault::ParameterUnfilled {
+            instance: "e".to_owned(),
+            parameter: "seed".to_owned(),
+            expected: context_type("note"),
+        }]
+    );
+}
+
+#[cfg(test)]
+#[test]
+fn argument_of_wrong_type_is_refused() {
+    let mut source = IdSource::new();
+    let workflow = one_entry("note");
+
+    // No binding exists to compare, so the wiring validator cannot see this and
+    // the run is the only thing that can.
+    assert!(validate_wiring(&workflow).is_empty());
+
+    let arguments = Arguments::new().supply("e", "seed", ctx(&mut source, "diff"));
+    let refusal = Run::<Infallible>::start(&workflow, arguments, 10)
+        .expect_err("an argument of the wrong context type is refused");
+    assert_eq!(
+        signature(refusal),
+        vec![SignatureFault::ArgumentTypeDisagrees {
+            instance: "e".to_owned(),
+            parameter: "seed".to_owned(),
+            expected: context_type("note"),
+            supplied: context_type("diff"),
+        }]
+    );
+}
+
+#[cfg(test)]
+#[test]
+fn entry_parameter_also_bound_is_refused() {
+    let mut source = IdSource::new();
+    let types = vec![
+        node_type("Src", &[], "note"),
+        node_type("Entry", &[("seed", "note")], "note"),
+    ];
+    let instances = vec![
+        instance("a", "Src", &[]),
+        instance("e", "Entry", &[("seed", "a")]).into_entry(),
+    ];
+    let workflow = definition(types, instances, &["e"]);
+
+    // The wiring is sound: a binding into an entry node is checked like any
+    // other, which is what makes this the run's question.
+    assert!(validate_wiring(&workflow).is_empty());
+
+    let expected = vec![SignatureFault::ParameterAlsoBound {
+        instance: "e".to_owned(),
+        parameter: "seed".to_owned(),
+    }];
+
+    // Both arrangements, because a reader that silently prefers the argument
+    // passes the first and one that silently prefers the wire passes the second.
+    let with_argument = Arguments::new().supply("e", "seed", ctx(&mut source, "note"));
+    let refusal = Run::<Infallible>::start(&workflow, with_argument, 10)
+        .expect_err("a parameter with two sources is refused");
+    assert_eq!(signature(refusal), expected);
+
+    let refusal = Run::<Infallible>::start(&workflow, Arguments::new(), 10)
+        .expect_err("a wired entry parameter is refused with no argument too");
+    assert_eq!(signature(refusal), expected);
+}
+
+#[cfg(test)]
+#[test]
+fn argument_for_no_parameter_is_refused() {
+    let mut source = IdSource::new();
+    let workflow = one_entry("note");
+    let good = ctx(&mut source, "note");
+
+    // A typo in the instance name. Ignoring it leaves the real parameter
+    // unfilled while the caller believes it supplied one.
+    let arguments = Arguments::new().supply("e", "seed", good.clone()).supply(
+        "ee",
+        "seed",
+        ctx(&mut source, "note"),
+    );
+    let refusal = Run::<Infallible>::start(&workflow, arguments, 10)
+        .expect_err("an argument naming no instance is refused");
+    assert_eq!(
+        signature(refusal),
+        vec![SignatureFault::ArgumentMatchesNothing {
+            instance: "ee".to_owned(),
+            parameter: "seed".to_owned(),
+        }]
+    );
+
+    // And a typo in the parameter name.
+    let arguments =
+        Arguments::new()
+            .supply("e", "seed", good)
+            .supply("e", "sead", ctx(&mut source, "note"));
+    let refusal = Run::<Infallible>::start(&workflow, arguments, 10)
+        .expect_err("an argument naming no parameter is refused");
+    assert_eq!(
+        signature(refusal),
+        vec![SignatureFault::ArgumentMatchesNothing {
+            instance: "e".to_owned(),
+            parameter: "sead".to_owned(),
+        }]
+    );
+
+    // A parameter given two arguments is the same question from the other side.
+    let arguments = Arguments::new()
+        .supply("e", "seed", ctx(&mut source, "note"))
+        .supply("e", "seed", ctx(&mut source, "note"));
+    let refusal = Run::<Infallible>::start(&workflow, arguments, 10)
+        .expect_err("a parameter supplied twice is refused");
+    assert_eq!(
+        signature(refusal),
+        vec![SignatureFault::ParameterSuppliedTwice {
+            instance: "e".to_owned(),
+            parameter: "seed".to_owned(),
+        }]
+    );
+
+    // Both typos at once are two faults, not the first of them. A caller that
+    // learns its faults one round trip at a time is the cost this exists to
+    // avoid, and nothing else here has more than one fault to report.
+    let arguments = Arguments::new()
+        .supply("e", "seed", ctx(&mut source, "note"))
+        .supply("ee", "seed", ctx(&mut source, "note"))
+        .supply("e", "sead", ctx(&mut source, "note"));
+    let refusal = Run::<Infallible>::start(&workflow, arguments, 10)
+        .expect_err("two arguments matching nothing are refused");
+    assert_eq!(
+        signature(refusal),
+        vec![
+            SignatureFault::ArgumentMatchesNothing {
+                instance: "ee".to_owned(),
+                parameter: "seed".to_owned(),
+            },
+            SignatureFault::ArgumentMatchesNothing {
+                instance: "e".to_owned(),
+                parameter: "sead".to_owned(),
+            },
+        ]
+    );
+}
+
+#[cfg(test)]
+#[test]
+fn signature_filled_exactly_starts() {
+    let mut source = IdSource::new();
+    // Two entry instances whose node types each declare a parameter called the
+    // same thing, for two different context types - the shape measured handing
+    // one context to both (EVD_RUN_ENTRY_NAME_SHARED). They are two parameters.
+    // `p` and `p2` are two instances of one node type, so they necessarily
+    // declare the same parameter names and are two parameters all the same.
+    let types = vec![
+        node_type("Alpha", &[("seed", "note")], "note"),
+        node_type("Beta", &[("seed", "diff")], "note").with_optional(&[("hint", "note")]),
+        node_type(
+            "Join",
+            &[("left", "note"), ("right", "note"), ("extra", "note")],
+            "note",
+        ),
+    ];
+    let instances = vec![
+        instance("p", "Alpha", &[]).into_entry(),
+        instance("q", "Beta", &[]).into_entry(),
+        instance("p2", "Alpha", &[]).into_entry(),
+        instance(
+            "j",
+            "Join",
+            &[("left", "p"), ("right", "q"), ("extra", "p2")],
+        ),
+    ];
+    let workflow = definition(types, instances, &["j"]);
+
+    // One argument per required entry parameter, each of the declared type, and
+    // `q`'s optional parameter deliberately unsupplied: refusing that would make
+    // a workflow unusable that is not wrong.
+    let alpha_seed = ctx(&mut source, "note");
+    let beta_seed = ctx(&mut source, "diff");
+    let (alpha_id, beta_id) = (alpha_seed.id(), beta_seed.id());
+    let p2_seed = ctx(&mut source, "note");
+    let p2_id = p2_seed.id();
+    let arguments = Arguments::new()
+        .supply("p", "seed", alpha_seed)
+        .supply("q", "seed", beta_seed)
+        .supply("p2", "seed", p2_seed);
+
+    let mut run =
+        Run::<Infallible>::start(&workflow, arguments, 10).expect("the signature is filled");
+
+    // Each entry instance is given its own argument rather than one shared by
+    // name, which is the whole point of addressing them per instance.
+    let mut seen = Vec::new();
+    loop {
+        match run.step() {
+            Step::Ended(ending) => {
+                assert!(matches!(ending, RunEnding::Completed(_)), "{ending:?}");
+                break;
+            }
+            Step::Activate(activation) => {
+                // Same node type, same parameter name, its own argument.
+                if activation.instance() == "p" {
+                    assert_eq!(activation.inputs()[0].1.id(), alpha_id);
+                }
+                if activation.instance() == "p2" {
+                    assert_eq!(activation.inputs()[0].1.id(), p2_id);
+                }
+                if activation.instance() == "q" {
+                    assert_eq!(
+                        activation.inputs().len(),
+                        1,
+                        "the optional one is unsupplied"
+                    );
+                    assert_eq!(activation.inputs()[0].1.id(), beta_id);
+                }
+                seen.push(activation.instance().to_owned());
+                let produced = ctx(&mut source, "note");
+                run.produced(produced).expect("an activation was offered");
+            }
+        }
+    }
+    assert_eq!(seen, ["p", "q", "p2", "j"]);
 }

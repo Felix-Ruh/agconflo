@@ -354,6 +354,24 @@
           "title": "agconflo-core run::activations_never_exceed_budget",
           "type": "test_run"
         },
+        "RUN_RUN_ARGUMENT_FOR_NO_PARAMETER_IS_REFUSED": {
+          "executes": [
+            "TEST_RUN_ARGUMENT_FOR_NO_PARAMETER_IS_REFUSED"
+          ],
+          "id": "RUN_RUN_ARGUMENT_FOR_NO_PARAMETER_IS_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::argument_for_no_parameter_is_refused",
+          "type": "test_run"
+        },
+        "RUN_RUN_ARGUMENT_OF_WRONG_TYPE_IS_REFUSED": {
+          "executes": [
+            "TEST_RUN_ARGUMENT_OF_WRONG_TYPE_IS_REFUSED"
+          ],
+          "id": "RUN_RUN_ARGUMENT_OF_WRONG_TYPE_IS_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::argument_of_wrong_type_is_refused",
+          "type": "test_run"
+        },
         "RUN_RUN_BUDGET_STOPS_AT_THE_LIMIT": {
           "executes": [
             "TEST_RUN_BUDGET_STOPS_AT_THE_LIMIT"
@@ -399,6 +417,15 @@
           "title": "agconflo-core run::defective_workflow_is_refused",
           "type": "test_run"
         },
+        "RUN_RUN_ENTRY_PARAMETER_ALSO_BOUND_IS_REFUSED": {
+          "executes": [
+            "TEST_RUN_ENTRY_PARAMETER_ALSO_BOUND_IS_REFUSED"
+          ],
+          "id": "RUN_RUN_ENTRY_PARAMETER_ALSO_BOUND_IS_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::entry_parameter_also_bound_is_refused",
+          "type": "test_run"
+        },
         "RUN_RUN_IDLE_INSTANCE_DOES_NOT_MAKE_IT_STUCK": {
           "executes": [
             "TEST_RUN_IDLE_INSTANCE_DOES_NOT_MAKE_IT_STUCK"
@@ -415,6 +442,15 @@
           "id": "RUN_RUN_LAST_PERMITTED_ACTIVATION_COMPLETES",
           "test_outcome": "passed",
           "title": "agconflo-core run::last_permitted_activation_completes",
+          "type": "test_run"
+        },
+        "RUN_RUN_MISSING_ARGUMENT_IS_REFUSED": {
+          "executes": [
+            "TEST_RUN_MISSING_ARGUMENT_IS_REFUSED"
+          ],
+          "id": "RUN_RUN_MISSING_ARGUMENT_IS_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::missing_argument_is_refused",
           "type": "test_run"
         },
         "RUN_RUN_QUIESCENT_NAMES_ONLY_UNPRODUCED": {
@@ -442,6 +478,15 @@
           "id": "RUN_RUN_RESULT_IS_THE_DESIGNATED_CONTEXT",
           "test_outcome": "passed",
           "title": "agconflo-core run::result_is_the_designated_context",
+          "type": "test_run"
+        },
+        "RUN_RUN_SIGNATURE_FILLED_EXACTLY_STARTS": {
+          "executes": [
+            "TEST_RUN_SIGNATURE_FILLED_EXACTLY_STARTS"
+          ],
+          "id": "RUN_RUN_SIGNATURE_FILLED_EXACTLY_STARTS",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::signature_filled_exactly_starts",
           "type": "test_run"
         },
         "RUN_RUN_WELL_FORMED_RUNS_COMPLETE": {
