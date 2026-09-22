@@ -426,6 +426,24 @@
           "title": "agconflo-core run::entry_parameter_also_bound_is_refused",
           "type": "test_run"
         },
+        "RUN_RUN_FAILED_ACTIVATION_ENDS_THE_RUN": {
+          "executes": [
+            "TEST_RUN_FAILED_ACTIVATION_ENDS_THE_RUN"
+          ],
+          "id": "RUN_RUN_FAILED_ACTIVATION_ENDS_THE_RUN",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::failed_activation_ends_the_run",
+          "type": "test_run"
+        },
+        "RUN_RUN_FAILURE_WITH_NO_ACTIVATION_IS_REFUSED": {
+          "executes": [
+            "TEST_RUN_FAILURE_WITH_NO_ACTIVATION_IS_REFUSED"
+          ],
+          "id": "RUN_RUN_FAILURE_WITH_NO_ACTIVATION_IS_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::failure_with_no_activation_is_refused",
+          "type": "test_run"
+        },
         "RUN_RUN_IDLE_INSTANCE_DOES_NOT_MAKE_IT_STUCK": {
           "executes": [
             "TEST_RUN_IDLE_INSTANCE_DOES_NOT_MAKE_IT_STUCK"

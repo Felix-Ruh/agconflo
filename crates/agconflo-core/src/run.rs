@@ -504,6 +504,30 @@ impl<'a, F> Run<'a, F> {
         }
     }
 
+    /// Report that the outstanding activation failed, which ends the run.
+    ///
+    /// The failure is the caller's own type, carried into the ending as a value
+    /// (`CREQ_RUN_ENDS_ON_FAILURE`). What went wrong is the caller's to say; that
+    /// it ends the run, and that the ending carries it along with the instance
+    /// it was reported for, is the run's.
+    ///
+    /// Consumes the run, so that no further activation can be offered - the
+    /// failure mode is ruled out by the type rather than by a test. A run whose
+    /// result is already unreachable should not go on spending activations, and
+    /// for a node that calls a provider each one costs.
+    ///
+    /// Refused when no activation is outstanding: there is no instance to file
+    /// the failure against, and choosing one would attribute it to a node that
+    /// never ran.
+    // @A failed activation ends the run,IMPL_RUN_FAILED,impl,[CREQ_RUN_ENDS_ON_FAILURE]
+    pub fn fail(self, failure: F) -> Result<RunEnding<F>, NothingOutstanding> {
+        let outstanding = self.outstanding.ok_or(NothingOutstanding)?;
+        Ok(RunEnding::NodeFailed {
+            instance: outstanding.instance().to_owned(),
+            failure,
+        })
+    }
+
     /// Report what the outstanding activation produced.
     pub fn produced(&mut self, context: Context) -> Result<(), NothingOutstanding> {
         let outstanding = self.outstanding.take().ok_or(NothingOutstanding)?;
@@ -1200,4 +1224,101 @@ fn signature_filled_exactly_starts() {
         }
     }
     assert_eq!(seen, ["p", "q", "p2", "j"]);
+}
+
+/// A caller's own failure type. Named variants rather than a string, because
+/// asserting which failure occurred is what every error-path case here owes
+/// (`STKH_TYPED_FAILURE`), and prose cannot be asserted on.
+#[cfg(test)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum NodeTrouble {
+    Refused(&'static str),
+    TimedOut,
+}
+
+/// A workflow of two instances that are both ready from the start, the first
+/// designated.
+#[cfg(test)]
+fn two_ready() -> WorkflowDefinition {
+    let types = vec![node_type("Src", &[], "note")];
+    let instances = vec![instance("a", "Src", &[]), instance("b", "Src", &[])];
+    definition(types, instances, &["a"])
+}
+
+#[cfg(test)]
+#[test]
+fn failed_activation_ends_the_run() {
+    let mut source = IdSource::new();
+    let workflow = two_ready();
+
+    let mut run = Run::<NodeTrouble>::start(&workflow, Arguments::new(), 10).expect("sound");
+    let Step::Activate(activation) = run.step() else {
+        panic!("an instance with nothing to wait for is offered")
+    };
+    assert_eq!(activation.instance(), "a");
+
+    let ending = run
+        .fail(NodeTrouble::Refused("the node said no"))
+        .expect("an activation was outstanding");
+
+    // The instance is named, and the failure is carried as the caller's own
+    // value: matched here rather than read out of a message, which is what a
+    // rendered failure would force and what this exists to rule out.
+    match ending {
+        RunEnding::NodeFailed { instance, failure } => {
+            assert_eq!(instance, "a");
+            assert_eq!(failure, NodeTrouble::Refused("the node said no"));
+        }
+        other => panic!("a reported failure ends the run as a failure, not {other:?}"),
+    }
+
+    // That the run offers nothing further is held by the type rather than by an
+    // assertion: `fail` consumes the run, so carrying on does not compile. A
+    // test could only check that this caller did not carry on.
+    crate::compile_fail::assert_refused(
+        "run_continues_after_failing",
+        "fn after(mut run: agconflo_core::Run<'static, ()>) { let _ = run.fail(()); let _ = run.step(); }",
+        "E0382",
+        "moved value",
+    );
+
+    // `b` was ready the whole time, which is what makes the case bite: without
+    // another instance waiting, a run that carried on would be indistinguishable
+    // from one that stopped. The same workflow driven without a failure goes on
+    // to activate it.
+    let (_, activated) = drive(&workflow, Arguments::new(), 10, &mut source);
+    assert_eq!(names(&activated), ["a"]);
+
+    // And with `b` designated instead, it is reached - so it really was ready.
+    let types = vec![node_type("Src", &[], "note")];
+    let instances = vec![instance("a", "Src", &[]), instance("b", "Src", &[])];
+    let b_designated = definition(types, instances, &["b"]);
+    let (_, activated) = drive(&b_designated, Arguments::new(), 10, &mut source);
+    assert_eq!(names(&activated), ["a", "b"]);
+}
+
+#[cfg(test)]
+#[test]
+fn failure_with_no_activation_is_refused() {
+    let mut source = IdSource::new();
+    let workflow = two_ready();
+
+    // Nothing has been offered yet.
+    let run = Run::<NodeTrouble>::start(&workflow, Arguments::new(), 10).expect("sound");
+    assert_eq!(
+        run.fail(NodeTrouble::TimedOut).unwrap_err(),
+        NothingOutstanding
+    );
+
+    // And nothing is outstanding once an outcome has been reported for it.
+    let mut run = Run::<NodeTrouble>::start(&workflow, Arguments::new(), 10).expect("sound");
+    let Step::Activate(_) = run.step() else {
+        panic!("an instance with nothing to wait for is offered")
+    };
+    run.produced(ctx(&mut source, "note"))
+        .expect("an activation was outstanding");
+    assert_eq!(
+        run.fail(NodeTrouble::TimedOut).unwrap_err(),
+        NothingOutstanding
+    );
 }
