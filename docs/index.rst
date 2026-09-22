@@ -29,6 +29,7 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    features/context
    features/wiring
    features/topology
+   features/run
    components/context
    components/wiring
    components/topology
