@@ -1,6 +1,7 @@
 //! The engine core of Agconflo: contexts, their identity and their lineage,
-//! whether a workflow's wiring is sound before any of it runs, and workflows
-//! read from TOML documents and written back into them.
+//! whether a workflow's wiring is sound before any of it runs, workflows read
+//! from TOML documents and written back into them, and a run over one - driven
+//! by its caller, which performs each activation and reports what came of it.
 //!
 //! Everything public is re-exported here from private modules. The modules are
 //! named to fit the test case ids in `docs/tests/`, which is a reason to keep
