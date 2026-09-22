@@ -848,7 +848,7 @@ proptest! {
 /// Definitions that are well formed by construction, varying in what is wired
 /// on top of a skeleton carrying every legal shape a strict validator refuses.
 #[cfg(test)]
-fn well_formed_definition() -> impl Strategy<Value = WorkflowDefinition> {
+pub(crate) fn well_formed_definition() -> impl Strategy<Value = WorkflowDefinition> {
     vec((0..2usize, any::<bool>()), 0..=3).prop_map(|extras| {
         let node_types = vec![
             node_type("seed_note", &[], "note"),

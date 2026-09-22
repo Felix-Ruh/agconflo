@@ -345,6 +345,294 @@
           "title": "agconflo-core reader::unnamed_keys_are_read",
           "type": "test_run"
         },
+        "RUN_RUN_ACTIVATIONS_NEVER_EXCEED_BUDGET": {
+          "executes": [
+            "TEST_RUN_ACTIVATIONS_NEVER_EXCEED_BUDGET"
+          ],
+          "id": "RUN_RUN_ACTIVATIONS_NEVER_EXCEED_BUDGET",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::activations_never_exceed_budget",
+          "type": "test_run"
+        },
+        "RUN_RUN_ARGUMENT_FOR_NO_PARAMETER_IS_REFUSED": {
+          "executes": [
+            "TEST_RUN_ARGUMENT_FOR_NO_PARAMETER_IS_REFUSED"
+          ],
+          "id": "RUN_RUN_ARGUMENT_FOR_NO_PARAMETER_IS_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::argument_for_no_parameter_is_refused",
+          "type": "test_run"
+        },
+        "RUN_RUN_ARGUMENT_OF_WRONG_TYPE_IS_REFUSED": {
+          "executes": [
+            "TEST_RUN_ARGUMENT_OF_WRONG_TYPE_IS_REFUSED"
+          ],
+          "id": "RUN_RUN_ARGUMENT_OF_WRONG_TYPE_IS_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::argument_of_wrong_type_is_refused",
+          "type": "test_run"
+        },
+        "RUN_RUN_BUDGET_STOPS_AT_THE_LIMIT": {
+          "executes": [
+            "TEST_RUN_BUDGET_STOPS_AT_THE_LIMIT"
+          ],
+          "id": "RUN_RUN_BUDGET_STOPS_AT_THE_LIMIT",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::budget_stops_at_the_limit",
+          "type": "test_run"
+        },
+        "RUN_RUN_COMPLETES_BEFORE_OFFERING_MORE": {
+          "executes": [
+            "TEST_RUN_COMPLETES_BEFORE_OFFERING_MORE"
+          ],
+          "id": "RUN_RUN_COMPLETES_BEFORE_OFFERING_MORE",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::completes_before_offering_more",
+          "type": "test_run"
+        },
+        "RUN_RUN_COMPLETES_ON_DESIGNATED_OUTPUT": {
+          "executes": [
+            "TEST_RUN_COMPLETES_ON_DESIGNATED_OUTPUT"
+          ],
+          "id": "RUN_RUN_COMPLETES_ON_DESIGNATED_OUTPUT",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::completes_on_designated_output",
+          "type": "test_run"
+        },
+        "RUN_RUN_CYCLE_ENDS_QUIESCENT": {
+          "executes": [
+            "TEST_RUN_CYCLE_ENDS_QUIESCENT"
+          ],
+          "id": "RUN_RUN_CYCLE_ENDS_QUIESCENT",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::cycle_ends_quiescent",
+          "type": "test_run"
+        },
+        "RUN_RUN_DEFECTIVE_WORKFLOW_IS_REFUSED": {
+          "executes": [
+            "TEST_RUN_DEFECTIVE_WORKFLOW_IS_REFUSED"
+          ],
+          "id": "RUN_RUN_DEFECTIVE_WORKFLOW_IS_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::defective_workflow_is_refused",
+          "type": "test_run"
+        },
+        "RUN_RUN_ENTRY_PARAMETER_ALSO_BOUND_IS_REFUSED": {
+          "executes": [
+            "TEST_RUN_ENTRY_PARAMETER_ALSO_BOUND_IS_REFUSED"
+          ],
+          "id": "RUN_RUN_ENTRY_PARAMETER_ALSO_BOUND_IS_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::entry_parameter_also_bound_is_refused",
+          "type": "test_run"
+        },
+        "RUN_RUN_FAILED_ACTIVATION_ENDS_THE_RUN": {
+          "executes": [
+            "TEST_RUN_FAILED_ACTIVATION_ENDS_THE_RUN"
+          ],
+          "id": "RUN_RUN_FAILED_ACTIVATION_ENDS_THE_RUN",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::failed_activation_ends_the_run",
+          "type": "test_run"
+        },
+        "RUN_RUN_FAILURE_WITH_NO_ACTIVATION_IS_REFUSED": {
+          "executes": [
+            "TEST_RUN_FAILURE_WITH_NO_ACTIVATION_IS_REFUSED"
+          ],
+          "id": "RUN_RUN_FAILURE_WITH_NO_ACTIVATION_IS_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::failure_with_no_activation_is_refused",
+          "type": "test_run"
+        },
+        "RUN_RUN_IDLE_INSTANCE_DOES_NOT_MAKE_IT_STUCK": {
+          "executes": [
+            "TEST_RUN_IDLE_INSTANCE_DOES_NOT_MAKE_IT_STUCK"
+          ],
+          "id": "RUN_RUN_IDLE_INSTANCE_DOES_NOT_MAKE_IT_STUCK",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::idle_instance_does_not_make_it_stuck",
+          "type": "test_run"
+        },
+        "RUN_RUN_LAST_PERMITTED_ACTIVATION_COMPLETES": {
+          "executes": [
+            "TEST_RUN_LAST_PERMITTED_ACTIVATION_COMPLETES"
+          ],
+          "id": "RUN_RUN_LAST_PERMITTED_ACTIVATION_COMPLETES",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::last_permitted_activation_completes",
+          "type": "test_run"
+        },
+        "RUN_RUN_MISSING_ARGUMENT_IS_REFUSED": {
+          "executes": [
+            "TEST_RUN_MISSING_ARGUMENT_IS_REFUSED"
+          ],
+          "id": "RUN_RUN_MISSING_ARGUMENT_IS_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::missing_argument_is_refused",
+          "type": "test_run"
+        },
+        "RUN_RUN_QUIESCENT_NAMES_ONLY_UNPRODUCED": {
+          "executes": [
+            "TEST_RUN_QUIESCENT_NAMES_ONLY_UNPRODUCED"
+          ],
+          "id": "RUN_RUN_QUIESCENT_NAMES_ONLY_UNPRODUCED",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::quiescent_names_only_unproduced",
+          "type": "test_run"
+        },
+        "RUN_RUN_REFUSAL_CARRIES_EVERY_DEFECT": {
+          "executes": [
+            "TEST_RUN_REFUSAL_CARRIES_EVERY_DEFECT"
+          ],
+          "id": "RUN_RUN_REFUSAL_CARRIES_EVERY_DEFECT",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::refusal_carries_every_defect",
+          "type": "test_run"
+        },
+        "RUN_RUN_RESULT_IS_THE_DESIGNATED_CONTEXT": {
+          "executes": [
+            "TEST_RUN_RESULT_IS_THE_DESIGNATED_CONTEXT"
+          ],
+          "id": "RUN_RUN_RESULT_IS_THE_DESIGNATED_CONTEXT",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::result_is_the_designated_context",
+          "type": "test_run"
+        },
+        "RUN_RUN_SIGNATURE_FILLED_EXACTLY_STARTS": {
+          "executes": [
+            "TEST_RUN_SIGNATURE_FILLED_EXACTLY_STARTS"
+          ],
+          "id": "RUN_RUN_SIGNATURE_FILLED_EXACTLY_STARTS",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::signature_filled_exactly_starts",
+          "type": "test_run"
+        },
+        "RUN_RUN_WELL_FORMED_RUNS_COMPLETE": {
+          "executes": [
+            "TEST_RUN_WELL_FORMED_RUNS_COMPLETE"
+          ],
+          "id": "RUN_RUN_WELL_FORMED_RUNS_COMPLETE",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::well_formed_runs_complete",
+          "type": "test_run"
+        },
+        "RUN_RUN_ZERO_BUDGET_ACTIVATES_NOTHING": {
+          "executes": [
+            "TEST_RUN_ZERO_BUDGET_ACTIVATES_NOTHING"
+          ],
+          "id": "RUN_RUN_ZERO_BUDGET_ACTIVATES_NOTHING",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::zero_budget_activates_nothing",
+          "type": "test_run"
+        },
+        "RUN_SCHEDULER_ACTIVATION_IS_EXACTLY_ITS_BINDINGS": {
+          "executes": [
+            "TEST_SCHEDULER_ACTIVATION_IS_EXACTLY_ITS_BINDINGS"
+          ],
+          "id": "RUN_SCHEDULER_ACTIVATION_IS_EXACTLY_ITS_BINDINGS",
+          "test_outcome": "passed",
+          "title": "agconflo-core scheduler::activation_is_exactly_its_bindings",
+          "type": "test_run"
+        },
+        "RUN_SCHEDULER_BOUND_OPTIONAL_IS_AWAITED": {
+          "executes": [
+            "TEST_SCHEDULER_BOUND_OPTIONAL_IS_AWAITED"
+          ],
+          "id": "RUN_SCHEDULER_BOUND_OPTIONAL_IS_AWAITED",
+          "test_outcome": "passed",
+          "title": "agconflo-core scheduler::bound_optional_is_awaited",
+          "type": "test_run"
+        },
+        "RUN_SCHEDULER_EACH_PARAMETER_GETS_ITS_OWN": {
+          "executes": [
+            "TEST_SCHEDULER_EACH_PARAMETER_GETS_ITS_OWN"
+          ],
+          "id": "RUN_SCHEDULER_EACH_PARAMETER_GETS_ITS_OWN",
+          "test_outcome": "passed",
+          "title": "agconflo-core scheduler::each_parameter_gets_its_own",
+          "type": "test_run"
+        },
+        "RUN_SCHEDULER_ENTRY_IS_READY_AT_ONCE": {
+          "executes": [
+            "TEST_SCHEDULER_ENTRY_IS_READY_AT_ONCE"
+          ],
+          "id": "RUN_SCHEDULER_ENTRY_IS_READY_AT_ONCE",
+          "test_outcome": "passed",
+          "title": "agconflo-core scheduler::entry_is_ready_at_once",
+          "type": "test_run"
+        },
+        "RUN_SCHEDULER_GLOBALS_ARE_NOT_GIVEN": {
+          "executes": [
+            "TEST_SCHEDULER_GLOBALS_ARE_NOT_GIVEN"
+          ],
+          "id": "RUN_SCHEDULER_GLOBALS_ARE_NOT_GIVEN",
+          "test_outcome": "passed",
+          "title": "agconflo-core scheduler::globals_are_not_given",
+          "type": "test_run"
+        },
+        "RUN_SCHEDULER_INPUTS_IGNORE_INSTANCE_ORDER": {
+          "executes": [
+            "TEST_SCHEDULER_INPUTS_IGNORE_INSTANCE_ORDER"
+          ],
+          "id": "RUN_SCHEDULER_INPUTS_IGNORE_INSTANCE_ORDER",
+          "test_outcome": "passed",
+          "title": "agconflo-core scheduler::inputs_ignore_instance_order",
+          "type": "test_run"
+        },
+        "RUN_SCHEDULER_INPUTS_IN_DECLARED_ORDER": {
+          "executes": [
+            "TEST_SCHEDULER_INPUTS_IN_DECLARED_ORDER"
+          ],
+          "id": "RUN_SCHEDULER_INPUTS_IN_DECLARED_ORDER",
+          "test_outcome": "passed",
+          "title": "agconflo-core scheduler::inputs_in_declared_order",
+          "type": "test_run"
+        },
+        "RUN_SCHEDULER_NONE_READY_ONLY_WHEN_NONE": {
+          "executes": [
+            "TEST_SCHEDULER_NONE_READY_ONLY_WHEN_NONE"
+          ],
+          "id": "RUN_SCHEDULER_NONE_READY_ONLY_WHEN_NONE",
+          "test_outcome": "passed",
+          "title": "agconflo-core scheduler::none_ready_only_when_none",
+          "type": "test_run"
+        },
+        "RUN_SCHEDULER_PARTIAL_INPUTS_STILL_QUIESCENT": {
+          "executes": [
+            "TEST_SCHEDULER_PARTIAL_INPUTS_STILL_QUIESCENT"
+          ],
+          "id": "RUN_SCHEDULER_PARTIAL_INPUTS_STILL_QUIESCENT",
+          "test_outcome": "passed",
+          "title": "agconflo-core scheduler::partial_inputs_still_quiescent",
+          "type": "test_run"
+        },
+        "RUN_SCHEDULER_PRODUCED_INSTANCE_NOT_OFFERED": {
+          "executes": [
+            "TEST_SCHEDULER_PRODUCED_INSTANCE_NOT_OFFERED"
+          ],
+          "id": "RUN_SCHEDULER_PRODUCED_INSTANCE_NOT_OFFERED",
+          "test_outcome": "passed",
+          "title": "agconflo-core scheduler::produced_instance_not_offered",
+          "type": "test_run"
+        },
+        "RUN_SCHEDULER_UNBOUND_OPTIONAL_IS_READY": {
+          "executes": [
+            "TEST_SCHEDULER_UNBOUND_OPTIONAL_IS_READY"
+          ],
+          "id": "RUN_SCHEDULER_UNBOUND_OPTIONAL_IS_READY",
+          "test_outcome": "passed",
+          "title": "agconflo-core scheduler::unbound_optional_is_ready",
+          "type": "test_run"
+        },
+        "RUN_SCHEDULER_UNRESOLVED_SOURCE_NEVER_READY": {
+          "executes": [
+            "TEST_SCHEDULER_UNRESOLVED_SOURCE_NEVER_READY"
+          ],
+          "id": "RUN_SCHEDULER_UNRESOLVED_SOURCE_NEVER_READY",
+          "test_outcome": "passed",
+          "title": "agconflo-core scheduler::unresolved_source_never_ready",
+          "type": "test_run"
+        },
         "RUN_WIRING_AGREEING_WIRES_PASS": {
           "executes": [
             "TEST_WIRING_AGREEING_WIRES_PASS"
