@@ -39,6 +39,7 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    decisions/context
    decisions/workflow
    decisions/topology
+   decisions/run
    decisions/toolchain
    decisions/requirements
    evidence/toolchain
