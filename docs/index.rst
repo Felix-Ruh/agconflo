@@ -44,3 +44,4 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    evidence/toolchain
    evidence/requirements
    evidence/topology
+   evidence/run
