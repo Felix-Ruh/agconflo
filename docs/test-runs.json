@@ -3,6 +3,78 @@
   "versions": {
     "": {
       "needs": {
+        "RUN_BEHAVIOURS_CHECKING_RUNS_NOTHING": {
+          "executes": [
+            "TEST_BEHAVIOURS_CHECKING_RUNS_NOTHING"
+          ],
+          "id": "RUN_BEHAVIOURS_CHECKING_RUNS_NOTHING",
+          "test_outcome": "passed",
+          "title": "agconflo-lua behaviours::checking_runs_nothing",
+          "type": "test_run"
+        },
+        "RUN_BEHAVIOURS_EVERY_FAULT_REPORTED": {
+          "executes": [
+            "TEST_BEHAVIOURS_EVERY_FAULT_REPORTED"
+          ],
+          "id": "RUN_BEHAVIOURS_EVERY_FAULT_REPORTED",
+          "test_outcome": "passed",
+          "title": "agconflo-lua behaviours::every_fault_reported",
+          "type": "test_run"
+        },
+        "RUN_BEHAVIOURS_MISSING_SCRIPT_IS_REFUSED": {
+          "executes": [
+            "TEST_BEHAVIOURS_MISSING_SCRIPT_IS_REFUSED"
+          ],
+          "id": "RUN_BEHAVIOURS_MISSING_SCRIPT_IS_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-lua behaviours::missing_script_is_refused",
+          "type": "test_run"
+        },
+        "RUN_BEHAVIOURS_TWO_SCRIPTS_ARE_REFUSED": {
+          "executes": [
+            "TEST_BEHAVIOURS_TWO_SCRIPTS_ARE_REFUSED"
+          ],
+          "id": "RUN_BEHAVIOURS_TWO_SCRIPTS_ARE_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-lua behaviours::two_scripts_are_refused",
+          "type": "test_run"
+        },
+        "RUN_BEHAVIOURS_UNCOMPILABLE_SCRIPT_IS_REFUSED": {
+          "executes": [
+            "TEST_BEHAVIOURS_UNCOMPILABLE_SCRIPT_IS_REFUSED"
+          ],
+          "id": "RUN_BEHAVIOURS_UNCOMPILABLE_SCRIPT_IS_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-lua behaviours::uncompilable_script_is_refused",
+          "type": "test_run"
+        },
+        "RUN_BEHAVIOURS_UNDEFINED_NAME_FAILS_WHEN_RUN": {
+          "executes": [
+            "TEST_BEHAVIOURS_UNDEFINED_NAME_FAILS_WHEN_RUN"
+          ],
+          "id": "RUN_BEHAVIOURS_UNDEFINED_NAME_FAILS_WHEN_RUN",
+          "test_outcome": "passed",
+          "title": "agconflo-lua behaviours::undefined_name_fails_when_run",
+          "type": "test_run"
+        },
+        "RUN_BEHAVIOURS_UNINSTANTIATED_BROKEN_SCRIPT_PASSES": {
+          "executes": [
+            "TEST_BEHAVIOURS_UNINSTANTIATED_BROKEN_SCRIPT_PASSES"
+          ],
+          "id": "RUN_BEHAVIOURS_UNINSTANTIATED_BROKEN_SCRIPT_PASSES",
+          "test_outcome": "passed",
+          "title": "agconflo-lua behaviours::uninstantiated_broken_script_passes",
+          "type": "test_run"
+        },
+        "RUN_BEHAVIOURS_UNINSTANTIATED_TYPE_NEEDS_NO_SCRIPT": {
+          "executes": [
+            "TEST_BEHAVIOURS_UNINSTANTIATED_TYPE_NEEDS_NO_SCRIPT"
+          ],
+          "id": "RUN_BEHAVIOURS_UNINSTANTIATED_TYPE_NEEDS_NO_SCRIPT",
+          "test_outcome": "passed",
+          "title": "agconflo-lua behaviours::uninstantiated_type_needs_no_script",
+          "type": "test_run"
+        },
         "RUN_CATALOGUE_DISTINCT_DECLARATIONS_HELD": {
           "executes": [
             "TEST_CATALOGUE_DISTINCT_DECLARATIONS_HELD"
@@ -163,6 +235,141 @@
           "id": "RUN_DEFECT_SIGNATURE_NAMES_THE_DEFINITION",
           "test_outcome": "passed",
           "title": "agconflo-core defect::signature_names_the_definition",
+          "type": "test_run"
+        },
+        "RUN_HOST_EACH_TYPE_RUNS_ITS_OWN_SCRIPT": {
+          "executes": [
+            "TEST_HOST_EACH_TYPE_RUNS_ITS_OWN_SCRIPT"
+          ],
+          "id": "RUN_HOST_EACH_TYPE_RUNS_ITS_OWN_SCRIPT",
+          "test_outcome": "passed",
+          "title": "agconflo-lua host::each_type_runs_its_own_script",
+          "type": "test_run"
+        },
+        "RUN_HOST_ERROR_CARRIES_ITS_MESSAGE": {
+          "executes": [
+            "TEST_HOST_ERROR_CARRIES_ITS_MESSAGE"
+          ],
+          "id": "RUN_HOST_ERROR_CARRIES_ITS_MESSAGE",
+          "test_outcome": "passed",
+          "title": "agconflo-lua host::error_carries_its_message",
+          "type": "test_run"
+        },
+        "RUN_HOST_INPUTS_BY_PARAMETER_NAME": {
+          "executes": [
+            "TEST_HOST_INPUTS_BY_PARAMETER_NAME"
+          ],
+          "id": "RUN_HOST_INPUTS_BY_PARAMETER_NAME",
+          "test_outcome": "passed",
+          "title": "agconflo-lua host::inputs_by_parameter_name",
+          "type": "test_run"
+        },
+        "RUN_HOST_INSTRUCTION_LIMIT_IS_PER_ACTIVATION": {
+          "executes": [
+            "TEST_HOST_INSTRUCTION_LIMIT_IS_PER_ACTIVATION"
+          ],
+          "id": "RUN_HOST_INSTRUCTION_LIMIT_IS_PER_ACTIVATION",
+          "test_outcome": "passed",
+          "title": "agconflo-lua host::instruction_limit_is_per_activation",
+          "type": "test_run"
+        },
+        "RUN_HOST_MEMORY_BOMB_IS_STOPPED": {
+          "executes": [
+            "TEST_HOST_MEMORY_BOMB_IS_STOPPED"
+          ],
+          "id": "RUN_HOST_MEMORY_BOMB_IS_STOPPED",
+          "test_outcome": "passed",
+          "title": "agconflo-lua host::memory_bomb_is_stopped",
+          "type": "test_run"
+        },
+        "RUN_HOST_MEMORY_LIMIT_IS_PER_ACTIVATION": {
+          "executes": [
+            "TEST_HOST_MEMORY_LIMIT_IS_PER_ACTIVATION"
+          ],
+          "id": "RUN_HOST_MEMORY_LIMIT_IS_PER_ACTIVATION",
+          "test_outcome": "passed",
+          "title": "agconflo-lua host::memory_limit_is_per_activation",
+          "type": "test_run"
+        },
+        "RUN_HOST_NON_STRING_ERROR_IS_RAISED": {
+          "executes": [
+            "TEST_HOST_NON_STRING_ERROR_IS_RAISED"
+          ],
+          "id": "RUN_HOST_NON_STRING_ERROR_IS_RAISED",
+          "test_outcome": "passed",
+          "title": "agconflo-lua host::non_string_error_is_raised",
+          "type": "test_run"
+        },
+        "RUN_HOST_NOTHING_CATCHES_AN_ERROR": {
+          "executes": [
+            "TEST_HOST_NOTHING_CATCHES_AN_ERROR"
+          ],
+          "id": "RUN_HOST_NOTHING_CATCHES_AN_ERROR",
+          "test_outcome": "passed",
+          "title": "agconflo-lua host::nothing_catches_an_error",
+          "type": "test_run"
+        },
+        "RUN_HOST_NOTHING_READS_OUTSIDE": {
+          "executes": [
+            "TEST_HOST_NOTHING_READS_OUTSIDE"
+          ],
+          "id": "RUN_HOST_NOTHING_READS_OUTSIDE",
+          "test_outcome": "passed",
+          "title": "agconflo-lua host::nothing_reads_outside",
+          "type": "test_run"
+        },
+        "RUN_HOST_NOTHING_SURVIVES_AN_ACTIVATION": {
+          "executes": [
+            "TEST_HOST_NOTHING_SURVIVES_AN_ACTIVATION"
+          ],
+          "id": "RUN_HOST_NOTHING_SURVIVES_AN_ACTIVATION",
+          "test_outcome": "passed",
+          "title": "agconflo-lua host::nothing_survives_an_activation",
+          "type": "test_run"
+        },
+        "RUN_HOST_NOT_ONE_CONTEXT_FAILS": {
+          "executes": [
+            "TEST_HOST_NOT_ONE_CONTEXT_FAILS"
+          ],
+          "id": "RUN_HOST_NOT_ONE_CONTEXT_FAILS",
+          "test_outcome": "passed",
+          "title": "agconflo-lua host::not_one_context_fails",
+          "type": "test_run"
+        },
+        "RUN_HOST_OUTPUT_TYPE_IS_GIVEN": {
+          "executes": [
+            "TEST_HOST_OUTPUT_TYPE_IS_GIVEN"
+          ],
+          "id": "RUN_HOST_OUTPUT_TYPE_IS_GIVEN",
+          "test_outcome": "passed",
+          "title": "agconflo-lua host::output_type_is_given",
+          "type": "test_run"
+        },
+        "RUN_HOST_REFUSED_OUTPUT_FAILS_WITH_THE_REFUSAL": {
+          "executes": [
+            "TEST_HOST_REFUSED_OUTPUT_FAILS_WITH_THE_REFUSAL"
+          ],
+          "id": "RUN_HOST_REFUSED_OUTPUT_FAILS_WITH_THE_REFUSAL",
+          "test_outcome": "passed",
+          "title": "agconflo-lua host::refused_output_fails_with_the_refusal",
+          "type": "test_run"
+        },
+        "RUN_HOST_RUNAWAY_SCRIPT_IS_STOPPED": {
+          "executes": [
+            "TEST_HOST_RUNAWAY_SCRIPT_IS_STOPPED"
+          ],
+          "id": "RUN_HOST_RUNAWAY_SCRIPT_IS_STOPPED",
+          "test_outcome": "passed",
+          "title": "agconflo-lua host::runaway_script_is_stopped",
+          "type": "test_run"
+        },
+        "RUN_HOST_UNBOUND_OPTIONAL_IS_ABSENT": {
+          "executes": [
+            "TEST_HOST_UNBOUND_OPTIONAL_IS_ABSENT"
+          ],
+          "id": "RUN_HOST_UNBOUND_OPTIONAL_IS_ABSENT",
+          "test_outcome": "passed",
+          "title": "agconflo-lua host::unbound_optional_is_absent",
           "type": "test_run"
         },
         "RUN_ID_CANNOT_BE_FORGED": {
@@ -721,6 +928,33 @@
           "id": "RUN_SCHEDULER_UNRESOLVED_SOURCE_NEVER_READY",
           "test_outcome": "passed",
           "title": "agconflo-core scheduler::unresolved_source_never_ready",
+          "type": "test_run"
+        },
+        "RUN_SCRIPTED_ARGUMENTS_FROM_ANOTHER_SOURCE_FAIL": {
+          "executes": [
+            "TEST_SCRIPTED_ARGUMENTS_FROM_ANOTHER_SOURCE_FAIL"
+          ],
+          "id": "RUN_SCRIPTED_ARGUMENTS_FROM_ANOTHER_SOURCE_FAIL",
+          "test_outcome": "passed",
+          "title": "agconflo-lua scripted::arguments_from_another_source_fail",
+          "type": "test_run"
+        },
+        "RUN_SCRIPTED_CHANGED_SCRIPT_CHANGES_THE_RESULT": {
+          "executes": [
+            "TEST_SCRIPTED_CHANGED_SCRIPT_CHANGES_THE_RESULT"
+          ],
+          "id": "RUN_SCRIPTED_CHANGED_SCRIPT_CHANGES_THE_RESULT",
+          "test_outcome": "passed",
+          "title": "agconflo-lua scripted::changed_script_changes_the_result",
+          "type": "test_run"
+        },
+        "RUN_SCRIPTED_WORKFLOWS_RUN_TO_COMPLETION": {
+          "executes": [
+            "TEST_SCRIPTED_WORKFLOWS_RUN_TO_COMPLETION"
+          ],
+          "id": "RUN_SCRIPTED_WORKFLOWS_RUN_TO_COMPLETION",
+          "test_outcome": "passed",
+          "title": "agconflo-lua scripted::workflows_run_to_completion",
           "type": "test_run"
         },
         "RUN_WIRING_AGREEING_WIRES_PASS": {
