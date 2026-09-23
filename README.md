@@ -15,16 +15,22 @@ where did every byte come from?"* has an exact answer.
 
 ## Status
 
-**Pre-alpha. Nothing runs a node yet** — no node behaviour, no LLM calls, no loops. What exists is
-the development process around it and the first slices of code through it: a requirements project
-under `docs/` with a validated metamodel behind it, a commit gate, continuous integration, and
-`agconflo-core`. That implements the `Context` value itself — identity, composition by reference,
-and lineage — the static side of a workflow, and a run over one. The static side is checking its
-wiring before anything runs, and reading it from TOML documents and writing it back without losing
-what the reader did not understand. The run decides which node may activate and what it is given,
-holds it to a budget, and ends in exactly one of four ways; **its caller performs the activation**,
-so the core reaches no provider and owns no runtime. Each is traced from its requirements to the
-code and back from the tests that check it.
+**Pre-alpha. Nodes run, but only as scripts** — no LLM calls, no loops, nothing persisted. What
+exists is the development process around it and the first slices of code through it: a
+requirements project under `docs/` with a validated metamodel behind it, a commit gate, continuous
+integration, and two crates.
+
+`agconflo-core` implements the `Context` value itself — identity, composition by reference, and
+lineage — the static side of a workflow, and a run over one. The static side is checking its wiring
+before anything runs, and reading it from TOML documents and writing it back without losing what the
+reader did not understand. The run decides which node may activate and what it is given, refuses an
+output that contradicts its declaration, holds it to a budget, and ends in exactly one of four ways;
+**its caller performs the activation**, so the core reaches no provider and owns no runtime.
+
+`agconflo-lua` is such a caller. It performs each activation by running a Lua 5.5 script supplied
+for the node type, in a state made for that one activation, with nothing to reach but its inputs and
+the context API, and under a limit on instructions and memory. Each crate is traced from its
+requirements to the code and back from the tests that check it.
 
 Expect the public API to change without warning. Breaking changes, yes; force-pushes to `main`, no —
 those are blocked outright, along with direct pushes to it.
@@ -36,8 +42,8 @@ those are blocked outright, along with direct pushes to it.
 - **Provider-agnostic LLM access** via [`genai`](https://github.com/jeremychone/rust-genai), and MCP
   via [`rmcp`](https://github.com/modelcontextprotocol/rust-sdk). The agent loop is ours — that is the
   layer this project exists to own.
-- **Node behaviour in Lua** (`mlua`), behind a host-function interface that is not Lua-shaped, so a
-  WASM backend stays possible later.
+- **Node behaviour in Lua** (`mlua`), now running: a script is given the context API and nothing
+  else, which is what leaves a second backend, such as WASM, possible later.
 - **Workflow topology as declarative data**, not script — so it can be statically validated,
   round-tripped through a visual editor, and edited by a machine.
 - **An MCP server whose tools actually edit workflows and node types**, so agents can help build
@@ -51,7 +57,9 @@ those are blocked outright, along with direct pushes to it.
   `sh`, `curl`, `unzip` and `sha256sum` that the setup scripts and the commit hook need, so nothing
   else has to be installed for them.
 - **Rust**, via [rustup](https://rustup.rs). `rust-toolchain.toml` pins the channel and components,
-  so the right ones are installed on first use.
+  so the right ones are installed on first use. `agconflo-lua` builds Lua from its C source, so it
+  needs the C compiler Rust's own toolchain already relies on — the MSVC build tools on Windows —
+  and no Lua installed anywhere.
 
 The documentation toolchain is [ubCode](https://ubcode.useblocks.com/) (`ubc`) and nothing else — no
 Python, no Sphinx, no Java. The tests run under [cargo-nextest](https://nexte.st/), because it writes
