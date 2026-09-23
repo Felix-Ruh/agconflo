@@ -43,9 +43,11 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    decisions/workflow
    decisions/topology
    decisions/run
+   decisions/behaviour
    decisions/toolchain
    decisions/requirements
    evidence/toolchain
    evidence/requirements
    evidence/topology
    evidence/run
+   evidence/behaviour
