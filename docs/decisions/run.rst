@@ -15,6 +15,11 @@ it. The other four are judgements, and none of them is a measurement wearing a
 judgement's clothes - where a decision below says a shape was rejected, it was
 rejected on an argument, and the argument is written out.
 
+Those are the first eight. The ninth, last in the file, was taken a day later on
+measurements of the run itself rather than of the prototype: what a run does
+with an output that contradicts a declaration, once it has been shown to accept
+two kinds of them without a word.
+
 What this slice does not settle is as load-bearing as what it does, so it is
 named here rather than left to be inferred. Nothing below decides whether node
 behaviour is eventually asynchronous, whether the engine acquires a runtime, how
@@ -266,3 +271,39 @@ to leave every one of them open.
    them, so a run reads none. And a router decides which of its outgoing edges
    fire, which is a choice about control edges that do not exist, so no instance
    is skipped by a decision.
+
+.. dec:: A refused output leaves its activation outstanding
+   :id: DEC_REFUSED_OUTPUT_OUTSTANDING
+   :dec_status: accepted
+   :decided_on: 2026-09-23
+   :supported_by: EVD_RUN_ACCEPTS_UNDECLARED_OUTPUT, EVD_RUN_ACCEPTS_HELD_IDENTIFIER
+   :statement: Agconflo shall refuse an output that contradicts a declaration by keeping its activation outstanding rather than by ending the run.
+
+   Both measured defects are an output the run should not have accepted: one of
+   a type its node type does not declare (``EVD_RUN_ACCEPTS_UNDECLARED_OUTPUT``),
+   and one carrying an identifier the run already held
+   (``EVD_RUN_ACCEPTS_HELD_IDENTIFIER``). That the run refuses them is what the
+   requirements derived from them say. This settles what the run does instead.
+
+   Two alternatives were rejected, and neither on taste.
+
+   Ending the run was the first, and it has no ending to end with. A node's
+   failure carries the caller's own failure type (``CREQ_RUN_ENDS_ON_FAILURE``),
+   which the run cannot construct, and a fifth ending would supersede
+   ``DEC_RUN_ENDS_ONE_WAY`` for a case the caller can already express: it
+   reports the activation failed, with a failure of its own saying why.
+
+   Checking in the caller alone was the other. Every caller would carry the same
+   two checks, and the measurements were taken with a caller that carried
+   neither - which is the ordinary state of a caller written by somebody who
+   did not know the checks were theirs to make.
+
+   Keeping the activation outstanding is what stops a refusal being ignored. A
+   caller that asks for the next step is handed the same activation again, so a
+   run cannot move past an output it refused. The caller then does one of the
+   two things it already can: it reports an output the run accepts, or it
+   reports the activation failed and the run ends carrying that failure.
+
+   The activation is counted against the budget once, when it was offered, and
+   not again on the answer that follows a refusal. The node was not offered a
+   second time, so nothing a budget exists to count has happened twice.

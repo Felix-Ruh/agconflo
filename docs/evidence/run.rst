@@ -105,3 +105,51 @@ about running rather than about wiring.
    finding does settle is that completion is a question about the designated
    output alone, and therefore that quiescence is reported only when that output
    can no longer be produced.
+
+The two findings below are a different kind of evidence about the same run, and
+they are ``measurement`` rather than ``prototype``: each is a run of
+``agconflo-core`` itself at ``4dc940b``, driven by a throwaway caller outside the
+repository that answered each activation with a context chosen to contradict
+one declaration. Both definitions passed ``validate_wiring`` with nothing
+reported, and every run below completed. They were taken while planning node
+behaviour, because a script is the first caller that can return anything at
+all.
+
+.. evd:: A run accepted an output of a type its node type does not declare
+   :id: EVD_RUN_ACCEPTS_UNDECLARED_OUTPUT
+   :evd_kind: measurement
+   :observed_on: 2026-09-23
+   :observation: A run of agconflo-core at 4dc940b accepted an output of context type banana from an instance whose node type declares prompt, handed it to a parameter declared for prompt, and completed.
+
+   Two instances: an entry instance ``a`` of a type declaring the output
+   ``prompt``, and ``b``, whose one required parameter is declared for
+   ``prompt`` and bound to ``a``. The caller answered ``a``'s activation with a
+   new context of type ``banana``. ``Run::produced`` accepted it, ``b``'s
+   activation carried it under the parameter declared for ``prompt``, and the
+   run completed on ``b``.
+
+   ``validate_wiring`` had compared ``a``'s declared output with ``b``'s
+   declared parameter and found them equal, which was true of the declarations
+   and false of the run. Nothing compares what an instance produces with what its
+   type declares, so the check made before a run starts holds only for as long
+   as every caller happens to honour the declarations it checked.
+
+.. evd:: A run accepted an output carrying an identifier it already held
+   :id: EVD_RUN_ACCEPTS_HELD_IDENTIFIER
+   :evd_kind: measurement
+   :observed_on: 2026-09-23
+   :observation: A run of agconflo-core at 4dc940b accepted as an instance's output first the argument that instance was given and then another instance's output, each carrying the identifier it already had, and completed both times.
+
+   The same two instances, with ``b``'s type declaring the output ``prompt`` so
+   that no type disagreed. In one run the caller answered ``a``'s activation
+   with the argument ``a`` had been given, identifier 0. In another it answered
+   ``b``'s activation with ``a``'s output, identifier 1, and that run completed
+   with identifier 1 as its result - the context ``a`` produced, recorded as
+   ``b``'s.
+
+   ``DEC_IDENTITY_PER_ACTIVATION`` gives every context an identifier unique to
+   the activation that produced it, and here one identifier is credited to two
+   activations, or to an activation and the caller. A control in the same
+   session answered ``b``'s activation with a composition of its input instead.
+   That was accepted with a new identifier, 2, holding the input by reference,
+   which is the shape a node passing its input on is meant to take.

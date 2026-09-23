@@ -17,7 +17,7 @@ A case's id is the path of the Rust test that implements it, uppercased, so the
 scheduler's cases live in one module and the run's in another and a renamed test
 breaks the build as a dead link rather than going quietly unrecorded.
 
-Six failure modes have no case of their own, because each is an interaction
+Nine failure modes have no case of their own, because each is an interaction
 between requirements or an assertion that belongs inside another case. They are
 named here so the derivation can be audited rather than taken on trust:
 
@@ -45,9 +45,18 @@ named here so the derivation can be audited rather than taken on trust:
 - ``CREQ_RUN_ENDS_ON_FAILURE``'s "the failure rendered into a message" is
   asserted by every error-path case in this file, each of which matches on the
   ending as a value rather than on its text.
+- ``CREQ_RUN_REFUSES_UNDECLARED_OUTPUT``'s "refused without saying why" is
+  asserted by ``TEST_RUN_UNDECLARED_OUTPUT_IS_REFUSED``, which matches on the
+  refusal's fields, and on which kind of refusal it is.
+- ``CREQ_RUN_REFUSES_UNDECLARED_OUTPUT``'s "the output recorded before it is
+  compared" is asserted by the same case, which checks that the refused output's
+  consumer is not offered next.
+- ``CREQ_RUN_REFUSES_HELD_IDENTIFIER``'s "refused without naming the
+  identifier" is asserted by both of its passed-through cases, each of which
+  matches on the identifier the refusal names.
 
 ``DEC_RUN_ENDS_ONE_WAY`` has no case of its own either, and it is a decision
-rather than a failure mode, so it is not one of the six. That a run reaches
+rather than a failure mode, so it is not one of the nine. That a run reaches
 exactly one ending is asserted inside each ending's case, which checks that the
 other three were not reported, because a standalone property would have no
 single requirement to verify.
@@ -480,3 +489,129 @@ single requirement to verify.
    The counterweight to a file of refusals. Most requirements here say what must
    not happen, and a run that refuses everything satisfies them; this is what
    that run fails.
+
+.. test_case:: An output of a type its node type does not declare is refused
+   :id: TEST_RUN_UNDECLARED_OUTPUT_IS_REFUSED
+   :verifies: CREQ_RUN_REFUSES_UNDECLARED_OUTPUT
+   :test_kind: error_path
+   :coverage: partial
+
+   The measured defect (``EVD_RUN_ACCEPTS_UNDECLARED_OUTPUT``). An entry
+   instance whose node type declares one output type is answered with a context
+   of another. The refusal names that instance, the declared type and the
+   reported type, as values, and is told apart from a refusal for a held
+   identifier by which it is.
+
+   The instance consuming that output is not offered next. That is what shows
+   the output was refused before it was recorded rather than recorded and then
+   complained about, since a recorded output would have made its consumer ready.
+
+.. test_case:: The designated instance's output type is checked
+   :id: TEST_RUN_DESIGNATED_UNDECLARED_OUTPUT_IS_REFUSED
+   :verifies: CREQ_RUN_REFUSES_UNDECLARED_OUTPUT
+   :test_kind: error_path
+   :coverage: partial
+
+   A workflow whose designated instance is answered with a context of a type its
+   node type does not declare. Nothing consumes that output, so a run comparing
+   outputs with the parameters they reach checks nothing here, and it would
+   complete with a mistyped result.
+
+.. test_case:: An output of the declared type is accepted whatever its inputs were
+   :id: TEST_RUN_OUTPUT_OF_DECLARED_TYPE_IS_ACCEPTED
+   :verifies: CREQ_RUN_REFUSES_UNDECLARED_OUTPUT
+   :test_kind: positive
+   :coverage: partial
+
+   A node type whose output type differs from its input's is answered with a
+   context of its declared output type, and then with a composition of that type
+   whose part is of another. Both are accepted.
+
+   The first control refuses a run that compares outputs with inputs, which
+   every type-changing node would fail. The second refuses one that compares a
+   composition's parts rather than the composition.
+
+.. test_case:: An argument handed back as an output is refused
+   :id: TEST_RUN_PASSED_THROUGH_ARGUMENT_IS_REFUSED
+   :verifies: CREQ_RUN_REFUSES_HELD_IDENTIFIER
+   :test_kind: error_path
+   :coverage: partial
+
+   Half of the measured defect (``EVD_RUN_ACCEPTS_HELD_IDENTIFIER``). An entry
+   instance is answered with the argument it was given, whose type is the
+   declared output type so that only the identifier is wrong. The refusal names
+   the instance and the argument's identifier.
+
+.. test_case:: Another instance's output handed back is refused
+   :id: TEST_RUN_PASSED_THROUGH_OUTPUT_IS_REFUSED
+   :verifies: CREQ_RUN_REFUSES_HELD_IDENTIFIER
+   :test_kind: error_path
+   :coverage: partial
+
+   The other half of the measured defect, in its harder shape: the output handed
+   back is that of an instance which is not wired to the one being answered, so
+   a run comparing an output with the instance's own inputs finds nothing. The
+   refusal names the instance and the identifier handed back.
+
+.. test_case:: An output composing its input is accepted
+   :id: TEST_RUN_OUTPUT_COMPOSING_ITS_INPUT_IS_ACCEPTED
+   :verifies: CREQ_RUN_REFUSES_HELD_IDENTIFIER
+   :test_kind: positive
+   :coverage: partial
+
+   An instance is answered with a composition holding the input it was given.
+   The composition has an identifier of its own and holds its part by
+   reference, and it is accepted - the one sanctioned way to pass an input on,
+   and the control the measurement took.
+
+.. test_case:: Every output a run accepts is new to it
+   :id: TEST_RUN_ACCEPTED_OUTPUTS_ARE_ALL_NEW
+   :verifies: CREQ_RUN_REFUSES_HELD_IDENTIFIER
+   :test_kind: property
+   :coverage: partial
+
+   For any chain of instances and any caller choosing, for each activation, a
+   new context, a composition of what the run holds, or any context the run
+   holds handed back unchanged: an output is refused exactly when it was handed
+   back, and no two contexts the run accepted or was started with share an
+   identifier.
+
+.. test_case:: A refused output leaves the same activation outstanding
+   :id: TEST_RUN_REFUSED_OUTPUT_KEEPS_THE_ACTIVATION
+   :verifies: CREQ_RUN_REFUSED_OUTPUT_OUTSTANDING
+   :test_kind: error_path
+   :coverage: partial
+
+   An instance answered with a refused output. The run has not ended, and the
+   next step offers that same instance again rather than the instance consuming
+   its output. An accepted answer then lets the run go on to completion.
+
+   The first half catches a run ended by the refusal, and the second a refused
+   output recorded anyway, which would have made its consumer ready. What it
+   cannot tell apart is an activation kept from one dropped and offered afresh:
+   the scheduler offers the first ready instance in the definition's order
+   either way, so both offer the same one.
+   ``TEST_RUN_REFUSAL_DOES_NOT_SPEND_THE_BUDGET`` is the case that separates
+   them, because only one of the two counts it again.
+
+.. test_case:: A refusal does not spend the budget again
+   :id: TEST_RUN_REFUSAL_DOES_NOT_SPEND_THE_BUDGET
+   :verifies: CREQ_RUN_REFUSED_OUTPUT_OUTSTANDING
+   :test_kind: error_path
+   :coverage: partial
+
+   A workflow run with a budget of exactly as many activations as it has
+   instances, one answer refused and then corrected. The run completes rather
+   than ending on its budget, which it would if the activation had been counted
+   a second time.
+
+.. test_case:: A refused activation can be failed
+   :id: TEST_RUN_REFUSED_OUTPUT_CAN_BE_FAILED
+   :verifies: CREQ_RUN_REFUSED_OUTPUT_OUTSTANDING
+   :test_kind: error_path
+   :coverage: partial
+
+   A failure reported after a refused output ends the run carrying that failure
+   and naming the instance, rather than being refused because nothing is
+   outstanding. A caller that cannot produce an acceptable output has to be
+   able to give up on the activation, and this is the only way it can.
