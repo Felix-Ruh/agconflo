@@ -264,6 +264,15 @@
           "title": "agconflo-lua host::inputs_by_parameter_name",
           "type": "test_run"
         },
+        "RUN_HOST_INSTRUCTION_LIMIT_HOLDS_ACROSS_A_MODEL_CALL": {
+          "executes": [
+            "TEST_HOST_INSTRUCTION_LIMIT_HOLDS_ACROSS_A_MODEL_CALL"
+          ],
+          "id": "RUN_HOST_INSTRUCTION_LIMIT_HOLDS_ACROSS_A_MODEL_CALL",
+          "test_outcome": "passed",
+          "title": "agconflo-lua host::instruction_limit_holds_across_a_model_call",
+          "type": "test_run"
+        },
         "RUN_HOST_INSTRUCTION_LIMIT_IS_PER_ACTIVATION": {
           "executes": [
             "TEST_HOST_INSTRUCTION_LIMIT_IS_PER_ACTIVATION"
@@ -282,6 +291,15 @@
           "title": "agconflo-lua host::memory_bomb_is_stopped",
           "type": "test_run"
         },
+        "RUN_HOST_MEMORY_LIMIT_HOLDS_ACROSS_A_MODEL_CALL": {
+          "executes": [
+            "TEST_HOST_MEMORY_LIMIT_HOLDS_ACROSS_A_MODEL_CALL"
+          ],
+          "id": "RUN_HOST_MEMORY_LIMIT_HOLDS_ACROSS_A_MODEL_CALL",
+          "test_outcome": "passed",
+          "title": "agconflo-lua host::memory_limit_holds_across_a_model_call",
+          "type": "test_run"
+        },
         "RUN_HOST_MEMORY_LIMIT_IS_PER_ACTIVATION": {
           "executes": [
             "TEST_HOST_MEMORY_LIMIT_IS_PER_ACTIVATION"
@@ -289,6 +307,33 @@
           "id": "RUN_HOST_MEMORY_LIMIT_IS_PER_ACTIVATION",
           "test_outcome": "passed",
           "title": "agconflo-lua host::memory_limit_is_per_activation",
+          "type": "test_run"
+        },
+        "RUN_HOST_MODEL_ANSWER_IS_A_CONTEXT": {
+          "executes": [
+            "TEST_HOST_MODEL_ANSWER_IS_A_CONTEXT"
+          ],
+          "id": "RUN_HOST_MODEL_ANSWER_IS_A_CONTEXT",
+          "test_outcome": "passed",
+          "title": "agconflo-lua host::model_answer_is_a_context",
+          "type": "test_run"
+        },
+        "RUN_HOST_MODEL_CALL_LIMIT_HOLDS": {
+          "executes": [
+            "TEST_HOST_MODEL_CALL_LIMIT_HOLDS"
+          ],
+          "id": "RUN_HOST_MODEL_CALL_LIMIT_HOLDS",
+          "test_outcome": "passed",
+          "title": "agconflo-lua host::model_call_limit_holds",
+          "type": "test_run"
+        },
+        "RUN_HOST_MODEL_FAILURE_ENDS_THE_ACTIVATION": {
+          "executes": [
+            "TEST_HOST_MODEL_FAILURE_ENDS_THE_ACTIVATION"
+          ],
+          "id": "RUN_HOST_MODEL_FAILURE_ENDS_THE_ACTIVATION",
+          "test_outcome": "passed",
+          "title": "agconflo-lua host::model_failure_ends_the_activation",
           "type": "test_run"
         },
         "RUN_HOST_NON_STRING_ERROR_IS_RAISED": {
@@ -343,6 +388,15 @@
           "id": "RUN_HOST_OUTPUT_TYPE_IS_GIVEN",
           "test_outcome": "passed",
           "title": "agconflo-lua host::output_type_is_given",
+          "type": "test_run"
+        },
+        "RUN_HOST_PROMPT_MUST_BE_A_CONTEXT": {
+          "executes": [
+            "TEST_HOST_PROMPT_MUST_BE_A_CONTEXT"
+          ],
+          "id": "RUN_HOST_PROMPT_MUST_BE_A_CONTEXT",
+          "test_outcome": "passed",
+          "title": "agconflo-lua host::prompt_must_be_a_context",
           "type": "test_run"
         },
         "RUN_HOST_REFUSED_OUTPUT_FAILS_WITH_THE_REFUSAL": {
@@ -442,6 +496,60 @@
           "id": "RUN_LINEAGE_REACHES_EACH_ONCE",
           "test_outcome": "passed",
           "title": "agconflo-core lineage::reaches_each_once",
+          "type": "test_run"
+        },
+        "RUN_MODELS_ANSWER_KEPT_AS_SENT": {
+          "executes": [
+            "TEST_MODELS_ANSWER_KEPT_AS_SENT"
+          ],
+          "id": "RUN_MODELS_ANSWER_KEPT_AS_SENT",
+          "test_outcome": "passed",
+          "title": "agconflo-lua models::answer_kept_as_sent",
+          "type": "test_run"
+        },
+        "RUN_MODELS_PROMPT_SENT_EXACTLY": {
+          "executes": [
+            "TEST_MODELS_PROMPT_SENT_EXACTLY"
+          ],
+          "id": "RUN_MODELS_PROMPT_SENT_EXACTLY",
+          "test_outcome": "passed",
+          "title": "agconflo-lua models::prompt_sent_exactly",
+          "type": "test_run"
+        },
+        "RUN_MODELS_PROVIDER_FAILURE_CARRIED": {
+          "executes": [
+            "TEST_MODELS_PROVIDER_FAILURE_CARRIED"
+          ],
+          "id": "RUN_MODELS_PROVIDER_FAILURE_CARRIED",
+          "test_outcome": "passed",
+          "title": "agconflo-lua models::provider_failure_carried",
+          "type": "test_run"
+        },
+        "RUN_MODELS_ROLES_REACH_THEIR_MODELS": {
+          "executes": [
+            "TEST_MODELS_ROLES_REACH_THEIR_MODELS"
+          ],
+          "id": "RUN_MODELS_ROLES_REACH_THEIR_MODELS",
+          "test_outcome": "passed",
+          "title": "agconflo-lua models::roles_reach_their_models",
+          "type": "test_run"
+        },
+        "RUN_MODELS_UNMAPPED_ROLE_FAILS": {
+          "executes": [
+            "TEST_MODELS_UNMAPPED_ROLE_FAILS"
+          ],
+          "id": "RUN_MODELS_UNMAPPED_ROLE_FAILS",
+          "test_outcome": "passed",
+          "title": "agconflo-lua models::unmapped_role_fails",
+          "type": "test_run"
+        },
+        "RUN_MODELS_UNREACHABLE_PROVIDER_HAS_NO_STATUS": {
+          "executes": [
+            "TEST_MODELS_UNREACHABLE_PROVIDER_HAS_NO_STATUS"
+          ],
+          "id": "RUN_MODELS_UNREACHABLE_PROVIDER_HAS_NO_STATUS",
+          "test_outcome": "passed",
+          "title": "agconflo-lua models::unreachable_provider_has_no_status",
           "type": "test_run"
         },
         "RUN_READER_ABSENT_OUTPUT_IS_NO_OUTPUT": {
@@ -1000,6 +1108,24 @@
           "id": "RUN_SCRIPTED_CHANGED_SCRIPT_CHANGES_THE_RESULT",
           "test_outcome": "passed",
           "title": "agconflo-lua scripted::changed_script_changes_the_result",
+          "type": "test_run"
+        },
+        "RUN_SCRIPTED_SAME_WORKFLOW_TWO_PROVIDERS": {
+          "executes": [
+            "TEST_SCRIPTED_SAME_WORKFLOW_TWO_PROVIDERS"
+          ],
+          "id": "RUN_SCRIPTED_SAME_WORKFLOW_TWO_PROVIDERS",
+          "test_outcome": "passed",
+          "title": "agconflo-lua scripted::same_workflow_two_providers",
+          "type": "test_run"
+        },
+        "RUN_SCRIPTED_SOURCE_HANDED_BACK_ADVANCED": {
+          "executes": [
+            "TEST_SCRIPTED_SOURCE_HANDED_BACK_ADVANCED"
+          ],
+          "id": "RUN_SCRIPTED_SOURCE_HANDED_BACK_ADVANCED",
+          "test_outcome": "passed",
+          "title": "agconflo-lua scripted::source_handed_back_advanced",
           "type": "test_run"
         },
         "RUN_SCRIPTED_WORKFLOWS_RUN_TO_COMPLETION": {

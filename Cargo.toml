@@ -23,7 +23,14 @@ toml_edit = "=0.25.15"
 # built from source by `vendored`, so no Lua need be installed. Pinned exactly,
 # because every sandbox finding in evidence/behaviour was measured on this
 # release - moving it means measuring again first.
-mlua = { version = "=0.12.1", features = ["lua55", "vendored"] }
+mlua = { version = "=0.12.1", features = ["lua55", "vendored", "async"] }
+
+# agconflo-lua reaches language models through genai (DEC_MODELS_THROUGH_GENAI),
+# pinned exactly at the newest release, a pre-release, on which every finding in
+# evidence/models was measured. tokio drives it in the tests, which answer with
+# a stub on the loopback interface rather than a provider.
+genai = "=0.7.0-beta.24"
+tokio = { version = "=1.53.1", features = ["rt", "macros", "net", "io-util"] }
 
 # Testing policy: property-based tests wherever a property can be stated,
 # alongside positive tests and error-path ("negative") tests.

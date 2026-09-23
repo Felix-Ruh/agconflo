@@ -6,7 +6,9 @@
 //! true or false taken alone, and every requirement it could carry is already
 //! the run's, the behaviour set's or the host's.
 
+use std::cell::RefCell;
 use std::fmt;
+use std::rc::Rc;
 
 use agconflo_core::{
     Arguments, IdSource, NothingOutstanding, Run, RunEnding, StartRefusal, Step, WorkflowDefinition,
@@ -14,6 +16,7 @@ use agconflo_core::{
 
 use crate::behaviours::{BehaviourFault, Behaviours};
 use crate::host::{self, Limits, ScriptFailure};
+use crate::models::Roster;
 
 /// Why a scripted run was not started.
 ///
@@ -57,19 +60,31 @@ impl std::error::Error for ScriptedRefusal {}
 /// decides what activates and how it ends, exactly as for any caller, and a
 /// script's failure is carried in the run's ending as a [`ScriptFailure`].
 ///
+/// Model calls go through `roster`, which maps the roles scripts name to the
+/// caller's models (`DEC_MODELS_BY_ROLE`); a run whose scripts call no model can
+/// be given a roster mapping nothing.
+///
+/// Asynchronous, because a model call is awaited (`DEC_BEHAVIOUR_ASYNC`). The
+/// future is not `Send` - a Lua state is not (`EVD_RUN_IS_SEND`) - so it runs on
+/// the thread that polls it: a current-thread runtime, or a local set.
+///
 /// `source` issues the identifiers of every context the scripts make, and must
 /// be the one `arguments` were made from: two sources repeat each other's
 /// identifiers, and the run refuses an output carrying one it already holds.
+/// It is lent to the scripts for the length of the run and handed back when it
+/// ends, however it ends.
 // @Refused before anything runs,IMPL_SCRIPTED_REFUSAL,impl,[CREQ_BEHAVIOURS_REFUSE_MISSING, CREQ_BEHAVIOURS_REFUSE_UNCOMPILABLE, CREQ_BEHAVIOURS_REFUSE_TWICE]
-pub fn run_scripted(
+pub async fn run_scripted(
     definition: &WorkflowDefinition,
     behaviours: &Behaviours,
+    roster: &Roster,
     arguments: Arguments,
     source: &mut IdSource,
     budget: usize,
     limits: Limits,
 ) -> Result<RunEnding<ScriptFailure>, ScriptedRefusal> {
     let mut run = Run::start(definition, arguments, budget).map_err(ScriptedRefusal::Start)?;
+    let lent = Lent::new(source);
 
     let faults = behaviours.faults(definition);
     if !faults.is_empty() {
@@ -96,11 +111,37 @@ pub fn run_scripted(
             .script_for(node_type)
             .expect("every instantiated type has exactly one script");
 
-        let outcome = host::perform(script, &activation, source, limits)
+        let outcome = host::perform(script, &activation, &lent.source, roster, limits)
+            .await
             .and_then(|output| run.produced(output).map_err(ScriptFailure::OutputRefused));
         if let Err(failure) = outcome {
             return Ok(fail(run, failure));
         }
+    }
+}
+
+/// The caller's identifier source, lent to the scripts for the length of a run.
+///
+/// Each host function owns its handle to the source rather than borrowing it
+/// for a scope, since a model call is awaited and a scoped function cannot be.
+/// Dropping the loan puts the source back where it came from, advanced past
+/// every identifier the run issued - on every way out of the run, an early
+/// return included.
+struct Lent<'a> {
+    home: &'a mut IdSource,
+    source: Rc<RefCell<IdSource>>,
+}
+
+impl<'a> Lent<'a> {
+    fn new(home: &'a mut IdSource) -> Self {
+        let source = Rc::new(RefCell::new(std::mem::take(home)));
+        Self { home, source }
+    }
+}
+
+impl Drop for Lent<'_> {
+    fn drop(&mut self) {
+        *self.home = std::mem::take(&mut *self.source.borrow_mut());
     }
 }
 
@@ -143,7 +184,29 @@ pub(crate) fn workflow(types: &str, flow: &str) -> WorkflowDefinition {
 pub(crate) const SMALL: Limits = Limits {
     instructions: 200_000,
     memory: 2 << 20,
+    model_calls: 2,
 };
+
+/// Drive `future` to its end on a runtime of its own, on this thread.
+///
+/// Current-thread because a scripted run is not `Send` (`EVD_RUN_IS_SEND`), and
+/// with its drivers enabled because a model call reaches the network - a stub
+/// on the loopback interface, in these tests.
+#[cfg(test)]
+pub(crate) fn block<F: std::future::Future>(future: F) -> F::Output {
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("a runtime")
+        .block_on(future)
+}
+
+/// A roster mapping no role, for runs whose scripts call no model. Building a
+/// client reaches nothing.
+#[cfg(test)]
+pub(crate) fn offline() -> Roster {
+    Roster::new(genai::Client::builder().build().expect("a client"))
+}
 
 /// A context of type `declared` holding `text`, from `source`.
 #[cfg(test)]
@@ -153,11 +216,22 @@ pub(crate) fn note(source: &mut IdSource, declared: &str, text: &str) -> Context
 }
 
 /// Run `definition` with `behaviours` under the small limits, its one entry
-/// instance `entry` given `argument` for its parameter `input`.
+/// instance `entry` given `argument` for its parameter `input`, and no model.
 #[cfg(test)]
 pub(crate) fn run_with(
     definition: &WorkflowDefinition,
     behaviours: &Behaviours,
+    entry: Option<(&str, &str)>,
+) -> Result<RunEnding<ScriptFailure>, ScriptedRefusal> {
+    run_with_roster(definition, behaviours, &offline(), entry)
+}
+
+/// As [`run_with`], with the scripts' model calls going through `roster`.
+#[cfg(test)]
+pub(crate) fn run_with_roster(
+    definition: &WorkflowDefinition,
+    behaviours: &Behaviours,
+    roster: &Roster,
     entry: Option<(&str, &str)>,
 ) -> Result<RunEnding<ScriptFailure>, ScriptedRefusal> {
     let mut source = IdSource::new();
@@ -166,7 +240,15 @@ pub(crate) fn run_with(
         let argument = note(&mut source, "note", text);
         arguments = arguments.supply(instance, "input", argument);
     }
-    run_scripted(definition, behaviours, arguments, &mut source, 20, SMALL)
+    block(run_scripted(
+        definition,
+        behaviours,
+        roster,
+        arguments,
+        &mut source,
+        20,
+        SMALL,
+    ))
 }
 
 /// What a completed run rendered, or a panic naming how it ended instead.
@@ -254,14 +336,15 @@ fn arguments_from_another_source_fail() {
         let argument = note(&mut IdSource::new(), "note", "hello");
         let held = argument.id();
         let arguments = Arguments::new().supply("first", "input", argument);
-        let ending = run_scripted(
+        let ending = block(run_scripted(
             &definition,
             &behaviours,
+            &offline(),
             arguments,
             &mut IdSource::new(),
             20,
             SMALL,
-        );
+        ));
 
         let (instance, failure) = failed(ending);
         assert_eq!(instance, "first");
@@ -336,4 +419,68 @@ proptest::proptest! {
         let result = rendered(run_with(&definition, &behaviours, Some(("n0", &argument))));
         proptest::prop_assert_eq!(result, format!("{argument} {}", words.join(" ")));
     }
+}
+
+#[cfg(test)]
+#[test]
+fn same_workflow_two_providers() {
+    let stub = crate::models::Stub::answering(200, "an answer");
+    let calling = "local given, host = ...\nlocal answer = host.complete('drafting', given.input)\nreturn host.compose(host.output, {given.input, answer}, ' / ')";
+    let behaviours = Behaviours::new()
+        .define("seed", "seed.lua", calling)
+        .define("step", "step.lua", &appending("stepped"));
+    let definition = workflow(CHAIN_TYPES, CHAIN);
+
+    // Nothing in the workflow or its scripts changes between the two runs;
+    // only the caller's roster does.
+    let mut paths = Vec::new();
+    for model in ["openai::gpt-draft", "anthropic::claude-draft"] {
+        let roster = Roster::new(crate::models::client_for(&stub.base)).map("drafting", model);
+        let result = rendered(run_with_roster(
+            &definition,
+            &behaviours,
+            &roster,
+            Some(("first", "hello")),
+        ));
+        assert_eq!(result, "hello / an answer stepped stepped");
+        paths.push(stub.requests().last().expect("a request").0.clone());
+    }
+    assert_eq!(paths, ["/v1/chat/completions", "/v1/messages"]);
+}
+
+#[cfg(test)]
+#[test]
+fn source_handed_back_advanced() {
+    let definition = workflow(CHAIN_TYPES, CHAIN);
+    let behaviours = Behaviours::new()
+        .define("seed", "seed.lua", &appending("seeded"))
+        .define("step", "step.lua", &appending("stepped"));
+    let mut source = IdSource::new();
+    let argument = note(&mut source, "note", "hello");
+    let arguments = Arguments::new().supply("first", "input", argument);
+
+    let ending = block(run_scripted(
+        &definition,
+        &behaviours,
+        &offline(),
+        arguments,
+        &mut source,
+        20,
+        SMALL,
+    ));
+    let RunEnding::Completed(result) = ending.expect("starts") else {
+        panic!("expected completion")
+    };
+
+    // What the caller's source issues next is new to everything the run made:
+    // handed back reset, it would repeat the argument's identifier and the
+    // run's own.
+    let after = note(&mut source, "note", "later");
+    let mut issued: Vec<_> = result.lineage().iter().map(|c| c.id()).collect();
+    issued.push(result.id());
+    assert!(
+        !issued.contains(&after.id()),
+        "{:?} was issued in the run",
+        after.id()
+    );
 }

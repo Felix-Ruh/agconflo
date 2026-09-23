@@ -7,7 +7,8 @@ How a node reaches a language model, what it may send, and what bounds it.
 behaviour is ever asynchronous; these settle both for the Lua host, and neither
 reaches into the core.
 
-Five rest on measurements recorded in ``evidence/models``. Two are judgements,
+Six rest on measurements recorded in ``evidence/models``, the last taken while
+implementing. Two are judgements,
 and say so: where the code lives, and that a script names a role rather than a
 model. The second is argued from ``STKH_PROVIDER_CHOICE`` itself, which is the
 strongest footing a judgement can have and still not a measurement.
@@ -151,3 +152,26 @@ not exist yet.
    composing it into its output keeps the model's bytes addressable as the
    model's, where a string would splice them in indistinguishably from the
    script's own.
+
+.. dec:: A model's answer is the text the provider sent
+   :id: DEC_ANSWER_AS_SENT
+   :dec_status: accepted
+   :decided_on: 2026-09-23
+   :supported_by: EVD_GENAI_OPENAI_TRIMS
+   :statement: Agconflo shall read a model's answer from the response the provider sent rather than from genai's reading of it, for the response formats it has measured.
+
+   Taken after the others, while implementing: ``genai``'s OpenAI adapter
+   trimmed an answer's surrounding whitespace and its Anthropic adapter did not
+   (``EVD_GENAI_OPENAI_TRIMS``). The same workflow would then get different bytes
+   from two providers saying the same thing, which is the difference
+   ``STKH_PROVIDER_CHOICE`` wants to stop at the engine.
+
+   Accepting the trim was the alternative, and it is the one defect this project
+   is least willing to carry: text is held byte for byte everywhere else
+   (``CREQ_VALUE_TEXT_EXACT``), and a model's bytes are the ones whose origin
+   matters most.
+
+   ``genai`` captures the response body on request, and the answer is read from
+   it for the two formats measured. For any other format it falls back to
+   ``genai``'s reading, trimmed or not, and that is the stated limit rather than
+   a guess about formats nobody has tried.

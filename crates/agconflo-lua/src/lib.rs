@@ -9,8 +9,9 @@
 //! A script is handed over as text, with the name of the document it came from
 //! (`DEC_SCRIPTS_FROM_CALLER`); nothing here opens a file. It runs as the body of
 //! its node's behaviour, in a Lua state made for that one activation, with
-//! nothing to reach but its activation and the context API, and under a limit on
-//! the instructions it executes and the memory it allocates.
+//! nothing to reach but its activation, the context API and the models its
+//! caller mapped, and under a limit on the instructions it executes, the memory
+//! it allocates and the model calls it makes.
 //!
 //! A comment of the form `// @<title>,<IMPL id>,impl,[<requirement ids>]` is a
 //! trace marker, read into the requirements graph by
@@ -18,8 +19,10 @@
 
 mod behaviours;
 mod host;
+mod models;
 mod scripted;
 
 pub use behaviours::{BehaviourFault, Behaviours};
 pub use host::{Limits, ScriptFailure};
+pub use models::{ModelFailure, Roster};
 pub use scripted::{ScriptedRefusal, run_scripted};
