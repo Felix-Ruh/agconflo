@@ -30,22 +30,27 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    features/wiring
    features/topology
    features/run
+   features/behaviour
    components/context
    components/wiring
    components/topology
    components/run
+   components/behaviour
    tests/context
    tests/wiring
    tests/topology
    tests/run
+   tests/behaviour
    code/agconflo-core
    decisions/context
    decisions/workflow
    decisions/topology
    decisions/run
+   decisions/behaviour
    decisions/toolchain
    decisions/requirements
    evidence/toolchain
    evidence/requirements
    evidence/topology
    evidence/run
+   evidence/behaviour
