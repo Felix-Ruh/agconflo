@@ -20,9 +20,9 @@ component requirement whose subject is anything else.
    spent, and which activation is outstanding.
 
    Everything about a run's history belongs here: the two refusals that stop one
-   before it starts, the count the budget is measured against, and each of the
-   four endings. None of them can be decided by reading a definition, which is
-   what separates this from the scheduler it asks.
+   before it starts, the outputs it refuses once it has, the count the budget is
+   measured against, and each of the four endings. None of them can be decided by
+   reading a definition, which is what separates this from the scheduler it asks.
 
    It performs no activation (``DEC_RUN_IS_DRIVEN``). It hands one out, takes
    back a context or a failure, and that is the whole of its contact with node
@@ -331,3 +331,93 @@ component requirement whose subject is anything else.
    - **The result returned by identifier rather than as the context.** A caller
      binding a workflow into another as a node needs the value, and an identifier
      is only usable by something holding the run.
+
+.. comp_req:: An output of a type its node type does not declare is refused
+   :id: CREQ_RUN_REFUSES_UNDECLARED_OUTPUT
+   :derived_from: FEAT_RUN_OUTPUT_OF_DECLARED_TYPE
+   :allocated_to: COMP_WORKFLOW_RUN
+   :ears_pattern: unwanted
+   :statement: If an output reported for an activation is not of the context type its instance's node type declares, then Workflow run shall refuse that output naming the instance, the declared type and the reported type.
+
+   The comparison is with the declaration, which the run can read, rather than
+   with whatever consumes the output, which it need not have: the designated
+   instance's output goes to the caller, and nothing in the workflow need
+   consume it.
+
+   Failure modes:
+
+   - **Not compared at all.** The state measured
+     (``EVD_RUN_ACCEPTS_UNDECLARED_OUTPUT``): the output is accepted, the
+     consumer is handed a context of a type its parameter was never declared for,
+     and the run completes.
+   - **Compared with the consuming parameters' types.** Agrees with the
+     declaration on every sound workflow whose output has a consumer, and checks
+     nothing for the designated instance, whose result a caller binding this
+     workflow into another is about to rely on.
+   - **Compared with the type of the instance's inputs.** A node that passes its
+     input's type on happens to agree, and every node whose type changes the type
+     - which is most of them - is refused for being right.
+   - **Refused without saying why.** A caller that learns only that its output
+     was refused cannot tell a wrong type from a reused identifier, and has two
+     things to go and look at.
+   - **The output recorded before it is compared.** A refusal reported after the
+     output has been stored is the measured defect with a message beside it.
+
+   Must pass unreported: an output of the declared type, including a composition
+   whose parts are of other types, since a composition's type is the one it was
+   declared with whatever its parts' types are (``CREQ_VALUE_DECLARED_TYPE``).
+
+.. comp_req:: An output the run already holds is refused
+   :id: CREQ_RUN_REFUSES_HELD_IDENTIFIER
+   :derived_from: FEAT_RUN_OUTPUT_IS_NEW
+   :allocated_to: COMP_WORKFLOW_RUN
+   :ears_pattern: unwanted
+   :statement: If an output reported for an activation carries the identifier of an argument or of an output the run has accepted, then Workflow run shall refuse that output naming the instance and the identifier.
+
+   What a run holds is exactly those two: the arguments it was started with and
+   the outputs it has accepted since. A context the caller built and never
+   reported is not held, and an identifier it carries is one no activation has
+   yet been credited with.
+
+   Failure modes:
+
+   - **Not compared at all.** Measured (``EVD_RUN_ACCEPTS_HELD_IDENTIFIER``): an
+     argument passed through, and another instance's output passed through, were
+     both accepted and the run completed.
+   - **Outputs compared and arguments not.** The first half of the measurement
+     then still passes: an entry instance handing back its own argument is
+     credited with a context the caller made.
+   - **Compared with the instance's own inputs alone.** A caller holding any
+     context of the run can hand it back, including the output of an instance
+     that is not wired to this one, and nothing about the wiring stops it.
+   - **A composition holding a held context refused.** Its identifier is new and
+     its parts are held by reference, which is the one sanctioned way to pass an
+     input on; refusing it leaves no way at all.
+   - **Refused without naming the identifier.** Which context was reused is what
+     tells the caller whether it passed through an input or confused two
+     activations.
+
+   Must pass unreported: an output composed of the instance's inputs, and an
+   output built from nothing the run holds.
+
+.. comp_req:: A refused output leaves its activation outstanding
+   :id: CREQ_RUN_REFUSED_OUTPUT_OUTSTANDING
+   :derived_from: FEAT_RUN_OUTPUT_OF_DECLARED_TYPE, FEAT_RUN_OUTPUT_IS_NEW
+   :allocated_to: COMP_WORKFLOW_RUN
+   :ears_pattern: unwanted
+   :statement: If an output reported for an activation is refused, then Workflow run shall keep that activation outstanding without counting it against the budget again.
+
+   ``DEC_REFUSED_OUTPUT_OUTSTANDING`` is why: the four endings stay closed, and
+   the caller does one of the two things it already can - reports an output the
+   run accepts, or reports the activation failed.
+
+   Failure modes:
+
+   - **The run ended by the refusal.** There is no ending to end it with: a
+     node's failure carries the caller's failure type, which the run cannot make.
+   - **The activation dropped.** The instance has not produced, so the scheduler
+     offers it again as a new activation, and the same node is counted twice
+     against the budget - a run within its budget reported as a runaway.
+   - **A failure reported after a refusal refused.** The activation is still
+     outstanding, so a caller giving up on it must be able to say so, and being
+     told nothing is outstanding would leave it no way to end the run.

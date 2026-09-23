@@ -10,15 +10,15 @@
 
 use std::collections::HashMap;
 
-use crate::Context;
 use crate::run::Arguments;
 use crate::workflow::{NodeInstance, WorkflowDefinition};
+use crate::{Context, ContextType};
 
 /// What every instance that has activated produced, by instance name.
 pub(crate) type Produced = HashMap<String, Context>;
 
-/// One node about to run: which instance, and the context for each parameter it
-/// is given.
+/// One node about to run: which instance, the context for each parameter it is
+/// given, and the context type it is declared to produce.
 ///
 /// Held by value rather than by reference into the definition, because the
 /// caller performs the activation (`DEC_RUN_IS_DRIVEN`) and a `Context` is a
@@ -32,6 +32,7 @@ pub(crate) type Produced = HashMap<String, Context>;
 pub struct Activation {
     instance: String,
     inputs: Vec<(String, Context)>,
+    output: ContextType,
 }
 
 impl Activation {
@@ -54,6 +55,17 @@ impl Activation {
     /// bound to something that rendered to nothing.
     pub fn inputs(&self) -> &[(String, Context)] {
         &self.inputs
+    }
+
+    /// The context type the instance's node type declares for its one output,
+    /// which is the type the run accepts an output of
+    /// (`CREQ_RUN_REFUSES_UNDECLARED_OUTPUT`).
+    ///
+    /// Carried here rather than looked up again when the output is reported: the
+    /// declaration was already in hand when the activation was built, and a
+    /// caller performing the activation needs to know it just as much.
+    pub fn output(&self) -> &ContextType {
+        &self.output
     }
 }
 
@@ -130,6 +142,7 @@ pub(crate) fn activation_for(
     Some(Activation {
         instance: instance.name.clone(),
         inputs,
+        output: declared.output.clone(),
     })
 }
 

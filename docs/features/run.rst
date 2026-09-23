@@ -23,13 +23,22 @@ that say what makes a workflow invalid, and there is no run to refuse anything,
 because nothing calls the validator. A goal met by a judgement nobody asks for
 is the gap this feature closes.
 
-Five of the seven statements below use the ``unwanted`` pattern and one uses
-``event``. ``DEC_EARS_SIX_PATTERNS`` predicted that distribution would arrive
-with a feature that has real triggers, and asked to be looked at again when one
-had been written. Nothing here was hard to classify and none of the six is still
-unused in a way that argues for a change, so the decision is left as it stands.
+Five of the first seven statements below use the ``unwanted`` pattern and one
+uses ``event``. ``DEC_EARS_SIX_PATTERNS`` predicted that distribution would
+arrive with a feature that has real triggers, and asked to be looked at again
+when one had been written. Nothing here was hard to classify and none of the six
+is still unused in a way that argues for a change, so the decision is left as it
+stands.
 
-The feature's architecture closes the file. It realises all seven requirements
+The last two were added a day after the rest, once the run had been measured
+accepting outputs that contradict what was declared about them
+(``EVD_RUN_ACCEPTS_UNDECLARED_OUTPUT``, ``EVD_RUN_ACCEPTS_HELD_IDENTIFIER``).
+Both are ``unwanted`` as well. They are about what the caller hands back rather
+than about what the run hands out, which no requirement had looked at, because
+until something could perform an activation nothing could hand back anything
+surprising.
+
+The feature's architecture closes the file. It realises all nine requirements
 and names the components they are divided between, which are defined in
 ``components/run``.
 
@@ -224,18 +233,75 @@ and names the components they are divided between, which are defined in
    same result, having spent activations on nodes nothing was waiting for -
    which under ``DEC_COMPLETION_IS_DESIGNATED_OUTPUT`` is not what a run is for.
 
+.. feat_req:: A node's output is of the type its node type declares
+   :id: FEAT_RUN_OUTPUT_OF_DECLARED_TYPE
+   :derived_from: STKH_WIRING_CHECKED
+   :ears_pattern: unwanted
+   :verification_method: test
+   :statement: If the caller reports an output whose context type differs from the output type its node type declares, then Agconflo shall refuse that output.
+
+   The parent refuses an invalid workflow before any node in it runs, and the
+   check it is met by compares declarations: the output type one node type
+   declares against the parameter type it is bound to. That comparison is a
+   statement about a run only while every output is of the type declared for
+   it, and nothing held a run to that.
+
+   It can be false while the parent holds, and it was measured false
+   (``EVD_RUN_ACCEPTS_UNDECLARED_OUTPUT``). The workflow passed validation, so
+   the parent was met, and a parameter declared for ``prompt`` was then handed a
+   ``banana``. The parent's own body puts the value of the check in what it
+   spares - a wiring mistake costing a rejection rather than half of an
+   expensive run - and an output contradicting its declaration spends the rest
+   of the run on inputs whose types nobody has checked.
+
+   This derivation is a judgement rather than a reading, so the reason for this
+   parent is worth giving. ``STKH_EXPLICIT_CONTEXT`` is the other candidate and
+   is not true of it: the mistyped context was the one wired to the parameter,
+   so the node was given exactly what was wired to it. What failed is the claim
+   the check before the run made, and that claim is this parent's.
+
+   That the refusal leaves the activation outstanding rather than ending the run
+   is ``DEC_REFUSED_OUTPUT_OUTSTANDING``, and belongs to the component allocated
+   the work.
+
+.. feat_req:: A node's output is a context new to the run
+   :id: FEAT_RUN_OUTPUT_IS_NEW
+   :derived_from: STKH_PROVENANCE
+   :ears_pattern: unwanted
+   :verification_method: test
+   :statement: If the caller reports an output whose identifier the run already holds, then Agconflo shall refuse that output.
+
+   The parent records which context each byte of a node's input came from, and
+   the record is kept by identifier. ``DEC_IDENTITY_PER_ACTIVATION`` is what
+   makes an identifier worth recording: it names the one activation that
+   produced the context. What a run holds is its arguments and the outputs it
+   has accepted, and an output carrying one of their identifiers credits one
+   context to two producers.
+
+   It can be false while the parent holds. A record can be kept faithfully and
+   still be wrong, because the identifiers it faithfully records are ambiguous -
+   measured (``EVD_RUN_ACCEPTS_HELD_IDENTIFIER``): a run completed with the
+   context one instance produced recorded as another's result.
+
+   Passing an input on is legitimate, and there is a shape for it that keeps the
+   record true. A composition holding the input is a new context with an
+   identifier of its own, and holds its part by reference rather than by copy
+   (``DEC_COMPOSITION_BY_REFERENCE``), so the input stays addressable as what it
+   was. The same measurement took that shape as its control, and it was accepted.
+
 .. feat_arch:: Running splits into a run and a scheduler
    :id: ARCH_RUN
-   :realises: FEAT_RUN_REFUSES_INVALID_WIRING, FEAT_RUN_ENTRY_SOURCE_EXACT, FEAT_RUN_WAITS_FOR_EVERY_BINDING, FEAT_RUN_BUDGET_STOPS, FEAT_RUN_QUIESCENCE_ENDS, FEAT_RUN_FAILURE_CARRIED, FEAT_RUN_COMPLETES_ON_DESIGNATED
+   :realises: FEAT_RUN_REFUSES_INVALID_WIRING, FEAT_RUN_ENTRY_SOURCE_EXACT, FEAT_RUN_WAITS_FOR_EVERY_BINDING, FEAT_RUN_BUDGET_STOPS, FEAT_RUN_QUIESCENCE_ENDS, FEAT_RUN_FAILURE_CARRIED, FEAT_RUN_COMPLETES_ON_DESIGNATED, FEAT_RUN_OUTPUT_OF_DECLARED_TYPE, FEAT_RUN_OUTPUT_IS_NEW
    :uses: COMP_WORKFLOW_RUN, COMP_RUN_SCHEDULER
    :statement: Agconflo shall allocate running a workflow to the workflow run and the run scheduler.
 
    Two components, each answerable for what the other cannot guarantee:
 
    - The workflow run answers for what becomes of a run. Both refusals before it
-     starts, the budget it is held to, and each of the four ways it may end are
-     statements about one run's history, which nothing that reads a definition
-     can make.
+     starts, the budget it is held to, the outputs it refuses, and each of the
+     four ways it may end are statements about one run's history, which nothing
+     that reads a definition can make. Whether an output's identifier is already
+     held is a question about exactly that history.
    - The run scheduler answers for which instance may activate and what that
      activation carries. That is a question about a definition and the outputs
      produced so far, with no history in it, and it fails in ways a run's
@@ -282,6 +348,9 @@ and names the components they are divided between, which are defined in
      questions about the designated output rather than about the graph.
    - ``DEC_ACTIVATION_ONCE_PER_RUN``: no instance activates twice, so the
      scheduler needs no activation tag and the run needs no epoch.
+   - ``DEC_REFUSED_OUTPUT_OUTSTANDING``: an output the run refuses leaves its
+     activation outstanding, so the four endings stay closed and the caller
+     answers again or reports a failure of its own.
 
    Two absences, recorded so they are not read as oversights. There is no run log
    component: what a run records for provenance is ``STKH_PROVENANCE``'s business
