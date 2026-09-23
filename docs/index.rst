@@ -35,6 +35,7 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    components/wiring
    components/topology
    components/run
+   components/behaviour
    tests/context
    tests/wiring
    tests/topology

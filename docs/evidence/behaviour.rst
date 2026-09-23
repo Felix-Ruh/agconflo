@@ -171,3 +171,20 @@ scripts in - and it is called the reduced environment below.
    replace ``render`` to change what a context says, attach a field to carry
    something along, or give a context of its own making the look of one the
    host made.
+
+.. evd:: Table addresses and key order differed between processes
+   :id: EVD_LUA_ORDER_PER_PROCESS
+   :evd_kind: measurement
+   :observed_on: 2026-09-23
+   :observation: On Lua 5.5 in the reduced environment, three processes gave three different addresses from tostring of a table and from string.format with percent-p, and visited the same twelve string keys with pairs in three different orders.
+
+   Taken while writing the requirement that a script reads nothing but its
+   inputs, to find out whether leaving ``math.random`` out had made a script's
+   output a function of its inputs alone. It had not. The order ``pairs`` visits
+   string keys in depends on a hash seed chosen per process, and a script that
+   joins keys in that order produces different text from the same inputs.
+
+   Neither is a value a script reads from outside, the way it reads a random
+   number: both are the order and the naming of values the script already
+   holds. They are recorded because nothing here makes a script deterministic,
+   and nothing should be read as claiming it.

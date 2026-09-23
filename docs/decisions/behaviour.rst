@@ -90,7 +90,7 @@ decided when it is wanted.
    :id: DEC_ENVIRONMENT_BY_NAME
    :dec_status: accepted
    :decided_on: 2026-09-23
-   :supported_by: EVD_LUA_DEFAULT_STATE_EXPOSES, EVD_LUA_PCALL_SWALLOWS_LIMITS, EVD_LUA_RANDOM_PER_PROCESS
+   :supported_by: EVD_LUA_DEFAULT_STATE_EXPOSES, EVD_LUA_PCALL_SWALLOWS_LIMITS, EVD_LUA_RANDOM_PER_PROCESS, EVD_LUA_ORDER_PER_PROCESS
    :statement: Agconflo shall build a script's environment from named libraries, leaving out every function that reads outside the activation or catches an error.
 
    The default is the wrong starting point, measured: ``mlua``'s default state,
@@ -107,6 +107,14 @@ decided when it is wanted.
    numbers in different processes (``EVD_LUA_RANDOM_PER_PROCESS``), so a script
    using it produces output depending on something no wire carries. The clock
    and the environment are out already, with ``os``.
+
+   Leaving it out does not make a script deterministic, and is not claimed to.
+   The order ``pairs`` visits string keys in, and the address ``tostring`` gives
+   a table, both differed between processes (``EVD_LUA_ORDER_PER_PROCESS``).
+   Those are the order and naming of values a script already holds rather than
+   values it reads from outside, and they are part of the base library every
+   state has. Making a script's output reproducible is a question for the day a
+   run has to be replayed.
 
    Those that catch an error. ``pcall`` let a script survive both of its limits
    and return normally (``EVD_LUA_PCALL_SWALLOWS_LIMITS``), and ``xpcall`` did the

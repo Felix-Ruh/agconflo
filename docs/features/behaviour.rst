@@ -22,6 +22,10 @@ could this be false while its parent is true? The body of each says how. Two
 parents are judgements rather than readings, and those bodies say why the parent
 is the one it is: the instruction limit's and the refusal before a run starts.
 
+The feature's architecture closes the file. It realises all seven requirements
+and names the two components they are divided between, which are defined in
+``components/behaviour``.
+
 Five of the seven statements use the ``unwanted`` pattern and two
 ``ubiquitous``: what a node runs, and what it can read, are true of every
 activation rather than triggered by something. That is the distribution a
@@ -96,6 +100,12 @@ already been looked at again for a feature with the same shape.
 
    ``DEC_ENVIRONMENT_BY_NAME`` and ``DEC_STATE_PER_ACTIVATION`` are how it is
    met.
+
+   It is not a claim that a script's output is a function of its inputs alone.
+   The order ``pairs`` visits string keys in differed between processes
+   (``EVD_LUA_ORDER_PER_PROCESS``), and a script can put its output together in
+   that order. What this requires is that nothing reaches a script except
+   through its activation - which the order of its own table's keys does not.
 
 .. feat_req:: A script's error fails its activation and says what it was
    :id: FEAT_BEHAVIOUR_ERROR_CARRIED
@@ -184,3 +194,49 @@ already been looked at again for a feature with the same shape.
    running any of the script (``EVD_LUA_COMPILES_WITHOUT_RUNNING``). A call to a
    function that does not exist compiles, and fails when the script runs, as a
    script error.
+
+.. feat_arch:: Node behaviour splits into a behaviour set and a script host
+   :id: ARCH_BEHAVIOUR
+   :realises: FEAT_BEHAVIOUR_FROM_SCRIPT, FEAT_BEHAVIOUR_ONE_CONTEXT, FEAT_BEHAVIOUR_READS_ONLY_ITS_INPUTS, FEAT_BEHAVIOUR_ERROR_CARRIED, FEAT_BEHAVIOUR_INSTRUCTION_LIMIT, FEAT_BEHAVIOUR_MEMORY_LIMIT, FEAT_BEHAVIOUR_REFUSED_BEFORE_START
+   :uses: COMP_BEHAVIOUR_SET, COMP_SCRIPT_HOST
+   :statement: Agconflo shall allocate running node behaviour to the behaviour set and the script host.
+
+   Two components, each answerable for what the other cannot guarantee:
+
+   - The behaviour set answers for the scripts a run is given, before it starts.
+     Whether every node type the workflow instantiates has exactly one script,
+     and whether each compiles, are questions about the scripts and the
+     definition together, answered once and before anything has run.
+   - The script host answers for one activation: the state it runs in, what the
+     script can reach there, the limits it runs under, and what becomes of what
+     it returns. None of that depends on any other activation, and a fresh state
+     for each (``DEC_STATE_PER_ACTIVATION``) is what makes that true rather than
+     hoped.
+
+   ``FEAT_BEHAVIOUR_FROM_SCRIPT`` is the one requirement split across both, and
+   the split is the clearest statement of the division: that the script supplied
+   is the only one for its node type is the set's, and that running it is how the
+   activation is performed is the host's.
+
+   What drives a run from its start to its ending - handing each activation the
+   run offers to the host and telling the run what came back - is not a third
+   component, for the reason ``ARCH_RUN`` dropped one: nothing about it is true or
+   false taken alone. Every requirement it could carry is already the run's, the
+   set's or the host's.
+
+   The decisions this is built against are named here rather than linked:
+
+   - ``DEC_BEHAVIOUR_IN_LUA``: the script is Lua 5.5.
+   - ``DEC_BEHAVIOUR_OWN_CRATE``: both components live in ``agconflo-lua``, and
+     ``agconflo-core`` gains no dependency.
+   - ``DEC_STATE_PER_ACTIVATION``: the host creates a state for each activation.
+   - ``DEC_ENVIRONMENT_BY_NAME``: the state holds named libraries, less what
+     reads outside the activation or catches an error.
+   - ``DEC_SCRIPTS_FROM_CALLER``: the set is given text and document names, and
+     opens nothing.
+   - ``DEC_SCRIPT_IS_THE_BODY``: the host runs the script itself, with the
+     activation's inputs and the host functions as its arguments, so compiling
+     it is the whole of what the set can check.
+   - ``DEC_LIMITS_NOT_TIME``: the limits are instructions and memory.
+   - ``DEC_HOST_FUNCTIONS_CONTEXT_API``: a script calls the context API and
+     nothing else.
