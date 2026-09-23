@@ -43,6 +43,7 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    tests/topology
    tests/run
    tests/behaviour
+   tests/models
    code/agconflo-core
    code/agconflo-lua
    decisions/context
