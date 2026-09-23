@@ -15,10 +15,11 @@ it. The other four are judgements, and none of them is a measurement wearing a
 judgement's clothes - where a decision below says a shape was rejected, it was
 rejected on an argument, and the argument is written out.
 
-Those are the first eight. The ninth, last in the file, was taken a day later on
-measurements of the run itself rather than of the prototype: what a run does
-with an output that contradicts a declaration, once it has been shown to accept
-two kinds of them without a word.
+Those are the first eight. The ninth was taken a day later on measurements of
+the run itself rather than of the prototype: what a run does with an output that
+contradicts a declaration, once it has been shown to accept two kinds of them
+without a word. The tenth, last in the file, was taken the same day on two more
+such measurements: where a run's identifiers are kept unambiguous.
 
 What this slice does not settle is as load-bearing as what it does, so it is
 named here rather than left to be inferred. Nothing below decides whether node
@@ -307,3 +308,42 @@ to leave every one of them open.
    The activation is counted against the budget once, when it was offered, and
    not again on the answer that follows a refusal. The node was not offered a
    second time, so nothing a budget exists to count has happened twice.
+
+.. dec:: An identifier names one context in a run
+   :id: DEC_IDENTIFIER_NAMES_ONE_CONTEXT
+   :dec_status: accepted
+   :decided_on: 2026-09-23
+   :supported_by: EVD_RUN_ARGUMENTS_SHARE_IDENTIFIER, EVD_RUN_PART_SHARES_IDENTIFIER
+   :statement: Agconflo shall refuse whatever would bring a second context under an identifier a run already holds rather than keep a run to one identifier source.
+
+   Two contexts under one identifier were measured twice, once among a run's
+   arguments (``EVD_RUN_ARGUMENTS_SHARE_IDENTIFIER``) and once as a part of an
+   output (``EVD_RUN_PART_SHARES_IDENTIFIER``), and both times the run completed
+   and its result's lineage lost a context. Every question about where a context
+   came from is asked by identifier, so a run holding two contexts under one
+   identifier answers them wrongly without saying so.
+
+   The cause is two identifier sources, and ``IdSource`` already says that
+   preventing them belongs to whatever owns a run. Three ways of doing that were
+   weighed, and two lost on an argument.
+
+   The run owning the source was the first. It would keep the contexts a caller
+   makes during a run to one source, and not the ones it brings: arguments are
+   made before a run exists, and may come from another run, a document or a
+   cache. Anything a run is started with can carry any identifier.
+
+   Identifiers unique across sources was the second - a counter shared by every
+   source in a process, or identifiers too large to repeat. Within one process
+   that would make the collision impossible, and across processes it would not,
+   which is where a resumed run's identifiers will come from. How identifiers
+   survive a process is ``STKH_RESUMABLE_RUN``'s to decide, and this is
+   deliberately a check that holds whatever they become.
+
+   So the run refuses the collision where it enters: at the start, among the
+   arguments and everything they were composed from, and at each output, among
+   everything the output was composed from that the run does not already hold.
+   "Holds" means the very value, not an equal one: a context passed on by
+   reference is the one the run holds, and passing an input on by composing it
+   is the sanctioned shape (``DEC_COMPOSITION_BY_REFERENCE``). A different
+   context under a held identifier is what is refused, and telling the two
+   apart needs the value's identity, because by identifier they are the same.

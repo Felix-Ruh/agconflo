@@ -615,3 +615,79 @@ single requirement to verify.
    and naming the instance, rather than being refused because nothing is
    outstanding. A caller that cannot produce an acceptable output has to be
    able to give up on the activation, and this is the only way it can.
+
+.. test_case:: Arguments sharing an identifier stop the run starting
+   :id: TEST_RUN_ARGUMENTS_SHARING_AN_IDENTIFIER_ARE_REFUSED
+   :verifies: CREQ_RUN_REFUSES_SHARED_ARGUMENT_IDENTIFIER
+   :test_kind: error_path
+   :coverage: partial
+
+   The measured shape (``EVD_RUN_ARGUMENTS_SHARE_IDENTIFIER``) and a harder one
+   together: two arguments from two sources under one identifier, and a third
+   argument whose own identifier is new but which was composed from a context
+   repeating a fourth argument's identifier. The run is refused with both
+   identifiers, as a refusal of its own kind rather than a signature fault.
+
+   Catches: not asked; only the arguments themselves compared; the first shared
+   identifier only; reported as a signature fault.
+
+.. test_case:: One context supplied to two parameters starts
+   :id: TEST_RUN_ONE_CONTEXT_FOR_TWO_PARAMETERS_STARTS
+   :verifies: CREQ_RUN_REFUSES_SHARED_ARGUMENT_IDENTIFIER
+   :test_kind: positive
+   :coverage: partial
+
+   The same context supplied to two entry instances' parameters, and a second
+   context composed of it supplied to a third. The run starts and completes: one
+   context under one identifier, however often it is reached.
+
+   Catches: the same context supplied twice refused.
+
+.. test_case:: A part sharing a held identifier is refused
+   :id: TEST_RUN_PART_SHARING_AN_IDENTIFIER_IS_REFUSED
+   :verifies: CREQ_RUN_REFUSES_SHARED_OUTPUT_IDENTIFIER
+   :test_kind: error_path
+   :coverage: partial
+
+   The measured shape (``EVD_RUN_PART_SHARES_IDENTIFIER``): an output composed
+   of its argument and a new part under the argument's identifier, refused
+   naming the instance and the identifier. And one that only a run remembering
+   what it accepted can catch: a later output with a new part under the
+   identifier of a part an earlier accepted output was composed from.
+
+   Catches: only the output's own identifier asked; compared with the arguments
+   alone; what an accepted output brought in forgotten.
+
+.. test_case:: Two new parts under one identifier are refused
+   :id: TEST_RUN_PARTS_SHARING_AN_IDENTIFIER_ARE_REFUSED
+   :verifies: CREQ_RUN_REFUSES_SHARED_OUTPUT_IDENTIFIER
+   :test_kind: error_path
+   :coverage: partial
+
+   An output composed of two new contexts, from two sources, that share an
+   identifier the run has never held. Refused naming that identifier.
+
+   Catches: compared with the run and not within the output.
+
+.. test_case:: An output composing held contexts is accepted
+   :id: TEST_RUN_OUTPUT_COMPOSING_HELD_PARTS_IS_ACCEPTED
+   :verifies: CREQ_RUN_REFUSES_SHARED_OUTPUT_IDENTIFIER
+   :test_kind: positive
+   :coverage: partial
+
+   An output composed of its input, of a part its input was composed from, and
+   of a new context from the run's own source. Accepted: every held context in
+   it is the context the run holds.
+
+   Catches: a held context reached by reference refused.
+
+.. test_case:: No identifier names two contexts in a run
+   :id: TEST_RUN_NO_IDENTIFIER_NAMES_TWO_CONTEXTS
+   :verifies: FEAT_RUN_ONE_CONTEXT_PER_IDENTIFIER
+   :test_kind: property
+   :coverage: partial
+
+   For any chain of instances and any caller making each output from one of two
+   identifier sources, composing it freely of what the run holds and of new
+   contexts: whatever the run accepts, every context reachable from its
+   arguments and accepted outputs is the only context under its identifier.
