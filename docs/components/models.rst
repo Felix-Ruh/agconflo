@@ -155,3 +155,23 @@ component requirement whose subject is anything else.
      goes on with no answer, and its output says nothing of the failure.
    - **Reported as a script error.** The status and the role, which the roster
      carried as values, become prose.
+
+.. comp_req:: A call's answer is the text the provider sent
+   :id: CREQ_ROSTER_ANSWER_AS_SENT
+   :derived_from: FEAT_MODEL_ANSWER_IS_A_CONTEXT
+   :allocated_to: COMP_MODEL_ROSTER
+   :ears_pattern: ubiquitous
+   :statement: Model roster shall return a call's answer as the text the provider sent, whitespace included, for the response formats of OpenAI and Anthropic.
+
+   Added while implementing, when ``genai``'s OpenAI adapter was measured
+   trimming answers and its Anthropic adapter not (``EVD_GENAI_OPENAI_TRIMS``,
+   ``DEC_ANSWER_AS_SENT``). The two formats named are the two measured.
+
+   Failure modes:
+
+   - **The answer taken from ``genai``'s reading.** Whitespace at either end is
+     gone for one provider and kept for another.
+   - **Only the first of several text blocks kept.** Anthropic's format may hold
+     the answer in more than one, and the rest are dropped without a word.
+   - **The reasoning included.** A model reporting its reasoning separately has
+     not answered with it.

@@ -1,6 +1,6 @@
 //! The script host: one activation, performed by running its node type's script
-//! in a Lua state made for it alone, with nothing to reach but the activation
-//! and the context API, and under its limits.
+//! in a Lua state made for it alone, with nothing to reach but the activation,
+//! the context API and the models its caller mapped, and under its limits.
 
 use std::cell::{Cell, RefCell};
 use std::fmt;
@@ -10,13 +10,14 @@ use agconflo_core::{Activation, Context, ContextType, IdSource, OutputRefusal};
 use mlua::prelude::*;
 
 use crate::behaviours::Script;
+use crate::models::{ModelFailure, Roster};
 
 /// What one activation's script may spend.
 ///
-/// Counted in instructions executed and bytes allocated rather than in time
-/// (`DEC_LIMITS_NOT_TIME`): the same script stops at the same point on every
-/// machine, and a slow machine is not a runaway script. Each activation has its
-/// own, since nothing else is shared between activations either.
+/// Counted in instructions executed, bytes allocated and model calls made rather
+/// than in time (`DEC_LIMITS_NOT_TIME`): the same script stops at the same point
+/// on every machine, and a slow machine is not a runaway script. Each activation
+/// has its own, since nothing else is shared between activations either.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
     /// Instructions one activation's script may execute. Counted in steps of a
@@ -24,16 +25,23 @@ pub struct Limits {
     pub instructions: u64,
     /// Bytes one activation's Lua state may hold, the state's own included.
     pub memory: usize,
+    /// Model calls one activation's script may make (`DEC_MODEL_CALLS_COUNTED`).
+    /// Awaiting a model costs no instructions, so without this a loop was
+    /// measured making 2000 calls in one activation (`EVD_MODEL_CALLS_UNLIMITED`).
+    pub model_calls: u32,
 }
 
 impl Default for Limits {
-    /// Ten million instructions and 64 MiB: a few tens of milliseconds of work,
-    /// and several thousand times what an empty state holds. Neither number is
-    /// a requirement; both are room for a script that assembles text.
+    /// Ten million instructions, 64 MiB and one model call: a few tens of
+    /// milliseconds of work, several thousand times what an empty state holds,
+    /// and a run whose calls are bounded by its step budget. None of the
+    /// numbers is a requirement; each is room for a script that assembles text
+    /// and asks one question.
     fn default() -> Self {
         Self {
             instructions: 10_000_000,
             memory: 64 << 20,
+            model_calls: 1,
         }
     }
 }
@@ -42,7 +50,7 @@ impl Default for Limits {
 ///
 /// Carried as the run's failure, so a caller learns which of these it was as a
 /// value (`STKH_TYPED_FAILURE`). A limit is never reported as a script error nor
-/// the other way round: both limits reach a script as Lua errors, and telling
+/// the other way round: every limit reaches a script as a Lua error, and telling
 /// them apart is this type's reason to exist.
 ///
 /// `#[non_exhaustive]`: what a script can do wrong grows with what it can do.
@@ -69,6 +77,11 @@ pub enum ScriptFailure {
     /// The script allocated more memory than its limit
     /// (`CREQ_HOST_MEMORY_LIMIT`).
     MemoryLimit,
+    /// The script asked for more model calls than its limit
+    /// (`CREQ_HOST_MODEL_CALL_LIMIT`). The call over the limit was not made.
+    ModelCallLimit,
+    /// A model call failed (`CREQ_HOST_MODEL_FAILURE`), and this is how.
+    ModelFailed(ModelFailure),
     /// The script returned a context the run refused
     /// (`CREQ_HOST_OUTPUT_REFUSAL_CARRIED`), and this is the run's refusal.
     OutputRefused(OutputRefusal),
@@ -83,6 +96,8 @@ impl fmt::Display for ScriptFailure {
             }
             Self::InstructionLimit => f.write_str("the script exceeded its instruction limit"),
             Self::MemoryLimit => f.write_str("the script exceeded its memory limit"),
+            Self::ModelCallLimit => f.write_str("the script exceeded its model call limit"),
+            Self::ModelFailed(failure) => write!(f, "a model call failed: {failure}"),
             Self::OutputRefused(refusal) => write!(f, "the run refused the output: {refusal}"),
         }
     }
@@ -111,9 +126,11 @@ const LEFT_OUT: [&str; 8] = [
 /// A Lua state holding the environment a script runs in, and nothing else.
 ///
 /// Built from the libraries named here rather than by taking something out of
-/// a default (`DEC_ENVIRONMENT_BY_NAME`): `io`, `os`, `debug`, `package` and
-/// `coroutine` are never loaded, so what nobody thought of is out by
-/// construction. From what is loaded, the base library's file readers, compiler
+/// a default (`DEC_ENVIRONMENT_BY_NAME`): `io`, `os`, `debug` and `package` are
+/// never loaded, so what nobody thought of is out by construction. `coroutine`
+/// is not loaded here either, and `mlua` loads it anyway once an asynchronous
+/// function exists, so it is taken out again after the host functions are made
+/// (`EVD_MLUA_ASYNC_LOADS_COROUTINE`). From what is loaded, the base library's file readers, compiler
 /// and error catchers go, and so does `math`'s random source, which differed
 /// between processes (`EVD_LUA_RANDOM_PER_PROCESS`).
 // @An environment built from named parts,IMPL_HOST_SANDBOX,impl,[CREQ_HOST_NOTHING_OUTSIDE, CREQ_HOST_NO_CATCHING]
@@ -161,6 +178,16 @@ impl LuaUserData for Handed {
     }
 }
 
+/// What one activation's model calls came to, kept outside the script so that
+/// a call it could not complete is reported as what it was, not as the Lua
+/// error that stopped the script.
+#[derive(Default)]
+struct Calls {
+    made: Cell<u32>,
+    over_limit: Cell<bool>,
+    failed: RefCell<Option<ModelFailure>>,
+}
+
 /// Perform `activation` by running `script`, or say how it failed.
 ///
 /// A new state for every call (`DEC_STATE_PER_ACTIVATION`): one shared across a
@@ -172,89 +199,174 @@ impl LuaUserData for Handed {
 /// inputs under their parameters' names, with an unbound optional parameter
 /// absent rather than empty; and the host functions, which are the context API
 /// and nothing else (`DEC_HOST_FUNCTIONS_CONTEXT_API`) - `host.text(type, text)`,
-/// `host.compose(type, parts, separator)`, and `host.output`, the type the
-/// output is declared as.
+/// `host.compose(type, parts, separator)`, `host.complete(role, prompt, type)`
+/// and `host.output`, the type the output is declared as.
+///
+/// Asynchronous, because a model call is awaited rather than blocked on
+/// (`DEC_BEHAVIOUR_ASYNC`). The script runs in a Lua thread made for it, and its
+/// instruction limit is set on that thread: a limit set on the state never ran
+/// in the coroutine an asynchronous call uses (`EVD_LUA_HOOK_PER_THREAD`).
 ///
 /// Contexts the script makes are issued identifiers from `source`, which must be
 /// the source the run's arguments came from: a second source repeats the first
 /// one's identifiers, and the run refuses the collision.
-// @A script run in a state of its own,IMPL_HOST_PERFORM,impl,[CREQ_HOST_RUNS_THE_SCRIPT, CREQ_HOST_FRESH_STATE]
-pub(crate) fn perform(
+// @A script run in a state and thread of its own,IMPL_HOST_PERFORM,impl,[CREQ_HOST_RUNS_THE_SCRIPT, CREQ_HOST_FRESH_STATE, CREQ_HOST_INSTRUCTION_LIMIT]
+pub(crate) async fn perform(
     script: &Script,
     activation: &Activation,
-    source: &mut IdSource,
+    source: &Rc<RefCell<IdSource>>,
+    roster: &Roster,
     limits: Limits,
 ) -> Result<Context, ScriptFailure> {
     let lua = sandbox().map_err(raised)?;
-    let over_instructions = limit(&lua, limits).map_err(raised)?;
-    let source = RefCell::new(source);
+    lua.set_memory_limit(limits.memory).map_err(raised)?;
+    let calls = Rc::new(Calls::default());
 
-    let returned = lua.scope(|scope| {
-        let host = lua.create_table()?;
-        host.raw_set("output", activation.output().as_str())?;
-        host.raw_set(
-            "text",
-            scope.create_function(|_, (declared, text): (String, String)| {
-                let declared = ContextType::new(&declared).map_err(LuaError::external)?;
-                Context::text(&mut source.borrow_mut(), declared, text)
-                    .map(Handed)
-                    .map_err(LuaError::external)
-            })?,
-        )?;
-        host.raw_set(
-            "compose",
-            scope.create_function(
-                |_,
-                 (declared, parts, separator): (
-                    String,
-                    Vec<LuaUserDataRef<Handed>>,
-                    Option<String>,
-                )| {
-                    let declared = ContextType::new(&declared).map_err(LuaError::external)?;
-                    let parts: Vec<Context> = parts.iter().map(|part| part.0.clone()).collect();
-                    let separator = separator.unwrap_or_default();
-                    Context::compose(&mut source.borrow_mut(), declared, &parts, &separator)
-                        .map(Handed)
-                        .map_err(LuaError::external)
-                },
-            )?,
-        )?;
-
-        let given = lua.create_table()?;
-        for (parameter, context) in activation.inputs() {
-            given.raw_set(parameter.as_str(), Handed(context.clone()))?;
-        }
-
-        let values: LuaMultiValue = lua
-            .load(&script.source)
-            .set_name(chunk_name(&script.document))
-            .call((given, host))?;
-        Ok(one_context(values))
-    });
-
-    // The flag is asked before the error is: the instruction limit reaches the
-    // script as an ordinary error, and its message is not what says which
-    // limit it was.
-    if over_instructions.get() {
-        return Err(ScriptFailure::InstructionLimit);
+    let host = host_functions(&lua, activation, source, roster, &calls, limits).map_err(raised)?;
+    close_coroutines(&lua).map_err(raised)?;
+    let given = lua.create_table().map_err(raised)?;
+    for (parameter, context) in activation.inputs() {
+        given
+            .raw_set(parameter.as_str(), Handed(context.clone()))
+            .map_err(raised)?;
     }
-    returned.map_err(failure)?
+
+    let body = lua
+        .load(&script.source)
+        .set_name(chunk_name(&script.document))
+        .into_function()
+        .map_err(raised)?;
+    let thread = lua.create_thread(body).map_err(raised)?;
+    let over_instructions = limit(&thread, limits).map_err(raised)?;
+    let returned: LuaResult<LuaMultiValue> = match thread.into_async((given, host)) {
+        Ok(running) => running.await,
+        Err(error) => Err(error),
+    };
+
+    outcome(returned, &over_instructions, &calls)
 }
 
-/// Hold `lua` to `limits`, returning the flag the instruction count sets once it
-/// passes its limit.
+/// The host table: the context API, the one model call, and the output type.
 ///
-/// The instruction limit is a hook every thousand instructions, measured
-/// stopping an endless loop (`EVD_LUA_LIMITS_STOP`); the memory limit is the
-/// state's own. Both reach the script as errors it cannot catch, because nothing
-/// that catches one is in its environment (`CREQ_HOST_NO_CATCHING`).
-// @Both limits set on every state,IMPL_HOST_LIMITS,impl,[CREQ_HOST_INSTRUCTION_LIMIT, CREQ_HOST_MEMORY_LIMIT]
-fn limit(lua: &Lua, limits: Limits) -> LuaResult<Rc<Cell<bool>>> {
+/// Every function owns what it needs rather than borrowing it for a scope,
+/// because a model call is awaited and a scoped function cannot be.
+/// `host.complete` checks the call limit before calling (`CREQ_HOST_MODEL_CALL_LIMIT`),
+/// takes its prompt as a context and nothing else (`CREQ_HOST_PROMPT_IS_A_CONTEXT`),
+/// and gives the answer back as a new context of the type the script names, or
+/// of its output's declared type when it names none (`CREQ_HOST_MODEL_ANSWER`).
+// @A model call through the host,IMPL_HOST_COMPLETE,impl,[CREQ_HOST_MODEL_ANSWER, CREQ_HOST_PROMPT_IS_A_CONTEXT, CREQ_HOST_MODEL_CALL_LIMIT]
+fn host_functions(
+    lua: &Lua,
+    activation: &Activation,
+    source: &Rc<RefCell<IdSource>>,
+    roster: &Roster,
+    calls: &Rc<Calls>,
+    limits: Limits,
+) -> LuaResult<LuaTable> {
+    let host = lua.create_table()?;
+    host.raw_set("output", activation.output().as_str())?;
+
+    let issuing = source.clone();
+    host.raw_set(
+        "text",
+        lua.create_function(move |_, (declared, text): (String, String)| {
+            let declared = ContextType::new(&declared).map_err(LuaError::external)?;
+            Context::text(&mut issuing.borrow_mut(), declared, text)
+                .map(Handed)
+                .map_err(LuaError::external)
+        })?,
+    )?;
+
+    let issuing = source.clone();
+    host.raw_set(
+        "compose",
+        lua.create_function(
+            move |_,
+                  (declared, parts, separator): (
+                String,
+                Vec<LuaUserDataRef<Handed>>,
+                Option<String>,
+            )| {
+                let declared = ContextType::new(&declared).map_err(LuaError::external)?;
+                let parts: Vec<Context> = parts.iter().map(|part| part.0.clone()).collect();
+                let separator = separator.unwrap_or_default();
+                Context::compose(&mut issuing.borrow_mut(), declared, &parts, &separator)
+                    .map(Handed)
+                    .map_err(LuaError::external)
+            },
+        )?,
+    )?;
+
+    let issuing = source.clone();
+    let roster = roster.clone();
+    let calls = calls.clone();
+    let output = activation.output().as_str().to_owned();
+    host.raw_set(
+        "complete",
+        lua.create_async_function(
+            move |_, (role, prompt, declared): (String, LuaAnyUserData, Option<String>)| {
+                // Taken before anything is awaited: a borrow of the userdata
+                // cannot be held across the call, and a prompt that is not a
+                // context is refused before any call is made.
+                let prompt = prompt.borrow::<Handed>().map(|handed| handed.0.clone());
+                let declared = declared.unwrap_or_else(|| output.clone());
+                let (issuing, roster, calls) = (issuing.clone(), roster.clone(), calls.clone());
+                async move {
+                    let prompt = prompt?;
+                    let declared = ContextType::new(&declared).map_err(LuaError::external)?;
+                    if calls.made.get() >= limits.model_calls {
+                        calls.over_limit.set(true);
+                        return Err(LuaError::runtime("model call limit exceeded"));
+                    }
+                    calls.made.set(calls.made.get() + 1);
+                    match roster.call(&role, &prompt).await {
+                        Ok(answer) => Context::text(&mut issuing.borrow_mut(), declared, answer)
+                            .map(Handed)
+                            .map_err(LuaError::external),
+                        Err(failure) => {
+                            let message = failure.to_string();
+                            *calls.failed.borrow_mut() = Some(failure);
+                            Err(LuaError::runtime(message))
+                        }
+                    }
+                }
+            },
+        )?,
+    )?;
+
+    Ok(host)
+}
+
+/// Take the coroutine library back out of the script's reach.
+///
+/// `mlua` loads it into the globals when the first asynchronous function is
+/// created, whatever the state was built with, and reads `coroutine.yield` from
+/// them there and then into its own poller (`EVD_MLUA_ASYNC_LOADS_COROUTINE`).
+/// Left in, a script could resume a coroutine and have any error - a limit's
+/// included - handed back as a value, which is catching it under another name
+/// (`CREQ_HOST_NO_CATCHING`). Removed after the host functions are made, so
+/// the poller keeps what it took.
+// @Coroutines closed after the host is built,IMPL_HOST_CLOSE_COROUTINES,impl,[CREQ_HOST_NO_CATCHING]
+fn close_coroutines(lua: &Lua) -> LuaResult<()> {
+    lua.globals().raw_set("coroutine", LuaNil)
+}
+
+/// Hold `thread` to its instruction limit, returning the flag the count sets
+/// once it passes the limit.
+///
+/// A hook every thousand instructions, measured stopping an endless loop
+/// (`EVD_LUA_LIMITS_STOP`), and set on the thread the script runs in rather than
+/// on the state (`DEC_HOOK_ON_THE_THREAD`). The memory limit is the state's, and
+/// held under an asynchronous call. Both reach the script as errors it cannot
+/// catch, because nothing that catches one is in its environment
+/// (`CREQ_HOST_NO_CATCHING`).
+// @Both limits set on every activation,IMPL_HOST_LIMITS,impl,[CREQ_HOST_INSTRUCTION_LIMIT, CREQ_HOST_MEMORY_LIMIT]
+fn limit(thread: &LuaThread, limits: Limits) -> LuaResult<Rc<Cell<bool>>> {
     const EVERY: u32 = 1000;
     let over = Rc::new(Cell::new(false));
     let flag = over.clone();
     let spent = Cell::new(0u64);
-    lua.set_hook(
+    thread.set_hook(
         LuaHookTriggers::new().every_nth_instruction(EVERY),
         move |_, _| {
             spent.set(spent.get() + u64::from(EVERY));
@@ -266,8 +378,31 @@ fn limit(lua: &Lua, limits: Limits) -> LuaResult<Rc<Cell<bool>>> {
             }
         },
     )?;
-    lua.set_memory_limit(limits.memory)?;
     Ok(over)
+}
+
+/// What the script's run comes to.
+///
+/// The flags are asked before the error is: every limit, and a failed model
+/// call, reach the script as ordinary errors, and their messages are not what
+/// says which it was. The instruction limit is asked first, since a script over
+/// it may have been anywhere, a model call's aftermath included.
+// @A limit is a limit and a failed call is a failed call,IMPL_HOST_OUTCOME,impl,[CREQ_HOST_MODEL_FAILURE, CREQ_HOST_MODEL_CALL_LIMIT, CREQ_HOST_INSTRUCTION_LIMIT]
+fn outcome(
+    returned: LuaResult<LuaMultiValue>,
+    over_instructions: &Cell<bool>,
+    calls: &Calls,
+) -> Result<Context, ScriptFailure> {
+    if over_instructions.get() {
+        return Err(ScriptFailure::InstructionLimit);
+    }
+    if calls.over_limit.get() {
+        return Err(ScriptFailure::ModelCallLimit);
+    }
+    if let Some(failed) = calls.failed.borrow_mut().take() {
+        return Err(ScriptFailure::ModelFailed(failed));
+    }
+    returned.map_err(failure).and_then(one_context)
 }
 
 /// The one context `values` holds, or what they held instead.
@@ -290,7 +425,7 @@ fn one_context(values: LuaMultiValue) -> Result<Context, ScriptFailure> {
     }
 }
 
-/// The failure a Lua error stands for, once the instruction flag has been asked.
+/// The failure a Lua error stands for, once the flags have been asked.
 ///
 /// A memory error is the memory limit, whatever raised it. Anything else is the
 /// script's own error, kept whole: the document, the line and the traceback are
@@ -309,7 +444,6 @@ fn raised(error: LuaError) -> ScriptFailure {
         message: error.to_string(),
     }
 }
-
 #[cfg(test)]
 use crate::Behaviours;
 #[cfg(test)]
@@ -434,14 +568,15 @@ bindings = { first = "one", second = "two" }
     let arguments = agconflo_core::Arguments::new()
         .supply("one", "input", note(&mut source, "note", "ONE"))
         .supply("two", "input", note(&mut source, "note", "TWO"));
-    let ending = crate::run_scripted(
+    let ending = crate::scripted::block(crate::run_scripted(
         &workflow(types, flow),
         &behaviours,
+        &crate::scripted::offline(),
         arguments,
         &mut source,
         10,
         SMALL,
-    );
+    ));
     assert_eq!(rendered(ending), "ONE+TWO");
 }
 
@@ -785,4 +920,163 @@ fn memory_limit_is_per_activation() {
     );
 
     assert_eq!(rendered(chained(&holding(hold))), "hello");
+}
+
+/// Run the pair with `script` as `a`'s behaviour and `roster` for its calls, and
+/// return how `a` failed.
+#[cfg(test)]
+fn first_fails_calling(script: &str, roster: &crate::Roster) -> ScriptFailure {
+    let behaviours = Behaviours::new()
+        .define("first", "first.lua", script)
+        .define(
+            "second",
+            "second.lua",
+            "local given, host = ...\nreturn host.text(host.output, 'b')",
+        );
+    let (instance, failure) = failed(crate::scripted::run_with_roster(
+        &workflow(PAIR_TYPES, PAIR),
+        &behaviours,
+        roster,
+        None,
+    ));
+    assert_eq!(instance, "a", "the run ended on the failing instance");
+    failure
+}
+
+/// A roster mapping `drafting` to an OpenAI model at `stub`.
+#[cfg(test)]
+fn drafting(stub: &crate::models::Stub) -> crate::Roster {
+    crate::Roster::new(crate::models::client_for(&stub.base)).map("drafting", "openai::m")
+}
+
+#[cfg(test)]
+#[test]
+fn model_answer_is_a_context() {
+    let answer = "  an answer\nwith its whitespace \n";
+    let stub = crate::models::Stub::answering(200, answer);
+    let script = r#"
+local given, host = ...
+local named = host.complete('drafting', host.text(host.output, 'first'), 'draft')
+local plain = host.complete('drafting', host.text(host.output, 'second'))
+return host.compose(host.output, {host.text(host.output, named:type()), named, plain, host.text(host.output, plain:type())}, '|')
+"#;
+    let behaviours = Behaviours::new().define("first", "first.lua", script);
+    let flow = r#"
+name = "one"
+output = "a"
+
+[instances.a]
+node_type = "first"
+"#;
+    let result = rendered(crate::scripted::run_with_roster(
+        &workflow(PAIR_TYPES, flow),
+        &behaviours,
+        &drafting(&stub),
+        None,
+    ));
+    // Both answers exactly as sent, the first of the type named and the second
+    // of the output's declared type - and the output made of them accepted.
+    assert_eq!(result, format!("draft|{answer}|{answer}|note"));
+    assert_eq!(stub.requests().len(), 2);
+}
+
+#[cfg(test)]
+#[test]
+fn prompt_must_be_a_context() {
+    let stub = crate::models::Stub::answering(200, "unused");
+    let failure = first_fails_calling(
+        "local given, host = ...\nreturn host.complete('drafting', 'a plain string')",
+        &drafting(&stub),
+    );
+    assert!(
+        matches!(failure, ScriptFailure::Raised { .. }),
+        "{failure:?}"
+    );
+    assert!(stub.requests().is_empty(), "no call was made");
+}
+
+#[cfg(test)]
+#[test]
+fn model_call_limit_holds() {
+    let stub = crate::models::Stub::answering(200, "ok");
+    let asking = |times: u32| {
+        format!(
+            "local given, host = ...\nlocal last\nfor i = 1, {times} do last = host.complete('drafting', host.text(host.output, 'q')) end\nreturn host.compose(host.output, {{given.input, last}}, ' ')"
+        )
+    };
+
+    // Three calls against a limit of two: the third is refused before it is
+    // made, as the limit rather than as a script error.
+    let behaviours = Behaviours::new()
+        .define("seed", "seed.lua", &asking(SMALL.model_calls + 1))
+        .define("step", "step.lua", &asking(1));
+    let (instance, failure) = failed(crate::scripted::run_with_roster(
+        &workflow(CHAIN_TYPES, CHAIN),
+        &behaviours,
+        &drafting(&stub),
+        Some(("first", "hello")),
+    ));
+    assert_eq!(
+        (instance.as_str(), failure),
+        ("first", ScriptFailure::ModelCallLimit)
+    );
+    assert_eq!(stub.requests().len(), 2);
+
+    // Two calls in each of three activations: each activation's own count.
+    let behaviours = Behaviours::new()
+        .define("seed", "seed.lua", &asking(SMALL.model_calls))
+        .define("step", "step.lua", &asking(SMALL.model_calls));
+    let result = rendered(crate::scripted::run_with_roster(
+        &workflow(CHAIN_TYPES, CHAIN),
+        &behaviours,
+        &drafting(&stub),
+        Some(("first", "hello")),
+    ));
+    assert_eq!(result, "hello ok ok ok");
+    assert_eq!(stub.requests().len(), 2 + 6);
+}
+
+#[cfg(test)]
+#[test]
+fn model_failure_ends_the_activation() {
+    let stub = crate::models::Stub::answering(503, "unused");
+    let failure = first_fails_calling(
+        "local given, host = ...\nreturn host.complete('drafting', host.text(host.output, 'q'))",
+        &drafting(&stub),
+    );
+    match failure {
+        ScriptFailure::ModelFailed(crate::ModelFailure::Provider { role, status, .. }) => {
+            assert_eq!(role, "drafting");
+            assert_eq!(status, Some(503));
+        }
+        other => panic!("a failed call is a model failure, not {other:?}"),
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn instruction_limit_holds_across_a_model_call() {
+    let stub = crate::models::Stub::answering(200, "ok");
+    let failure = first_fails_calling(
+        "local given, host = ...\nhost.complete('drafting', host.text(host.output, 'q'))\nwhile true do end",
+        &drafting(&stub),
+    );
+    assert_eq!(failure, ScriptFailure::InstructionLimit);
+    assert_eq!(
+        stub.requests().len(),
+        1,
+        "the call was made before the loop"
+    );
+}
+
+#[cfg(test)]
+#[test]
+fn memory_limit_holds_across_a_model_call() {
+    let stub = crate::models::Stub::answering(200, "ok");
+    let failure = first_fails_calling(
+        "local given, host = ...\nhost.complete('drafting', host.text(host.output, 'q'))\nreturn string.rep('x', 1 << 30)",
+        &drafting(&stub),
+    );
+    assert_eq!(failure, ScriptFailure::MemoryLimit);
+    assert_eq!(stub.requests().len(), 1);
 }

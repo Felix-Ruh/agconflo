@@ -106,3 +106,53 @@ provider then answers the same way is not something these measurements can say.
    for ``mlua::Lua`` failed to compile, on an ``Rc`` inside it - so a caller
    running scripts keeps them on one thread. That is the script host's
    constraint, not the run's.
+
+The last three were taken the same day while implementing, two of them against
+the same stub and one against a real model: a local server on this machine,
+LM Studio, serving ``qwen3.8-27b-ridge`` through its OpenAI-compatible
+interface, with a token held outside the repository.
+
+.. evd:: genai trimmed an OpenAI answer and kept an Anthropic one whole
+   :id: EVD_GENAI_OPENAI_TRIMS
+   :evd_kind: measurement
+   :observed_on: 2026-09-23
+   :observation: genai 0.7.0-beta.24 returned a stubbed answer with its leading and trailing whitespace removed through its OpenAI adapter and intact through its Anthropic adapter, while the raw response body it captured held the answer exactly in both.
+
+   The stub answered ``"  openai answer 1 \n"`` in one format and the same
+   shape in the other. ``first_text`` gave ``"openai answer 1"`` for OpenAI's and
+   the whole string for Anthropic's. The OpenAI adapter's source trims the
+   content it reads; the Anthropic adapter's does not.
+
+   The real model did not show it: asked for a poem with empty lines around it,
+   its answer began and ended with text in the raw body too, so there was
+   nothing to trim. The difference is measured on the stub and not yet seen on
+   a model.
+
+.. evd:: A real model answered through genai and the local server
+   :id: EVD_GENAI_REAL_LOCAL_MODEL
+   :evd_kind: measurement
+   :observed_on: 2026-09-23
+   :observation: genai 0.7.0-beta.24 reached qwen3.8-27b-ridge through LM Studio, which answered pong in 11.3 s with 31 of 35 completion tokens spent on reasoning the answer text left out, and a wrong token gave status 401.
+
+   The prompt asked for exactly one word, and the answer was that word. The
+   model reported its reasoning separately and ``genai`` kept it out of the
+   answer's text, so an answer context holds what the model answered and not
+   how it got there. The server counted 63 prompt tokens for a nine-word
+   prompt: its chat template wraps the message, on the provider's side of the
+   wire, and changes nothing Agconflo sends.
+
+   A second prompt took 30.3 s and 1165 reasoning tokens for a two-line poem,
+   which is the order of time a call to a local model costs here.
+
+.. evd:: mlua's async feature put the coroutine library back
+   :id: EVD_MLUA_ASYNC_LOADS_COROUTINE
+   :evd_kind: measurement
+   :observed_on: 2026-09-23
+   :observation: With mlua 0.12.1's async feature enabled, a state built without the coroutine library gave a script a coroutine table once an asynchronous function had been created in it, and removing that global afterwards left asynchronous calls working.
+
+   Found by the existing case ``TEST_HOST_NOTHING_CATCHES_AN_ERROR``, which
+   expected ``coroutine`` to be ``nil`` and read a table. ``mlua``'s source loads
+   the library when the first asynchronous function is made, and reads
+   ``coroutine.yield`` into its poller at that moment, so removing the global
+   once the host functions exist takes it from scripts without taking it from
+   ``mlua``: every model case passed with it removed.

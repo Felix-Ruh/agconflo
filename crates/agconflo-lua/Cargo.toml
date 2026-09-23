@@ -11,10 +11,13 @@ readme.workspace = true
 
 [dependencies]
 agconflo-core = { path = "../agconflo-core" }
+genai = { workspace = true }
 mlua = { workspace = true }
+serde_json = { workspace = true }
 
 [dev-dependencies]
 proptest = { workspace = true }
+tokio = { workspace = true }
 
 # `unsafe_code = "forbid"` and clippy's `all` group, from the workspace. Without
 # this table a member crate inherits none of them, silently.

@@ -168,3 +168,28 @@ unless they are set where the script runs (``EVD_LUA_HOOK_PER_THREAD``).
    Anthropic's, and each result carries that provider's answer.
 
    The parent goal made concrete: nothing in the workflow changed.
+
+.. test_case:: An answer keeps the whitespace the provider sent
+   :id: TEST_MODELS_ANSWER_KEPT_AS_SENT
+   :verifies: CREQ_ROSTER_ANSWER_AS_SENT
+   :test_kind: error_path
+   :coverage: partial
+
+   A stub answering with whitespace at both ends, in OpenAI's format and in
+   Anthropic's. Both calls return the answer exactly as sent.
+
+   Catches: the answer taken from ``genai``'s reading, which is the measured
+   defect for the OpenAI format. Not caught here, and recorded: several text
+   blocks, and reasoning reported separately, since the stub sends neither.
+
+.. test_case:: A scripted run hands its identifier source back advanced
+   :id: TEST_SCRIPTED_SOURCE_HANDED_BACK_ADVANCED
+   :verifies: FEAT_RUN_ONE_CONTEXT_PER_IDENTIFIER
+   :test_kind: error_path
+   :coverage: partial
+
+   A scripted run lends the caller's identifier source to its scripts, because
+   a function that awaits a model cannot borrow it. After the run, the next
+   identifier the caller's source issues is none of those the run's contexts
+   carry. Handed back reset, it would repeat the argument's and the run's own,
+   and the caller's next run would hold two contexts under one identifier.
