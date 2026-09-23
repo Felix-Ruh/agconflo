@@ -595,3 +595,29 @@ needs_fields = [
     { name = "type", type = "str", default = "impl" },
     { name = "implements", type = "list[str]", default = [] },
 ]
+
+# The same shape for agconflo-lua: one project per crate, so each crate's
+# markers are brought into the graph by its own docs/code/<crate>.rst.
+[codelinks.projects.agconflo-lua]
+remote_url_pattern = "https://github.com/Felix-Ruh/agconflo/blob/{commit}/{path}#L{line}"
+
+[codelinks.projects.agconflo-lua.source_discover]
+src_dir = "../crates"
+include = ["**/agconflo-lua/src/**/*.rs"]
+comment_type = "rust"
+
+[codelinks.projects.agconflo-lua.analyse]
+get_oneline_needs = true
+get_need_id_refs = false
+
+[codelinks.projects.agconflo-lua.analyse.oneline_comment_style]
+start_sequence = "@"
+end_sequence = "\n"
+field_split_char = ","
+# `implements` in the place of the default `links`: see [needs.links.implements].
+needs_fields = [
+    { name = "title", type = "str" },
+    { name = "id", type = "str" },
+    { name = "type", type = "str", default = "impl" },
+    { name = "implements", type = "list[str]", default = [] },
+]

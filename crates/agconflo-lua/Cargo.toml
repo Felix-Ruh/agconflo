@@ -1,0 +1,22 @@
+[package]
+name = "agconflo-lua"
+description = "Runs Agconflo node behaviour as sandboxed Lua scripts, as a caller of agconflo-core's run."
+version.workspace = true
+edition.workspace = true
+# Its own rather than the workspace's: mlua 0.12.1 declares 1.88.
+rust-version = "1.88"
+license.workspace = true
+authors.workspace = true
+readme.workspace = true
+
+[dependencies]
+agconflo-core = { path = "../agconflo-core" }
+mlua = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
+
+# `unsafe_code = "forbid"` and clippy's `all` group, from the workspace. Without
+# this table a member crate inherits none of them, silently.
+[lints]
+workspace = true

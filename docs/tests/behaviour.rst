@@ -207,13 +207,25 @@ time a test is allowed.
    :test_kind: error_path
    :coverage: partial
 
-   A run's arguments made from one identifier source and the run given another.
-   The first context a script makes carries an identifier an argument already
-   has, the run refuses it, and the activation fails carrying that refusal.
+   A run's arguments made from one identifier source and the run given another,
+   with a script whose output is the first context it makes. That output
+   carries the identifier an argument already has, the run refuses it, and the
+   activation fails carrying that refusal.
 
    Not a failure mode of the requirement but of using it: the run and its
    caller have to share one source, and this pins down what a caller who does
    not is told.
+
+   It pins down less than it was first written to. The case originally used a
+   script composing its input with a word, and that run completed: the first
+   context the script made was the word, a part, and it took the argument's
+   identifier; the composition, the output, took the next one, which the run
+   did not hold. The run asks only about the output's own identifier
+   (``CREQ_RUN_REFUSES_HELD_IDENTIFIER``), so a collision inside a composition
+   passes silently, and one run then holds two contexts sharing an identifier.
+   Recorded here rather than left for someone to find: preventing two sources is
+   what ``IdSource`` already says belongs to whatever owns a run, and nothing
+   does yet.
 
 .. test_case:: Nothing an activation leaves behind reaches the next
    :id: TEST_HOST_NOTHING_SURVIVES_AN_ACTIVATION

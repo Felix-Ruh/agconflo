@@ -41,11 +41,12 @@ case "${1:-}" in
         ;;
 esac
 
-# The one crate whose tests have test cases in docs/. junit-to-needs is
+# The crates whose tests have test cases in docs/. junit-to-needs is
 # deliberately absent: it is tooling, its tests answer to no requirement, and a
 # run naming a test case that does not exist is a dead link that would fail the
-# documentation build. A second traced crate would be another --crate below.
-CRATE="agconflo-core"
+# documentation build. A case id carries no crate name, so the traced crates'
+# module names must not repeat one another.
+CRATES="agconflo-core agconflo-lua"
 
 report="$root/target/nextest/default/junit.xml"
 committed="$root/docs/test-runs.json"
@@ -65,7 +66,15 @@ fi
 
 # The importer prints the file and writes nothing itself, so a failure here
 # cannot leave a half-written file behind for the next run to compare against.
-if ! cargo run --quiet --package junit-to-needs -- --crate "$CRATE" "$report" > "$produced"; then
+crate_args=""
+for crate in $CRATES; do
+    crate_args="$crate_args --crate $crate"
+done
+
+# $crate_args is split on purpose: each word is one argument, and crate names
+# hold no spaces.
+# shellcheck disable=SC2086
+if ! cargo run --quiet --package junit-to-needs -- $crate_args "$report" > "$produced"; then
     echo "import-test-runs: the importer refused the report - see its message above" >&2
     rm -f "$produced"
     exit 1
