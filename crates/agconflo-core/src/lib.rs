@@ -35,7 +35,10 @@ pub use id::{ContextId, IdSource, SourceExhausted};
 pub use reader::{
     FaultKind, NodeTypeDocument, ReadFault, WorkflowDocument, read_node_types, read_workflow,
 };
-pub use run::{Arguments, NothingOutstanding, Run, RunEnding, SignatureFault, StartRefusal, Step};
+pub use run::{
+    Arguments, NothingOutstanding, OutputRefusal, Run, RunEnding, SignatureFault, StartRefusal,
+    Step,
+};
 pub use scheduler::Activation;
 pub use wiring::validate_wiring;
 pub use workflow::{Binding, NodeInstance, NodeType, Parameter, WorkflowDefinition};

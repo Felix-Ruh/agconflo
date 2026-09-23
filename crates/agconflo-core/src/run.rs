@@ -13,7 +13,7 @@ use std::marker::PhantomData;
 use crate::defect::WiringDefect;
 use crate::scheduler::{Activation, Produced, next_activation};
 use crate::workflow::WorkflowDefinition;
-use crate::{Context, ContextType, validate_wiring};
+use crate::{Context, ContextId, ContextType, validate_wiring};
 
 /// The contexts a run supplies to its workflow's entry parameters.
 ///
@@ -344,6 +344,68 @@ impl fmt::Display for NothingOutstanding {
 
 impl std::error::Error for NothingOutstanding {}
 
+/// Why an output reported for an activation was not accepted.
+///
+/// Refusing an output ends nothing: the activation stays outstanding, counted
+/// once, and the caller either reports an output the run accepts or reports the
+/// activation failed (`DEC_REFUSED_OUTPUT_OUTSTANDING`). A fifth ending would
+/// supersede the decision that there are four, and ending the run as a node's
+/// failure would need a failure of the caller's type, which the run cannot make.
+///
+/// `#[non_exhaustive]` for the reason [`StartRefusal`] is: what a run can find
+/// wrong with an output is not finished, where the ways it can end are.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum OutputRefusal {
+    /// No activation was outstanding, so there is no instance the output could
+    /// be filed against.
+    NothingOutstanding,
+    /// The output is not of the type the instance's node type declares
+    /// (`CREQ_RUN_REFUSES_UNDECLARED_OUTPUT`). Measured accepted and handed on to
+    /// a parameter declared for another type (`EVD_RUN_ACCEPTS_UNDECLARED_OUTPUT`).
+    UndeclaredType {
+        /// The instance the output was reported for.
+        instance: String,
+        /// The output type its node type declares.
+        declared: ContextType,
+        /// The type the reported output carries.
+        reported: ContextType,
+    },
+    /// The output carries the identifier of an argument or of an output the run
+    /// has already accepted (`CREQ_RUN_REFUSES_HELD_IDENTIFIER`), which would
+    /// credit one context to two producers (`EVD_RUN_ACCEPTS_HELD_IDENTIFIER`).
+    IdentifierHeld {
+        /// The instance the output was reported for.
+        instance: String,
+        /// The identifier the run already holds.
+        id: ContextId,
+    },
+}
+
+impl fmt::Display for OutputRefusal {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::NothingOutstanding => NothingOutstanding.fmt(f),
+            Self::UndeclaredType {
+                instance,
+                declared,
+                reported,
+            } => write!(
+                f,
+                "{instance} is declared to produce {} and was reported producing {}",
+                declared.as_str(),
+                reported.as_str()
+            ),
+            Self::IdentifierHeld { instance, id } => write!(
+                f,
+                "{instance} was reported producing {id:?}, which the run already holds"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for OutputRefusal {}
+
 /// The one way a run ended.
 ///
 /// Four, and the set is closed on purpose (`DEC_RUN_ENDS_ONE_WAY`): a caller
@@ -529,11 +591,56 @@ impl<'a, F> Run<'a, F> {
     }
 
     /// Report what the outstanding activation produced.
-    pub fn produced(&mut self, context: Context) -> Result<(), NothingOutstanding> {
-        let outstanding = self.outstanding.take().ok_or(NothingOutstanding)?;
-        self.produced
-            .insert(outstanding.instance().to_owned(), context);
+    ///
+    /// Refused, and nothing recorded, when the output is not of the type the
+    /// instance's node type declares or carries an identifier the run already
+    /// holds. Either way the activation stays outstanding and is not
+    /// counted again (`DEC_REFUSED_OUTPUT_OUTSTANDING`): asking for the next
+    /// step hands it back, so a refusal cannot be stepped past, and the caller
+    /// answers again or reports the activation failed.
+    // @An output is checked before it is recorded,IMPL_RUN_PRODUCED,impl,[CREQ_RUN_REFUSES_UNDECLARED_OUTPUT, CREQ_RUN_REFUSES_HELD_IDENTIFIER, CREQ_RUN_REFUSED_OUTPUT_OUTSTANDING]
+    pub fn produced(&mut self, context: Context) -> Result<(), OutputRefusal> {
+        let outstanding = self
+            .outstanding
+            .as_ref()
+            .ok_or(OutputRefusal::NothingOutstanding)?;
+
+        if context.declared_type() != outstanding.output() {
+            return Err(OutputRefusal::UndeclaredType {
+                instance: outstanding.instance().to_owned(),
+                declared: outstanding.output().clone(),
+                reported: context.declared_type().clone(),
+            });
+        }
+
+        if self.holds(context.id()) {
+            return Err(OutputRefusal::IdentifierHeld {
+                instance: outstanding.instance().to_owned(),
+                id: context.id(),
+            });
+        }
+
+        let instance = outstanding.instance().to_owned();
+        self.outstanding = None;
+        self.produced.insert(instance, context);
         Ok(())
+    }
+
+    /// Whether `id` is the identifier of an argument the run was started with or
+    /// of an output it has accepted - which is everything a run holds.
+    ///
+    /// Asked of the whole run rather than of the outstanding instance's inputs:
+    /// a caller holding any context of the run can hand it back, including the
+    /// output of an instance not wired to this one. Only the output's own
+    /// identifier is asked about. A composition holding a held context by
+    /// reference has an identifier of its own, and is the one sanctioned way to
+    /// pass an input on.
+    // @Everything a run holds,IMPL_RUN_HOLDS,impl,[CREQ_RUN_REFUSES_HELD_IDENTIFIER]
+    fn holds(&self, id: ContextId) -> bool {
+        self.arguments
+            .iter()
+            .any(|(_, _, context)| context.id() == id)
+            || self.produced.values().any(|context| context.id() == id)
     }
 
     /// The context the designated instance produced, when it has.
@@ -567,11 +674,11 @@ impl<'a, F> Run<'a, F> {
 use std::convert::Infallible;
 
 #[cfg(test)]
+use crate::IdSource;
+#[cfg(test)]
 use crate::wiring::{any_definition, well_formed_definition};
 #[cfg(test)]
 use crate::workflow::{context_type, definition, instance, node_type};
-#[cfg(test)]
-use crate::{ContextId, IdSource};
 #[cfg(test)]
 use proptest::prelude::*;
 
@@ -581,7 +688,12 @@ fn ctx(source: &mut IdSource, type_name: &str) -> Context {
     Context::text(source, context_type(type_name), "x").expect("a fresh source issues")
 }
 
-/// Drive a run to its ending, producing a fresh context for each activation.
+/// Drive a run to its ending, producing a fresh context of the declared output
+/// type for each activation.
+///
+/// The declared type rather than a fixed one: until the run checked outputs, a
+/// fixed `note` here let `well_formed_runs_complete` pass on workflows whose
+/// types declare other outputs, by feeding every consumer a mistyped context.
 ///
 /// Returns the ending and, in order, every instance activated with the
 /// identifier of what it produced - so that a test can assert on what the run
@@ -600,7 +712,7 @@ fn drive(
         match run.step() {
             Step::Ended(ending) => return (ending, activated),
             Step::Activate(activation) => {
-                let produced = ctx(source, "note");
+                let produced = ctx(source, activation.output().as_str());
                 activated.push((activation.instance().to_owned(), produced.id()));
                 run.produced(produced)
                     .expect("an activation had just been offered");
@@ -916,10 +1028,10 @@ proptest! {
             loop {
                 match run.step() {
                     Step::Ended(_) => break,
-                    Step::Activate(_) => {
+                    Step::Activate(activation) => {
                         activations += 1;
                         prop_assert!(activations <= budget);
-                        let produced = ctx(&mut source, "note");
+                        let produced = ctx(&mut source, activation.output().as_str());
                         run.produced(produced).expect("an activation was offered");
                     }
                 }
@@ -1321,4 +1433,357 @@ fn failure_with_no_activation_is_refused() {
         run.fail(NodeTrouble::TimedOut).unwrap_err(),
         NothingOutstanding
     );
+}
+
+/// The activation a run offers next, or a panic naming what came instead.
+#[cfg(test)]
+fn offered<F: fmt::Debug>(run: &mut Run<'_, F>) -> Activation {
+    match run.step() {
+        Step::Activate(activation) => activation,
+        Step::Ended(ending) => panic!("expected an activation, the run ended: {ending:?}"),
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn undeclared_output_is_refused() {
+    let mut source = IdSource::new();
+    let workflow = chain(2);
+    let mut run = Run::<Infallible>::start(&workflow, Arguments::new(), 10).expect("sound");
+
+    assert_eq!(offered(&mut run).instance(), "n0");
+    // The measured defect (EVD_RUN_ACCEPTS_UNDECLARED_OUTPUT): `n0`'s type
+    // declares `note`, and it is answered with a `diff`.
+    let refusal = run
+        .produced(ctx(&mut source, "diff"))
+        .expect_err("an output of an undeclared type is refused");
+    // Matched as a whole, so a refusal naming the wrong instance or either type
+    // wrongly fails, and so a refusal of the other kind cannot stand in for it.
+    assert_eq!(
+        refusal,
+        OutputRefusal::UndeclaredType {
+            instance: "n0".to_owned(),
+            declared: context_type("note"),
+            reported: context_type("diff"),
+        }
+    );
+
+    // Refused before it was recorded: had it been recorded, `n1` - bound to
+    // `n0` - would be ready and offered now.
+    assert_eq!(offered(&mut run).instance(), "n0");
+}
+
+#[cfg(test)]
+#[test]
+fn designated_undeclared_output_is_refused() {
+    let mut source = IdSource::new();
+    // Nothing consumes the designated instance's output, so a run comparing
+    // outputs with the parameters they reach checks nothing here.
+    let workflow = definition(
+        vec![node_type("Src", &[], "note")],
+        vec![instance("only", "Src", &[])],
+        &["only"],
+    );
+    let mut run = Run::<Infallible>::start(&workflow, Arguments::new(), 10).expect("sound");
+
+    offered(&mut run);
+    let refusal = run
+        .produced(ctx(&mut source, "diff"))
+        .expect_err("the result's type is checked too");
+    assert_eq!(
+        refusal,
+        OutputRefusal::UndeclaredType {
+            instance: "only".to_owned(),
+            declared: context_type("note"),
+            reported: context_type("diff"),
+        }
+    );
+    // And the run did not complete with the mistyped result.
+    assert_eq!(offered(&mut run).instance(), "only");
+}
+
+#[cfg(test)]
+#[test]
+fn output_of_declared_type_is_accepted() {
+    let mut source = IdSource::new();
+    // `Summ` changes the type: it takes a `note` and produces a `summary`, so a
+    // run comparing an output with its inputs refuses it for being right.
+    let types = vec![
+        node_type("Src", &[], "note"),
+        node_type("Summ", &[("input", "note")], "summary"),
+    ];
+    let workflow = definition(
+        types,
+        vec![
+            instance("a", "Src", &[]),
+            instance("s", "Summ", &[("input", "a")]),
+        ],
+        &["s"],
+    );
+
+    // Answered with a plain context of the declared type.
+    let (ending, _) = drive(&workflow, Arguments::new(), 10, &mut source);
+    assert!(matches!(ending, RunEnding::Completed(_)), "{ending:?}");
+
+    // And with a composition of the declared type whose part is a `note`: a
+    // composition's type is the one it was declared with, whatever its parts'.
+    let mut run = Run::<Infallible>::start(&workflow, Arguments::new(), 10).expect("sound");
+    offered(&mut run);
+    run.produced(ctx(&mut source, "note"))
+        .expect("of the declared type");
+    let activation = offered(&mut run);
+    let composed = Context::compose(
+        &mut source,
+        context_type("summary"),
+        [&activation.inputs()[0].1],
+        "",
+    )
+    .expect("a fresh source issues");
+    run.produced(composed)
+        .expect("a composition of the declared type is accepted");
+    assert!(matches!(run.step(), Step::Ended(RunEnding::Completed(_))));
+}
+
+#[cfg(test)]
+#[test]
+fn passed_through_argument_is_refused() {
+    let mut source = IdSource::new();
+    // Declared `note` in and `note` out, so only the identifier is wrong.
+    let workflow = one_entry("note");
+    let argument = ctx(&mut source, "note");
+    let held = argument.id();
+    let arguments = Arguments::new().supply("e", "seed", argument);
+    let mut run = Run::<Infallible>::start(&workflow, arguments, 10).expect("sound");
+
+    let activation = offered(&mut run);
+    let refusal = run
+        .produced(activation.inputs()[0].1.clone())
+        .expect_err("an argument handed back is refused");
+    assert_eq!(
+        refusal,
+        OutputRefusal::IdentifierHeld {
+            instance: "e".to_owned(),
+            id: held,
+        }
+    );
+}
+
+#[cfg(test)]
+#[test]
+fn passed_through_output_is_refused() {
+    let mut source = IdSource::new();
+    // `a` and `b` are not wired to each other, so a run asking only about the
+    // instance's own inputs finds nothing to compare.
+    let workflow = definition(
+        vec![node_type("Src", &[], "note")],
+        vec![instance("a", "Src", &[]), instance("b", "Src", &[])],
+        &["b"],
+    );
+    let mut run = Run::<Infallible>::start(&workflow, Arguments::new(), 10).expect("sound");
+
+    assert_eq!(offered(&mut run).instance(), "a");
+    let from_a = ctx(&mut source, "note");
+    run.produced(from_a.clone()).expect("a new context");
+
+    assert_eq!(offered(&mut run).instance(), "b");
+    let refusal = run
+        .produced(from_a.clone())
+        .expect_err("another instance's output handed back is refused");
+    assert_eq!(
+        refusal,
+        OutputRefusal::IdentifierHeld {
+            instance: "b".to_owned(),
+            id: from_a.id(),
+        }
+    );
+}
+
+#[cfg(test)]
+#[test]
+fn output_composing_its_input_is_accepted() {
+    let mut source = IdSource::new();
+    let workflow = chain(2);
+    let mut run = Run::<Infallible>::start(&workflow, Arguments::new(), 10).expect("sound");
+
+    offered(&mut run);
+    run.produced(ctx(&mut source, "note"))
+        .expect("a new context");
+
+    let activation = offered(&mut run);
+    let input = activation.inputs()[0].1.clone();
+    let composed = Context::compose(&mut source, context_type("note"), [&input], "")
+        .expect("a fresh source issues");
+    let composed_id = composed.id();
+    run.produced(composed)
+        .expect("a composition holding the input is new to the run");
+
+    // The result is the composition, holding the input as itself.
+    match run.step() {
+        Step::Ended(RunEnding::Completed(result)) => {
+            assert_eq!(result.id(), composed_id);
+            assert_ne!(result.id(), input.id());
+            assert_eq!(result.parts()[0].id(), input.id());
+        }
+        other => panic!("expected completion, got {other:?}"),
+    }
+}
+
+/// A chain of `count` instances whose first is an entry instance taking one
+/// `note` argument, the last designated.
+#[cfg(test)]
+fn entry_chain(count: usize) -> WorkflowDefinition {
+    let types = vec![
+        node_type("Entry", &[("seed", "note")], "note"),
+        node_type("Step", &[("input", "note")], "note"),
+    ];
+    let mut instances = vec![instance("n0", "Entry", &[]).into_entry()];
+    for step in 1..count {
+        instances.push(instance(
+            &format!("n{step}"),
+            "Step",
+            &[("input", &format!("n{}", step - 1))],
+        ));
+    }
+    let last = format!("n{}", count - 1);
+    definition(types, instances, &[&last])
+}
+
+/// What a caller answers one activation with.
+#[cfg(test)]
+#[derive(Clone, Debug)]
+enum Answer {
+    /// A new context built from nothing the run holds.
+    Fresh,
+    /// A composition of the held context at this index, modulo how many there
+    /// are.
+    Compose(usize),
+    /// The held context at this index handed back unchanged, and a new context
+    /// once that has been refused.
+    HandBack(usize),
+}
+
+#[cfg(test)]
+proptest! {
+    /// However a caller answers, an output is refused exactly when it was handed
+    /// back, and nothing the run was started with or accepted shares an
+    /// identifier with anything else it holds.
+    #[test]
+    fn accepted_outputs_are_all_new(
+        answers in prop::collection::vec(
+            prop_oneof![
+                Just(Answer::Fresh),
+                any::<usize>().prop_map(Answer::Compose),
+                any::<usize>().prop_map(Answer::HandBack),
+            ],
+            1..7,
+        ),
+    ) {
+        let mut source = IdSource::new();
+        let workflow = entry_chain(answers.len());
+        let argument = ctx(&mut source, "note");
+        let mut held = vec![argument.clone()];
+        let arguments = Arguments::new().supply("n0", "seed", argument);
+        let mut run = Run::<Infallible>::start(&workflow, arguments, answers.len())
+            .expect("sound");
+
+        for answer in &answers {
+            let activation = offered(&mut run);
+            let pick = |index: usize| held[index % held.len()].clone();
+            let accepted = match answer {
+                Answer::Fresh => ctx(&mut source, "note"),
+                Answer::Compose(index) => {
+                    let part = pick(*index);
+                    Context::compose(&mut source, context_type("note"), [&part], "")
+                        .expect("a fresh source issues")
+                }
+                Answer::HandBack(index) => {
+                    let back = pick(*index);
+                    prop_assert_eq!(
+                        run.produced(back.clone()),
+                        Err(OutputRefusal::IdentifierHeld {
+                            instance: activation.instance().to_owned(),
+                            id: back.id(),
+                        })
+                    );
+                    ctx(&mut source, "note")
+                }
+            };
+            prop_assert_eq!(run.produced(accepted.clone()), Ok(()));
+            held.push(accepted);
+        }
+
+        prop_assert!(matches!(run.step(), Step::Ended(RunEnding::Completed(_))));
+        let ids: std::collections::HashSet<_> = held.iter().map(Context::id).collect();
+        prop_assert_eq!(ids.len(), held.len());
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn refused_output_keeps_the_activation() {
+    let mut source = IdSource::new();
+    let workflow = chain(2);
+    let mut run = Run::<Infallible>::start(&workflow, Arguments::new(), 10).expect("sound");
+
+    assert_eq!(offered(&mut run).instance(), "n0");
+    run.produced(ctx(&mut source, "diff"))
+        .expect_err("an undeclared type is refused");
+
+    // Not ended, and the same instance again rather than its consumer.
+    assert_eq!(offered(&mut run).instance(), "n0");
+
+    // An accepted answer lets the run go on to completion.
+    run.produced(ctx(&mut source, "note"))
+        .expect("of the declared type");
+    assert_eq!(offered(&mut run).instance(), "n1");
+    run.produced(ctx(&mut source, "note"))
+        .expect("of the declared type");
+    assert!(matches!(run.step(), Step::Ended(RunEnding::Completed(_))));
+}
+
+#[cfg(test)]
+#[test]
+fn refusal_does_not_spend_the_budget() {
+    let mut source = IdSource::new();
+    let workflow = chain(2);
+    // Exactly as many activations as there are instances.
+    let mut run = Run::<Infallible>::start(&workflow, Arguments::new(), 2).expect("sound");
+
+    offered(&mut run);
+    run.produced(ctx(&mut source, "diff"))
+        .expect_err("an undeclared type is refused");
+    offered(&mut run);
+    run.produced(ctx(&mut source, "note"))
+        .expect("of the declared type");
+    assert_eq!(offered(&mut run).instance(), "n1");
+    run.produced(ctx(&mut source, "note"))
+        .expect("of the declared type");
+
+    // Counted a second time, the refused activation would have left no budget
+    // for `n1`, and the run would have ended on it instead.
+    match run.step() {
+        Step::Ended(RunEnding::Completed(_)) => {}
+        other => panic!("a refusal spends nothing, so the run completes: {other:?}"),
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn refused_output_can_be_failed() {
+    let mut source = IdSource::new();
+    let workflow = chain(2);
+    let mut run = Run::<NodeTrouble>::start(&workflow, Arguments::new(), 10).expect("sound");
+
+    offered(&mut run);
+    run.produced(ctx(&mut source, "diff"))
+        .expect_err("an undeclared type is refused");
+
+    // Still outstanding, so the caller can give up on it.
+    match run.fail(NodeTrouble::Refused("no acceptable output")) {
+        Ok(RunEnding::NodeFailed { instance, failure }) => {
+            assert_eq!(instance, "n0");
+            assert_eq!(failure, NodeTrouble::Refused("no acceptable output"));
+        }
+        other => panic!("a refused activation can be failed, got {other:?}"),
+    }
 }
