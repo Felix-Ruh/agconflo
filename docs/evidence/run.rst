@@ -153,3 +153,44 @@ all.
    session answered ``b``'s activation with a composition of its input instead.
    That was accepted with a new identifier, 2, holding the input by reference,
    which is the shape a node passing its input on is meant to take.
+
+The last two are measurements of the same kind, taken on the same day at
+``68e0b2c`` after writing the Lua host turned up the shape: a caller making its
+contexts from one identifier source and the run's arguments from another. In
+both, every output was accepted and the run completed, and what went wrong
+showed up only in the result's lineage - the question provenance exists to
+answer.
+
+.. evd:: Two arguments sharing an identifier were accepted and lost from lineage
+   :id: EVD_RUN_ARGUMENTS_SHARE_IDENTIFIER
+   :evd_kind: measurement
+   :observed_on: 2026-09-23
+   :observation: A run of agconflo-core at 68e0b2c was started with two arguments from two identifier sources, both identifier 0, completed, and its result's lineage reported three contexts where it was composed from four.
+
+   Two entry instances, ``p`` and ``q``, each given one argument, and a third
+   instance joining their outputs. Each argument was made from a fresh source,
+   so both carried identifier 0. The run started, every output was a new
+   context and was accepted, and the result rendered both arguments' text.
+
+   Its lineage reported identifiers 2, 0 and 1: the two entry outputs and one
+   identifier 0. The walker tells contexts apart by identifier
+   (``DEC_NO_CONTENT_ADDRESSING``), so two contexts under one identifier are one
+   context to it, and one of the arguments is missing from the answer to where
+   the result came from.
+
+.. evd:: A part sharing an argument's identifier was accepted and lost from lineage
+   :id: EVD_RUN_PART_SHARES_IDENTIFIER
+   :evd_kind: measurement
+   :observed_on: 2026-09-23
+   :observation: A run of agconflo-core at 68e0b2c accepted an output composed of its argument and a new part that carried the argument's identifier, and the result's lineage reported one of the two contexts it was composed from.
+
+   One entry instance, given an argument made from one source. Its activation
+   was answered with a composition, made from a second source, of the argument
+   and a new text context. The new context took identifier 0, which the
+   argument had; the composition took identifier 1, which the run did not hold,
+   so ``CREQ_RUN_REFUSES_HELD_IDENTIFIER`` - asked of the output's own
+   identifier only - accepted it.
+
+   The result rendered both texts, and its lineage reported one context.
+   Measured first through the Lua host, where a composing script made the part;
+   this is the same shape with the host taken away.

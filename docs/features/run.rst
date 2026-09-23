@@ -38,7 +38,13 @@ than about what the run hands out, which no requirement had looked at, because
 until something could perform an activation nothing could hand back anything
 surprising.
 
-The feature's architecture closes the file. It realises all nine requirements
+The tenth came the same day, from the first real caller: a context brought into
+a run under an identifier the run already holds for another
+(``EVD_RUN_ARGUMENTS_SHARE_IDENTIFIER``, ``EVD_RUN_PART_SHARES_IDENTIFIER``). It
+is ``ubiquitous``, because it is a property of the whole run rather than of one
+answer, and the component requirements under it say where it is enforced.
+
+The feature's architecture closes the file. It realises all ten requirements
 and names the components they are divided between, which are defined in
 ``components/run``.
 
@@ -289,15 +295,39 @@ and names the components they are divided between, which are defined in
    (``DEC_COMPOSITION_BY_REFERENCE``), so the input stays addressable as what it
    was. The same measurement took that shape as its control, and it was accepted.
 
+.. feat_req:: One identifier names one context in a run
+   :id: FEAT_RUN_ONE_CONTEXT_PER_IDENTIFIER
+   :derived_from: STKH_PROVENANCE
+   :ears_pattern: ubiquitous
+   :verification_method: test
+   :statement: Agconflo shall hold no two different contexts under one identifier in a run.
+
+   The parent records which context each byte of a node's input came from, and
+   every such record is kept, and every such question asked, by identifier. Two
+   contexts under one identifier make each answer about either of them wrong,
+   and wrong in the way that is not noticed: the walk over a result's lineage
+   reported one context where there were two, and nothing failed.
+
+   It can be false while the parent holds, and was measured false twice
+   (``EVD_RUN_ARGUMENTS_SHARE_IDENTIFIER``, ``EVD_RUN_PART_SHARES_IDENTIFIER``).
+   ``FEAT_RUN_OUTPUT_IS_NEW`` was already met in both: every output's own
+   identifier was new. What it does not reach is the contexts an output is
+   composed of, nor the arguments a run starts with, and those are where the
+   second context came in.
+
+   One identifier source per run would prevent it, and a run cannot insist on
+   one, since what it is started with was made before it existed
+   (``DEC_IDENTIFIER_NAMES_ONE_CONTEXT``). So it is held where contexts enter.
+
 .. feat_arch:: Running splits into a run and a scheduler
    :id: ARCH_RUN
-   :realises: FEAT_RUN_REFUSES_INVALID_WIRING, FEAT_RUN_ENTRY_SOURCE_EXACT, FEAT_RUN_WAITS_FOR_EVERY_BINDING, FEAT_RUN_BUDGET_STOPS, FEAT_RUN_QUIESCENCE_ENDS, FEAT_RUN_FAILURE_CARRIED, FEAT_RUN_COMPLETES_ON_DESIGNATED, FEAT_RUN_OUTPUT_OF_DECLARED_TYPE, FEAT_RUN_OUTPUT_IS_NEW
+   :realises: FEAT_RUN_REFUSES_INVALID_WIRING, FEAT_RUN_ENTRY_SOURCE_EXACT, FEAT_RUN_WAITS_FOR_EVERY_BINDING, FEAT_RUN_BUDGET_STOPS, FEAT_RUN_QUIESCENCE_ENDS, FEAT_RUN_FAILURE_CARRIED, FEAT_RUN_COMPLETES_ON_DESIGNATED, FEAT_RUN_OUTPUT_OF_DECLARED_TYPE, FEAT_RUN_OUTPUT_IS_NEW, FEAT_RUN_ONE_CONTEXT_PER_IDENTIFIER
    :uses: COMP_WORKFLOW_RUN, COMP_RUN_SCHEDULER
    :statement: Agconflo shall allocate running a workflow to the workflow run and the run scheduler.
 
    Two components, each answerable for what the other cannot guarantee:
 
-   - The workflow run answers for what becomes of a run. Both refusals before it
+   - The workflow run answers for what becomes of a run. The refusals before it
      starts, the budget it is held to, the outputs it refuses, and each of the
      four ways it may end are statements about one run's history, which nothing
      that reads a definition can make. Whether an output's identifier is already
@@ -351,6 +381,8 @@ and names the components they are divided between, which are defined in
    - ``DEC_REFUSED_OUTPUT_OUTSTANDING``: an output the run refuses leaves its
      activation outstanding, so the four endings stay closed and the caller
      answers again or reports a failure of its own.
+   - ``DEC_IDENTIFIER_NAMES_ONE_CONTEXT``: a second context under a held
+     identifier is refused where it enters, at the start and at each output.
 
    Two absences, recorded so they are not read as oversights. There is no run log
    component: what a run records for provenance is ``STKH_PROVENANCE``'s business

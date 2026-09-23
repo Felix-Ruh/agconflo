@@ -208,24 +208,22 @@ time a test is allowed.
    :coverage: partial
 
    A run's arguments made from one identifier source and the run given another,
-   with a script whose output is the first context it makes. That output
-   carries the identifier an argument already has, the run refuses it, and the
-   activation fails carrying that refusal.
+   with two scripts. One makes its output first, so the output carries the
+   identifier an argument already has; the other composes its input with a word,
+   so the word - a part - carries it. The run refuses each, as a held identifier
+   and as a shared one, and the activation fails carrying that refusal.
 
    Not a failure mode of the requirement but of using it: the run and its
    caller have to share one source, and this pins down what a caller who does
    not is told.
 
-   It pins down less than it was first written to. The case originally used a
-   script composing its input with a word, and that run completed: the first
-   context the script made was the word, a part, and it took the argument's
-   identifier; the composition, the output, took the next one, which the run
-   did not hold. The run asks only about the output's own identifier
-   (``CREQ_RUN_REFUSES_HELD_IDENTIFIER``), so a collision inside a composition
-   passes silently, and one run then holds two contexts sharing an identifier.
-   Recorded here rather than left for someone to find: preventing two sources is
-   what ``IdSource`` already says belongs to whatever owns a run, and nothing
-   does yet.
+   The composing shape is the one that found the gap. The case was first
+   written with it, and that run completed: the run asked only about the
+   output's own identifier, so the word under the argument's identifier passed
+   and one run held two contexts sharing it. The case was narrowed to the direct
+   shape until the run refused a second context under a held identifier
+   anywhere in an output (``CREQ_RUN_REFUSES_SHARED_OUTPUT_IDENTIFIER``), and
+   now holds both.
 
 .. test_case:: Nothing an activation leaves behind reaches the next
    :id: TEST_HOST_NOTHING_SURVIVES_AN_ACTIVATION

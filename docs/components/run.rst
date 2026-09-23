@@ -19,7 +19,7 @@ component requirement whose subject is anything else.
    way it ended. It holds what has been produced, how many activations have been
    spent, and which activation is outstanding.
 
-   Everything about a run's history belongs here: the two refusals that stop one
+   Everything about a run's history belongs here: the refusals that stop one
    before it starts, the outputs it refuses once it has, the count the budget is
    measured against, and each of the four endings. None of them can be decided by
    reading a definition, which is what separates this from the scheduler it asks.
@@ -372,12 +372,19 @@ component requirement whose subject is anything else.
    :derived_from: FEAT_RUN_OUTPUT_IS_NEW
    :allocated_to: COMP_WORKFLOW_RUN
    :ears_pattern: unwanted
-   :statement: If an output reported for an activation carries the identifier of an argument or of an output the run has accepted, then Workflow run shall refuse that output naming the instance and the identifier.
+   :statement: If an output reported for an activation carries an identifier the run holds, then Workflow run shall refuse that output naming the instance and the identifier.
 
-   What a run holds is exactly those two: the arguments it was started with and
-   the outputs it has accepted since. A context the caller built and never
+   What a run holds is its arguments, the outputs it has accepted, and every
+   context any of them was composed from. A context the caller built and never
    reported is not held, and an identifier it carries is one no activation has
    yet been credited with.
+
+   The statement first named only arguments and accepted outputs, because that
+   was all a run kept. Once a run kept everything they were composed from
+   (``CREQ_RUN_REFUSES_SHARED_OUTPUT_IDENTIFIER``), a part of an input handed
+   back unchanged became the one held context the old wording let through,
+   credited to a node that did not make it. The parent already said "an
+   identifier the run already holds"; this now says the same.
 
    Failure modes:
 
@@ -402,7 +409,7 @@ component requirement whose subject is anything else.
 
 .. comp_req:: A refused output leaves its activation outstanding
    :id: CREQ_RUN_REFUSED_OUTPUT_OUTSTANDING
-   :derived_from: FEAT_RUN_OUTPUT_OF_DECLARED_TYPE, FEAT_RUN_OUTPUT_IS_NEW
+   :derived_from: FEAT_RUN_OUTPUT_OF_DECLARED_TYPE, FEAT_RUN_OUTPUT_IS_NEW, FEAT_RUN_ONE_CONTEXT_PER_IDENTIFIER
    :allocated_to: COMP_WORKFLOW_RUN
    :ears_pattern: unwanted
    :statement: If an output reported for an activation is refused, then Workflow run shall keep that activation outstanding without counting it against the budget again.
@@ -421,3 +428,72 @@ component requirement whose subject is anything else.
    - **A failure reported after a refusal refused.** The activation is still
      outstanding, so a caller giving up on it must be able to say so, and being
      told nothing is outstanding would leave it no way to end the run.
+
+.. comp_req:: Arguments sharing an identifier stop the run starting
+   :id: CREQ_RUN_REFUSES_SHARED_ARGUMENT_IDENTIFIER
+   :derived_from: FEAT_RUN_ONE_CONTEXT_PER_IDENTIFIER
+   :allocated_to: COMP_WORKFLOW_RUN
+   :ears_pattern: unwanted
+   :statement: If two different contexts among a run's arguments and the contexts they were composed from share an identifier, then Workflow run shall refuse to start that run naming every identifier they share.
+
+   Arguments are made before the run exists, so they are where a second source
+   enters first (``EVD_RUN_ARGUMENTS_SHARE_IDENTIFIER``). "Different" is the
+   value's identity: one context supplied to two parameters is one context, and
+   is not refused (``DEC_IDENTIFIER_NAMES_ONE_CONTEXT``).
+
+   Asked after the wiring and the signature, as a third refusal before the run
+   starts: a run refused for its wiring has no arguments worth checking against
+   each other.
+
+   Failure modes:
+
+   - **Not asked.** Measured: the run started, completed, and its result's
+     lineage lost an argument.
+   - **Only the arguments themselves compared.** Two arguments with different
+     identifiers, one composed of a context that repeats the other's, pass it,
+     and the lineage is as wrong as before.
+   - **The same context supplied twice refused.** Passing one context to two
+     entry parameters is ordinary, and it is one context under one identifier.
+   - **The first shared identifier only.** A caller whose arguments came from two
+     sources has as many collisions as the smaller source issued, and learns
+     them one refusal at a time.
+   - **Reported as a signature fault.** Every signature fault names an entry
+     instance and a parameter; a shared identifier belongs to no one parameter,
+     and filing it under one sends the caller to the wrong place.
+
+.. comp_req:: An output bringing in a second context under a held identifier is refused
+   :id: CREQ_RUN_REFUSES_SHARED_OUTPUT_IDENTIFIER
+   :derived_from: FEAT_RUN_ONE_CONTEXT_PER_IDENTIFIER
+   :allocated_to: COMP_WORKFLOW_RUN
+   :ears_pattern: unwanted
+   :statement: If a context an output was composed from shares its identifier with a different context of the run or of that output, then Workflow run shall refuse that output naming the instance and the identifier.
+
+   ``CREQ_RUN_REFUSES_HELD_IDENTIFIER`` asks about the output's own identifier;
+   this asks about everything the output was composed from, which is where the
+   measured part came in (``EVD_RUN_PART_SHARES_IDENTIFIER``). What the run holds
+   grows by everything an accepted output was composed from, so a later output
+   is compared with those too.
+
+   A context the run already holds, reached by reference, is not a second
+   context, and the walk stops there: its own parts were compared when it was
+   accepted, so each output costs what it brings in rather than its whole
+   ancestry.
+
+   Failure modes:
+
+   - **Only the output's own identifier asked.** The measured shape: a new part
+     under an argument's identifier, accepted.
+   - **Compared with the arguments alone.** A part repeating an earlier output's
+     part passes, and so does one repeating a part of an argument.
+   - **Compared with the run and not within the output.** Two new parts under
+     one identifier, both new to the run, pass each other.
+   - **A held context reached by reference refused.** An output composing its
+     input, or a part of its input, holds contexts the run holds already, and
+     they are the same contexts. Refusing them refuses the sanctioned way to
+     pass an input on (``DEC_COMPOSITION_BY_REFERENCE``).
+   - **What an accepted output brought in forgotten.** The run then compares the
+     next output with its arguments and outputs, and not with the parts those
+     outputs were composed from.
+
+   Must pass unreported: an output composed of its inputs, of their parts, and of
+   new contexts from the run's one source.

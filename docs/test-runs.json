@@ -570,6 +570,15 @@
           "title": "agconflo-core run::activations_never_exceed_budget",
           "type": "test_run"
         },
+        "RUN_RUN_ARGUMENTS_SHARING_AN_IDENTIFIER_ARE_REFUSED": {
+          "executes": [
+            "TEST_RUN_ARGUMENTS_SHARING_AN_IDENTIFIER_ARE_REFUSED"
+          ],
+          "id": "RUN_RUN_ARGUMENTS_SHARING_AN_IDENTIFIER_ARE_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::arguments_sharing_an_identifier_are_refused",
+          "type": "test_run"
+        },
         "RUN_RUN_ARGUMENT_FOR_NO_PARAMETER_IS_REFUSED": {
           "executes": [
             "TEST_RUN_ARGUMENT_FOR_NO_PARAMETER_IS_REFUSED"
@@ -696,6 +705,33 @@
           "title": "agconflo-core run::missing_argument_is_refused",
           "type": "test_run"
         },
+        "RUN_RUN_NO_IDENTIFIER_NAMES_TWO_CONTEXTS": {
+          "executes": [
+            "TEST_RUN_NO_IDENTIFIER_NAMES_TWO_CONTEXTS"
+          ],
+          "id": "RUN_RUN_NO_IDENTIFIER_NAMES_TWO_CONTEXTS",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::no_identifier_names_two_contexts",
+          "type": "test_run"
+        },
+        "RUN_RUN_ONE_CONTEXT_FOR_TWO_PARAMETERS_STARTS": {
+          "executes": [
+            "TEST_RUN_ONE_CONTEXT_FOR_TWO_PARAMETERS_STARTS"
+          ],
+          "id": "RUN_RUN_ONE_CONTEXT_FOR_TWO_PARAMETERS_STARTS",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::one_context_for_two_parameters_starts",
+          "type": "test_run"
+        },
+        "RUN_RUN_OUTPUT_COMPOSING_HELD_PARTS_IS_ACCEPTED": {
+          "executes": [
+            "TEST_RUN_OUTPUT_COMPOSING_HELD_PARTS_IS_ACCEPTED"
+          ],
+          "id": "RUN_RUN_OUTPUT_COMPOSING_HELD_PARTS_IS_ACCEPTED",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::output_composing_held_parts_is_accepted",
+          "type": "test_run"
+        },
         "RUN_RUN_OUTPUT_COMPOSING_ITS_INPUT_IS_ACCEPTED": {
           "executes": [
             "TEST_RUN_OUTPUT_COMPOSING_ITS_INPUT_IS_ACCEPTED"
@@ -712,6 +748,24 @@
           "id": "RUN_RUN_OUTPUT_OF_DECLARED_TYPE_IS_ACCEPTED",
           "test_outcome": "passed",
           "title": "agconflo-core run::output_of_declared_type_is_accepted",
+          "type": "test_run"
+        },
+        "RUN_RUN_PARTS_SHARING_AN_IDENTIFIER_ARE_REFUSED": {
+          "executes": [
+            "TEST_RUN_PARTS_SHARING_AN_IDENTIFIER_ARE_REFUSED"
+          ],
+          "id": "RUN_RUN_PARTS_SHARING_AN_IDENTIFIER_ARE_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::parts_sharing_an_identifier_are_refused",
+          "type": "test_run"
+        },
+        "RUN_RUN_PART_SHARING_AN_IDENTIFIER_IS_REFUSED": {
+          "executes": [
+            "TEST_RUN_PART_SHARING_AN_IDENTIFIER_IS_REFUSED"
+          ],
+          "id": "RUN_RUN_PART_SHARING_AN_IDENTIFIER_IS_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::part_sharing_an_identifier_is_refused",
           "type": "test_run"
         },
         "RUN_RUN_PASSED_THROUGH_ARGUMENT_IS_REFUSED": {
