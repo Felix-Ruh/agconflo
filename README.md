@@ -15,7 +15,7 @@ where did every byte come from?"* has an exact answer.
 
 ## Status
 
-**Pre-alpha. Nodes run, but only as scripts** — no LLM calls, no loops, nothing persisted. What
+**Pre-alpha. Nodes run as scripts, and can call a model** — no loops, no tools, nothing persisted. What
 exists is the development process around it and the first slices of code through it: a
 requirements project under `docs/` with a validated metamodel behind it, a commit gate, continuous
 integration, and two crates.
@@ -29,8 +29,12 @@ output that contradicts its declaration, holds it to a budget, and ends in exact
 
 `agconflo-lua` is such a caller. It performs each activation by running a Lua 5.5 script supplied
 for the node type, in a state made for that one activation, with nothing to reach but its inputs and
-the context API, and under a limit on instructions and memory. Each crate is traced from its
-requirements to the code and back from the tests that check it.
+the context API, and under a limit on instructions, memory and model calls. A script calls a model
+by a role - `host.complete('drafting', prompt)` - and the caller maps each role to a provider's model
+through [`genai`](https://github.com/jeremychone/rust-genai), so the same workflow runs against
+another provider by changing that mapping. The prompt is a context and is all the model is shown;
+the answer comes back as a context of its own. Each crate is traced from its requirements to the
+code and back from the tests that check it.
 
 Expect the public API to change without warning. Breaking changes, yes; force-pushes to `main`, no —
 those are blocked outright, along with direct pushes to it.
@@ -39,9 +43,9 @@ those are blocked outright, along with direct pushes to it.
 
 - **Rust**, as a Cargo workspace. `agconflo-core` is a normal Rust crate with a deliberately strict
   public API; frontends (CLI, viewer, MCP server) are separate crates that depend on it.
-- **Provider-agnostic LLM access** via [`genai`](https://github.com/jeremychone/rust-genai), and MCP
-  via [`rmcp`](https://github.com/modelcontextprotocol/rust-sdk). The agent loop is ours — that is the
-  layer this project exists to own.
+- **Provider-agnostic LLM access** via [`genai`](https://github.com/jeremychone/rust-genai), now
+  running, and MCP via [`rmcp`](https://github.com/modelcontextprotocol/rust-sdk). The agent loop is
+  ours — that is the layer this project exists to own.
 - **Node behaviour in Lua** (`mlua`), now running: a script is given the context API and nothing
   else, which is what leaves a second backend, such as WASM, possible later.
 - **Workflow topology as declarative data**, not script — so it can be statically validated,
