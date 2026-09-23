@@ -31,11 +31,13 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    features/topology
    features/run
    features/behaviour
+   features/models
    components/context
    components/wiring
    components/topology
    components/run
    components/behaviour
+   components/models
    tests/context
    tests/wiring
    tests/topology
