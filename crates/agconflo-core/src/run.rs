@@ -7,6 +7,7 @@
 //! runtime, a script language and a provider client out of this crate until
 //! there is a requirement for them.
 
+use std::collections::HashMap;
 use std::fmt;
 use std::marker::PhantomData;
 
@@ -115,6 +116,11 @@ pub enum StartRefusal {
     /// filled by exactly one context of their declared type
     /// (`CREQ_RUN_REFUSES_UNFILLED_SIGNATURE`).
     Signature(Vec<SignatureFault>),
+    /// Different contexts among the arguments, or among what they were composed
+    /// from, share these identifiers, each named once in the order found
+    /// (`CREQ_RUN_REFUSES_SHARED_ARGUMENT_IDENTIFIER`). Not a signature fault:
+    /// a shared identifier belongs to no one entry parameter.
+    SharedIdentifiers(Vec<ContextId>),
 }
 
 impl fmt::Display for StartRefusal {
@@ -122,6 +128,7 @@ impl fmt::Display for StartRefusal {
         let (what, count) = match self {
             Self::Wiring(defects) => ("wiring defect", defects.len()),
             Self::Signature(faults) => ("signature fault", faults.len()),
+            Self::SharedIdentifiers(ids) => ("shared identifier", ids.len()),
         };
         write!(f, "the workflow carries {count} {what}")?;
         if count != 1 {
@@ -329,6 +336,77 @@ fn signature_faults(definition: &WorkflowDefinition, arguments: &Arguments) -> V
     faults
 }
 
+/// Everything the run's arguments hold, or every identifier that different
+/// contexts among them share.
+///
+/// Each argument is brought in as an output would be, against what the
+/// arguments before it brought, so one context supplied twice is one context,
+/// and two contexts under one identifier are found wherever in the arguments
+/// they sit. Every shared identifier is collected, named once each, so that a
+/// caller whose arguments came from two sources learns all of it at once.
+// @Arguments hold one context per identifier,IMPL_RUN_HELD_ARGUMENTS,impl,[CREQ_RUN_REFUSES_SHARED_ARGUMENT_IDENTIFIER]
+fn held_arguments(arguments: &Arguments) -> Result<HashMap<ContextId, Context>, Vec<ContextId>> {
+    let mut held = HashMap::new();
+    let mut shared: Vec<ContextId> = Vec::new();
+    for (_, _, argument) in arguments.iter() {
+        let (brought, found) = brought_in(&held, argument);
+        held.extend(brought);
+        for id in found {
+            if !shared.contains(&id) {
+                shared.push(id);
+            }
+        }
+    }
+    if shared.is_empty() {
+        Ok(held)
+    } else {
+        Err(shared)
+    }
+}
+
+/// What `context` would bring into a run holding `held`: every context reachable
+/// from it, itself included, that `held` does not already hold - and every
+/// identifier under which it reaches a context other than the one `held`, or an
+/// earlier step of the same walk, has under that identifier.
+///
+/// A held context reached again is the very context held, and the walk stops
+/// there: its own parts were brought in when it was. So a walk costs what the
+/// context brings in rather than its whole ancestry, and passing an input on by
+/// composing it (`DEC_COMPOSITION_BY_REFERENCE`) brings in nothing but the
+/// composition. "The very context" is the value's identity, since by identifier
+/// a second context and the held one are indistinguishable
+/// (`DEC_IDENTIFIER_NAMES_ONE_CONTEXT`).
+///
+/// A stack of its own rather than recursion, for the reason the lineage walker
+/// has one.
+// @A second context under a held identifier is found,IMPL_RUN_BROUGHT_IN,impl,[CREQ_RUN_REFUSES_SHARED_ARGUMENT_IDENTIFIER, CREQ_RUN_REFUSES_SHARED_OUTPUT_IDENTIFIER]
+fn brought_in(
+    held: &HashMap<ContextId, Context>,
+    context: &Context,
+) -> (HashMap<ContextId, Context>, Vec<ContextId>) {
+    let mut brought: HashMap<ContextId, Context> = HashMap::new();
+    let mut shared = Vec::new();
+    let mut pending = vec![context];
+    while let Some(reached) = pending.pop() {
+        match held
+            .get(&reached.id())
+            .or_else(|| brought.get(&reached.id()))
+        {
+            Some(known) if known.is(reached) => {}
+            Some(_) => {
+                if !shared.contains(&reached.id()) {
+                    shared.push(reached.id());
+                }
+            }
+            None => {
+                brought.insert(reached.id(), reached.clone());
+                pending.extend(reached.parts());
+            }
+        }
+    }
+    (brought, shared)
+}
+
 /// Reporting an outcome when the run had offered no activation.
 ///
 /// There is no instance to file it against, and choosing one would attribute
@@ -371,13 +449,23 @@ pub enum OutputRefusal {
         /// The type the reported output carries.
         reported: ContextType,
     },
-    /// The output carries the identifier of an argument or of an output the run
-    /// has already accepted (`CREQ_RUN_REFUSES_HELD_IDENTIFIER`), which would
-    /// credit one context to two producers (`EVD_RUN_ACCEPTS_HELD_IDENTIFIER`).
+    /// The output carries an identifier the run already holds
+    /// (`CREQ_RUN_REFUSES_HELD_IDENTIFIER`), which would credit one context to
+    /// two producers (`EVD_RUN_ACCEPTS_HELD_IDENTIFIER`).
     IdentifierHeld {
         /// The instance the output was reported for.
         instance: String,
         /// The identifier the run already holds.
+        id: ContextId,
+    },
+    /// A context the output was composed from carries an identifier the run,
+    /// or the output itself, holds for a different context
+    /// (`CREQ_RUN_REFUSES_SHARED_OUTPUT_IDENTIFIER`). Measured accepted, and the
+    /// result's lineage then lost a context (`EVD_RUN_PART_SHARES_IDENTIFIER`).
+    IdentifierShared {
+        /// The instance the output was reported for.
+        instance: String,
+        /// The first identifier found shared.
         id: ContextId,
     },
 }
@@ -399,6 +487,10 @@ impl fmt::Display for OutputRefusal {
             Self::IdentifierHeld { instance, id } => write!(
                 f,
                 "{instance} was reported producing {id:?}, which the run already holds"
+            ),
+            Self::IdentifierShared { instance, id } => write!(
+                f,
+                "{instance} was reported producing a context composed of a second context under {id:?}"
             ),
         }
     }
@@ -462,6 +554,10 @@ pub struct Run<'a, F> {
     definition: &'a WorkflowDefinition,
     arguments: Arguments,
     produced: Produced,
+    /// Every context the run holds - its arguments, the outputs it has
+    /// accepted, and everything any of them was composed from - each under its
+    /// identifier, which names it alone (`DEC_IDENTIFIER_NAMES_ONE_CONTEXT`).
+    held: HashMap<ContextId, Context>,
     outstanding: Option<Activation>,
     budget: usize,
     activations: usize,
@@ -500,6 +596,10 @@ impl<'a, F> Run<'a, F> {
     /// an entry instance whose node type is missing has no parameter list to
     /// check arguments against - the faults would be derived from a graph
     /// already known to be broken.
+    ///
+    /// The arguments' identifiers are checked third, against each other and
+    /// against everything they were composed from: they are made before the run
+    /// exists, and so are the first place a second identifier source enters.
     // @A run of a defective workflow does not start,IMPL_RUN_REFUSES_DEFECTS,impl,[CREQ_RUN_REFUSES_DEFECTS, CREQ_RUN_REFUSAL_NAMES_EVERY_DEFECT]
     pub fn start(
         definition: &'a WorkflowDefinition,
@@ -516,10 +616,13 @@ impl<'a, F> Run<'a, F> {
             return Err(StartRefusal::Signature(faults));
         }
 
+        let held = held_arguments(&arguments).map_err(StartRefusal::SharedIdentifiers)?;
+
         Ok(Self {
             definition,
             arguments,
             produced: Produced::new(),
+            held,
             outstanding: None,
             budget,
             activations: 0,
@@ -593,12 +696,13 @@ impl<'a, F> Run<'a, F> {
     /// Report what the outstanding activation produced.
     ///
     /// Refused, and nothing recorded, when the output is not of the type the
-    /// instance's node type declares or carries an identifier the run already
-    /// holds. Either way the activation stays outstanding and is not
-    /// counted again (`DEC_REFUSED_OUTPUT_OUTSTANDING`): asking for the next
+    /// instance's node type declares, carries an identifier the run already
+    /// holds, or was composed from a second context under an identifier the run
+    /// or the output holds for another. Each way the activation stays
+    /// outstanding and is not counted again (`DEC_REFUSED_OUTPUT_OUTSTANDING`): asking for the next
     /// step hands it back, so a refusal cannot be stepped past, and the caller
     /// answers again or reports the activation failed.
-    // @An output is checked before it is recorded,IMPL_RUN_PRODUCED,impl,[CREQ_RUN_REFUSES_UNDECLARED_OUTPUT, CREQ_RUN_REFUSES_HELD_IDENTIFIER, CREQ_RUN_REFUSED_OUTPUT_OUTSTANDING]
+    // @An output is checked before it is recorded,IMPL_RUN_PRODUCED,impl,[CREQ_RUN_REFUSES_UNDECLARED_OUTPUT, CREQ_RUN_REFUSES_HELD_IDENTIFIER, CREQ_RUN_REFUSES_SHARED_OUTPUT_IDENTIFIER, CREQ_RUN_REFUSED_OUTPUT_OUTSTANDING]
     pub fn produced(&mut self, context: Context) -> Result<(), OutputRefusal> {
         let outstanding = self
             .outstanding
@@ -620,27 +724,32 @@ impl<'a, F> Run<'a, F> {
             });
         }
 
+        let (brought, shared) = brought_in(&self.held, &context);
+        if let Some(&id) = shared.first() {
+            return Err(OutputRefusal::IdentifierShared {
+                instance: outstanding.instance().to_owned(),
+                id,
+            });
+        }
+
         let instance = outstanding.instance().to_owned();
         self.outstanding = None;
+        self.held.extend(brought);
         self.produced.insert(instance, context);
         Ok(())
     }
 
-    /// Whether `id` is the identifier of an argument the run was started with or
-    /// of an output it has accepted - which is everything a run holds.
+    /// Whether the run holds a context under `id`: an argument, an accepted
+    /// output, or anything either was composed from.
     ///
     /// Asked of the whole run rather than of the outstanding instance's inputs:
     /// a caller holding any context of the run can hand it back, including the
-    /// output of an instance not wired to this one. Only the output's own
-    /// identifier is asked about. A composition holding a held context by
-    /// reference has an identifier of its own, and is the one sanctioned way to
-    /// pass an input on.
+    /// output of an instance not wired to this one, or a part of its own input.
+    /// A composition holding a held context by reference has an identifier of
+    /// its own, and is the one sanctioned way to pass an input on.
     // @Everything a run holds,IMPL_RUN_HOLDS,impl,[CREQ_RUN_REFUSES_HELD_IDENTIFIER]
     fn holds(&self, id: ContextId) -> bool {
-        self.arguments
-            .iter()
-            .any(|(_, _, context)| context.id() == id)
-            || self.produced.values().any(|context| context.id() == id)
+        self.held.contains_key(&id)
     }
 
     /// The context the designated instance produced, when it has.
@@ -1566,6 +1675,22 @@ fn passed_through_argument_is_refused() {
             id: held,
         }
     );
+
+    // A part the argument was composed from is held too, though it is neither
+    // an argument nor an output: handed back, it would be credited to `e`.
+    let inner = ctx(&mut source, "note");
+    let argument = Context::compose(&mut source, context_type("note"), [&inner], "")
+        .expect("a fresh source issues");
+    let arguments = Arguments::new().supply("e", "seed", argument);
+    let mut run = Run::<Infallible>::start(&workflow, arguments, 10).expect("sound");
+    offered(&mut run);
+    assert_eq!(
+        run.produced(inner.clone()),
+        Err(OutputRefusal::IdentifierHeld {
+            instance: "e".to_owned(),
+            id: inner.id(),
+        })
+    );
 }
 
 #[cfg(test)]
@@ -1785,5 +1910,271 @@ fn refused_output_can_be_failed() {
             assert_eq!(failure, NodeTrouble::Refused("no acceptable output"));
         }
         other => panic!("a refused activation can be failed, got {other:?}"),
+    }
+}
+
+/// Four entry instances of one type, each taking one `note`, all feeding a
+/// join that is designated.
+#[cfg(test)]
+fn four_entries() -> WorkflowDefinition {
+    let types = vec![
+        node_type("Entry", &[("seed", "note")], "note"),
+        node_type(
+            "Join",
+            &[("a", "note"), ("b", "note"), ("c", "note"), ("d", "note")],
+            "note",
+        ),
+    ];
+    let instances = vec![
+        instance("pa", "Entry", &[]).into_entry(),
+        instance("pb", "Entry", &[]).into_entry(),
+        instance("pc", "Entry", &[]).into_entry(),
+        instance("pd", "Entry", &[]).into_entry(),
+        instance(
+            "j",
+            "Join",
+            &[("a", "pa"), ("b", "pb"), ("c", "pc"), ("d", "pd")],
+        ),
+    ];
+    definition(types, instances, &["j"])
+}
+
+#[cfg(test)]
+#[test]
+fn arguments_sharing_an_identifier_are_refused() {
+    let workflow = four_entries();
+    let (mut one, mut two) = (IdSource::new(), IdSource::new());
+
+    // `pa` and `pb`: two sources, one identifier - the measured shape.
+    let first = ctx(&mut one, "note");
+    let second = ctx(&mut two, "note");
+    assert_eq!(first.id(), second.id());
+    // `pc` and `pd`: `pd` is new under its own identifier, and was composed
+    // from a context repeating `pc`'s.
+    let third = ctx(&mut one, "note");
+    let repeat = ctx(&mut two, "note");
+    assert_eq!(third.id(), repeat.id());
+    let fourth = Context::compose(&mut two, context_type("note"), [&repeat], "")
+        .expect("a fresh source issues");
+    assert_ne!(fourth.id(), third.id());
+
+    let arguments = Arguments::new()
+        .supply("pa", "seed", first.clone())
+        .supply("pb", "seed", second)
+        .supply("pc", "seed", third.clone())
+        .supply("pd", "seed", fourth);
+    let refusal =
+        Run::<Infallible>::start(&workflow, arguments, 10).expect_err("two contexts, one id");
+    // Both identifiers, each once, as a refusal of its own kind.
+    assert_eq!(
+        refusal,
+        StartRefusal::SharedIdentifiers(vec![first.id(), third.id()])
+    );
+}
+
+#[cfg(test)]
+#[test]
+fn one_context_for_two_parameters_starts() {
+    let mut source = IdSource::new();
+    let workflow = four_entries();
+    let shared = ctx(&mut source, "note");
+    let composed = Context::compose(&mut source, context_type("note"), [&shared], "")
+        .expect("a fresh source issues");
+
+    // One context reached three times, and a composition of it: one identifier
+    // per context, however often each is reached.
+    let arguments = Arguments::new()
+        .supply("pa", "seed", shared.clone())
+        .supply("pb", "seed", shared.clone())
+        .supply("pc", "seed", composed)
+        .supply("pd", "seed", shared);
+    let (ending, _) = drive(&workflow, arguments, 10, &mut source);
+    assert!(matches!(ending, RunEnding::Completed(_)), "{ending:?}");
+}
+
+#[cfg(test)]
+#[test]
+fn part_sharing_an_identifier_is_refused() {
+    let workflow = entry_chain(3);
+    let (mut own, mut other) = (IdSource::new(), IdSource::new());
+    let argument = ctx(&mut own, "note");
+    let arguments = Arguments::new().supply("n0", "seed", argument.clone());
+    let mut run = Run::<Infallible>::start(&workflow, arguments, 10).expect("sound");
+
+    // The measured shape: a new part under the argument's identifier.
+    let activation = offered(&mut run);
+    let part = ctx(&mut other, "note");
+    assert_eq!(part.id(), argument.id());
+    let output = Context::compose(
+        &mut other,
+        context_type("note"),
+        [&activation.inputs()[0].1, &part],
+        "",
+    )
+    .expect("a fresh source issues");
+    assert_eq!(
+        run.produced(output),
+        Err(OutputRefusal::IdentifierShared {
+            instance: "n0".to_owned(),
+            id: argument.id(),
+        })
+    );
+
+    // Answered properly, `n0`'s output is composed of the argument and a part of
+    // its own, both from the run's source, and accepted.
+    let own_part = ctx(&mut own, "note");
+    let accepted = Context::compose(
+        &mut own,
+        context_type("note"),
+        [&activation.inputs()[0].1, &own_part],
+        "",
+    )
+    .expect("a fresh source issues");
+    run.produced(accepted).expect("one source, nothing shared");
+
+    // A later output repeating the identifier of that earlier output's part -
+    // which is neither an argument nor an output - is refused too, so the run
+    // remembers what an accepted output brought in.
+    offered(&mut run);
+    let mut late = IdSource::new();
+    let mut repeat = ctx(&mut late, "note");
+    while repeat.id() != own_part.id() {
+        repeat = ctx(&mut late, "note");
+    }
+    let output = Context::compose(&mut own, context_type("note"), [&repeat], "")
+        .expect("a fresh source issues");
+    assert_eq!(
+        run.produced(output),
+        Err(OutputRefusal::IdentifierShared {
+            instance: "n1".to_owned(),
+            id: own_part.id(),
+        })
+    );
+}
+
+#[cfg(test)]
+#[test]
+fn parts_sharing_an_identifier_are_refused() {
+    let workflow = chain(1);
+    let mut run = Run::<Infallible>::start(&workflow, Arguments::new(), 10).expect("sound");
+    offered(&mut run);
+
+    // Two new contexts, from two sources, under an identifier the run has never
+    // held: they collide with each other and with nothing else.
+    let (mut one, mut two) = (IdSource::new(), IdSource::new());
+    let left = ctx(&mut one, "note");
+    let right = ctx(&mut two, "note");
+    assert_eq!(left.id(), right.id());
+    let output = Context::compose(&mut one, context_type("note"), [&left, &right], "")
+        .expect("a fresh source issues");
+    assert_eq!(
+        run.produced(output),
+        Err(OutputRefusal::IdentifierShared {
+            instance: "n0".to_owned(),
+            id: left.id(),
+        })
+    );
+}
+
+#[cfg(test)]
+#[test]
+fn output_composing_held_parts_is_accepted() {
+    let mut source = IdSource::new();
+    let workflow = entry_chain(1);
+    let inner = ctx(&mut source, "note");
+    let argument = Context::compose(&mut source, context_type("note"), [&inner], "")
+        .expect("a fresh source issues");
+    let arguments = Arguments::new().supply("n0", "seed", argument);
+    let mut run = Run::<Infallible>::start(&workflow, arguments, 10).expect("sound");
+
+    // The input, a part the input was composed from, and a new context: every
+    // held context in it is the context the run holds.
+    let activation = offered(&mut run);
+    let input = &activation.inputs()[0].1;
+    let fresh = ctx(&mut source, "note");
+    let output = Context::compose(
+        &mut source,
+        context_type("note"),
+        [input, &input.parts()[0], &fresh],
+        "",
+    )
+    .expect("a fresh source issues");
+    run.produced(output)
+        .expect("held contexts reached by reference are the held contexts");
+    assert!(matches!(run.step(), Step::Ended(RunEnding::Completed(_))));
+}
+
+/// Every context reachable from `roots`, themselves included, grouped by
+/// identifier - so that a test can ask whether any identifier names two.
+#[cfg(test)]
+fn by_identifier(roots: &[Context]) -> HashMap<ContextId, Vec<Context>> {
+    let mut found: HashMap<ContextId, Vec<Context>> = HashMap::new();
+    let mut pending: Vec<Context> = roots.to_vec();
+    while let Some(context) = pending.pop() {
+        let under = found.entry(context.id()).or_default();
+        if under.iter().any(|known| known.is(&context)) {
+            continue;
+        }
+        under.push(context.clone());
+        pending.extend(context.parts().iter().cloned());
+    }
+    found
+}
+
+#[cfg(test)]
+proptest! {
+    /// However a caller mixes two identifier sources, composing freely of what
+    /// the run holds and of new contexts, no identifier names two different
+    /// contexts among everything the run accepted or started with.
+    #[test]
+    fn no_identifier_names_two_contexts(
+        answers in prop::collection::vec(
+            (any::<bool>(), prop::collection::vec(any::<prop::sample::Index>(), 0..3), any::<bool>()),
+            1..7,
+        ),
+    ) {
+        let workflow = entry_chain(answers.len());
+        let mut sources = [IdSource::new(), IdSource::new()];
+        let argument = ctx(&mut sources[0], "note");
+        let mut accepted = vec![argument.clone()];
+        let arguments = Arguments::new().supply("n0", "seed", argument);
+        let mut run = Run::<Infallible>::start(&workflow, arguments, answers.len())
+            .expect("sound");
+
+        for (use_second, picks, add_new) in &answers {
+            offered(&mut run);
+            // Anything the run holds, parts included, may be picked.
+            let holdable: Vec<Context> = by_identifier(&accepted)
+                .into_values()
+                .flatten()
+                .collect();
+            let mut parts: Vec<Context> = picks.iter().map(|pick| pick.get(&holdable).clone()).collect();
+            let source = &mut sources[usize::from(*use_second)];
+            if *add_new {
+                parts.push(ctx(source, "note"));
+            }
+            let output = Context::compose(source, context_type("note"), &parts, "")
+                .expect("a fresh source issues");
+            if run.produced(output.clone()).is_ok() {
+                accepted.push(output);
+            } else {
+                // Refused: answer from the run's own source instead, composed of
+                // nothing it could collide with.
+                let fresh = ctx(&mut sources[0], "note");
+                let safe = Context::compose(&mut sources[0], context_type("note"), [&fresh], "")
+                    .expect("a fresh source issues");
+                if run.produced(safe.clone()).is_ok() {
+                    accepted.push(safe);
+                } else {
+                    // Even that can repeat what the second source issued; the
+                    // run stops here, and what it accepted is still checked.
+                    break;
+                }
+            }
+        }
+
+        for (id, contexts) in by_identifier(&accepted) {
+            prop_assert_eq!(contexts.len(), 1, "{:?} names {} contexts", id, contexts.len());
+        }
     }
 }

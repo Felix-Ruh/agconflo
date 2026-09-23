@@ -540,7 +540,9 @@ single requirement to verify.
    Half of the measured defect (``EVD_RUN_ACCEPTS_HELD_IDENTIFIER``). An entry
    instance is answered with the argument it was given, whose type is the
    declared output type so that only the identifier is wrong. The refusal names
-   the instance and the argument's identifier.
+   the instance and the argument's identifier. Then a part the argument was
+   composed from is handed back, and is refused the same way: it is held, though
+   it is neither an argument nor an output.
 
 .. test_case:: Another instance's output handed back is refused
    :id: TEST_RUN_PASSED_THROUGH_OUTPUT_IS_REFUSED

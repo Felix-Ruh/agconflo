@@ -372,12 +372,19 @@ component requirement whose subject is anything else.
    :derived_from: FEAT_RUN_OUTPUT_IS_NEW
    :allocated_to: COMP_WORKFLOW_RUN
    :ears_pattern: unwanted
-   :statement: If an output reported for an activation carries the identifier of an argument or of an output the run has accepted, then Workflow run shall refuse that output naming the instance and the identifier.
+   :statement: If an output reported for an activation carries an identifier the run holds, then Workflow run shall refuse that output naming the instance and the identifier.
 
-   What a run holds is exactly those two: the arguments it was started with and
-   the outputs it has accepted since. A context the caller built and never
+   What a run holds is its arguments, the outputs it has accepted, and every
+   context any of them was composed from. A context the caller built and never
    reported is not held, and an identifier it carries is one no activation has
    yet been credited with.
+
+   The statement first named only arguments and accepted outputs, because that
+   was all a run kept. Once a run kept everything they were composed from
+   (``CREQ_RUN_REFUSES_SHARED_OUTPUT_IDENTIFIER``), a part of an input handed
+   back unchanged became the one held context the old wording let through,
+   credited to a node that did not make it. The parent already said "an
+   identifier the run already holds"; this now says the same.
 
    Failure modes:
 

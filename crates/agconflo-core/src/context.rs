@@ -139,6 +139,17 @@ impl Context {
         }))
     }
 
+    /// Whether `other` is this very context - the same value reached through
+    /// another handle - rather than one that merely carries the same identifier.
+    ///
+    /// Crate-private, and not an equality: nothing outside may treat two contexts
+    /// as one on any ground but identity (`DEC_NO_CONTENT_ADDRESSING`), and this
+    /// exists so that the run can tell a context it holds from a second one under
+    /// the same identifier (`DEC_IDENTIFIER_NAMES_ONE_CONTEXT`).
+    pub(crate) fn is(&self, other: &Context) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+
     /// The identifier, which no other context in the run shares.
     pub fn id(&self) -> ContextId {
         self.0.id

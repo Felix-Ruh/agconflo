@@ -235,40 +235,49 @@ bindings = { input = \"second\" }
 #[test]
 fn arguments_from_another_source_fail() {
     let definition = workflow(CHAIN_TYPES, CHAIN);
-    // The output is the first context the script makes. A script that composes
-    // makes a part first, and the part takes the colliding identifier where the
-    // run does not look - measured passing, and recorded in the test case.
-    let fresh = "local given, host = ...
-return host.text(host.output, 'made')";
-    let behaviours = Behaviours::new().define("seed", "seed.lua", fresh).define(
-        "step",
-        "step.lua",
-        &appending("stepped"),
-    );
 
-    // The argument is made from one source and the run given a fresh other, so
-    // the first context a script makes repeats the argument's identifier.
-    let argument = note(&mut IdSource::new(), "note", "hello");
-    let held = argument.id();
-    let arguments = Arguments::new().supply("first", "input", argument);
-    let ending = run_scripted(
-        &definition,
-        &behaviours,
-        arguments,
-        &mut IdSource::new(),
-        20,
-        SMALL,
-    );
+    // Two scripts, two shapes. The first makes its output directly, so the
+    // output itself repeats the argument's identifier. The second composes its
+    // input with a word, so the word - a part - repeats it and the output does
+    // not; that one the run once accepted, measured
+    // (`EVD_RUN_PART_SHARES_IDENTIFIER`).
+    let direct = "local given, host = ...\nreturn host.text(host.output, 'made')";
+    for (script, shared_in_a_part) in [(direct, false), (appending("seeded").as_str(), true)] {
+        let behaviours = Behaviours::new().define("seed", "seed.lua", script).define(
+            "step",
+            "step.lua",
+            &appending("stepped"),
+        );
 
-    let (instance, failure) = failed(ending);
-    assert_eq!(instance, "first");
-    assert_eq!(
-        failure,
-        ScriptFailure::OutputRefused(agconflo_core::OutputRefusal::IdentifierHeld {
-            instance: "first".to_owned(),
-            id: held,
-        })
-    );
+        // The argument is made from one source and the run given a fresh other,
+        // so the first context a script makes repeats the argument's identifier.
+        let argument = note(&mut IdSource::new(), "note", "hello");
+        let held = argument.id();
+        let arguments = Arguments::new().supply("first", "input", argument);
+        let ending = run_scripted(
+            &definition,
+            &behaviours,
+            arguments,
+            &mut IdSource::new(),
+            20,
+            SMALL,
+        );
+
+        let (instance, failure) = failed(ending);
+        assert_eq!(instance, "first");
+        let refusal = if shared_in_a_part {
+            agconflo_core::OutputRefusal::IdentifierShared {
+                instance: "first".to_owned(),
+                id: held,
+            }
+        } else {
+            agconflo_core::OutputRefusal::IdentifierHeld {
+                instance: "first".to_owned(),
+                id: held,
+            }
+        };
+        assert_eq!(failure, ScriptFailure::OutputRefused(refusal), "{script}");
+    }
 }
 
 #[cfg(test)]
