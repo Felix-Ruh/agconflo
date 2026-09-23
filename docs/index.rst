@@ -31,16 +31,19 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    features/topology
    features/run
    features/behaviour
+   features/models
    components/context
    components/wiring
    components/topology
    components/run
    components/behaviour
+   components/models
    tests/context
    tests/wiring
    tests/topology
    tests/run
    tests/behaviour
+   tests/models
    code/agconflo-core
    code/agconflo-lua
    decisions/context
@@ -48,6 +51,7 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    decisions/topology
    decisions/run
    decisions/behaviour
+   decisions/models
    decisions/toolchain
    decisions/requirements
    evidence/toolchain
@@ -55,3 +59,4 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    evidence/topology
    evidence/run
    evidence/behaviour
+   evidence/models
