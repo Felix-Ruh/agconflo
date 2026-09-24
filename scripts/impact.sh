@@ -8,14 +8,16 @@
 # Four directions, each a question the analysis has to answer for every row:
 #
 #   UP        the chain the need answers to - its parents, up to the stakeholder
-#             requirement. A change is justified against these and nothing else.
+#             requirement, and for an architecture the features it realises. A
+#             change is justified against these and nothing else.
 #   DOWN      everything that depends on it through a link: requirements derived
 #             from it, the architecture realising it, code markers, test cases
 #             and their runs, decisions resting on it. Each either still holds
 #             after the change or changes with it, in the same pull request.
 #   SIDEWAYS  what it shares a place with without depending on it: requirements
-#             allocated to the same component as it or anything below it, and
-#             feature requirements realised by the same architecture. A change
+#             allocated to the same component as it or anything below it, those
+#             allocated to the components an architecture uses, and feature
+#             requirements realised by the same architecture. A change
 #             is most likely to break these by accident, because no link says so.
 #   TEXT      every line naming it in prose - decision and evidence bodies, doc
 #             comments, the README - which no link carries and no query finds.
@@ -70,8 +72,11 @@ case $found in
         ;;
 esac
 
+# An architecture has no derived_from: it answers to the feature requirements it
+# realises, and through them to theirs. Following derived_from alone reported an
+# architecture as answering to nothing.
 echo "== UP: what $id answers to"
-query "MATCH (n {id: '$id'})-[:derived_from*1..]->(p) RETURN DISTINCT p.id AS id, p.type AS type ORDER BY type, id"
+query "MATCH (n {id: '$id'})-[:derived_from|realises*1..]->(p) RETURN DISTINCT p.id AS id, p.type AS type ORDER BY type, id"
 
 echo
 echo "== DOWN: what depends on $id through a link"
@@ -80,6 +85,10 @@ query "MATCH (n {id: '$id'})<-[*1..8]-(m) RETURN DISTINCT m.id AS id, m.type AS 
 echo
 echo "== SIDEWAYS: requirements sharing a component with $id or anything below it"
 query "MATCH (n {id: '$id'})<-[*0..8]-(c:comp_req)-[:allocated_to]->(k:comp)<-[:allocated_to]-(o:comp_req) WHERE NOT (o)-[*0..8]->(n) RETURN DISTINCT k.id AS component, o.id AS requirement ORDER BY component, requirement"
+
+echo
+echo "== SIDEWAYS: requirements allocated to a component $id uses (an architecture's)"
+query "MATCH (n {id: '$id'})-[:uses]->(k:comp)<-[:allocated_to]-(o:comp_req) RETURN DISTINCT k.id AS component, o.id AS requirement ORDER BY component, requirement"
 
 echo
 echo "== SIDEWAYS: feature requirements sharing an architecture with $id"
