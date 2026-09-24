@@ -112,7 +112,23 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
+      # Full history, because the change-record check below compares the branch
+      # with where it left main, and a one-commit clone has no such point.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      # A change to an existing requirement must arrive with a record naming it
+      # (AGENTS.md, "The V-Model"). Compared against the merge base with main,
+      # so the whole branch is held to it rather than only its last commit; on
+      # main itself the range is empty and it passes, having been held on the
+      # branch that brought each change. The self-test first, unconditionally,
+      # so a check that has stopped refusing fails here rather than passing.
+      # Git alone - no ubc, so no licence and no diagnosis step.
+      - name: Change records
+        run: |
+          sh scripts/change-records.sh --selftest
+          sh scripts/change-records.sh "$(git merge-base HEAD origin/main)"
 
       # Deliberately NOT cached. Measured: the download takes under 4 s and
       # hashing it 0.2 s, so a cache would save nothing worth having - while

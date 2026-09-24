@@ -61,6 +61,84 @@ Keep it tight. Tables and short paragraphs; padding costs the reader time and ga
 something and roll it back — a throwaway fixture, a query, a scratch clone. Replanning because an
 experiment contradicted the plan is the normal outcome, not a mistake to hide.
 
+## The V-Model: what a requirement answers to, and how it changes
+
+The README says which levels and links exist. This is what they commit a person to, when a
+requirement is written and when one is changed. These rules are not negotiated per feature.
+
+### What a requirement answers to
+
+- **A requirement answers to its parents - the needs its `derived_from` names - and to nothing
+  else.** It may have several; it then answers to each and is necessary for them. A stakeholder
+  requirement answers to its stakeholder.
+- **It states what its parents need of its level, and no more.** Every requirement's body answers
+  two questions. *Could it be false while its parents hold?* - why it exists at all. *Could its
+  parents hold while it is false?* - if so, it claims more than they need, and that surplus is
+  exactly where some later, unrelated feature will collide with it.
+- **It names a property, not the mechanism that delivers it today.** The mechanism is a decision,
+  a `dec`, which later evidence may supersede; a requirement statement is not meant to move. Words
+  that close the world - *only*, *each*, *every*, *exactly*, *no other*, a list of the mechanisms
+  that happen to exist - are allowed where the parent closes it too, and nowhere else.
+  (`EVD_AMENDMENTS_CAME_SIDEWAYS`: five of the first six statements ever changed here were
+  changed for another stakeholder requirement's feature, each because it named the mechanisms of
+  its day as the only ones.)
+- **Ask it of every statement before it is committed:** would it read the same if no other
+  stakeholder requirement existed?
+
+### When a requirement may change
+
+Changing an existing requirement's statement, EARS pattern, verification method, stakeholder, or
+the links that place it - or removing it - is a **change request**. Rewording its body is not.
+
+A change request has two possible justifications, and only two:
+
+1. **its parent changed**, or
+2. **it is wrong against its own parents** - it claims more or less than they need, or cannot be
+   verified as written.
+
+**The needs of other work are never a justification.** When new work collides with an existing
+requirement, the question is not what the new work needs but whether the existing requirement is
+right for its own parents:
+
+- **If it is wrong for them**, it is corrected on their terms. The corrected statement must be the
+  one its author would have written had the new work never been proposed; if the new work shows
+  through in the wording, the correction is wrong.
+- **If it is right for them**, the new work is designed around it.
+- **If neither can give way**, two stakeholder requirements conflict. That is the stakeholder's to
+  resolve, so stop and ask. The resolution is recorded at the stakeholder level first and flows down
+  through the parent it affects - never sideways into another requirement's descendants.
+
+Stakeholder requirements change only at their stakeholder's word. Decisions are different on
+purpose: a `dec` is superseded by a new one naming it in `supersedes`, on new evidence, and that
+is where design is allowed to move.
+
+### The change procedure
+
+A change request is carried out in this order, in one pull request, and the order matters:
+
+1. **Name it in the plan**: the requirement, what raised it, and which of the two justifications
+   applies.
+2. **Run the impact analysis**: `sh scripts/impact.sh <ID>`. It prints four directions -
+   **up**, the chain the requirement answers to; **down**, everything depending on it by a link,
+   from derived requirements to code markers, test cases and their runs; **sideways**, what shares a
+   component or an architecture with it without depending on it; and **text**, every line naming
+   it in prose. Every row gets a verdict: unaffected, and why - or changing, and how.
+3. **Analyse it against the parents alone**, in the form of stage 1 below: the parent's statement,
+   what the requirement claims beyond or short of it, the options, one recommendation, the
+   pitfalls. The trigger is context for the analysis, never its argument.
+4. **Record it** in `docs/decisions/changes.rst`: a `dec` whose body names the requirement,
+   gives the old and the new statement and carries the analysis and every verdict, `supported_by`
+   an `evd` holding the impact analysis as run - its date, the command, the counts per direction.
+   The changed requirement's body names the record.
+5. **Change the requirement and everything the verdicts said changes**, in the same pull request -
+   the requirements below it, their test cases and the code. Then re-run the test cases of every
+   row, and the revert-proofs of those whose meaning moved.
+
+`sh scripts/change-records.sh` holds the part of this a machine can: in the commit hook and in CI,
+a change to a requirement's statement, pattern, method, stakeholder or placing links, or its
+removal, fails unless the same range adds a line to `docs/decisions/changes.rst` naming it. It
+cannot check that the analysis is any good - that is the review's - only that one was written.
+
 ## Changing behaviour: two stages
 
 When a defect is reported or a behaviour has to change, the thinking comes first and the code
@@ -113,6 +191,10 @@ Categories that produce hits here:
 - **What the change quietly stopped doing.** A correct fix can remove a behaviour something else
   depended on by accident, and no test of the fix can show that — its tests assert the new
   behaviour.
+- **A requirement changed sideways.** Every existing statement the branch changes -
+  `git diff origin/main -- docs | grep '^-   :statement:'` - needs its change record, and the
+  record's analysis has to stand on the requirement's own parents. The check sees that a record
+  exists; only the review sees whether its argument is the new work in disguise.
 - **Blast radius, not diff.** Which documents, rules, fixtures and gates reach the thing that
   changed. Editing `schemas.json` reaches every golden below the rule you touched, for the reason
   the README gives under "Changing a rule".
@@ -271,11 +353,15 @@ changing an enum value is a change that needs its own fixture, not a neutral edi
   rather than a workaround;
 - a golden file moves that was not predicted;
 - a requirement cannot be written without inventing a new `stkh_req` parent;
+- an existing requirement that is right for its own parents cannot hold beside new work - two
+  stakeholder requirements conflict, and resolving that is the stakeholder's;
 - the work needs a decision the plan has not pinned **and that no measurement can settle**;
 - anything is about to be pushed, opened or merged.
 
 ## Never
 
+- Never change an existing requirement because other work needs it changed. Its parents are its
+  only grounds, and the change procedure is the only way.
 - Never write a metadata `feat_req`. It has no honest parent, and pointing it at an existing
   stakeholder requirement would be a link true enough to pass and not true. Nothing in the
   toolchain can catch that.

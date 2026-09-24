@@ -282,6 +282,29 @@ else
     echo "pre-commit: docs self-test - nothing staged that can affect it, skipping"
 fi
 
+# --- change records ----------------------------------------------------------
+# A change to what an existing requirement obliges - its statement, pattern,
+# verification method, stakeholder or placing links, or its removal - is a change
+# request (AGENTS.md, "The V-Model"), and must arrive with a record naming it in
+# docs/decisions/changes.rst. scripts/change-records.sh compares the index with
+# HEAD. Git alone, no ubc and no network, so it never stands down.
+#
+# Run on every commit rather than filtered to docs/: the check is a few git
+# reads, and a filter would be one more thing to keep in step with what it reads.
+# Its own self-test builds a scratch repository and plants twelve kinds of
+# change - about eleven seconds on Windows - so, like the metamodel self-test, it
+# runs only when the script itself is staged. CI runs it unconditionally.
+
+echo "pre-commit: change records"
+sh scripts/change-records.sh --staged ||
+    fail "an existing requirement changed with no change record - see AGENTS.md, 'The change procedure'"
+
+if git diff --cached --name-only | grep -qx 'scripts/change-records\.sh'; then
+    echo "pre-commit: change records self-test"
+    sh scripts/change-records.sh --selftest ||
+        fail "the change-record check did not refuse what it must"
+fi
+
 # --- rust --------------------------------------------------------------------
 # Written before the first crate existed and skipped until it did, so that it
 # never had to be remembered and retrofitted; each step was tripped once when
