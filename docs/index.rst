@@ -34,6 +34,7 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    features/models
    features/resume
    features/person
+   features/yield
    components/context
    components/wiring
    components/topology
