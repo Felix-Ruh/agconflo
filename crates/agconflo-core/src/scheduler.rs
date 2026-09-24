@@ -17,28 +17,46 @@ use crate::{Context, ContextType};
 /// What every instance that has activated produced, by instance name.
 pub(crate) type Produced = HashMap<String, Context>;
 
-/// One node about to run: which instance, the context for each parameter it is
-/// given, and the context type it is declared to produce.
+/// One node about to run: which instance it is for, the node type it performs,
+/// the context for each parameter it is given, and the context type it is
+/// declared to produce - and, for a node type a model called, which call it
+/// performs.
 ///
 /// Held by value rather than by reference into the definition, because the
 /// caller performs the activation (`DEC_RUN_IS_DRIVEN`) and a `Context` is a
 /// handle - cloning one shares the value rather than copying it.
 ///
 /// It carries no identifier of its own. No instance activates twice in a run
-/// (`DEC_ACTIVATION_ONCE_PER_RUN`), so the instance name says which activation
-/// this is; the moment that stops being true, activation tagging is required
-/// before anything is built on top.
+/// (`DEC_ACTIVATION_ONCE_PER_RUN`), so the instance name says which of an
+/// instance's own activations this is, and a called node type's activation is
+/// told apart by the call it performs: the provider's identifier for it, which
+/// the provider issued once (`DEC_CALL_IS_AN_ACTIVATION`).
 #[derive(Clone, Debug)]
 pub struct Activation {
-    instance: String,
-    inputs: Vec<(String, Context)>,
-    output: ContextType,
+    pub(crate) instance: String,
+    pub(crate) node_type: String,
+    pub(crate) call: Option<String>,
+    pub(crate) inputs: Vec<(String, Context)>,
+    pub(crate) output: ContextType,
 }
 
 impl Activation {
-    /// The instance this activates.
+    /// The instance this activation is for: the one activated, or for a call,
+    /// the one whose model made it.
     pub fn instance(&self) -> &str {
         &self.instance
+    }
+
+    /// The node type this activation performs: the instance's own, or for a
+    /// call, the node type called.
+    pub fn node_type(&self) -> &str {
+        &self.node_type
+    }
+
+    /// The identifier of the call this activation performs, as the provider
+    /// issued it, or `None` for an instance's own activation.
+    pub fn call(&self) -> Option<&str> {
+        self.call.as_deref()
     }
 
     /// One context per parameter the instance is given, each named by that
@@ -57,7 +75,7 @@ impl Activation {
         &self.inputs
     }
 
-    /// The context type the instance's node type declares for its one output,
+    /// The context type the activation's node type declares for its one output,
     /// which is the type the run accepts an output of
     /// (`CREQ_RUN_REFUSES_UNDECLARED_OUTPUT`).
     ///
@@ -141,6 +159,8 @@ pub(crate) fn activation_for(
 
     Some(Activation {
         instance: instance.name.clone(),
+        node_type: declared.name.clone(),
+        call: None,
         inputs,
         output: declared.output.clone(),
     })

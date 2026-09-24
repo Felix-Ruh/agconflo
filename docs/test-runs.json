@@ -804,6 +804,15 @@
           "title": "agconflo-core run::activations_never_exceed_budget",
           "type": "test_run"
         },
+        "RUN_RUN_ACTIVATIONS_WITH_CALLS_NEVER_EXCEED_BUDGET": {
+          "executes": [
+            "TEST_RUN_ACTIVATIONS_WITH_CALLS_NEVER_EXCEED_BUDGET"
+          ],
+          "id": "RUN_RUN_ACTIVATIONS_WITH_CALLS_NEVER_EXCEED_BUDGET",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::activations_with_calls_never_exceed_budget",
+          "type": "test_run"
+        },
         "RUN_RUN_ARGUMENTS_SHARING_AN_IDENTIFIER_ARE_REFUSED": {
           "executes": [
             "TEST_RUN_ARGUMENTS_SHARING_AN_IDENTIFIER_ARE_REFUSED"
@@ -840,6 +849,33 @@
           "title": "agconflo-core run::budget_stops_at_the_limit",
           "type": "test_run"
         },
+        "RUN_RUN_CALLED_OUTPUT_OF_UNDECLARED_TYPE_IS_REFUSED": {
+          "executes": [
+            "TEST_RUN_CALLED_OUTPUT_OF_UNDECLARED_TYPE_IS_REFUSED"
+          ],
+          "id": "RUN_RUN_CALLED_OUTPUT_OF_UNDECLARED_TYPE_IS_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::called_output_of_undeclared_type_is_refused",
+          "type": "test_run"
+        },
+        "RUN_RUN_CALL_OUTPUT_GOES_BACK_TO_THE_CALLER": {
+          "executes": [
+            "TEST_RUN_CALL_OUTPUT_GOES_BACK_TO_THE_CALLER"
+          ],
+          "id": "RUN_RUN_CALL_OUTPUT_GOES_BACK_TO_THE_CALLER",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::call_output_goes_back_to_the_caller",
+          "type": "test_run"
+        },
+        "RUN_RUN_CALL_SHARING_AN_IDENTIFIER_IS_REFUSED": {
+          "executes": [
+            "TEST_RUN_CALL_SHARING_AN_IDENTIFIER_IS_REFUSED"
+          ],
+          "id": "RUN_RUN_CALL_SHARING_AN_IDENTIFIER_IS_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::call_sharing_an_identifier_is_refused",
+          "type": "test_run"
+        },
         "RUN_RUN_COMPLETES_BEFORE_OFFERING_MORE": {
           "executes": [
             "TEST_RUN_COMPLETES_BEFORE_OFFERING_MORE"
@@ -867,6 +903,15 @@
           "title": "agconflo-core run::cycle_ends_quiescent",
           "type": "test_run"
         },
+        "RUN_RUN_DECLARED_CALL_IS_OFFERED_NEXT": {
+          "executes": [
+            "TEST_RUN_DECLARED_CALL_IS_OFFERED_NEXT"
+          ],
+          "id": "RUN_RUN_DECLARED_CALL_IS_OFFERED_NEXT",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::declared_call_is_offered_next",
+          "type": "test_run"
+        },
         "RUN_RUN_DEFECTIVE_WORKFLOW_IS_REFUSED": {
           "executes": [
             "TEST_RUN_DEFECTIVE_WORKFLOW_IS_REFUSED"
@@ -892,6 +937,15 @@
           "id": "RUN_RUN_ENTRY_PARAMETER_ALSO_BOUND_IS_REFUSED",
           "test_outcome": "passed",
           "title": "agconflo-core run::entry_parameter_also_bound_is_refused",
+          "type": "test_run"
+        },
+        "RUN_RUN_EXCHANGES_HELD_WITH_THEIR_ACTIVATION": {
+          "executes": [
+            "TEST_RUN_EXCHANGES_HELD_WITH_THEIR_ACTIVATION"
+          ],
+          "id": "RUN_RUN_EXCHANGES_HELD_WITH_THEIR_ACTIVATION",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::exchanges_held_with_their_activation",
           "type": "test_run"
         },
         "RUN_RUN_FAILED_ACTIVATION_ENDS_THE_RUN": {
@@ -1083,6 +1137,15 @@
           "title": "agconflo-core run::signature_filled_exactly_starts",
           "type": "test_run"
         },
+        "RUN_RUN_UNDECLARED_CALL_IS_REFUSED": {
+          "executes": [
+            "TEST_RUN_UNDECLARED_CALL_IS_REFUSED"
+          ],
+          "id": "RUN_RUN_UNDECLARED_CALL_IS_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::undeclared_call_is_refused",
+          "type": "test_run"
+        },
         "RUN_RUN_UNDECLARED_OUTPUT_IS_REFUSED": {
           "executes": [
             "TEST_RUN_UNDECLARED_OUTPUT_IS_REFUSED"
@@ -1090,6 +1153,15 @@
           "id": "RUN_RUN_UNDECLARED_OUTPUT_IS_REFUSED",
           "test_outcome": "passed",
           "title": "agconflo-core run::undeclared_output_is_refused",
+          "type": "test_run"
+        },
+        "RUN_RUN_UNFILLED_CALL_IS_REFUSED": {
+          "executes": [
+            "TEST_RUN_UNFILLED_CALL_IS_REFUSED"
+          ],
+          "id": "RUN_RUN_UNFILLED_CALL_IS_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::unfilled_call_is_refused",
           "type": "test_run"
         },
         "RUN_RUN_WELL_FORMED_RUNS_COMPLETE": {
