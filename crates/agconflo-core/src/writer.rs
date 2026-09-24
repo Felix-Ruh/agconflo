@@ -10,7 +10,7 @@
 use std::collections::HashSet;
 use std::fmt;
 
-use toml_edit::{InlineTable, Item, Table, TableLike, Value};
+use toml_edit::{Array, InlineTable, Item, Table, TableLike, Value};
 
 use crate::reader::WorkflowDocument;
 use crate::workflow::{Binding, NodeInstance, WorkflowDefinition};
@@ -150,6 +150,23 @@ fn write_instance(written: &mut dyn TableLike, instance: &NodeInstance) {
     }
 
     write_bindings(written, &instance.bindings);
+    write_calls(written, &instance.calls);
+}
+
+/// The calls of one instance made to be exactly `calls`, in their order.
+///
+/// A list the document already holds is left alone when it names the same node
+/// types in the same order, however it is written, and replaced whole
+/// otherwise, keeping what surrounds it. An empty list removes the key rather
+/// than writing an empty array: absent already reads as no calls, and the
+/// writer adds nothing a definition does not carry.
+// @An instance's calls written as the definition lists them,IMPL_WRITER_CALLS,impl,[CREQ_WRITER_WRITES]
+fn write_calls(written: &mut dyn TableLike, calls: &[String]) {
+    if calls.is_empty() {
+        written.remove("calls");
+        return;
+    }
+    set_value(written, "calls", Value::Array(array(calls)));
 }
 
 /// The bindings of one instance made to be exactly `bindings`.
@@ -218,12 +235,19 @@ fn set_value(table: &mut dyn TableLike, key: &str, new: Value) {
     }
 }
 
-/// Whether two values hold the same string or the same boolean, however each is
-/// written.
+/// Whether two values hold the same string, the same boolean or the same array
+/// of those, however each is written.
 fn same(written: &Value, new: &Value) -> bool {
     match (written, new) {
         (Value::String(written), Value::String(new)) => written.value() == new.value(),
         (Value::Boolean(written), Value::Boolean(new)) => written.value() == new.value(),
+        (Value::Array(written), Value::Array(new)) => {
+            written.len() == new.len()
+                && written
+                    .iter()
+                    .zip(new.iter())
+                    .all(|(written, new)| same(written, new))
+        }
         _ => false,
     }
 }
@@ -241,6 +265,9 @@ fn new_instance(instance: &NodeInstance) -> Item {
     if instance.entry {
         table.insert("entry", Item::Value(Value::from(true)));
     }
+    if !instance.calls.is_empty() {
+        table.insert("calls", Item::Value(Value::Array(array(&instance.calls))));
+    }
     if !instance.bindings.is_empty() {
         table.insert(
             "bindings",
@@ -248,6 +275,10 @@ fn new_instance(instance: &NodeInstance) -> Item {
         );
     }
     Item::Table(table)
+}
+
+fn array(calls: &[String]) -> Array {
+    calls.iter().map(String::as_str).collect()
 }
 
 fn inline(bindings: &[Binding]) -> InlineTable {
@@ -385,15 +416,16 @@ use proptest::prelude::*;
 use std::collections::BTreeMap;
 
 /// A definition as reading a written document back is compared with it: its
-/// name and output, how many instances it holds, and each instance and its
-/// bindings under their names rather than in order, since a document keeps its
-/// own order (`DEC_DOCUMENT_KEEPS_ITS_ORDER`).
+/// name and output, how many instances it holds, and each instance, its
+/// bindings and its calls under their names rather than in order, since a
+/// document keeps its own order (`DEC_DOCUMENT_KEEPS_ITS_ORDER`). An instance's
+/// calls are in the order it lists them, which is the definition's.
 #[cfg(test)]
 type ByName = (
     String,
     Vec<String>,
     usize,
-    BTreeMap<String, (String, bool, BTreeMap<String, String>)>,
+    BTreeMap<String, (String, bool, BTreeMap<String, String>, Vec<String>)>,
 );
 
 #[cfg(test)]
@@ -409,7 +441,12 @@ fn by_name(definition: &WorkflowDefinition) -> ByName {
                 .collect();
             (
                 instance.name.clone(),
-                (instance.node_type.clone(), instance.entry, bindings),
+                (
+                    instance.node_type.clone(),
+                    instance.entry,
+                    bindings,
+                    instance.calls.clone(),
+                ),
             )
         })
         .collect();
@@ -901,4 +938,94 @@ bindings = { input = \"a\" }
         by_name(&read_back(&document, &catalogue)),
         by_name(&definition)
     );
+}
+
+/// One change to an instance's calls, drawn by index like [`Change`].
+#[cfg(test)]
+#[derive(Clone, Debug)]
+enum CallChange {
+    Add(usize, usize, usize),
+    Remove(usize, usize),
+    Reverse(usize),
+    Clear(usize),
+}
+
+#[cfg(test)]
+fn any_call_change() -> impl Strategy<Value = CallChange> {
+    prop_oneof![
+        (any::<usize>(), any::<usize>(), any::<usize>())
+            .prop_map(|(a, b, c)| CallChange::Add(a, b, c)),
+        (any::<usize>(), any::<usize>()).prop_map(|(a, b)| CallChange::Remove(a, b)),
+        any::<usize>().prop_map(CallChange::Reverse),
+        any::<usize>().prop_map(CallChange::Clear),
+    ]
+}
+
+/// `change` applied to the calls of one of `definition`'s instances. A name may
+/// already be listed, and may be a node type nobody declares.
+#[cfg(test)]
+fn apply_call(definition: &mut WorkflowDefinition, change: &CallChange) {
+    const CALLED: [&str; 4] = ["source", "sink", "ghost", "two words"];
+    let count = definition.instances.len();
+    if count == 0 {
+        return;
+    }
+    match *change {
+        CallChange::Add(at, name, position) => {
+            let calls = &mut definition.instances[at % count].calls;
+            let position = position % (calls.len() + 1);
+            calls.insert(position, CALLED[name % CALLED.len()].to_owned());
+        }
+        CallChange::Remove(at, call) => {
+            let calls = &mut definition.instances[at % count].calls;
+            if !calls.is_empty() {
+                let call = call % calls.len();
+                calls.remove(call);
+            }
+        }
+        CallChange::Reverse(at) => definition.instances[at % count].calls.reverse(),
+        CallChange::Clear(at) => definition.instances[at % count].calls.clear(),
+    }
+}
+
+#[cfg(test)]
+proptest! {
+    /// For any document the test writes, whose instances may declare calls in
+    /// any of the forms TOML allows, and any sequence of changes to those calls -
+    /// added anywhere, removed, reversed, emptied - writing the changed
+    /// definition into the document and reading it back gives every instance
+    /// the changed calls in the changed order.
+    ///
+    /// And the document as it was read, written back with its calls unchanged,
+    /// is the same text byte for byte: a list naming the same node types in the
+    /// same order is left alone, however it is written.
+    #[test]
+    fn calls_read_back(
+        written in any_written(WRITTEN),
+        changes in vec(any_call_change(), 0..=4),
+    ) {
+        let catalogue = catalogue();
+        let text = written.text();
+        let Ok((mut definition, mut document)) = read_workflow("calls.toml", &text, &catalogue) else {
+            return Err(TestCaseError::fail(format!("the document written does not read:\n{text}")));
+        };
+
+        let mut unchanged = document.clone();
+        prop_assert_eq!(write_workflow(&mut unchanged, &definition), Ok(()));
+        prop_assert_eq!(unchanged.to_string(), text.clone());
+
+        for change in &changes {
+            apply_call(&mut definition, change);
+        }
+        prop_assert_eq!(write_workflow(&mut document, &definition), Ok(()));
+        let read = read_back(&document, &catalogue);
+        let calls = |definition: &WorkflowDefinition| -> BTreeMap<String, Vec<String>> {
+            definition
+                .instances
+                .iter()
+                .map(|instance| (instance.name.clone(), instance.calls.clone()))
+                .collect()
+        };
+        prop_assert_eq!(calls(&read), calls(&definition), "{}", document);
+    }
 }

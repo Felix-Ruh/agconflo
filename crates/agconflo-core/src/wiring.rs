@@ -49,6 +49,7 @@ pub fn validate_wiring(definition: &WorkflowDefinition) -> Vec<WiringDefect> {
             continue;
         }
         check_instance(instance, &declarations, &instances, &shared, &mut defects);
+        check_calls(instance, &declarations, &mut defects);
     }
     check_signature(definition, &mut defects);
     check_output_resolves(definition, &instances, &mut defects);
@@ -343,6 +344,55 @@ fn check_binding_type(
     }
 }
 
+/// Every node type an instance declares a call to is one the definition
+/// carries, and has a name both providers accept as a tool's.
+///
+/// Checked whatever the instance's own node type turned out to be: whether a
+/// call resolves does not depend on the caller's declaration, and leaving it for
+/// the next report is the round trip `FEAT_WIRING_ALL_DEFECTS` rules out. For the
+/// same reason a name is checked against the rule whether or not it resolves,
+/// since adding the node type would not make it acceptable.
+///
+/// A name listed twice is looked at once: it is one name to fix, and reporting it
+/// twice would be one defect word for word at one place.
+///
+/// The rule is `^[a-zA-Z0-9_-]{1,64}$` (`DEC_TOOL_NAMES_PORTABLE`), matched
+/// whole and counted in characters, which for the characters it allows are
+/// bytes.
+// @Every call resolved and its name one every provider accepts,IMPL_WIRING_CALLS,impl,[CREQ_VALIDATOR_CALL_RESOLVES, CREQ_VALIDATOR_CALL_NAME]
+fn check_calls(
+    instance: &NodeInstance,
+    declarations: &HashMap<&str, &NodeType>,
+    defects: &mut Vec<WiringDefect>,
+) {
+    let mut looked_at = HashSet::new();
+    for call in &instance.calls {
+        if !looked_at.insert(call.as_str()) {
+            continue;
+        }
+        if !declarations.contains_key(call.as_str()) {
+            defects.push(WiringDefect::UnresolvedCall {
+                instance: instance.name.clone(),
+                unresolved: call.clone(),
+            });
+        }
+        if !portable(call) {
+            defects.push(WiringDefect::UnportableCallName {
+                instance: instance.name.clone(),
+                name: call.clone(),
+            });
+        }
+    }
+}
+
+/// Whether `name` matches `^[a-zA-Z0-9_-]{1,64}$`.
+pub(crate) fn portable(name: &str) -> bool {
+    (1..=64).contains(&name.len())
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+}
+
 /// A workflow is wired into another through its signature
 /// (`DEC_WORKFLOW_SIGNATURE`), so one designating no output, or several, cannot
 /// be composed and is malformed on its own terms.
@@ -421,6 +471,9 @@ use proptest::prelude::*;
 pub(crate) fn any_definition() -> impl Strategy<Value = WorkflowDefinition> {
     const CONTEXT_TYPES: [&str; 2] = ["note", "diff"];
     const PARAMETERS: [&str; 3] = ["p0", "p1", "q0"];
+    // Calls to node types that may or may not be declared, and to one no
+    // provider would accept as a tool's name, which is also declared nowhere.
+    const CALLS: [&str; 4] = ["t0", "t2", "t9", "a.b"];
 
     let declarations = vec((0..=2usize, 0..=1usize, 0..=1usize, 0..2usize), 1..=3);
     // Per node: its type, whether it is an entry node, its bindings, whether a
@@ -439,6 +492,7 @@ pub(crate) fn any_definition() -> impl Strategy<Value = WorkflowDefinition> {
             vec((0..3usize, 0..5usize), 0..=3),
             any::<bool>(),
             0..10usize,
+            vec(0..CALLS.len(), 0..=2),
         ),
         1..=4,
     );
@@ -468,7 +522,7 @@ pub(crate) fn any_definition() -> impl Strategy<Value = WorkflowDefinition> {
         // A node taking an earlier node's name shares it, with that node and
         // with any other that took it too.
         let mut names: Vec<String> = Vec::new();
-        for (node, &(.., earlier)) in nodes.iter().enumerate() {
+        for (node, &(_, _, _, _, earlier, _)) in nodes.iter().enumerate() {
             let name = if earlier < node {
                 names[earlier].clone()
             } else {
@@ -480,7 +534,7 @@ pub(crate) fn any_definition() -> impl Strategy<Value = WorkflowDefinition> {
         let instances: Vec<NodeInstance> = nodes
             .iter()
             .zip(&names)
-            .map(|((declared, entry, bindings, repeats, _), name)| {
+            .map(|((declared, entry, bindings, repeats, _, calls), name)| {
                 // A type index past the declarations names a type nobody
                 // supplied; a source index past the instances names a node the
                 // definition does not carry, and so may one naming a node whose
@@ -507,7 +561,8 @@ pub(crate) fn any_definition() -> impl Strategy<Value = WorkflowDefinition> {
                     .iter()
                     .map(|(parameter, source)| (*parameter, source.as_str()))
                     .collect();
-                let built = instance(name, &declared, &bound);
+                let calls: Vec<&str> = calls.iter().map(|&call| CALLS[call]).collect();
+                let built = instance(name, &declared, &bound).with_calls(&calls);
                 if *entry { built.into_entry() } else { built }
             })
             .collect();
@@ -817,7 +872,8 @@ proptest! {
 
                 let same_class = std::mem::discriminant(defect) == std::mem::discriminant(other);
                 let same_place = defect.instance() == other.instance()
-                    && defect.parameter() == other.parameter();
+                    && defect.parameter() == other.parameter()
+                    && defect.call() == other.call();
                 prop_assert!(
                     !(same_class && same_place),
                     "one place named twice by one class: {:?} and {:?}",
@@ -871,8 +927,9 @@ pub(crate) fn well_formed_definition() -> impl Strategy<Value = WorkflowDefiniti
             // One output bound by several parameters.
             instance("fan_x", "pass_note", &[("input", "seed")]),
             instance("fan_y", "pass_note", &[("input", "seed")]),
-            // An optional left unbound, and a declared global nothing carries.
-            instance("lax", "lenient", &[]),
+            // An optional left unbound, and a declared global nothing carries -
+            // and calls, one of them listed twice, to node types it carries.
+            instance("lax", "lenient", &[]).with_calls(&["pass_note", "seed_diff", "pass_note"]),
         ];
 
         for (extra, &(kind, bind_optional)) in extras.iter().enumerate() {
@@ -1500,4 +1557,156 @@ fn empty_definition_is_refused_for_its_signature() {
     // definition has nothing to wire and nothing to designate, so it is the case
     // where two requirements could quietly both fire.
     assert_eq!(report, vec![signature_defect(0)]);
+}
+
+#[cfg(test)]
+fn unresolved_call(instance: &str, unresolved: &str) -> WiringDefect {
+    WiringDefect::UnresolvedCall {
+        instance: instance.to_owned(),
+        unresolved: unresolved.to_owned(),
+    }
+}
+
+#[cfg(test)]
+fn unportable(instance: &str, name: &str) -> WiringDefect {
+    WiringDefect::UnportableCallName {
+        instance: instance.to_owned(),
+        name: name.to_owned(),
+    }
+}
+
+#[test]
+fn call_to_missing_type_is_reported() {
+    let types = vec![
+        node_type("source", &[], "note"),
+        node_type("sink", &[("input", "note")], "note"),
+    ];
+    let instances = vec![
+        // Two calls to node types nobody declares, beside one that resolves.
+        instance("a", "source", &[]).with_calls(&["ghost", "sink", "phantom"]),
+        // One more, on another instance: one defect per call, not per workflow.
+        instance("b", "sink", &[("input", "a")]).with_calls(&["ghost"]),
+        // An unrelated binding defect, in the same report.
+        instance("c", "sink", &[("input", "nowhere")]),
+        // An instance whose own node type is missing, and which calls nothing:
+        // its defect is the one it always was, and nothing is added for calls.
+        instance("d", "missing", &[]),
+    ];
+    let workflow = definition(types, instances, &["b"]);
+    let report = validate_wiring(&workflow);
+
+    assert_eq!(
+        report,
+        vec![
+            unresolved_call("a", "ghost"),
+            unresolved_call("a", "phantom"),
+            unresolved_call("b", "ghost"),
+            unresolved("c", "input", "nowhere"),
+            WiringDefect::UnresolvedNodeType {
+                instance: "d".to_owned(),
+                unresolved: "missing".to_owned(),
+            },
+        ]
+    );
+    // The place is values, the call among them.
+    assert_eq!(
+        (
+            report[1].instance(),
+            report[1].parameter(),
+            report[1].call()
+        ),
+        (Some("a"), None, Some("phantom"))
+    );
+
+    // A run of it is refused before anything is offered, carrying all five.
+    match crate::Run::<std::convert::Infallible>::start(&workflow, crate::Arguments::new(), 10) {
+        Err(crate::StartRefusal::Wiring(defects)) => assert_eq!(defects, report),
+        other => panic!("a workflow calling a missing node type does not start: {other:?}"),
+    }
+}
+
+#[test]
+fn unportable_call_name_is_reported() {
+    let long_legal = "z".repeat(64);
+    let too_long = "x".repeat(65);
+    // Legal under Anthropic's rule alone, which allows 128.
+    let anthropic_only = "y".repeat(100);
+    let names: Vec<&str> = vec![
+        "look up",
+        "a.b",
+        "\u{e9}",
+        &too_long,
+        &anthropic_only,
+        &long_legal,
+        "a-Z_9",
+    ];
+
+    let mut types: Vec<NodeType> = names
+        .iter()
+        .map(|&name| node_type(name, &[], "note"))
+        .collect();
+    types.push(node_type("source", &[], "note"));
+    // A node type with an illegal name that no instance calls is never offered.
+    types.push(node_type("never called", &[], "note"));
+
+    let workflow = definition(
+        types,
+        vec![instance("a", "source", &[]).with_calls(&names)],
+        &["a"],
+    );
+    let report = validate_wiring(&workflow);
+
+    // Each declared, so only the name is wrong; searched rather than matched
+    // whole, every one of them holds a legal character and would pass.
+    assert_eq!(
+        report,
+        vec![
+            unportable("a", "look up"),
+            unportable("a", "a.b"),
+            unportable("a", "\u{e9}"),
+            unportable("a", &too_long),
+            unportable("a", &anthropic_only),
+        ]
+    );
+    assert!(matches!(
+        crate::Run::<std::convert::Infallible>::start(&workflow, crate::Arguments::new(), 10),
+        Err(crate::StartRefusal::Wiring(defects)) if defects == report
+    ));
+}
+
+#[cfg(test)]
+proptest! {
+    /// For any name a call gives, the validator reports it exactly when it does
+    /// not match `^[a-zA-Z0-9_-]{1,64}$`.
+    ///
+    /// The expected verdict comes from how the name was built rather than from
+    /// a second copy of the rule: a run of legal characters of a chosen length,
+    /// with one character outside the set put in or not. Lengths are drawn near
+    /// the edges - nought, one, 64 and 65 - where a rule off by one shows.
+    #[test]
+    fn call_names_match_the_rule(
+        length in prop_oneof![Just(0usize), Just(1), Just(63), Just(64), Just(65), 0..130usize],
+        legal in "[a-zA-Z0-9_-]{130}",
+        stranger in proptest::option::of((prop_oneof![
+            Just(' '), Just('.'), Just('/'), Just('\u{e9}'), Just('\u{1F600}'), Just('\n')
+        ], any::<usize>())),
+    ) {
+        let mut name: String = legal.chars().take(length).collect();
+        if let Some((stranger, at)) = stranger {
+            let at = at % (name.len() + 1);
+            name.insert(at, stranger);
+        }
+        let accepted = stranger.is_none() && (1..=64).contains(&length);
+
+        let workflow = definition(
+            vec![node_type(&name, &[], "note"), node_type("source", &[], "note")],
+            vec![instance("a", "source", &[]).with_calls(&[&name])],
+            &["a"],
+        );
+        let report = validate_wiring(&workflow);
+        let reported = report
+            .iter()
+            .any(|defect| matches!(defect, WiringDefect::UnportableCallName { .. }));
+        prop_assert_eq!(reported, !accepted, "{:?}: {:?}", name, report);
+    }
 }

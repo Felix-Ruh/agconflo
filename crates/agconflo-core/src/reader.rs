@@ -395,7 +395,37 @@ impl<'t> Reading<'t> {
             node_type,
             entry,
             bindings,
+            calls: self.calls(table, &key)?,
         })
+    }
+
+    /// The node types an instance declares calls to, in the order its `calls`
+    /// array lists them, or none when it has no such key.
+    ///
+    /// Each name is copied as written and looked up nowhere, as every other name
+    /// of an instance is: a call to a node type nobody supplied is a wiring
+    /// defect (`CREQ_VALIDATOR_CALL_RESOLVES`). A name listed twice is read
+    /// twice. A key that is not an array of strings is refused where it is
+    /// written rather than read as no calls, since that would declare nothing
+    /// without a word.
+    // @An instance's calls read in the order written,IMPL_READER_CALLS,impl,[CREQ_READER_CALLS]
+    fn calls(&self, table: &dyn TableLike, key: &[&str]) -> Result<Vec<String>, ReadFault> {
+        let Some(item) = table.get("calls") else {
+            return Ok(Vec::new());
+        };
+        let key = [key, &["calls"]].concat();
+        let Some(array) = item.as_array() else {
+            return Err(self.wrong_type(item.span(), &key, "array", item.type_name()));
+        };
+
+        array
+            .iter()
+            .map(|call| {
+                call.as_str()
+                    .map(str::to_owned)
+                    .ok_or_else(|| self.wrong_type(call.span(), &key, "string", call.type_name()))
+            })
+            .collect()
     }
 
     /// `item` read as a context type, whose name has to be a string and one the
@@ -649,6 +679,9 @@ pub(crate) struct WrittenInstance {
     /// The entry key: absent, or present and true or false.
     pub(crate) entry: Option<bool>,
     pub(crate) bindings: Vec<(String, String)>,
+    /// The node types it declares calls to, written as an array when there are
+    /// any.
+    pub(crate) calls: Vec<String>,
     /// Whether it is a header table of its own, `[instances.<name>]`.
     pub(crate) header: bool,
     /// For a header table, whether its bindings get a header of their own too.
@@ -681,6 +714,9 @@ impl Written {
                 if let Some(entry) = instance.entry {
                     text += &format!("{at}.entry = {entry}\n");
                 }
+                if !instance.calls.is_empty() {
+                    text += &format!("{at}.calls = {}\n", array(&instance.calls));
+                }
                 for (parameter, source) in &instance.bindings {
                     text += &format!("{at}.bindings.{} = {}\n", key(parameter), quoted(source));
                 }
@@ -694,6 +730,9 @@ impl Written {
                 let mut fields = vec![format!("node_type = {}", quoted(&instance.node_type))];
                 if let Some(entry) = instance.entry {
                     fields.push(format!("entry = {entry}"));
+                }
+                if !instance.calls.is_empty() {
+                    fields.push(format!("calls = {}", array(&instance.calls)));
                 }
                 if !instance.bindings.is_empty() {
                     fields.push(format!(
@@ -710,6 +749,9 @@ impl Written {
             text += &format!("\n[{at}]\nnode_type = {}\n", quoted(&instance.node_type));
             if let Some(entry) = instance.entry {
                 text += &format!("entry = {entry}\n");
+            }
+            if !instance.calls.is_empty() {
+                text += &format!("calls = {}\n", array(&instance.calls));
             }
             if instance.bindings.is_empty() {
                 continue;
@@ -746,6 +788,7 @@ impl Written {
                             source: source.clone(),
                         })
                         .collect(),
+                    calls: written.calls.clone(),
                 })
                 .collect(),
             designated_outputs: self.output.iter().cloned().collect(),
@@ -767,6 +810,28 @@ fn key(name: &str) -> String {
 #[cfg(test)]
 fn quoted(value: &str) -> String {
     format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""))
+}
+
+/// `names` as a TOML array written the way a person might: padded inside its
+/// brackets, and its first name as a literal string where TOML allows one.
+///
+/// Not the writer's own way of writing an array, on purpose. An array the writer
+/// rewrote while its names stayed the same would then come back as different
+/// text, so leaving an unchanged list alone is something a test can see.
+#[cfg(test)]
+fn array(names: &[String]) -> String {
+    let items: Vec<String> = names
+        .iter()
+        .enumerate()
+        .map(|(position, name)| {
+            if position == 0 && !name.contains('\'') && !name.contains('\n') {
+                format!("'{name}'")
+            } else {
+                quoted(name)
+            }
+        })
+        .collect();
+    format!("[ {} ]", items.join(" , "))
 }
 
 #[cfg(test)]
@@ -807,6 +872,7 @@ pub(crate) fn any_written(pools: Pools) -> impl Strategy<Value = Written> {
             any::<bool>(),
             any::<bool>(),
             vec((any::<usize>(), any::<usize>()), 0..=3),
+            vec(any::<usize>(), 0..=3),
         ),
         INSTANCE_NAMES.len(),
     );
@@ -833,7 +899,7 @@ pub(crate) fn any_written(pools: Pools) -> impl Strategy<Value = Written> {
                 .iter()
                 .zip(&shapes)
                 .map(
-                    |(&instance, (declared, entry, header, bindings_header, wires))| {
+                    |(&instance, (declared, entry, header, bindings_header, wires, calls))| {
                         let mut bindings: Vec<(String, String)> = Vec::new();
                         for &(parameter, source) in wires {
                             let parameter = pools.parameters[parameter % pools.parameters.len()];
@@ -849,6 +915,10 @@ pub(crate) fn any_written(pools: Pools) -> impl Strategy<Value = Written> {
                             node_type: pools.types[declared % pools.types.len()].to_owned(),
                             entry: *entry,
                             bindings,
+                            calls: calls
+                                .iter()
+                                .map(|&call| pools.types[call % pools.types.len()].to_owned())
+                                .collect(),
                             header: *header,
                             bindings_header: *bindings_header,
                         }
@@ -1491,4 +1561,74 @@ proptest! {
             Ok(written.definition(&catalogue))
         );
     }
+}
+
+#[test]
+fn calls_read_in_order() {
+    // Three calls, one listed twice, on one instance; none on another; and a
+    // calls key on a node type document, where it is a key the reader does not
+    // name. The workflow's calls name a type the catalogue lacks as well, since
+    // resolving is the validator's.
+    let types = read_node_types(
+        "types.toml",
+        "[types.lookup]\noutput = \"note\"\ncalls = [\"sink\"]\n",
+    )
+    .expect("a node type with an unread key reads");
+    assert_eq!(types.node_types(), &[node_type("lookup", &[], "note")]);
+
+    let text = r#"name = "w"
+output = "b"
+
+[instances.a]
+node_type = "source"
+calls = ["sink", "lookup", "sink", "nowhere"]
+
+[instances.b]
+node_type = "sink"
+bindings = { input = "a" }
+"#;
+    let (definition, _) = read_workflow("w.toml", text, &catalogue()).expect("it reads");
+
+    assert_eq!(
+        definition.instances[0].calls,
+        ["sink", "lookup", "sink", "nowhere"],
+        "in the order written, the repeat kept"
+    );
+    assert!(definition.instances[1].calls.is_empty(), "no key, no calls");
+}
+
+#[test]
+fn malformed_calls_located() {
+    // Each is a fault at the value that is wrong - a calls key that is not an
+    // array, and an array holding something other than a string - rather than
+    // an instance read as calling nothing.
+    let cases = [
+        ("calls = \"sink\"", (4, 9), "array", "string"),
+        ("calls = [\"sink\", 7]", (4, 18), "string", "integer"),
+        ("calls = { sink = true }", (4, 9), "array", "inline table"),
+    ];
+
+    for (line, place, expected, found) in cases {
+        let text = format!("name = \"w\"\n\n[instances.a]\n{line}\nnode_type = \"source\"\n");
+        let fault = read_workflow("calls.toml", &text, &catalogue())
+            .expect_err("a malformed calls key is refused");
+        assert_eq!(
+            (fault.document(), fault.line(), fault.column()),
+            ("calls.toml", place.0, place.1),
+            "{fault}"
+        );
+        assert_eq!(
+            fault.kind(),
+            &FaultKind::WrongType {
+                key: vec!["instances".to_owned(), "a".to_owned(), "calls".to_owned()],
+                expected,
+                found,
+            },
+            "{line}"
+        );
+    }
+
+    // A call to a node type nobody declares is not a fault in the text.
+    let text = "name = \"w\"\n[instances.a]\nnode_type = \"source\"\ncalls = [\"nowhere\"]\n";
+    assert!(read_workflow("calls.toml", text, &catalogue()).is_ok());
 }

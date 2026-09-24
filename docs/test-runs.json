@@ -588,6 +588,15 @@
           "title": "agconflo-core reader::any_text_is_read_or_refused",
           "type": "test_run"
         },
+        "RUN_READER_CALLS_READ_IN_ORDER": {
+          "executes": [
+            "TEST_READER_CALLS_READ_IN_ORDER"
+          ],
+          "id": "RUN_READER_CALLS_READ_IN_ORDER",
+          "test_outcome": "passed",
+          "title": "agconflo-core reader::calls_read_in_order",
+          "type": "test_run"
+        },
         "RUN_READER_EMPTY_CONTEXT_TYPE_IS_A_FAULT": {
           "executes": [
             "TEST_READER_EMPTY_CONTEXT_TYPE_IS_A_FAULT"
@@ -622,6 +631,15 @@
           "id": "RUN_READER_FAULTS_CARRY_THEIR_PLACE",
           "test_outcome": "passed",
           "title": "agconflo-core reader::faults_carry_their_place",
+          "type": "test_run"
+        },
+        "RUN_READER_MALFORMED_CALLS_LOCATED": {
+          "executes": [
+            "TEST_READER_MALFORMED_CALLS_LOCATED"
+          ],
+          "id": "RUN_READER_MALFORMED_CALLS_LOCATED",
+          "test_outcome": "passed",
+          "title": "agconflo-core reader::malformed_calls_located",
           "type": "test_run"
         },
         "RUN_READER_PARAMETER_DECLARED_TWICE_IS_A_FAULT": {
@@ -1344,6 +1362,24 @@
           "title": "agconflo-core wiring::binding_to_missing_instance_is_reported",
           "type": "test_run"
         },
+        "RUN_WIRING_CALL_NAMES_MATCH_THE_RULE": {
+          "executes": [
+            "TEST_WIRING_CALL_NAMES_MATCH_THE_RULE"
+          ],
+          "id": "RUN_WIRING_CALL_NAMES_MATCH_THE_RULE",
+          "test_outcome": "passed",
+          "title": "agconflo-core wiring::call_names_match_the_rule",
+          "type": "test_run"
+        },
+        "RUN_WIRING_CALL_TO_MISSING_TYPE_IS_REPORTED": {
+          "executes": [
+            "TEST_WIRING_CALL_TO_MISSING_TYPE_IS_REPORTED"
+          ],
+          "id": "RUN_WIRING_CALL_TO_MISSING_TYPE_IS_REPORTED",
+          "test_outcome": "passed",
+          "title": "agconflo-core wiring::call_to_missing_type_is_reported",
+          "type": "test_run"
+        },
         "RUN_WIRING_DECLARED_PARAMETERS_PASS": {
           "executes": [
             "TEST_WIRING_DECLARED_PARAMETERS_PASS"
@@ -1542,6 +1578,15 @@
           "title": "agconflo-core wiring::undeclared_parameter_is_reported",
           "type": "test_run"
         },
+        "RUN_WIRING_UNPORTABLE_CALL_NAME_IS_REPORTED": {
+          "executes": [
+            "TEST_WIRING_UNPORTABLE_CALL_NAME_IS_REPORTED"
+          ],
+          "id": "RUN_WIRING_UNPORTABLE_CALL_NAME_IS_REPORTED",
+          "test_outcome": "passed",
+          "title": "agconflo-core wiring::unportable_call_name_is_reported",
+          "type": "test_run"
+        },
         "RUN_WIRING_UNWIRED_INSTANCE_IS_REPORTED": {
           "executes": [
             "TEST_WIRING_UNWIRED_INSTANCE_IS_REPORTED"
@@ -1558,6 +1603,15 @@
           "id": "RUN_WIRING_WELL_FORMED_DEFINITIONS_PASS",
           "test_outcome": "passed",
           "title": "agconflo-core wiring::well_formed_definitions_pass",
+          "type": "test_run"
+        },
+        "RUN_WRITER_CALLS_READ_BACK": {
+          "executes": [
+            "TEST_WRITER_CALLS_READ_BACK"
+          ],
+          "id": "RUN_WRITER_CALLS_READ_BACK",
+          "test_outcome": "passed",
+          "title": "agconflo-core writer::calls_read_back",
           "type": "test_run"
         },
         "RUN_WRITER_EVERY_CHANGE_READS_BACK": {

@@ -94,6 +94,16 @@ pub struct NodeInstance {
     pub entry: bool,
     /// The bindings that fill this instance's parameters.
     pub bindings: Vec<Binding>,
+    /// The node types a model performing this instance may call, in the order
+    /// the workflow lists them (`DEC_CALLS_DECLARED_ON_THE_INSTANCE`).
+    ///
+    /// On the instance rather than on its node type, because what a node may
+    /// call is wiring, and one node type used in two workflows may call
+    /// different things in each. Names rather than handles, as a binding's are:
+    /// a call to a node type nobody supplied is a defect to report
+    /// (`CREQ_VALIDATOR_CALL_RESOLVES`). A name listed twice is kept twice, as
+    /// written.
+    pub calls: Vec<String>,
 }
 
 /// A workflow definition: the node types it carries, the instances wired into
@@ -165,6 +175,12 @@ impl NodeInstance {
         self.entry = true;
         self
     }
+
+    /// The same instance, also declaring calls to `calls`.
+    pub(crate) fn with_calls(mut self, calls: &[&str]) -> Self {
+        self.calls = calls.iter().map(|&name| name.to_owned()).collect();
+        self
+    }
 }
 
 /// Parameters from `(name, context type)` pairs, in the order given.
@@ -194,6 +210,7 @@ pub(crate) fn instance(name: &str, node_type: &str, bindings: &[(&str, &str)]) -
                 source: source.to_owned(),
             })
             .collect(),
+        calls: Vec::new(),
     }
 }
 
