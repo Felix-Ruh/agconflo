@@ -4,9 +4,10 @@ use std::fmt;
 
 /// The identifier of one context, shared with no other context in the same run.
 ///
-/// Only an [`IdSource`] makes one. The field is private and nothing converts
-/// into this type, so an identifier cannot be written down, defaulted or parsed
-/// into existence. Copying one is harmless: a copy names the same context, and
+/// Only an [`IdSource`] makes one, or a run's record naming one a source issued
+/// before the run was interrupted, and handing it back beside a source past it.
+/// The field is private and nothing converts into this type, so an identifier
+/// cannot be written down, defaulted or parsed into existence. Copying one is harmless: a copy names the same context, and
 /// a context is created from a source rather than from an identifier, so a
 /// copy can never label a second one.
 ///
@@ -52,6 +53,40 @@ impl IdSource {
         let id = self.next.ok_or(SourceExhausted)?;
         self.next = id.checked_add(1);
         Ok(ContextId(id))
+    }
+
+    /// The identifier this source would issue next, or `None` once it has
+    /// issued them all - which is what a run's record keeps of it
+    /// (`DEC_RECORD_CARRIES_THE_SOURCE`).
+    pub(crate) fn position(&self) -> Option<u64> {
+        self.next
+    }
+
+    /// A source standing where a recorded one stood.
+    ///
+    /// The one way besides [`IdSource::new`] to make a source, and crate-private
+    /// for the reason the identifier's constructor is: a source placed anywhere
+    /// else would reissue what one before it issued. The run record calls it
+    /// only after refusing a record holding an identifier at or past `position`.
+    pub(crate) fn resumed_at(position: Option<u64>) -> Self {
+        Self { next: position }
+    }
+}
+
+impl ContextId {
+    /// An identifier read back from a run's record.
+    ///
+    /// Crate-private, and called only by the run record, which hands every
+    /// identifier it makes this way back beside a source positioned past it
+    /// (`CREQ_SOURCE_SOLE_ISSUER`): the identifier was issued once, before the
+    /// run was interrupted, and is being named again rather than issued.
+    pub(crate) fn resumed(value: u64) -> Self {
+        Self(value)
+    }
+
+    /// The number this identifier is, for writing it into a record.
+    pub(crate) fn value(self) -> u64 {
+        self.0
     }
 }
 

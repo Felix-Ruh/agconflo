@@ -576,6 +576,7 @@ bindings = { first = "one", second = "two" }
         &mut source,
         10,
         SMALL,
+        |_| {},
     ));
     assert_eq!(rendered(ending), "ONE+TWO");
 }

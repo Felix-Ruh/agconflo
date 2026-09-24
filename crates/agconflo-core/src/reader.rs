@@ -583,7 +583,7 @@ fn path(key: &[&str]) -> Vec<String> {
 /// down to its two edges: an offset at or past the end of the text is placed
 /// just after the last character, on its line, and an offset inside a character
 /// wider than one byte falls back to counting bytes.
-fn line_and_column(text: &str, offset: usize) -> (usize, usize) {
+pub(crate) fn line_and_column(text: &str, offset: usize) -> (usize, usize) {
     let bytes = text.as_bytes();
     if bytes.is_empty() {
         return (1, offset + 1);

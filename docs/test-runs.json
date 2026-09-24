@@ -660,6 +660,96 @@
           "title": "agconflo-core reader::unnamed_keys_are_read",
           "type": "test_run"
         },
+        "RUN_RECORD_CONTEXTS_KEPT": {
+          "executes": [
+            "TEST_RECORD_CONTEXTS_KEPT"
+          ],
+          "id": "RUN_RECORD_CONTEXTS_KEPT",
+          "test_outcome": "passed",
+          "title": "agconflo-core record::contexts_kept",
+          "type": "test_run"
+        },
+        "RUN_RECORD_DEEP_COMPOSITION_KEPT": {
+          "executes": [
+            "TEST_RECORD_DEEP_COMPOSITION_KEPT"
+          ],
+          "id": "RUN_RECORD_DEEP_COMPOSITION_KEPT",
+          "test_outcome": "passed",
+          "title": "agconflo-core record::deep_composition_kept",
+          "type": "test_run"
+        },
+        "RUN_RECORD_DIVERGED_RECORD_REFUSED": {
+          "executes": [
+            "TEST_RECORD_DIVERGED_RECORD_REFUSED"
+          ],
+          "id": "RUN_RECORD_DIVERGED_RECORD_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-core record::diverged_record_refused",
+          "type": "test_run"
+        },
+        "RUN_RECORD_HOLDS_THE_RUN": {
+          "executes": [
+            "TEST_RECORD_HOLDS_THE_RUN"
+          ],
+          "id": "RUN_RECORD_HOLDS_THE_RUN",
+          "test_outcome": "passed",
+          "title": "agconflo-core record::holds_the_run",
+          "type": "test_run"
+        },
+        "RUN_RECORD_IDENTIFIERS_ONLY_WITH_A_SOURCE": {
+          "executes": [
+            "TEST_RECORD_IDENTIFIERS_ONLY_WITH_A_SOURCE"
+          ],
+          "id": "RUN_RECORD_IDENTIFIERS_ONLY_WITH_A_SOURCE",
+          "test_outcome": "passed",
+          "title": "agconflo-core record::identifiers_only_with_a_source",
+          "type": "test_run"
+        },
+        "RUN_RECORD_OUTSTANDING_NOT_CHARGED_AGAIN": {
+          "executes": [
+            "TEST_RECORD_OUTSTANDING_NOT_CHARGED_AGAIN"
+          ],
+          "id": "RUN_RECORD_OUTSTANDING_NOT_CHARGED_AGAIN",
+          "test_outcome": "passed",
+          "title": "agconflo-core record::outstanding_not_charged_again",
+          "type": "test_run"
+        },
+        "RUN_RECORD_RESUMED_RUN_ENDS_ALIKE": {
+          "executes": [
+            "TEST_RECORD_RESUMED_RUN_ENDS_ALIKE"
+          ],
+          "id": "RUN_RECORD_RESUMED_RUN_ENDS_ALIKE",
+          "test_outcome": "passed",
+          "title": "agconflo-core record::resumed_run_ends_alike",
+          "type": "test_run"
+        },
+        "RUN_RECORD_SOURCE_CONTINUES": {
+          "executes": [
+            "TEST_RECORD_SOURCE_CONTINUES"
+          ],
+          "id": "RUN_RECORD_SOURCE_CONTINUES",
+          "test_outcome": "passed",
+          "title": "agconflo-core record::source_continues",
+          "type": "test_run"
+        },
+        "RUN_RECORD_START_REFUSAL_CARRIED": {
+          "executes": [
+            "TEST_RECORD_START_REFUSAL_CARRIED"
+          ],
+          "id": "RUN_RECORD_START_REFUSAL_CARRIED",
+          "test_outcome": "passed",
+          "title": "agconflo-core record::start_refusal_carried",
+          "type": "test_run"
+        },
+        "RUN_RECORD_UNREADABLE_REFUSED": {
+          "executes": [
+            "TEST_RECORD_UNREADABLE_REFUSED"
+          ],
+          "id": "RUN_RECORD_UNREADABLE_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-core record::unreadable_refused",
+          "type": "test_run"
+        },
         "RUN_RUN_ACCEPTED_OUTPUTS_ARE_ALL_NEW": {
           "executes": [
             "TEST_RUN_ACCEPTED_OUTPUTS_ARE_ALL_NEW"
@@ -1108,6 +1198,24 @@
           "id": "RUN_SCRIPTED_CHANGED_SCRIPT_CHANGES_THE_RESULT",
           "test_outcome": "passed",
           "title": "agconflo-lua scripted::changed_script_changes_the_result",
+          "type": "test_run"
+        },
+        "RUN_SCRIPTED_INTERRUPTED_RUN_RESUMES": {
+          "executes": [
+            "TEST_SCRIPTED_INTERRUPTED_RUN_RESUMES"
+          ],
+          "id": "RUN_SCRIPTED_INTERRUPTED_RUN_RESUMES",
+          "test_outcome": "passed",
+          "title": "agconflo-lua scripted::interrupted_run_resumes",
+          "type": "test_run"
+        },
+        "RUN_SCRIPTED_RECORDS_HANDED_OVER": {
+          "executes": [
+            "TEST_SCRIPTED_RECORDS_HANDED_OVER"
+          ],
+          "id": "RUN_SCRIPTED_RECORDS_HANDED_OVER",
+          "test_outcome": "passed",
+          "title": "agconflo-lua scripted::records_handed_over",
           "type": "test_run"
         },
         "RUN_SCRIPTED_SAME_WORKFLOW_TWO_PROVIDERS": {
