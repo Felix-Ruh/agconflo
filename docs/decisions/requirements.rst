@@ -80,7 +80,7 @@ judge.
    level - by the stakeholder - before anything below it moves.
 
 .. dec:: A change to a requirement is recorded with its impact analysis
-   :id: DEC_CHANGE_BY_RECORDED_REQUEST
+   :id: DEC_REQUIREMENT_CHANGES_RECORDED
    :dec_status: accepted
    :decided_on: 2026-09-24
    :supported_by: EVD_CHANGE_CHECK_FIRES

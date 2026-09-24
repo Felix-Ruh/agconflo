@@ -65,6 +65,7 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    decisions/changes
    evidence/toolchain
    evidence/requirements
+   evidence/changes
    evidence/topology
    evidence/run
    evidence/behaviour

@@ -696,7 +696,7 @@ impl<'t> Reading<'t> {
                     ));
                 };
                 let at = ["context", key];
-                // @An identifier only beside a source past it,IMPL_RECORD_SOURCE,impl,[CREQ_RECORD_SOURCE_CONTINUES, CREQ_SOURCE_SOLE_ISSUER]
+                // @An identifier only beside a source past it,IMPL_RECORD_SOURCE,impl,[CREQ_RECORD_SOURCE_CONTINUES]
                 if source.is_some_and(|next| id >= next) {
                     return Err(self.fault(span, RecordFaultKind::NotIssued { key: owned(&at) }));
                 }

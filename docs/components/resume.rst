@@ -102,6 +102,11 @@ the run's rule of one context per identifier, kept across an interruption.
      again.
    - **An exhausted source resumed as fresh.** Its first identifier repeats the
      first ever issued.
+   - **A record naming an identifier its source had not reached.** Resumed,
+     the source then issues it a second time. So a record holding an
+     identifier at or past its source's position is refused, and one whose
+     source is exhausted resumes with a source that issues nothing. Moved here
+     from ``CREQ_SOURCE_SOLE_ISSUER`` by ``DEC_CHANGE_SOURCE_SOLE_ISSUER``.
 
 .. comp_req:: A record the workflow would not have produced is refused
    :id: CREQ_RECORD_REFUSES_DIVERGENCE

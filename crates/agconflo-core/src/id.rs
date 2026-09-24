@@ -78,7 +78,7 @@ impl ContextId {
     ///
     /// Crate-private, and called only by the run record, which hands every
     /// identifier it makes this way back beside a source positioned past it
-    /// (`CREQ_SOURCE_SOLE_ISSUER`): the identifier was issued once, before the
+    /// (`CREQ_RECORD_SOURCE_CONTINUES`): the identifier was issued once, before the
     /// run was interrupted, and is being named again rather than issued.
     pub(crate) fn resumed(value: u64) -> Self {
         Self(value)

@@ -18,8 +18,8 @@ in a real second process, against a real model, was measured once outside the
 tests (``EVD_PERSON_ANSWERED_IN_A_NEW_PROCESS``).
 
 Every failure mode listed in ``components/person`` is named by the case that
-catches it, and one case checks the narrowed ``CREQ_BEHAVIOURS_REFUSE_MISSING``
-from the side it was narrowed on.
+catches it, and one case checks ``CREQ_BEHAVIOURS_REFUSE_MISSING`` for a
+behaviour supplied by naming a person rather than by a script.
 
 .. test_case:: A node type a person performs needs no script
    :id: TEST_BEHAVIOURS_PERSON_NEEDS_NO_SCRIPT
