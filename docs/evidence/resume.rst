@@ -105,3 +105,28 @@ on it.
    parser refuses the second rather than keeping either - except that a key is
    text, so ``7`` and ``07`` are two tables for one identifier unless the reader
    refuses the form that is not canonical.
+
+The last was taken the next day, once the record existed, and is the one
+measurement here of a process actually ending: against the local model the
+models feature was measured on (``EVD_GENAI_REAL_LOCAL_MODEL``), from a scratch
+binary built on the crates at the head of the implementation.
+
+.. evd:: A run killed during a model call resumed in a new process with one call
+   :id: EVD_RESUMED_ACROSS_A_RESTART
+   :evd_kind: measurement
+   :observed_on: 2026-09-24
+   :observation: A three-node scripted run against qwen3.8-27b-ridge, its process killed during the third model call, resumed from its last record in a new process, kept all five recorded contexts byte for byte under their identifiers and made two new ones.
+
+   Each node asked the model for an animal and a four-line poem, and the
+   binary replaced a record file with every record it was handed. When the
+   file held two outputs, 54 s in, the process was killed outright within half
+   a second - after the record, which the loop hands over just before it
+   starts the next activation's call, and seconds short of any answer, going
+   by the calls either side. A new process read the file, resumed, and
+   completed in 23.9 s, against 6 s and 53 s for the first two calls.
+
+   The record it ended with held every context of the one it began with,
+   identical, and two more: one answer and the result. A call makes one
+   answer, so one call was made - for the activation that was killed - and
+   the activations spent went from 2 to 3, not 4. The two answers the killed
+   process was given are in the result as it was given them.

@@ -149,8 +149,9 @@ the run's rule of one context per identifier, kept across an interruption.
    :ears_pattern: unwanted
    :statement: If a text cannot be read as a run record, then Run record shall refuse to resume it naming the fault and where in the text it is.
 
-   Where is a line and a column when the text is not TOML, and the key the
-   fault is under when it is.
+   Where is a line and a column for every fault, since every value of a parsed
+   record carries its place, and the key the fault is under for every fault but
+   text that is not TOML at all.
 
    Failure modes:
 
@@ -165,6 +166,9 @@ the run's rule of one context per identifier, kept across an interruption.
      being built.
    - **An identifier at or past the recorded source's position.** No source at
      that position could have issued it, so the record is not one run's.
+   - **A context nothing holds, kept.** A record holds what its run held, and a
+     context no argument, output or part reaches was written by something
+     else; resumed, it would be dropped without a word.
 
 .. comp_req:: A scripted run hands over its record at the start and after each output
    :id: CREQ_HOST_HANDS_RECORDS

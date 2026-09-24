@@ -546,6 +546,23 @@ pub enum Step<F> {
     Ended(RunEnding<F>),
 }
 
+/// A run's state as its record writes it: everything it was started with and
+/// everything it has accepted since, and nothing that can be derived from those
+/// (`EVD_RUN_STATE_DERIVABLE`).
+pub(crate) struct Recorded<'r> {
+    /// The budget the run is held to.
+    pub(crate) budget: usize,
+    /// The activations it has spent, one more than its outputs while one is
+    /// outstanding.
+    pub(crate) spent: usize,
+    /// What it was started with.
+    pub(crate) arguments: &'r Arguments,
+    /// Each accepted activation with its output, in the order accepted.
+    pub(crate) accepted: &'r [(Activation, Context)],
+    /// Every context it holds, each under its identifier.
+    pub(crate) held: &'r HashMap<ContextId, Context>,
+}
+
 /// One run of one workflow definition.
 ///
 /// Borrows the definition rather than owning it: a run reads it and never
@@ -558,6 +575,10 @@ pub struct Run<'a, F> {
     /// accepted, and everything any of them was composed from - each under its
     /// identifier, which names it alone (`DEC_IDENTIFIER_NAMES_ONE_CONTEXT`).
     held: HashMap<ContextId, Context>,
+    /// Every activation whose output was accepted, with that output, in the
+    /// order they were accepted - what a record needs of a run's history that
+    /// `produced` does not keep (`DEC_RECORD_IS_OUTPUTS`).
+    accepted: Vec<(Activation, Context)>,
     outstanding: Option<Activation>,
     budget: usize,
     activations: usize,
@@ -623,6 +644,7 @@ impl<'a, F> Run<'a, F> {
             arguments,
             produced: Produced::new(),
             held,
+            accepted: Vec::new(),
             outstanding: None,
             budget,
             activations: 0,
@@ -733,10 +755,24 @@ impl<'a, F> Run<'a, F> {
         }
 
         let instance = outstanding.instance().to_owned();
-        self.outstanding = None;
         self.held.extend(brought);
-        self.produced.insert(instance, context);
+        self.produced.insert(instance, context.clone());
+        if let Some(activation) = self.outstanding.take() {
+            self.accepted.push((activation, context));
+        }
         Ok(())
+    }
+
+    /// What a record of this run holds, read without changing it
+    /// (`CREQ_RECORD_HOLDS_THE_RUN`).
+    pub(crate) fn recorded(&self) -> Recorded<'_> {
+        Recorded {
+            budget: self.budget,
+            spent: self.activations,
+            arguments: &self.arguments,
+            accepted: &self.accepted,
+            held: &self.held,
+        }
     }
 
     /// Whether the run holds a context under `id`: an argument, an accepted

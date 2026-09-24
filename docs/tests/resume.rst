@@ -15,7 +15,9 @@ which is how the measurement behind this feature was taken
 (``EVD_INTERRUPTED_RUN_REPEATS_CALLS``). It ends the run the way a process
 ending does, short of the process: nothing after the drop runs. What a real
 restart adds - the memory gone - cannot leak into a resumed run here either,
-because a resumed run is built from the record's text and nothing else.
+because a resumed run is built from the record's text and nothing else. A real
+restart was measured once, outside the tests, against a real model
+(``EVD_RESUMED_ACROSS_A_RESTART``).
 
 Every failure mode listed in ``components/resume`` is named by the case that
 catches it, and one case verifies the requirement of ``components/context``
@@ -144,13 +146,15 @@ that the record amended.
    A sound record, each time damaged in one way: not TOML at all; another
    version; a field missing; a field added; a value of the wrong kind; an
    identifier written as ``07``; a part naming no recorded context; a
-   composition holding itself; an identifier at the source's position. Each is
-   refused with its own fault, at a line and column for the first and under the
-   key for the rest, and the undamaged record resumes.
+   composition holding itself; an identifier at the source's position; a
+   context nothing holds. Each is refused with its own fault, at a line and
+   column, and under the key for all but the first; the undamaged record
+   resumes.
 
    Catches: any TOML accepted; an unknown field ignored; an identifier written
    in another form; a part naming no recorded context, or a composition holding
-   itself; an identifier at or past the recorded source's position.
+   itself; an identifier at or past the recorded source's position; a context
+   nothing holds, kept.
 
 .. test_case:: A record's identifiers come back only beside a source past them
    :id: TEST_RECORD_IDENTIFIERS_ONLY_WITH_A_SOURCE

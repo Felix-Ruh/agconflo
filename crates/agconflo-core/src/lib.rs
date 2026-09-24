@@ -19,6 +19,7 @@ mod defect;
 mod id;
 mod lineage;
 mod reader;
+mod record;
 mod run;
 mod scheduler;
 mod wiring;
@@ -35,6 +36,7 @@ pub use id::{ContextId, IdSource, SourceExhausted};
 pub use reader::{
     FaultKind, NodeTypeDocument, ReadFault, WorkflowDocument, read_node_types, read_workflow,
 };
+pub use record::{Divergence, RecordFault, RecordFaultKind, ResumeRefusal};
 pub use run::{
     Arguments, NothingOutstanding, OutputRefusal, Run, RunEnding, SignatureFault, StartRefusal,
     Step,

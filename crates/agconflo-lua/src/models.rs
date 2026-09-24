@@ -178,21 +178,36 @@ impl Stub {
     /// Blocking sockets on a thread of its own, so that it serves whichever
     /// runtime a test happens to make.
     pub(crate) fn answering(status: u16, answer: &str) -> Self {
+        Self::serving(status, answer, usize::MAX)
+    }
+
+    /// A stub answering the first `answered` requests with `answer`, and
+    /// holding every later one open without a word - a provider a run can be
+    /// interrupted while waiting on.
+    pub(crate) fn holding_after(answered: usize, answer: &str) -> Self {
+        Self::serving(200, answer, answered)
+    }
+
+    fn serving(status: u16, answer: &str, answered: usize) -> Self {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("a loopback port");
         let base = format!("http://{}/v1/", listener.local_addr().expect("an address"));
         let seen = Arc::new(Mutex::new(Vec::new()));
         let recorded = seen.clone();
         let answer = answer.to_owned();
         std::thread::spawn(move || {
+            let mut held = Vec::new();
             for mut connection in listener.incoming().flatten() {
                 let Some((path, body)) = read_request(&mut connection) else {
                     continue;
                 };
                 let request = serde_json::from_str(&body).unwrap_or(serde_json::Value::Null);
-                recorded
-                    .lock()
-                    .expect("the log")
-                    .push((path.clone(), request));
+                let mut log = recorded.lock().expect("the log");
+                log.push((path.clone(), request));
+                if log.len() > answered {
+                    held.push(connection);
+                    continue;
+                }
+                drop(log);
                 let reply = if status != 200 {
                     serde_json::json!({"error": {"message": "the stub refused", "type": "stub"}})
                 } else if path.ends_with("/messages") {

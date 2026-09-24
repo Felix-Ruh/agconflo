@@ -25,4 +25,4 @@ mod scripted;
 pub use behaviours::{BehaviourFault, Behaviours};
 pub use host::{Limits, ScriptFailure};
 pub use models::{ModelFailure, Roster};
-pub use scripted::{ScriptedRefusal, run_scripted};
+pub use scripted::{ScriptedRefusal, resume_scripted, run_scripted};

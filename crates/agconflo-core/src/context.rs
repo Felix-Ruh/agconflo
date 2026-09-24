@@ -131,6 +131,41 @@ impl Context {
         Ok(Self::new(id, declared_type, composed))
     }
 
+    /// A text context read back from a run's record, under the identifier it
+    /// was recorded with.
+    ///
+    /// Crate-private: taking an identifier rather than a source is exactly what
+    /// the public constructors refuse to do, and the run record is the one
+    /// caller, holding each identifier once (`CREQ_RECORD_KEEPS_CONTEXTS`).
+    pub(crate) fn resumed_text(id: ContextId, declared_type: ContextType, text: String) -> Self {
+        Self::new(id, declared_type, Content::Text(text.into_boxed_str()))
+    }
+
+    /// A composed context read back from a run's record, holding `parts` - each
+    /// the one value the record resumed under that part's identifier.
+    pub(crate) fn resumed_composed(
+        id: ContextId,
+        declared_type: ContextType,
+        parts: Vec<Context>,
+        separator: &str,
+    ) -> Self {
+        let composed = Content::Composed {
+            parts,
+            separator: separator.into(),
+        };
+        Self::new(id, declared_type, composed)
+    }
+
+    /// The separator a composed context joins its parts with, or `None` for a
+    /// text context - which, with [`Context::parts`] and [`Context::render`], is
+    /// everything a run's record writes of it.
+    pub(crate) fn separator(&self) -> Option<&str> {
+        match &self.0.content {
+            Content::Text(_) => None,
+            Content::Composed { separator, .. } => Some(separator),
+        }
+    }
+
     fn new(id: ContextId, declared_type: ContextType, content: Content) -> Self {
         Self(Arc::new(Node {
             id,

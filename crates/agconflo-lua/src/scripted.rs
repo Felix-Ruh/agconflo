@@ -11,20 +11,21 @@ use std::fmt;
 use std::rc::Rc;
 
 use agconflo_core::{
-    Arguments, IdSource, NothingOutstanding, Run, RunEnding, StartRefusal, Step, WorkflowDefinition,
+    Arguments, IdSource, NothingOutstanding, ResumeRefusal, Run, RunEnding, StartRefusal, Step,
+    WorkflowDefinition,
 };
 
 use crate::behaviours::{BehaviourFault, Behaviours};
 use crate::host::{self, Limits, ScriptFailure};
 use crate::models::Roster;
 
-/// Why a scripted run was not started.
+/// Why a scripted run was not started, or not resumed.
 ///
-/// Two classes, asked in order: whatever the run itself refuses a workflow or
-/// its arguments for, and then the scripts. The scripts are asked about only
-/// once the run would start, because a workflow with a wiring defect may name a
-/// node type that does not exist, and whether it has a script is not a question
-/// worth answering first.
+/// Asked in order: whatever the run itself refuses a workflow or its arguments
+/// for - or, resuming, whatever it refuses a record for - and then the scripts.
+/// The scripts are asked about only once the run would start, because a
+/// workflow with a wiring defect may name a node type that does not exist, and
+/// whether it has a script is not a question worth answering first.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ScriptedRefusal {
@@ -33,6 +34,9 @@ pub enum ScriptedRefusal {
     /// The scripts cannot run, every fault of them
     /// (`CREQ_BEHAVIOURS_EVERY_FAULT`).
     Behaviours(Vec<BehaviourFault>),
+    /// The run refused to resume from the record it was given
+    /// (`FEAT_RESUME_REFUSES_ANOTHER_RUN`).
+    Resume(ResumeRefusal),
 }
 
 impl fmt::Display for ScriptedRefusal {
@@ -46,6 +50,7 @@ impl fmt::Display for ScriptedRefusal {
                 }
                 Ok(())
             }
+            Self::Resume(refusal) => refusal.fmt(f),
         }
     }
 }
@@ -64,9 +69,16 @@ impl std::error::Error for ScriptedRefusal {}
 /// caller's models (`DEC_MODELS_BY_ROLE`); a run whose scripts call no model can
 /// be given a roster mapping nothing.
 ///
+/// `keep` is handed the run's record once it starts and again each time it
+/// accepts an output (`DEC_SCRIPTED_RUN_HANDS_RECORDS`). A caller keeping the
+/// latest can give it to [`resume_scripted`] after an interruption and lose at
+/// most the activation that was in progress; one that needs no record ignores
+/// it.
+///
 /// Asynchronous, because a model call is awaited (`DEC_BEHAVIOUR_ASYNC`). The
 /// future is not `Send` - a Lua state is not (`EVD_RUN_IS_SEND`) - so it runs on
-/// the thread that polls it: a current-thread runtime, or a local set.
+/// the thread that polls it: a current-thread runtime, or a local set. Dropping
+/// it interrupts the run, and nothing after the drop runs.
 ///
 /// `source` issues the identifiers of every context the scripts make, and must
 /// be the one `arguments` were made from: two sources repeat each other's
@@ -74,6 +86,7 @@ impl std::error::Error for ScriptedRefusal {}
 /// It is lent to the scripts for the length of the run and handed back when it
 /// ends, however it ends.
 // @Refused before anything runs,IMPL_SCRIPTED_REFUSAL,impl,[CREQ_BEHAVIOURS_REFUSE_MISSING, CREQ_BEHAVIOURS_REFUSE_UNCOMPILABLE, CREQ_BEHAVIOURS_REFUSE_TWICE]
+#[allow(clippy::too_many_arguments)]
 pub async fn run_scripted(
     definition: &WorkflowDefinition,
     behaviours: &Behaviours,
@@ -82,8 +95,59 @@ pub async fn run_scripted(
     source: &mut IdSource,
     budget: usize,
     limits: Limits,
+    keep: impl FnMut(String),
 ) -> Result<RunEnding<ScriptFailure>, ScriptedRefusal> {
-    let mut run = Run::start(definition, arguments, budget).map_err(ScriptedRefusal::Start)?;
+    let run = Run::start(definition, arguments, budget).map_err(ScriptedRefusal::Start)?;
+    drive(run, definition, behaviours, roster, source, limits, keep).await
+}
+
+/// Resume the run `record` is a record of, against `definition`, and run it to
+/// its ending as [`run_scripted`] would have - or refuse to.
+///
+/// No activation whose output the record holds is performed again
+/// (`FEAT_RESUME_REPEATS_NO_OUTPUT`): the run is rebuilt from the record, and
+/// the first activation performed is the one the recorded run had not
+/// finished. The record is refused before any script runs if it does not
+/// describe a run of `definition` (`FEAT_RESUME_REFUSES_ANOTHER_RUN`), and the
+/// scripts are asked about as for a start.
+///
+/// Hands back the ending with the identifier source that came back with the
+/// run, advanced past everything the resumed run issued, since whatever the
+/// caller makes next must continue from it.
+pub async fn resume_scripted(
+    definition: &WorkflowDefinition,
+    behaviours: &Behaviours,
+    roster: &Roster,
+    record: &str,
+    limits: Limits,
+    keep: impl FnMut(String),
+) -> Result<(RunEnding<ScriptFailure>, IdSource), ScriptedRefusal> {
+    let (run, mut source) = Run::resume(definition, record).map_err(ScriptedRefusal::Resume)?;
+    let ending = drive(
+        run,
+        definition,
+        behaviours,
+        roster,
+        &mut source,
+        limits,
+        keep,
+    )
+    .await?;
+    Ok((ending, source))
+}
+
+/// Perform `run`'s activations until it ends, handing `keep` a record when it
+/// starts and after each accepted output - or refuse it for its scripts.
+// @A record handed over at the start and after each output,IMPL_SCRIPTED_RECORDS,impl,[CREQ_HOST_HANDS_RECORDS]
+async fn drive(
+    mut run: Run<'_, ScriptFailure>,
+    definition: &WorkflowDefinition,
+    behaviours: &Behaviours,
+    roster: &Roster,
+    source: &mut IdSource,
+    limits: Limits,
+    mut keep: impl FnMut(String),
+) -> Result<RunEnding<ScriptFailure>, ScriptedRefusal> {
     let lent = Lent::new(source);
 
     let faults = behaviours.faults(definition);
@@ -91,6 +155,9 @@ pub async fn run_scripted(
         return Err(ScriptedRefusal::Behaviours(faults));
     }
 
+    // The position is read from the loan, which is the source the scripts
+    // draw from: what stands in the caller's place meanwhile is a fresh one.
+    keep(run.record(&lent.source.borrow()));
     loop {
         let activation = match run.step() {
             Step::Ended(ending) => return Ok(ending),
@@ -117,6 +184,7 @@ pub async fn run_scripted(
         if let Err(failure) = outcome {
             return Ok(fail(run, failure));
         }
+        keep(run.record(&lent.source.borrow()));
     }
 }
 
@@ -248,6 +316,7 @@ pub(crate) fn run_with_roster(
         &mut source,
         20,
         SMALL,
+        |_| {},
     ))
 }
 
@@ -344,6 +413,7 @@ fn arguments_from_another_source_fail() {
             &mut IdSource::new(),
             20,
             SMALL,
+            |_| {},
         ));
 
         let (instance, failure) = failed(ending);
@@ -467,6 +537,7 @@ fn source_handed_back_advanced() {
         &mut source,
         20,
         SMALL,
+        |_| {},
     ));
     let RunEnding::Completed(result) = ending.expect("starts") else {
         panic!("expected completion")
@@ -483,4 +554,137 @@ fn source_handed_back_advanced() {
         "{:?} was issued in the run",
         after.id()
     );
+}
+
+#[cfg(test)]
+#[test]
+fn records_handed_over() {
+    let definition = workflow(CHAIN_TYPES, CHAIN);
+    let broken = "local given, host = ...\nerror('broken')";
+    for (step, expected) in [(appending("stepped"), 4), (broken.to_owned(), 2)] {
+        let behaviours = Behaviours::new()
+            .define("seed", "seed.lua", &appending("seeded"))
+            .define("step", "step.lua", &step);
+        let mut source = IdSource::new();
+        let argument = note(&mut source, "note", "hello");
+        let mut records = Vec::new();
+        let ending = block(run_scripted(
+            &definition,
+            &behaviours,
+            &offline(),
+            Arguments::new().supply("first", "input", argument),
+            &mut source,
+            20,
+            SMALL,
+            |record| records.push(record),
+        ));
+        assert!(ending.is_ok(), "{ending:?}");
+
+        // One at the start and one after each accepted output, the one after
+        // the i-th holding i outputs and no later one; and each a record of a
+        // run of this workflow - which one claiming the fresh source that
+        // stands in the caller's place during a run would not be, every
+        // identifier it holds being past it.
+        assert_eq!(records.len(), expected, "{step}");
+        for (outputs, record) in records.iter().enumerate() {
+            assert_eq!(record.matches("[[output]]").count(), outputs, "{record}");
+            let resumed = Run::<ScriptFailure>::resume(&definition, record);
+            assert!(resumed.is_ok(), "{:?}\n{record}", resumed.err());
+        }
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn interrupted_run_resumes() {
+    // The measured shape (EVD_INTERRUPTED_RUN_REPEATS_CALLS): three nodes each
+    // calling a model, the provider answering two calls and holding the third.
+    let calling = "local given, host = ...\nlocal answer = host.complete('drafting', given.input)\nreturn host.compose(host.output, {given.input, answer}, ' ')";
+    let behaviours = Behaviours::new()
+        .define("seed", "seed.lua", calling)
+        .define("step", "step.lua", calling);
+    let definition = workflow(CHAIN_TYPES, CHAIN);
+    let roster = |stub: &crate::models::Stub| {
+        Roster::new(crate::models::client_for(&stub.base)).map("drafting", "openai::m")
+    };
+
+    let holding = crate::models::Stub::holding_after(2, "an answer");
+    let first = roster(&holding);
+    let mut source = IdSource::new();
+    let argument = note(&mut source, "note", "hello");
+    let mut records = Vec::new();
+    let interrupted = block(async {
+        tokio::select! {
+            ending = run_scripted(
+                &definition,
+                &behaviours,
+                &first,
+                Arguments::new().supply("first", "input", argument),
+                &mut source,
+                20,
+                SMALL,
+                |record| records.push(record),
+            ) => Some(ending),
+            () = async {
+                while holding.requests().len() < 3 {
+                    tokio::task::yield_now().await;
+                }
+            } => None,
+        }
+    });
+    assert!(
+        interrupted.is_none(),
+        "the run was dropped during its third call"
+    );
+    let last = records.last().expect("records were handed over");
+    assert_eq!(last.matches("[[output]]").count(), 2);
+
+    // Resumed from the last record against a provider that answers: one call,
+    // for the activation that was interrupted.
+    let answering = crate::models::Stub::answering(200, "an answer");
+    let (ending, _) = block(resume_scripted(
+        &definition,
+        &behaviours,
+        &roster(&answering),
+        last,
+        SMALL,
+        |_| {},
+    ))
+    .expect("resumes");
+    assert_eq!(answering.requests().len(), 1);
+    let RunEnding::Completed(resumed) = ending else {
+        panic!("expected completion, got {ending:?}")
+    };
+
+    // The result an uninterrupted run gives, identifiers included: the first
+    // half's contexts are the ones it recorded.
+    let whole = crate::models::Stub::answering(200, "an answer");
+    let mut source = IdSource::new();
+    let argument = note(&mut source, "note", "hello");
+    let ending = block(run_scripted(
+        &definition,
+        &behaviours,
+        &roster(&whole),
+        Arguments::new().supply("first", "input", argument),
+        &mut source,
+        20,
+        SMALL,
+        |_| {},
+    ));
+    let Ok(RunEnding::Completed(uninterrupted)) = ending else {
+        panic!("expected completion, got {ending:?}")
+    };
+    assert_eq!(whole.requests().len(), 3);
+    assert_eq!(resumed.render(), uninterrupted.render());
+    assert_eq!(resumed.id(), uninterrupted.id());
+    let ids = |context: &agconflo_core::Context| {
+        let mut ids: Vec<String> = context
+            .lineage()
+            .iter()
+            .map(|c| format!("{:?}", c.id()))
+            .collect();
+        ids.sort();
+        ids
+    };
+    assert_eq!(ids(&resumed), ids(&uninterrupted));
 }
