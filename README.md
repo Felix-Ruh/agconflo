@@ -15,7 +15,7 @@ where did every byte come from?"* has an exact answer.
 
 ## Status
 
-**Pre-alpha. Nodes run as scripts, and can call a model** — no loops, no tools, nothing persisted. What
+**Pre-alpha. Nodes run as scripts, call models, and a run survives an interruption** — no loops, no tools. What
 exists is the development process around it and the first slices of code through it: a
 requirements project under `docs/` with a validated metamodel behind it, a commit gate, continuous
 integration, and two crates.
@@ -25,7 +25,10 @@ lineage — the static side of a workflow, and a run over one. The static side i
 before anything runs, and reading it from TOML documents and writing it back without losing what the
 reader did not understand. The run decides which node may activate and what it is given, refuses an
 output that contradicts its declaration, holds it to a budget, and ends in exactly one of four ways;
-**its caller performs the activation**, so the core reaches no provider and owns no runtime.
+**its caller performs the activation**, so the core reaches no provider and owns no runtime. A run can
+be written down as text at any point and resumed from that text in another process, holding the
+contexts it held under the identifiers they had; the core stores nothing, and where the text is kept
+is its caller's.
 
 `agconflo-lua` is such a caller. It performs each activation by running a Lua 5.5 script supplied
 for the node type, in a state made for that one activation, with nothing to reach but its inputs and
@@ -33,8 +36,9 @@ the context API, and under a limit on instructions, memory and model calls. A sc
 by a role - `host.complete('drafting', prompt)` - and the caller maps each role to a provider's model
 through [`genai`](https://github.com/jeremychone/rust-genai), so the same workflow runs against
 another provider by changing that mapping. The prompt is a context and is all the model is shown;
-the answer comes back as a context of its own. Each crate is traced from its requirements to the
-code and back from the tests that check it.
+the answer comes back as a context of its own. A scripted run hands its caller a record when it starts
+and after every output, so a run interrupted mid-call is resumed without repeating any call that was
+answered. Each crate is traced from its requirements to the code and back from the tests that check it.
 
 Expect the public API to change without warning. Breaking changes, yes; force-pushes to `main`, no —
 those are blocked outright, along with direct pushes to it.
