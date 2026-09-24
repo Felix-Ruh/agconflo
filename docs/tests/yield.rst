@@ -146,7 +146,9 @@ The run
    :test_kind: positive
    :coverage: full
 
-   The calling instance is the designated one and has a consumer. When the
+   The calling instance is the designated one and has a consumer. The called
+   node type handing back a context it was called with is refused, since that
+   would credit the caller's context to it too. When the
    called node type's output is accepted, the calling activation is outstanding
    again; the run has not completed, its consumer is not offered, and the
    calling instance's own output - a composition holding the called output - is

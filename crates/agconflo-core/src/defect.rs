@@ -123,6 +123,25 @@ pub enum WiringDefect {
         /// The instance name that resolved to nothing, as it was written.
         unresolved: String,
     },
+    /// An instance declares a call to a node type the definition does not carry
+    /// (`CREQ_VALIDATOR_CALL_RESOLVES`). It concerns the instance, and no
+    /// parameter.
+    UnresolvedCall {
+        /// The instance declaring the call.
+        instance: String,
+        /// The node type name that resolved to nothing, as it was written.
+        unresolved: String,
+    },
+    /// An instance declares a call to a node type whose name is not one both
+    /// providers accept as a tool's (`CREQ_VALIDATOR_CALL_NAME`). Reported
+    /// whether or not the node type resolves, since the name is refused either
+    /// way.
+    UnportableCallName {
+        /// The instance declaring the call.
+        instance: String,
+        /// The name as it was written.
+        name: String,
+    },
 }
 
 impl WiringDefect {
@@ -136,7 +155,9 @@ impl WiringDefect {
             | Self::UndeclaredParameter { instance, .. }
             | Self::RepeatedInstance { instance }
             | Self::RepeatedBinding { instance, .. }
-            | Self::ContextTypeDisagreement { instance, .. } => Some(instance),
+            | Self::ContextTypeDisagreement { instance, .. }
+            | Self::UnresolvedCall { instance, .. }
+            | Self::UnportableCallName { instance, .. } => Some(instance),
             Self::SignatureOutputs { .. } | Self::UnresolvedOutput { .. } => None,
         }
     }
@@ -153,7 +174,22 @@ impl WiringDefect {
             Self::UnresolvedNodeType { .. }
             | Self::RepeatedInstance { .. }
             | Self::SignatureOutputs { .. }
-            | Self::UnresolvedOutput { .. } => None,
+            | Self::UnresolvedOutput { .. }
+            | Self::UnresolvedCall { .. }
+            | Self::UnportableCallName { .. } => None,
+        }
+    }
+
+    /// The call this defect concerns, as the node type name its instance lists,
+    /// or `None` for one that concerns no call.
+    ///
+    /// Part of the place: an instance with two bad calls has two defects of one
+    /// class, and the call is what tells them apart.
+    pub fn call(&self) -> Option<&str> {
+        match self {
+            Self::UnresolvedCall { unresolved, .. } => Some(unresolved),
+            Self::UnportableCallName { name, .. } => Some(name),
+            _ => None,
         }
     }
 }
@@ -225,6 +261,17 @@ impl fmt::Display for WiringDefect {
                 f,
                 "the workflow '{definition}' designates '{unresolved}' as its output, which this workflow does not carry"
             ),
+            Self::UnresolvedCall {
+                instance,
+                unresolved,
+            } => write!(
+                f,
+                "the node '{instance}' may call '{unresolved}', which this workflow does not carry"
+            ),
+            Self::UnportableCallName { instance, name } => write!(
+                f,
+                "the node '{instance}' may call '{name}', which is not a tool name every provider accepts: 1 to 64 ASCII letters, digits, underscores or hyphens"
+            ),
         }
     }
 }
@@ -268,7 +315,9 @@ proptest! {
                 WiringDefect::UnresolvedNodeType { .. }
                 | WiringDefect::RepeatedInstance { .. }
                 | WiringDefect::SignatureOutputs { .. }
-                | WiringDefect::UnresolvedOutput { .. } => continue,
+                | WiringDefect::UnresolvedOutput { .. }
+                | WiringDefect::UnresolvedCall { .. }
+                | WiringDefect::UnportableCallName { .. } => continue,
             }
 
             let (Some(named), Some(parameter)) = (defect.instance(), defect.parameter()) else {
