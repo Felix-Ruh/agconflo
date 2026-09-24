@@ -39,7 +39,7 @@ nothing to it (``DEC_BEHAVIOUR_OWN_CRATE``).
    :derived_from: FEAT_BEHAVIOUR_REFUSED_BEFORE_START
    :allocated_to: COMP_BEHAVIOUR_SET
    :ears_pattern: unwanted
-   :statement: If a node type named by an instance of a workflow has no script, then Behaviour set shall refuse to start the run naming that node type.
+   :statement: If a node type named by an instance of a workflow has no script and is not named as performed by a person, then Behaviour set shall refuse to start the run naming that node type.
 
    Only the node types an instance names. A workflow's definition carries every
    declaration in its catalogue, and a type nothing instantiates is never run, so
@@ -61,7 +61,8 @@ nothing to it (``DEC_BEHAVIOUR_OWN_CRATE``).
    Must pass unreported: a script for every instantiated type and none for a
    type no instance names, and scripts supplied for types the workflow does not
    have at all, which a caller sharing one set of scripts across workflows will
-   do.
+   do. And a type the caller names as performed by a person, which has no script
+   because none runs for it (``DEC_PERSON_NAMED_BY_CALLER``).
 
 .. comp_req:: A script that does not compile stops the run starting
    :id: CREQ_BEHAVIOURS_REFUSE_UNCOMPILABLE
@@ -157,7 +158,7 @@ nothing to it (``DEC_BEHAVIOUR_OWN_CRATE``).
    :derived_from: FEAT_BEHAVIOUR_FROM_SCRIPT
    :allocated_to: COMP_SCRIPT_HOST
    :ears_pattern: ubiquitous
-   :statement: Script host shall perform an activation by running its node type's script given the activation's inputs by parameter name, its declared output type and the host functions.
+   :statement: Script host shall perform an activation of a node type given a script by running that script given the activation's inputs by parameter name, its declared output type and the host functions.
 
    What a script receives is the activation and the context API
    (``DEC_HOST_FUNCTIONS_CONTEXT_API``): its inputs, each under the name of the
