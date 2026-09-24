@@ -95,3 +95,30 @@ or keeps, on the commit named. Re-running one later shows what has moved since.
 
    ``CREQ_HOST_PROMPT_IS_A_CONTEXT``, which does not change, was run as well:
    2 above it, 3 below, 16 beside, and 2 lines of prose, both in ``host.rs``.
+
+.. evd:: The impact of counting a run's budget
+   :id: EVD_IMPACT_RUN_STOPS_AT_BUDGET
+   :evd_kind: measurement
+   :observed_on: 2026-09-24
+   :observation: CREQ_RUN_STOPS_AT_BUDGET answers to 2 needs, has 9 below it by link and 11 requirements sharing its component, and is named on 3 lines of prose.
+
+   Run on ``bae081b``. Below it: ``IMPL_RUN_STEP``, and four test cases with
+   their runs - ``TEST_RUN_ACTIVATIONS_NEVER_EXCEED_BUDGET``,
+   ``TEST_RUN_BUDGET_STOPS_AT_THE_LIMIT``,
+   ``TEST_RUN_LAST_PERMITTED_ACTIVATION_COMPLETES`` and
+   ``TEST_RUN_ZERO_BUDGET_ACTIVATES_NOTHING``. Beside it: every other
+   requirement of ``COMP_WORKFLOW_RUN``. In prose: two lines of ``run.rs`` and
+   one of ``tests/run``.
+
+.. evd:: The impact of checking an output's declared type
+   :id: EVD_IMPACT_RUN_REFUSES_UNDECLARED_OUTPUT
+   :evd_kind: measurement
+   :observed_on: 2026-09-24
+   :observation: CREQ_RUN_REFUSES_UNDECLARED_OUTPUT answers to 2 needs, has 7 below it by link and 11 requirements sharing its component, and is named on 6 lines of prose.
+
+   Run on ``bae081b``. Below it: ``IMPL_RUN_PRODUCED``, and three test cases
+   with their runs - ``TEST_RUN_DESIGNATED_UNDECLARED_OUTPUT_IS_REFUSED``,
+   ``TEST_RUN_OUTPUT_OF_DECLARED_TYPE_IS_ACCEPTED`` and
+   ``TEST_RUN_UNDECLARED_OUTPUT_IS_REFUSED``. Beside it: every other
+   requirement of ``COMP_WORKFLOW_RUN``. In prose: two lines of ``run.rs``, one
+   of ``scheduler.rs``, one of ``features/behaviour`` and two of ``tests/run``.

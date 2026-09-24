@@ -374,3 +374,125 @@ that changed them show through, and are revised here.
    - Text: none names the feature. The one line naming the component
      requirement is its trace marker in ``models.rs``, which names the new
      identifier.
+
+.. dec:: Revised: a run stops when its activations reach its budget
+   :id: DEC_CHANGE_RUN_STOPS_AT_BUDGET
+   :dec_status: accepted
+   :decided_on: 2026-09-24
+   :supported_by: EVD_IMPACT_RUN_STOPS_AT_BUDGET
+   :statement: Agconflo's requirements project shall state the budget CREQ_RUN_STOPS_AT_BUDGET holds a run to as a number of activations, as its parent and its own body do.
+
+   Amends ``CREQ_RUN_STOPS_AT_BUDGET``.
+
+   Before: "If a run has activated as many instances as its budget allows, then
+   Workflow run shall end that run without offering another activation."
+   After: "If a run has made as many activations as its budget allows, then
+   Workflow run shall end that run without offering another activation."
+
+   Raised while planning ``STKH_MODEL_YIELDS``, where a node type a model calls
+   is activated with no instance of its own. That is the trigger, not the
+   argument.
+
+   Justification: it cannot be verified as written against its own parent, and
+   so it is wrong against it. ``FEAT_RUN_BUDGET_STOPS`` stops a run that "has
+   activated as many nodes as its step budget allows", and
+   ``DEC_BUDGET_COUNTS_ACTIVATIONS``, which the requirement's body cites, makes
+   the unit an activation because an activation is what costs money. "Activated
+   as many instances" reads two ways: as the number of activations, or as the
+   number of instances that have activated. The second is a failure mode the
+   requirement's own body lists: "Counted per instance rather than per
+   activation. Indistinguishable while no instance activates twice, and wrong
+   the moment loops exist." A statement one of whose readings is its own named
+   defect is ambiguous whatever else exists. It also names instances where the
+   parent names nodes, which is the mechanism of its day rather than the
+   property.
+
+   "Made as many activations" is the reading the body already gave it and the
+   unit of the decision it cites. It names no kind of node and nothing a yield
+   brings, so it is what a reader of the parent alone would write.
+
+   Verdicts on the impact analysis (``EVD_IMPACT_RUN_STOPS_AT_BUDGET``):
+
+   - Up, ``FEAT_RUN_BUDGET_STOPS`` and ``STKH_STEP_BUDGET``: the justification
+     above; neither changes.
+   - Down, ``IMPL_RUN_STEP``: unaffected. The run counts one per activation it
+     offers, which is the revised statement's count.
+   - Down, ``TEST_RUN_ACTIVATIONS_NEVER_EXCEED_BUDGET``,
+     ``TEST_RUN_BUDGET_STOPS_AT_THE_LIMIT``,
+     ``TEST_RUN_LAST_PERMITTED_ACTIVATION_COMPLETES`` and
+     ``TEST_RUN_ZERO_BUDGET_ACTIVATES_NOTHING``: unaffected. Each counts the
+     activations offered, and all four runs pass at the head of this change.
+   - Sideways, the eleven other requirements of the workflow run: unaffected.
+     ``CREQ_RUN_REFUSED_OUTPUT_OUTSTANDING`` keeps a refused output's activation
+     from being counted again, which already speaks of activations, and
+     ``CREQ_RUN_REFUSES_UNDECLARED_OUTPUT`` is revised in its own record.
+   - Text: the doc comment on the budget ending in ``run.rs`` repeated "activated
+     as many instances" and now says the revised words. The trace marker on the
+     run's step still meets it. The note in ``tests/run`` that the per-instance
+     failure mode cannot be told apart while no instance activates twice is
+     about the failure mode, which is unchanged, and still holds.
+
+.. dec:: Revised: an output is checked against its activation's node type
+   :id: DEC_CHANGE_RUN_REFUSES_UNDECLARED_OUTPUT
+   :dec_status: accepted
+   :decided_on: 2026-09-24
+   :supported_by: EVD_IMPACT_RUN_REFUSES_UNDECLARED_OUTPUT
+   :statement: Agconflo's requirements project shall state the type CREQ_RUN_REFUSES_UNDECLARED_OUTPUT compares an output with as the one its activation's node type declares, as its parent does.
+
+   Amends ``CREQ_RUN_REFUSES_UNDECLARED_OUTPUT``.
+
+   Before: "If an output reported for an activation is not of the context type
+   its instance's node type declares, then Workflow run shall refuse that
+   output naming the instance, the declared type and the reported type." After:
+   "If an output reported for an activation is not of the context type that
+   activation's node type declares for its output, then Workflow run shall
+   refuse that output naming the instance, the declared type and the reported
+   type."
+
+   Raised while planning ``STKH_MODEL_YIELDS``, like the budget's record above,
+   and judged apart from it.
+
+   Justification: it is wrong against its own parent by one hop.
+   ``FEAT_RUN_OUTPUT_OF_DECLARED_TYPE`` refuses "an output whose context type
+   differs from the output type its node type declares". The requirement
+   reached that node type through "its instance's", which the parent does not:
+   it named how an activation came by its node type in the run as it stood,
+   rather than the node type. The revised statement takes the parent's term.
+   It still names the instance, which is now the instance the activation is
+   performed for, as it is in the run's other refusals; the body says so.
+
+   This is the weaker of the two run records, and it says so. While every
+   activation belongs to an instance, the two wordings pick out the same type,
+   and no test can tell them apart. The case for changing it is the rule that a
+   statement names the property and not the mechanism of its day (``AGENTS.md``,
+   "The V-Model"), and here the property is the parent's own word. Nothing the
+   code does changes: it compares with the type the activation carries, which
+   is what the revised statement says.
+
+   Verdicts on the impact analysis
+   (``EVD_IMPACT_RUN_REFUSES_UNDECLARED_OUTPUT``):
+
+   - Up, ``FEAT_RUN_OUTPUT_OF_DECLARED_TYPE`` and ``STKH_WIRING_CHECKED``: the
+     justification above; neither changes.
+   - Down, ``IMPL_RUN_PRODUCED``: unaffected. It compares the output with the
+     type the outstanding activation carries, and names its instance.
+   - Down, ``TEST_RUN_DESIGNATED_UNDECLARED_OUTPUT_IS_REFUSED``,
+     ``TEST_RUN_OUTPUT_OF_DECLARED_TYPE_IS_ACCEPTED`` and
+     ``TEST_RUN_UNDECLARED_OUTPUT_IS_REFUSED``: unaffected, and all three runs
+     pass at the head of this change.
+   - Sideways, the eleven other requirements of the workflow run: unaffected.
+     ``CREQ_RUN_REFUSES_HELD_IDENTIFIER`` and
+     ``CREQ_RUN_REFUSES_SHARED_OUTPUT_IDENTIFIER`` name "the instance" in their
+     refusals with no antecedent in their statements: the instance the
+     activation is performed for, the reading this record now gives its own.
+     ``CREQ_RUN_ENDS_ON_FAILURE`` names "the instance it was reported for".
+     ``CREQ_RUN_STOPS_AT_BUDGET`` is revised in its own record.
+   - Text, six lines. The doc comment on the refusal in ``run.rs`` said "the
+     instance's node type" and now says the activation's; so does the one on
+     reporting an output, which does not name the requirement and so is not
+     among the six, but repeated its words. The doc comment on the type an
+     activation carries, in ``scheduler.rs``, says "the instance's node type"
+     and is left: every activation the scheduler builds is an instance's. The
+     trace marker on the run's output check still meets it. ``features/behaviour``
+     cites it for refusing an output of the wrong type, and ``tests/run`` twice
+     for failure modes its cases assert; all three still hold.
