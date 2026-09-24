@@ -39,7 +39,7 @@ nothing to it (``DEC_BEHAVIOUR_OWN_CRATE``).
    :derived_from: FEAT_BEHAVIOUR_REFUSED_BEFORE_START
    :allocated_to: COMP_BEHAVIOUR_SET
    :ears_pattern: unwanted
-   :statement: If a node type named by an instance of a workflow has no script and is not named as performed by a person, then Behaviour set shall refuse to start the run naming that node type.
+   :statement: If a node type named by an instance of a workflow has no behaviour supplied for it, then Behaviour set shall refuse to start the run naming that node type.
 
    Only the node types an instance names. A workflow's definition carries every
    declaration in its catalogue, and a type nothing instantiates is never run, so
@@ -63,6 +63,12 @@ nothing to it (``DEC_BEHAVIOUR_OWN_CRATE``).
    have at all, which a caller sharing one set of scripts across workflows will
    do. And a type the caller names as performed by a person, which has no script
    because none runs for it (``DEC_PERSON_NAMED_BY_CALLER``).
+
+   Revised under ``DEC_CHANGE_BEHAVIOUR_REFUSED_BEFORE_START``, with its parent:
+   it had said "no script", and then "no script and not named as performed by a
+   person". The Behaviour set takes a behaviour as a script defined for the
+   node type or as the node type named as performed by a person, and the
+   must-pass cases above cover both.
 
 .. comp_req:: A script that does not compile stops the run starting
    :id: CREQ_BEHAVIOURS_REFUSE_UNCOMPILABLE
@@ -180,6 +186,9 @@ nothing to it (``DEC_BEHAVIOUR_OWN_CRATE``).
    - **The output type not given.** A script then writes its type out by hand,
      and a node type whose declaration changes is a script that fails at the
      run's refusal instead of following it.
+
+   Narrowed in #27 to an activation of a node type given a script, with its
+   parent; kept under ``DEC_CHANGE_BEHAVIOUR_FROM_SCRIPT``.
 
 .. comp_req:: A script that returns anything but one context fails
    :id: CREQ_HOST_ONE_CONTEXT

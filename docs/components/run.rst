@@ -407,6 +407,10 @@ component requirement whose subject is anything else.
    Must pass unreported: an output composed of the instance's inputs, and an
    output built from nothing the run holds.
 
+   Its statement was widened in #22 from "the identifier of an argument or of
+   an output the run has accepted" to "an identifier the run holds", which is
+   its parent's own word; kept under ``DEC_CHANGE_RUN_REFUSES_HELD_IDENTIFIER``.
+
 .. comp_req:: A refused output leaves its activation outstanding
    :id: CREQ_RUN_REFUSED_OUTPUT_OUTSTANDING
    :derived_from: FEAT_RUN_OUTPUT_OF_DECLARED_TYPE, FEAT_RUN_OUTPUT_IS_NEW, FEAT_RUN_ONE_CONTEXT_PER_IDENTIFIER
@@ -428,6 +432,10 @@ component requirement whose subject is anything else.
    - **A failure reported after a refusal refused.** The activation is still
      outstanding, so a caller giving up on it must be able to say so, and being
      told nothing is outstanding would leave it no way to end the run.
+
+   ``FEAT_RUN_ONE_CONTEXT_PER_IDENTIFIER`` became its third parent in #22, and
+   its statement suits all three; kept under
+   ``DEC_CHANGE_ONE_CONTEXT_PER_IDENTIFIER_PLACED``.
 
 .. comp_req:: Arguments sharing an identifier stop the run starting
    :id: CREQ_RUN_REFUSES_SHARED_ARGUMENT_IDENTIFIER

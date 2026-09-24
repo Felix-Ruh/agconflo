@@ -158,7 +158,7 @@ that the record amended.
 
 .. test_case:: A record's identifiers come back only beside a source past them
    :id: TEST_RECORD_IDENTIFIERS_ONLY_WITH_A_SOURCE
-   :verifies: CREQ_SOURCE_SOLE_ISSUER
+   :verifies: CREQ_RECORD_SOURCE_CONTINUES
    :test_kind: error_path
    :coverage: partial
 

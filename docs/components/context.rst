@@ -89,26 +89,28 @@ being infallible is a design choice, and it gets asserted like any other.
    :derived_from: FEAT_CONTEXT_IDENTITY
    :allocated_to: COMP_IDENTIFIER_SOURCE
    :ears_pattern: ubiquitous
-   :statement: Identifier source shall be the only means of obtaining a context identifier, except by resuming a run's record together with a source positioned past every identifier the record holds.
+   :statement: Identifier source shall be the only means by which code outside the core can make a context identifier.
 
    A source that never repeats guarantees nothing if an identifier can be made
    without it. This closes the gap the requirement above leaves open.
 
-   The exception was added with ``STKH_RESUMABLE_RUN``, which needs identifiers
-   read back from storage: a resumed run holds the contexts it was recorded with
-   (``FEAT_RESUME_KEEPS_CONTEXTS``). It keeps the promise rather than breaking
-   it, because a record's identifiers come back only beside a source that will
-   never issue them (``CREQ_RECORD_SOURCE_CONTINUES``), and a record holding
-   one at or past that source's position is refused. Code outside the core
-   still has no route to an identifier but these two.
+   Code outside the core is the line because it is the line a caller can cross.
+   The core itself names identifiers again when it resumes a run's record, and
+   that each one comes back only beside a source that will never issue it is
+   the run record's to guarantee (``CREQ_RECORD_SOURCE_CONTINUES``), under the
+   same stakeholder requirement by way of
+   ``FEAT_RUN_ONE_CONTEXT_PER_IDENTIFIER``.
 
    Failure modes:
 
    - **Code constructs an identifier directly.** Refused when the code is
      compiled, because an identifier has no constructor outside the source.
-   - **A record's identifiers resumed without a source past them.** A record
-     naming an identifier its source had not reached yet is resumed, and the
-     source then issues it a second time.
+
+   Revised under ``DEC_CHANGE_SOURCE_SOLE_ISSUER``. It had said "the only means
+   of obtaining" an identifier, which was already more than its parent asked -
+   code obtains identifiers from contexts all the time - and resuming a run
+   then added an exception naming the resume feature. What its parent needs of
+   this component is that nothing outside the core can make one.
 
 .. comp_req:: Text reads back exactly
    :id: CREQ_VALUE_TEXT_EXACT

@@ -389,3 +389,6 @@ and names the components they are divided between, which are defined in
    and belongs to a feature that has a run to record. And no component supplies a
    global context, because a node type declares the global types it reads and
    nothing yet provides them.
+
+   ``FEAT_RUN_ONE_CONTEXT_PER_IDENTIFIER`` was added to what it realises in #22;
+   kept under ``DEC_CHANGE_ONE_CONTEXT_PER_IDENTIFIER_PLACED``.

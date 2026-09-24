@@ -59,6 +59,9 @@ already been looked at again for a feature with the same shape.
    workflow with two different scripts for one node type, and two different
    results.
 
+   Its statement lost "each activation" in #27, a closure its parent never made;
+   kept under ``DEC_CHANGE_BEHAVIOUR_FROM_SCRIPT``.
+
 .. feat_req:: A script's output is one context the run accepts
    :id: FEAT_BEHAVIOUR_ONE_CONTEXT
    :derived_from: STKH_ONE_OUTPUT
@@ -181,12 +184,13 @@ already been looked at again for a feature with the same shape.
    :derived_from: STKH_WIRING_CHECKED
    :ears_pattern: unwanted
    :verification_method: test
-   :statement: If a node type named by an instance of a workflow has neither a script nor a person performing it or has a script that does not compile, then Agconflo shall refuse to start the run.
+   :statement: If a node type named by an instance of a workflow has no behaviour supplied for it or has a supplied behaviour found defective without running it, then Agconflo shall refuse to start the run.
 
    This derivation is a judgement too, and the reason for the parent is in its
    body: the value of refusing an invalid workflow before any node runs is that a
    mistake costs a rejection rather than half of an expensive run. A node type
-   with no script is that mistake. Found when the node is reached, it costs
+   with nothing to perform it is that mistake, and so is one whose behaviour can
+   be seen to be broken before it runs. Found when the node is reached, it costs
    every activation before it.
 
    It can be false while the parent holds. The wiring can be sound, so the
@@ -198,6 +202,13 @@ already been looked at again for a feature with the same shape.
    running any of the script (``EVD_LUA_COMPILES_WITHOUT_RUNNING``). A call to a
    function that does not exist compiles, and fails when the script runs, as a
    script error.
+
+   Revised under ``DEC_CHANGE_BEHAVIOUR_REFUSED_BEFORE_START``. It had named the
+   ways of supplying a behaviour that existed when it was written - a script,
+   then a script or a person - as the only ones, which its parent never asked;
+   it now names the property. A script is supplied by defining it and a person
+   by naming the node type (``DEC_PERSON_NAMED_BY_CALLER``), and not compiling
+   is what a script can be found defective by.
 
 .. feat_arch:: Node behaviour splits into a behaviour set and a script host
    :id: ARCH_BEHAVIOUR
