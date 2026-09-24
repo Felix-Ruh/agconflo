@@ -133,7 +133,7 @@ not exist yet.
 
 .. dec:: A prompt is a context and nothing is added to it
    :id: DEC_PROMPT_IS_A_CONTEXT
-   :dec_status: accepted
+   :dec_status: superseded
    :decided_on: 2026-09-23
    :supported_by: EVD_GENAI_TWO_FORMATS_EXACT
    :statement: Agconflo shall take a model call's prompt as a context and send that context's rendering as the call's only content.
@@ -152,6 +152,10 @@ not exist yet.
    composing it into its output keeps the model's bytes addressable as the
    model's, where a string would splice them in indistinguishably from the
    script's own.
+
+   Superseded by ``DEC_WINDOW_IS_A_CONTEXT``, which keeps the window a
+   context and sends its parts as the messages they are, once a call has put
+   more than a prompt in it.
 
 .. dec:: A model's answer is the text the provider sent
    :id: DEC_ANSWER_AS_SENT

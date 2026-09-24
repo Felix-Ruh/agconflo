@@ -34,6 +34,7 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    features/models
    features/resume
    features/person
+   features/yield
    components/context
    components/wiring
    components/topology
@@ -42,6 +43,7 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    components/models
    components/resume
    components/person
+   components/yield
    tests/context
    tests/wiring
    tests/topology
@@ -50,6 +52,7 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    tests/models
    tests/resume
    tests/person
+   tests/yield
    code/agconflo-core
    code/agconflo-lua
    decisions/context
@@ -60,6 +63,7 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    decisions/models
    decisions/resume
    decisions/person
+   decisions/yield
    decisions/toolchain
    decisions/requirements
    decisions/changes
