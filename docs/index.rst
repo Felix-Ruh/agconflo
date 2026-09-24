@@ -52,6 +52,7 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    tests/models
    tests/resume
    tests/person
+   tests/yield
    code/agconflo-core
    code/agconflo-lua
    decisions/context

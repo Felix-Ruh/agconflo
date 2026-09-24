@@ -3,9 +3,13 @@ Components of a model yielding
 ==============================
 
 The requirements ``ARCH_YIELD`` allocates to the wiring validator, the workflow
-run, the run record, the script host and the model roster, and the one reading
-an instance's calls, which ``FEAT_TOPOLOGY_READS`` allocates to the topology
-reader. No component is added. Each title is the grammatical subject of the
+run, the run record, the script host and the model roster, and three that
+earlier features need of calls: reading an instance's calls
+(``FEAT_TOPOLOGY_READS``), refusing a second context under a held identifier
+from a call or an exchange (``FEAT_RUN_ONE_CONTEXT_PER_IDENTIFIER``), and
+refusing a record whose calls the workflow would not accept
+(``FEAT_RESUME_REFUSES_ANOTHER_RUN``). Each is a new child of its feature, which
+changes nothing the feature says. No component is added. Each title is the grammatical subject of the
 requirements allocated to it, and the gate in ``scripts/gates`` refuses a
 component requirement whose subject is anything else.
 
@@ -271,6 +275,28 @@ The record
      answer.
    - **Held under a different activation.** A node type called twice has its
      calls answered from each other's exchanges.
+
+.. comp_req:: A record holding a call the workflow would not accept is refused
+   :id: CREQ_RECORD_REFUSES_UNDECLARED_CALL
+   :derived_from: FEAT_RESUME_REFUSES_ANOTHER_RUN
+   :allocated_to: COMP_RUN_RECORD
+   :ears_pattern: unwanted
+   :statement: If a record holds a call the workflow it is resumed against would not accept from the recorded activation with the recorded contexts, then Run record shall refuse to resume it naming the first such call.
+
+   A record describes a run of its workflow only if the run would have
+   accepted what it records (``DEC_RESUME_REPLAYS_CALLS``).
+   ``CREQ_RECORD_REFUSES_DIVERGENCE`` refuses a recorded output the workflow
+   would not have offered, which catches a call whose output was recorded; this
+   is the call whose output was not, because its node type was still being
+   performed - by a person, say - when the record was taken.
+
+   Failure modes:
+
+   - **Resumed, and refused at the call.** The run then fails halfway through
+     a replay, where the record could have been refused whole.
+   - **The call dropped from the resumed run.** The calling activation waits
+     for an output nothing will offer.
+   - **Named by its output.** It has none.
 
 The script host
 ===============
