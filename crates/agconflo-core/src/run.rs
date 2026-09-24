@@ -590,8 +590,13 @@ impl Call {
 }
 
 /// What an activation's performer sent out and got back: the offer and the
-/// window a model call was made with, the answer, and the identifiers of the
-/// calls the answer made (`DEC_RECORD_HOLDS_EXCHANGES`).
+/// window a model call was made with, the answer, and the calls the answer made,
+/// each with the provider's identifier, the node type and the contexts it was
+/// made with (`DEC_RECORD_HOLDS_EXCHANGES`).
+///
+/// The calls are held whole rather than by identifier, because what a model asked
+/// for is part of its answer: a run interrupted after the answer and before its
+/// calls were reported can go on from the exchange alone, without asking again.
 ///
 /// The core knows nothing of models. An exchange is contexts an activation sent
 /// and a context that came back, which is what makes it the run's to hold and
@@ -601,7 +606,7 @@ pub struct Exchange {
     offer: Vec<Context>,
     window: Context,
     answer: Context,
-    calls: Vec<String>,
+    calls: Vec<Call>,
 }
 
 impl Exchange {
@@ -622,9 +627,9 @@ impl Exchange {
         self
     }
 
-    /// The same exchange, its answer also making the call identified by `id`.
-    pub fn calling(mut self, id: &str) -> Self {
-        self.calls.push(id.to_owned());
+    /// The same exchange, its answer also making `call`.
+    pub fn calling(mut self, call: Call) -> Self {
+        self.calls.push(call);
         self
     }
 
@@ -643,15 +648,19 @@ impl Exchange {
         &self.answer
     }
 
-    /// The identifiers of the calls the answer made, in the order it made them.
-    pub fn calls(&self) -> &[String] {
+    /// The calls the answer made, in the order it made them.
+    pub fn calls(&self) -> &[Call] {
         &self.calls
     }
 
-    /// Every context the exchange holds: the offer, then the window, then the
-    /// answer.
+    /// Every context the exchange holds: the offer, the window, the answer, then
+    /// each call's contexts.
     fn contexts(&self) -> impl Iterator<Item = &Context> {
-        self.offer.iter().chain([&self.window, &self.answer])
+        self.offer.iter().chain([&self.window, &self.answer]).chain(
+            self.calls
+                .iter()
+                .flat_map(|call| call.inputs.iter().map(|(_, given)| given)),
+        )
     }
 }
 
@@ -1323,6 +1332,27 @@ impl<'a, F> Run<'a, F> {
         self.outstanding
             .as_ref()
             .map_or(&[], |outstanding| &outstanding.exchanges)
+    }
+
+    /// The output accepted for the call `id` the outstanding activation made, or
+    /// `None` when it made no such call or its output has not been accepted.
+    ///
+    /// What an activation resumed mid-call is answered from: its script runs
+    /// again, and a call the record holds an output for is not performed again
+    /// (`CREQ_HOST_ANSWERS_FROM_RECORD`).
+    pub fn called(&self, id: &str) -> Option<&Context> {
+        let caller = self.outstanding()?;
+        if caller.call().is_some() {
+            return None;
+        }
+        self.log.iter().rev().find_map(|event| match event {
+            Event::Output { activation, output }
+                if activation.instance() == caller.instance() && activation.call() == Some(id) =>
+            {
+                Some(output)
+            }
+            _ => None,
+        })
     }
 
     /// Every set of contexts an identifier is checked against: the run's own,
@@ -2836,9 +2866,9 @@ fn declared_call_is_offered_next() {
     let asking = offered(&mut run);
     assert_eq!((asking.instance(), asking.call()), ("asker", None));
     let window = ctx(&mut source, "note");
-    run.exchange(Exchange::new(window.clone(), ctx(&mut source, "note")).calling("call_7"))
-        .expect("the exchange that made the call");
     let (call, query, scope) = lookup_call(&mut source, "call_7");
+    run.exchange(Exchange::new(window.clone(), ctx(&mut source, "note")).calling(call.clone()))
+        .expect("the exchange that made the call");
     run.call(call).expect("a declared call, filled");
 
     // Offered next, before `second`, for the asker, with its inputs in the order
@@ -2906,6 +2936,9 @@ fn call_output_goes_back_to_the_caller() {
     // is designated, and its consumer is not offered. The asker is.
     let again = offered(&mut run);
     assert_eq!((again.instance(), again.call()), ("asker", None));
+    // The caller asks for it by the call's identifier, and for nothing else.
+    assert!(run.called("call_1").is_some_and(|output| output.is(&found)));
+    assert!(run.called("call_2").is_none());
 
     // Handed back as the asker's own, it would be credited to two producers.
     assert_eq!(
@@ -3068,10 +3101,16 @@ fn call_sharing_an_identifier_is_refused() {
 #[test]
 fn exchanges_held_with_their_activation() {
     let mut source = IdSource::new();
-    let types = vec![node_type("ask", &[], "note")];
+    let types = vec![
+        node_type("ask", &[], "note"),
+        node_type("lookup", &[("query", "note")], "note"),
+    ];
     let workflow = definition(
         types,
-        vec![instance("a", "ask", &[]), instance("b", "ask", &[])],
+        vec![
+            instance("a", "ask", &[]).with_calls(&["lookup"]),
+            instance("b", "ask", &[]).with_calls(&["lookup"]),
+        ],
         &["b"],
     );
     let mut run = Run::<Infallible>::start(&workflow, Arguments::new(), 10).expect("sound");
@@ -3079,8 +3118,15 @@ fn exchanges_held_with_their_activation() {
     assert_eq!(offered(&mut run).instance(), "a");
     let first = ctx(&mut source, "note");
     let second = ctx(&mut source, "note");
-    run.exchange(Exchange::new(ctx(&mut source, "note"), first.clone()).calling("call_1"))
+    let asked = ctx(&mut source, "note");
+    let call = Call::new("call_1", "lookup").input("query", asked.clone());
+    run.exchange(Exchange::new(ctx(&mut source, "note"), first.clone()).calling(call.clone()))
         .expect("an exchange that made a call");
+    run.call(call).expect("declared");
+    offered(&mut run);
+    run.produced(ctx(&mut source, "note"))
+        .expect("lookup's output");
+    assert!(run.called("call_1").is_some(), "a's call, asked of by a");
     run.exchange(Exchange::new(ctx(&mut source, "note"), second.clone()))
         .expect("one that made none");
     let answers: Vec<ContextId> = run
@@ -3089,7 +3135,12 @@ fn exchanges_held_with_their_activation() {
         .map(|exchange| exchange.answer().id())
         .collect();
     assert_eq!(answers, [first.id(), second.id()], "in the order reported");
-    assert_eq!(run.exchanges()[0].calls(), ["call_1"]);
+    let made = &run.exchanges()[0].calls()[0];
+    assert_eq!((made.id(), made.node_type()), ("call_1", "lookup"));
+    assert!(
+        made.inputs()[0].1.is(&asked),
+        "held whole, with its contexts"
+    );
 
     // The asker's answer returned as its output is its own to return.
     run.produced(second.clone())
@@ -3100,6 +3151,9 @@ fn exchanges_held_with_their_activation() {
         run.exchanges().is_empty(),
         "b's are b's, and it has none yet"
     );
+    // A provider's identifier is unique to its answer, not to the run: b asking
+    // for a call of the same identifier is not answered with a's output.
+    assert!(run.called("call_1").is_none(), "a's call is not b's");
     let third = ctx(&mut source, "note");
     run.exchange(Exchange::new(ctx(&mut source, "note"), third.clone()))
         .expect("b's exchange");
@@ -3110,7 +3164,12 @@ fn exchanges_held_with_their_activation() {
         .iter()
         .map(|exchanges| exchanges.iter().map(|e| e.answer().id()).collect())
         .collect();
-    assert_eq!(settled, [vec![first.id(), second.id()], vec![third.id()]]);
+    // lookup's activation settled first, having exchanged nothing; then a's
+    // two, then b's one.
+    assert_eq!(
+        settled,
+        [vec![], vec![first.id(), second.id()], vec![third.id()]]
+    );
 
     // The run has completed; nothing is outstanding to hold another.
     assert!(matches!(run.step(), Step::Ended(RunEnding::Completed(_))));

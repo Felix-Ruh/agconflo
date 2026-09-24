@@ -613,20 +613,33 @@ fn written_event(event: &Event) -> Table {
             written.insert("offer", offer.into());
             written.insert("window", id(exchange.window()).into());
             written.insert("answer", id(exchange.answer()).into());
-            let calls: toml_edit::Array = exchange.calls().iter().map(String::as_str).collect();
+            let mut calls = toml_edit::Array::new();
+            for call in exchange.calls() {
+                calls.push(written_call(call));
+            }
             written.insert("calls", calls.into());
             entry["exchange"] = value(written);
         }
         Event::Call { instance, call } => {
             entry["instance"] = value(instance);
-            let mut written = InlineTable::new();
-            written.insert("id", call.id().into());
-            written.insert("node_type", call.node_type().into());
-            written.insert("inputs", inputs(call.inputs()).into());
-            entry["call"] = value(written);
+            entry["call"] = value(written_call(call));
         }
     }
     entry
+}
+
+/// One call as a record writes it: the provider's identifier, the node type and
+/// each parameter's context by identifier.
+fn written_call(call: &Call) -> InlineTable {
+    let mut inputs = InlineTable::new();
+    for (parameter, context) in call.inputs() {
+        inputs.insert(parameter, context.id().value().to_string().into());
+    }
+    let mut written = InlineTable::new();
+    written.insert("id", call.id().into());
+    written.insert("node_type", call.node_type().into());
+    written.insert("inputs", inputs.into());
+    written
 }
 
 /// A record's content once read: its values, and every context it holds made.
@@ -883,26 +896,12 @@ impl<'t> Reading<'t> {
             {
                 let position = position.to_string();
                 let key = ["event", at, "exchange", "calls", position.as_str()];
-                exchange = exchange.calling(self.string(&item, &key)?);
+                exchange = exchange.calling(self.call(&item, &key, known, contexts)?);
             }
             Happened::Exchange(exchange)
         } else if let Some(written) = event.get("call") {
             self.only(event, &["event", at], &["instance", "performing", "call"])?;
-            let key = ["event", at, "call"];
-            let fields = self.table(written, &key)?;
-            self.only(fields, &key, &["id", "node_type", "inputs"])?;
-            let id = self.needed(fields, written.span(), &["event", at, "call", "id"])?;
-            let node_type =
-                self.needed(fields, written.span(), &["event", at, "call", "node_type"])?;
-            let inputs = self.needed(fields, written.span(), &["event", at, "call", "inputs"])?;
-            let mut call = Call::new(
-                self.string(id, &["event", at, "call", "id"])?,
-                self.string(node_type, &["event", at, "call", "node_type"])?,
-            );
-            for (parameter, given) in inputs_of(inputs, &["event", at, "call", "inputs"])? {
-                call = call.input(&parameter, contexts[&given].clone());
-            }
-            Happened::Call(call)
+            Happened::Call(self.call(written, &["event", at, "call"], known, contexts)?)
         } else {
             return Err(self.fault(
                 place,
@@ -917,6 +916,33 @@ impl<'t> Reading<'t> {
             performing,
             what,
         })
+    }
+
+    /// One call written under `key`: its identifier, node type and inputs.
+    fn call(
+        &self,
+        written: &Item,
+        key: &[&str],
+        known: &Known<'_>,
+        contexts: &HashMap<ContextId, Context>,
+    ) -> Result<Call, RecordFault> {
+        let fields = self.table(written, key)?;
+        self.only(fields, key, &["id", "node_type", "inputs"])?;
+        let under = |name: &'static str| [key, &[name]].concat();
+        let id = self.needed(fields, written.span(), &under("id"))?;
+        let node_type = self.needed(fields, written.span(), &under("node_type"))?;
+        let inputs = self.needed(fields, written.span(), &under("inputs"))?;
+        let mut call = Call::new(
+            self.string(id, &under("id"))?,
+            self.string(node_type, &under("node_type"))?,
+        );
+        let inputs_key = under("inputs");
+        for (parameter, given) in self.table(inputs, &inputs_key)?.iter() {
+            let mut at = inputs_key.clone();
+            at.push(parameter);
+            call = call.input(parameter, contexts[&known(given, &at)?].clone());
+        }
+        Ok(call)
     }
 
     /// The items of an array the record may leave out, each with its place.
@@ -2034,15 +2060,17 @@ fn holds_exchanges() {
     let ids = ["call_7", "toolu_7", long.as_str()];
     let mut exchange =
         Exchange::new(window.clone(), note(&mut source, "calls")).offering(vec![offer.clone()]);
-    for id in ids {
-        exchange = exchange.calling(id);
+    let calls: Vec<Call> = ids
+        .iter()
+        .map(|&id| Call::new(id, "lookup").input("query", note(&mut source, id)))
+        .collect();
+    for call in &calls {
+        exchange = exchange.calling(call.clone());
     }
     run.exchange(exchange)
         .expect("an exchange that made three calls");
-    for id in ids {
-        let query = note(&mut source, id);
-        run.call(Call::new(id, "lookup").input("query", query))
-            .expect("declared");
+    for (call, id) in calls.into_iter().zip(ids) {
+        run.call(call).expect("declared");
         let Step::Activate(called) = run.step() else {
             panic!("the call is offered")
         };
@@ -2074,13 +2102,23 @@ fn holds_exchanges() {
     let id = |context: &Context| context.id().value().to_string();
     let second = &events[1]["exchange"];
     assert_eq!(second["window"].as_str(), Some(id(&window).as_str()));
-    let calls: Vec<&str> = second["calls"]
+    let calls: Vec<(&str, &str)> = second["calls"]
         .as_array()
         .expect("calls")
         .iter()
-        .filter_map(|call| call.as_str())
+        .filter_map(|call| call.as_inline_table())
+        .map(|call| {
+            (
+                call["id"].as_str().expect("an identifier"),
+                call["node_type"].as_str().expect("a node type"),
+            )
+        })
         .collect();
-    assert_eq!(calls, ids, "each identifier as the provider gave it");
+    let expected: Vec<(&str, &str)> = ids.iter().map(|&id| (id, "lookup")).collect();
+    assert_eq!(
+        calls, expected,
+        "each call whole, its identifier as the provider gave it"
+    );
     let offered: Vec<&str> = second["offer"]
         .as_array()
         .expect("an offer")
@@ -2142,13 +2180,14 @@ fn undeclared_call_refused() {
     let Step::Activate(_) = run.step() else {
         panic!("the asker is offered")
     };
+    let query = note(&mut source, "q");
+    let call = Call::new("call_1", "lookup").input("query", query);
     run.exchange(
-        Exchange::new(note(&mut source, "window"), note(&mut source, "answer")).calling("call_1"),
+        Exchange::new(note(&mut source, "window"), note(&mut source, "answer"))
+            .calling(call.clone()),
     )
     .expect("held");
-    let query = note(&mut source, "q");
-    run.call(Call::new("call_1", "lookup").input("query", query))
-        .expect("declared");
+    run.call(call).expect("declared");
     let Step::Activate(_) = run.step() else {
         panic!("the call is offered")
     };
@@ -2222,15 +2261,20 @@ proptest! {
                 let window = note(&mut source, "window");
                 windows.push(window.clone());
                 let mut made = Exchange::new(window, note(&mut source, "answer"));
-                let ids: Vec<String> = (0..calls).map(|call| format!("a{instance}-{exchange}-{call}")).collect();
-                for id in &ids {
-                    made = made.calling(id);
+                let calls: Vec<Call> = (0..calls)
+                    .map(|call| {
+                        let id = format!("a{instance}-{exchange}-{call}");
+                        let query = note(&mut source, &id);
+                        Call::new(&id, "lookup").input("query", query)
+                    })
+                    .collect();
+                for call in &calls {
+                    made = made.calling(call.clone());
                 }
                 run.exchange(made).expect("held");
                 records.push(take(&run, &source));
-                for id in &ids {
-                    let query = note(&mut source, id);
-                    run.call(Call::new(id, "lookup").input("query", query)).expect("declared");
+                for call in calls {
+                    run.call(call).expect("declared");
                     records.push(take(&run, &source));
                     let Step::Activate(_) = run.step() else {
                         return Err(TestCaseError::fail("the call is offered"));

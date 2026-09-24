@@ -152,7 +152,9 @@ The run
    called node type's output is accepted, the calling activation is outstanding
    again; the run has not completed, its consumer is not offered, and the
    calling instance's own output - a composition holding the called output - is
-   then accepted and completes the run.
+   then accepted and completes the run. Meanwhile the run gives the called
+   output back by the call's identifier, and nothing for an identifier no call
+   had.
 
    Catches: taken as the calling instance's output; the calling activation left
    outstanding nowhere; the output not held.
@@ -213,8 +215,10 @@ The run
    :coverage: full
 
    Two activations each report two exchanges, one of them with no calls; each
-   activation holds its own two, in the order reported. An exchange reported
-   with nothing outstanding is refused, and nothing is held.
+   activation holds its own two, in the order reported, each exchange holding
+   its calls whole. A call's output is given back to the activation that made
+   the call and to no other, though the other's call has the same identifier. An
+   exchange reported with nothing outstanding is refused, and nothing is held.
 
    Catches: held for the run rather than for the activation; only exchanges
    that made calls held; an exchange reported with nothing outstanding
