@@ -219,8 +219,8 @@ matches zero needs and prints `[]` with exit 0, while the same command run from 
 anything at all.
 
 **Cypher's regex is not `schemas.json`'s regex.** `=~` matches the whole value, so
-`n.statement =~ "shall"` returns nothing where `n.statement =~ ".*shall.*"` returns all 17
-stakeholder requirements. `\b` does not work either: `n.id =~ ".*\bSELF.*"` matches zero needs
+`n.statement =~ "shall"` returns nothing where `n.statement =~ ".*shall.*"` returns every
+stakeholder requirement. `\b` does not work either: `n.id =~ ".*\bSELF.*"` matches zero needs
 where `".*SELF.*"` matches one. A gate written with either mistake passes by matching nothing.
 
 **A stray key in `ubproject.toml` is dropped without a word.** It produces no diagnostic and it
