@@ -3,8 +3,8 @@ Running a workflow
 ==================
 
 What happens when a workflow actually runs: what it can be made of, what it may
-integrate with, and the ways a run is allowed to end. Two of these constrain each
-other, and the bodies say where.
+integrate with, and the ways a run is allowed to end. Several of these constrain
+each other, or a goal in ``stakeholder/context``, and the bodies say where.
 
 .. stkh_req:: The provider is not baked in
    :id: STKH_PROVIDER_CHOICE
@@ -112,3 +112,54 @@ other, and the bodies say where.
    That is impossible against a panic, so a real typed error model is needed
    earlier than the placeholder assumed, and this is the requirement every
    error-path test case is written against.
+
+.. stkh_req:: A model can yield for more context
+   :id: STKH_MODEL_YIELDS
+   :stakeholder: user
+   :statement: Agconflo shall let a model yield during its node's activation to a node or workflow that node is declared to call and continue with the context that call produces.
+
+   A model working on a step often cannot know in advance everything it will
+   need: it looks something up, asks a tool, consults another workflow, and
+   carries on with what it got. Wiring can only supply what was known when the
+   workflow was written, so without this every such step is either impossible
+   or done outside the engine, where nothing records it.
+
+   The shape is a yield rather than a loop inside the node, and that is the
+   point of the requirement rather than a detail of it. An earlier view had an
+   LLM node run its own tool loop and record each call and result as it went.
+   A yield hands control back to the run instead: the thing called runs as a
+   step of the run, its output is a context like any other, and the model
+   continues with it added. Traceability then comes from how the call happens
+   rather than from a log kept beside it, and a call is a point the run can be
+   written down at and resumed from, rather than work inside an activation
+   that an interruption throws away.
+
+   What may be called is declared for the node, and only that. Which of the
+   declared calls a model makes, and when, is the model's choice at run time -
+   that is the compromise this requirement makes, and the one it limits.
+
+   This constrains ``STKH_EXPLICIT_CONTEXT``: a node is to be given exactly the
+   contexts wired to it, and a context a model yielded for was chosen during
+   the run. The two have to agree, and the declaration of what a node may call
+   is where they meet. It also leans on ``STKH_STEP_BUDGET``, since a call is
+   work the run does, and on ``STKH_WORKFLOW_AS_NODE``, since a workflow is one
+   of the things a model may call.
+
+.. stkh_req:: Tools are reached through nodes
+   :id: STKH_TOOLS_AS_NODES
+   :stakeholder: user
+   :statement: Agconflo shall let a model reach an external tool or MCP server only through a node or workflow that wraps it.
+
+   Tools and MCP servers are how models reach the world, and the obvious way to
+   support them is as a feature of their own beside the graph. That is exactly
+   what is not wanted: a second way for context to reach a model, with its own
+   rules, that the graph neither shows nor records.
+
+   Wrapped in a node or a workflow, a tool is called the way anything else a
+   model yields to is called, and what it returns is a context with a place in
+   the run. The wrapper is ordinary - a node type anyone could write - which is
+   what ``STKH_NO_PRIVILEGED_TYPES`` asks of everything Agconflo ships.
+
+   It is separate from the requirement above because either can hold without
+   the other. A model could yield to nodes and still be handed tools directly
+   on the side, and tools could be wrapped in nodes that no model can call.

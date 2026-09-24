@@ -56,3 +56,25 @@ about how each is realised are recorded as decisions instead.
    workflow model now: the format has to be machine-editable and checkable
    without executing anything, and errors have to be reported well enough that a
    model can correct itself from them.
+
+.. stkh_req:: The engine explains itself to a model
+   :id: STKH_REFLECTION
+   :stakeholder: agent
+   :statement: Agconflo shall give a model one defined interface through which it can discover, inspect, call and edit the workflows and node types available to it.
+
+   A model that can yield to a workflow needs to know which workflows exist,
+   what each takes and returns, and how to call it; a model that helps build
+   workflows needs to read and change them. Both are the same question asked of
+   the same components, and answering it twice, differently, is how the two
+   drift apart.
+
+   So the framework is meant to be reflective: its own components are what a
+   model reads and acts on, through one interface that is defined and
+   documented as such, rather than whatever each feature happens to expose.
+   Tool calls are how a model uses it.
+
+   This widens ``STKH_MACHINE_AUTHORING``, which asks that an agent can create
+   and modify workflows through tool calls, to discovering, inspecting and
+   calling as well, and asks that all of it be one interface. It is recorded
+   now so that the yield and the tools above are built against it, though what
+   it covers is expected to be built later.
