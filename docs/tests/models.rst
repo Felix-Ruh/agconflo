@@ -37,7 +37,7 @@ unless they are set where the script runs (``EVD_LUA_HOOK_PER_THREAD``).
 
 .. test_case:: A prompt is sent as one message and nothing else
    :id: TEST_MODELS_PROMPT_SENT_EXACTLY
-   :verifies: CREQ_ROSTER_ONE_MESSAGE
+   :verifies: CREQ_ROSTER_CONTEXTS_WHOLE
    :test_kind: property
    :coverage: partial
 
@@ -46,8 +46,9 @@ unless they are set where the script runs (``EVD_LUA_HOOK_PER_THREAD``).
    request holds exactly one message, from the user, whose text is the prompt's
    rendering byte for byte, and no system prompt.
 
-   Catches: a system prompt added; the prompt trimmed, normalised or re-encoded;
-   its parts sent as separate messages.
+   Catches: a system prompt added; the prompt trimmed, normalised or re-encoded.
+   That the request holds one message is ``DEC_PROMPT_IS_A_CONTEXT``'s division
+   of the text rather than the requirement's, and is asserted for the decision.
 
 .. test_case:: A call to an unmapped role fails and reaches nothing
    :id: TEST_MODELS_UNMAPPED_ROLE_FAILS

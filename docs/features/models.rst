@@ -44,16 +44,16 @@ and names the components they are divided between, which are defined in
    The test is the parent's claim made concrete: the same workflow and the same
    scripts, run twice with two mappings, reach two providers' formats.
 
-.. feat_req:: A model is shown exactly the prompt it was given
+.. feat_req:: A model is shown exactly the contexts its call is made with
    :id: FEAT_MODEL_WINDOW_IS_THE_PROMPT
    :derived_from: STKH_EXPLICIT_CONTEXT
    :ears_pattern: ubiquitous
    :verification_method: test
-   :statement: Agconflo shall send a model the rendering of the prompt context a script passes it as the call's only content.
+   :statement: Agconflo shall send a model exactly the contexts a call to it is made with.
 
    The parent gives a node exactly the contexts wired to it. A model call is the
    moment those contexts, assembled, become a window, and this says the window
-   is exactly the assembly and nothing the engine chose to add.
+   is exactly the contexts assembled and nothing the engine chose to add.
 
    It can be false while the parent holds. A node given exactly what was wired to
    it can still have its call prefixed with a system prompt the engine wrote,
@@ -64,6 +64,12 @@ and names the components they are divided between, which are defined in
 
    Taking the prompt as a context rather than a string is what makes the window
    nameable afterwards (``DEC_PROMPT_IS_A_CONTEXT``).
+
+   Revised under ``DEC_CHANGE_MODEL_WINDOW``. It had said "the rendering of the
+   prompt context a script passes it as the call's only content", which also
+   said how many contexts a call is made with, who passes them, and that they
+   go as one rendering. Those are the decision's choices; the parent asks none
+   of them.
 
 .. feat_req:: A model's answer is a context of its own
    :id: FEAT_MODEL_ANSWER_IS_A_CONTEXT

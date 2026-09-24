@@ -77,3 +77,21 @@ or keeps, on the commit named. Re-running one later shows what has moved since.
    Beside it: ``CREQ_BEHAVIOURS_PERSON_OR_SCRIPT`` and
    ``CREQ_BEHAVIOURS_REFUSE_TWICE``, which share the behaviour set without
    deriving from it.
+
+.. evd:: The impact of what a model call sends
+   :id: EVD_IMPACT_MODEL_WINDOW
+   :evd_kind: measurement
+   :observed_on: 2026-09-24
+   :observation: FEAT_MODEL_WINDOW_IS_THE_PROMPT answers to 1 need and has 9 below it, 20 requirements beside it and 4 features sharing its architecture. CREQ_ROSTER_ONE_MESSAGE answers to 2 and has 3 below it and 4 beside it.
+
+   Run on ``bae081b``. Below the feature: ``CREQ_HOST_PROMPT_IS_A_CONTEXT`` and
+   ``CREQ_ROSTER_ONE_MESSAGE``, ``ARCH_MODELS``, ``IMPL_HOST_COMPLETE`` and
+   ``IMPL_MODELS_CALL``, and ``TEST_HOST_PROMPT_MUST_BE_A_CONTEXT`` and
+   ``TEST_MODELS_PROMPT_SENT_EXACTLY`` with their runs. Beside it: the four
+   other requirements of the model roster and the sixteen of the script host.
+   The component requirement's three below are ``IMPL_MODELS_CALL`` and
+   ``TEST_MODELS_PROMPT_SENT_EXACTLY`` with its run. No line of prose names the
+   feature, and the one naming the component requirement is that marker.
+
+   ``CREQ_HOST_PROMPT_IS_A_CONTEXT``, which does not change, was run as well:
+   2 above it, 3 below, 16 beside, and 2 lines of prose, both in ``host.rs``.

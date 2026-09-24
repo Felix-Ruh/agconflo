@@ -286,3 +286,91 @@ that changed them show through, and are revised here.
      the code, which does not change. ``evidence/person`` cites the refusal the
      person feature measured, which still happens. The lines in
      ``evidence/requirements`` are the measurement of the change itself.
+
+.. dec:: Revised: a model is sent exactly the contexts its call is made with
+   :id: DEC_CHANGE_MODEL_WINDOW
+   :dec_status: accepted
+   :decided_on: 2026-09-24
+   :supported_by: EVD_IMPACT_MODEL_WINDOW
+   :statement: Agconflo's requirements project shall state what a model call sends as exactly the contexts the call is made with, and leave how many there are and how their text is divided into messages to DEC_PROMPT_IS_A_CONTEXT.
+
+   Amends ``FEAT_MODEL_WINDOW_IS_THE_PROMPT``, and ``CREQ_ROSTER_ONE_MESSAGE``,
+   which becomes ``CREQ_ROSTER_CONTEXTS_WHOLE``.
+
+   Before, the feature: "Agconflo shall send a model the rendering of the
+   prompt context a script passes it as the call's only content." After:
+   "Agconflo shall send a model exactly the contexts a call to it is made
+   with."
+
+   Before, the component requirement: "Model roster shall send a call's prompt
+   as one user message holding the prompt's rendering and no other content."
+   After: "Model roster shall send a call no text but the renderings of the
+   contexts the call is made with, whole and byte for byte."
+
+   Raised while planning ``STKH_MODEL_YIELDS``, whose calls send a model more
+   than one message. That is the trigger and not the argument, which follows
+   from the feature's parent alone.
+
+   Justification: the feature is wrong against its own parent, because it
+   claims more than the parent needs. ``STKH_EXPLICIT_CONTEXT`` gives a node
+   exactly the contexts wired to it, so that "what was in this call's context
+   window, and where did every byte come from?" has an exact answer. Of a model
+   call it needs the window to be those contexts, whole, with nothing added.
+   The statement said three things more: that a call is made with one context,
+   that a script passes it, and that it goes as one rendering. The parent can
+   hold while each of them is false. A call made with two contexts sent one
+   after the other, every byte of both from contexts the node was given,
+   answers the parent's question as exactly as one does. Those three are
+   ``DEC_PROMPT_IS_A_CONTEXT``'s choices, and a choice of mechanism belongs in
+   a decision, where evidence can move it, rather than in a statement that is
+   not meant to (``AGENTS.md``, "The V-Model").
+
+   The revised feature moves the parent's own sentence to the call. Its
+   "exactly" is the parent's closure, and it names no script, no count and no
+   message. That is the test the procedure sets a correction: it is what a
+   reader of the parent alone would write, and it would read the same had no
+   yield been proposed.
+
+   The component requirement follows its parent, the first justification, and
+   was wrong on the same ground besides, since "one user message" is the
+   mechanism on the wire. The revised statement keeps what its failure modes
+   guarded - no text added, none altered - and says "whole", which the parent's
+   "exactly" asks for and the old statement left to its body. It drops one
+   failure mode, a prompt's parts sent as separate messages. That was a defect
+   only against the old statement: against the parent, how the text is divided
+   is a choice, and the decision makes it, as one user message today. It is
+   renamed because an identifier saying one message would assert what its
+   statement no longer does.
+
+   Nothing the code does changes: it sends one user message holding the
+   prompt's rendering, which meets the revised component requirement and is
+   what the decision says.
+
+   Verdicts on the impact analysis (``EVD_IMPACT_MODEL_WINDOW``):
+
+   - Up, ``STKH_EXPLICIT_CONTEXT``: the justification above; it does not
+     change.
+   - Down, ``CREQ_ROSTER_ONE_MESSAGE``: changes, in this record.
+   - Down, ``CREQ_HOST_PROMPT_IS_A_CONTEXT``: unaffected. A prompt that is not a
+     context is text no context holds, and the revised feature refuses it as
+     the old one did. Its own analysis was run too and is in the evidence.
+   - Down, ``ARCH_MODELS``: unaffected. The allocation is the same, and its body
+     describes ``DEC_PROMPT_IS_A_CONTEXT``, which stands.
+   - Down, ``IMPL_MODELS_CALL``: its marker names the renamed requirement. The
+     code under it is unchanged.
+   - Down, ``IMPL_HOST_COMPLETE``: unaffected.
+   - Down, ``TEST_MODELS_PROMPT_SENT_EXACTLY``: verifies the renamed
+     requirement. It still asserts one message, and its body now says that is
+     the decision's division rather than the requirement's.
+   - Down, ``TEST_HOST_PROMPT_MUST_BE_A_CONTEXT``: unaffected.
+   - Down, both runs: re-run at the head of this change; both pass.
+   - Sideways, the four other requirements of the model roster: unaffected.
+     Which model a role reaches, an unmapped role, a provider's failure and the
+     answer as sent concern where a call goes and what comes back, not what it
+     sends.
+   - Sideways, the sixteen requirements of the script host: unaffected; none
+     says what a call sends.
+   - Sideways, the four features ``ARCH_MODELS`` also realises: unaffected.
+   - Text: none names the feature. The one line naming the component
+     requirement is its trace marker in ``models.rs``, which names the new
+     identifier.
