@@ -742,7 +742,7 @@ fn records_handed_over() {
         // identifier it holds being past it.
         assert_eq!(records.len(), expected, "{step}");
         for (outputs, record) in records.iter().enumerate() {
-            assert_eq!(record.matches("[[output]]").count(), outputs, "{record}");
+            assert_eq!(outputs_in(record), outputs, "{record}");
             let resumed = Run::<ScriptFailure>::resume(&definition, record);
             assert!(resumed.is_ok(), "{:?}\n{record}", resumed.err());
         }
@@ -792,7 +792,7 @@ fn interrupted_run_resumes() {
         "the run was dropped during its third call"
     );
     let last = records.last().expect("records were handed over");
-    assert_eq!(last.matches("[[output]]").count(), 2);
+    assert_eq!(outputs_in(last), 2, "two outputs recorded:\n{last}");
 
     // Resumed from the last record against a provider that answers: one call,
     // for the activation that was interrupted.
@@ -923,6 +923,16 @@ fn reviewed_until_it_stops(
     (outcome, records)
 }
 
+/// How many outputs a record's text holds: its events that are outputs, read
+/// from the text rather than from a resumed run.
+#[cfg(test)]
+fn outputs_in(record: &str) -> usize {
+    record
+        .lines()
+        .filter(|line| line.starts_with("output = "))
+        .count()
+}
+
 /// The identifiers of an activation's inputs, by parameter.
 #[cfg(test)]
 fn input_ids(activation: &Activation) -> Vec<(String, agconflo_core::ContextId)> {
@@ -1009,7 +1019,7 @@ proptest::proptest! {
         // After the answer and after `third`'s output; the first holds the
         // answer and resumes.
         proptest::prop_assert_eq!(after.len(), 2);
-        proptest::prop_assert_eq!(after[0].matches("[[output]]").count(), 2);
+        proptest::prop_assert_eq!(outputs_in(&after[0]), 2);
         let resumed = Run::<ScriptFailure>::resume(&definition, &after[0]);
         proptest::prop_assert!(resumed.is_ok(), "{:?}", resumed.err());
     }

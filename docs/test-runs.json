@@ -723,6 +723,24 @@
           "title": "agconflo-core record::diverged_record_refused",
           "type": "test_run"
         },
+        "RUN_RECORD_EXCHANGES_KEPT": {
+          "executes": [
+            "TEST_RECORD_EXCHANGES_KEPT"
+          ],
+          "id": "RUN_RECORD_EXCHANGES_KEPT",
+          "test_outcome": "passed",
+          "title": "agconflo-core record::exchanges_kept",
+          "type": "test_run"
+        },
+        "RUN_RECORD_HOLDS_EXCHANGES": {
+          "executes": [
+            "TEST_RECORD_HOLDS_EXCHANGES"
+          ],
+          "id": "RUN_RECORD_HOLDS_EXCHANGES",
+          "test_outcome": "passed",
+          "title": "agconflo-core record::holds_exchanges",
+          "type": "test_run"
+        },
         "RUN_RECORD_HOLDS_THE_RUN": {
           "executes": [
             "TEST_RECORD_HOLDS_THE_RUN"
@@ -777,6 +795,15 @@
           "title": "agconflo-core record::start_refusal_carried",
           "type": "test_run"
         },
+        "RUN_RECORD_UNDECLARED_CALL_REFUSED": {
+          "executes": [
+            "TEST_RECORD_UNDECLARED_CALL_REFUSED"
+          ],
+          "id": "RUN_RECORD_UNDECLARED_CALL_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-core record::undeclared_call_refused",
+          "type": "test_run"
+        },
         "RUN_RECORD_UNREADABLE_REFUSED": {
           "executes": [
             "TEST_RECORD_UNREADABLE_REFUSED"
@@ -784,6 +811,15 @@
           "id": "RUN_RECORD_UNREADABLE_REFUSED",
           "test_outcome": "passed",
           "title": "agconflo-core record::unreadable_refused",
+          "type": "test_run"
+        },
+        "RUN_RECORD_VERSION_ONE_REFUSED": {
+          "executes": [
+            "TEST_RECORD_VERSION_ONE_REFUSED"
+          ],
+          "id": "RUN_RECORD_VERSION_ONE_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-core record::version_one_refused",
           "type": "test_run"
         },
         "RUN_RUN_ACCEPTED_OUTPUTS_ARE_ALL_NEW": {

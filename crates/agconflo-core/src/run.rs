@@ -894,15 +894,41 @@ pub enum Step<F> {
 pub(crate) struct Recorded<'r> {
     /// The budget the run is held to.
     pub(crate) budget: usize,
-    /// The activations it has spent, one more than its outputs while one is
-    /// outstanding.
+    /// The activations it has spent: its outputs, and one more for each
+    /// activation outstanding or waiting on a call.
     pub(crate) spent: usize,
     /// What it was started with.
     pub(crate) arguments: &'r Arguments,
-    /// Each accepted activation with its output, in the order accepted.
-    pub(crate) accepted: &'r [(Activation, Context)],
-    /// Every context it holds, each under its identifier.
-    pub(crate) held: &'r HashMap<ContextId, Context>,
+    /// Every exchange, call and output the run accepted, in the order it
+    /// accepted them.
+    pub(crate) log: &'r [Event],
+    /// Every context it holds, each under its identifier: the run's own, and
+    /// those of each activation in progress, which are disjoint.
+    pub(crate) held: Vec<&'r HashMap<ContextId, Context>>,
+}
+
+/// One thing a run accepted, in the order it accepted it - what a record writes
+/// and a resume replays (`DEC_RESUME_REPLAYS_CALLS`).
+///
+/// One list rather than one per kind, because the order between kinds is part
+/// of what happened: an exchange reported after a call belongs to the activation
+/// outstanding then, and replayed before the call it would belong to another.
+#[derive(Clone, Debug)]
+pub(crate) enum Event {
+    /// An exchange held with the activation for `instance` performing `call`,
+    /// or its own when `call` is `None`.
+    Exchange {
+        instance: String,
+        performing: Option<String>,
+        exchange: Exchange,
+    },
+    /// A call the activation for `instance` made.
+    Call { instance: String, call: Call },
+    /// An output accepted for an activation.
+    Output {
+        activation: Activation,
+        output: Context,
+    },
 }
 
 /// One run of one workflow definition.
@@ -917,11 +943,11 @@ pub struct Run<'a, F> {
     /// accepted, and everything any of them was composed from - each under its
     /// identifier, which names it alone (`DEC_IDENTIFIER_NAMES_ONE_CONTEXT`).
     held: HashMap<ContextId, Context>,
-    /// Every activation whose output was accepted, with that output, in the
-    /// order they were accepted - what a record needs of a run's history that
-    /// `produced` does not keep (`DEC_RECORD_IS_OUTPUTS`).
-    accepted: Vec<(Activation, Context)>,
-    /// The exchanges each accepted activation made, beside it in `accepted`.
+    /// Every exchange, call and output accepted, in the order they were
+    /// accepted - what a record needs of a run's history that `produced` does
+    /// not keep (`DEC_RECORD_HOLDS_EXCHANGES`).
+    log: Vec<Event>,
+    /// The exchanges each accepted activation made, in the order accepted.
     settled_exchanges: Vec<Vec<Exchange>>,
     /// The activation being performed, with what it has brought in so far.
     outstanding: Option<InProgress>,
@@ -996,7 +1022,7 @@ impl<'a, F> Run<'a, F> {
             arguments,
             produced: Produced::new(),
             held,
-            accepted: Vec::new(),
+            log: Vec::new(),
             settled_exchanges: Vec::new(),
             outstanding: None,
             suspended: None,
@@ -1144,7 +1170,10 @@ impl<'a, F> Run<'a, F> {
             self.produced
                 .insert(done.activation.instance().to_owned(), context.clone());
         }
-        self.accepted.push((done.activation, context));
+        self.log.push(Event::Output {
+            activation: done.activation,
+            output: context,
+        });
         self.settled_exchanges.push(done.exchanges);
         self.outstanding = self.suspended.take();
         Ok(())
@@ -1228,6 +1257,10 @@ impl<'a, F> Run<'a, F> {
                     .cloned()
             })
             .collect();
+        self.log.push(Event::Call {
+            instance: instance.clone(),
+            call: call.clone(),
+        });
         let activation = Activation {
             instance,
             node_type,
@@ -1274,6 +1307,11 @@ impl<'a, F> Run<'a, F> {
         let Some(outstanding) = self.outstanding.as_mut() else {
             unreachable!("an outstanding activation was just read");
         };
+        self.log.push(Event::Exchange {
+            instance,
+            performing: outstanding.activation.call.clone(),
+            exchange: exchange.clone(),
+        });
         outstanding.contexts.extend(brought_all);
         outstanding.exchanges.push(exchange);
         Ok(())
@@ -1303,9 +1341,16 @@ impl<'a, F> Run<'a, F> {
             budget: self.budget,
             spent: self.activations,
             arguments: &self.arguments,
-            accepted: &self.accepted,
-            held: &self.held,
+            log: &self.log,
+            held: self.known(),
         }
+    }
+
+    /// The activation outstanding, if one is.
+    pub(crate) fn outstanding(&self) -> Option<&Activation> {
+        self.outstanding
+            .as_ref()
+            .map(|outstanding| &outstanding.activation)
     }
 
     /// Whether the run holds a context under `id`: an argument, an accepted

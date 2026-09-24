@@ -3,18 +3,19 @@
 //!
 //! A record is a TOML document (`DEC_RECORD_IN_TOML`). It holds the run's budget,
 //! the activations it spent, the position of the identifier source its
-//! contexts came from, its arguments, each output it accepted with the inputs
-//! that output's activation was given, and every context those hold - once
-//! each, in a table keyed by identifier, a composition naming its parts rather
-//! than holding them. Written nested, a deep composition was measured
+//! contexts came from, its arguments, every event the run accepted in the order
+//! it accepted them - each exchange, each call and each output with the inputs
+//! its activation was given (`DEC_RECORD_HOLDS_EXCHANGES`) - and every context
+//! those hold, once each, in a table keyed by identifier, a composition naming
+//! its parts rather than holding them. Written nested, a deep composition was measured
 //! unreadable (`EVD_NESTED_RECORD_REFUSED`). Every number is a decimal string,
 //! because a TOML integer stops short of an identifier's range
 //! (`EVD_TOML_RECORD_KEYS`).
 //!
 //! A run is resumed by starting it from its recorded arguments and reporting
-//! each recorded output to it in turn (`DEC_RESUME_BY_REPLAY`), so every check a
-//! run makes applies to a resumed one unchanged, and what this module adds is
-//! only what a record alone can get wrong.
+//! each recorded event to it in turn (`DEC_RESUME_REPLAYS_CALLS`), so every
+//! check a run makes applies to a resumed one unchanged, and what this module
+//! adds is only what a record alone can get wrong.
 //!
 //! Nothing here opens a file (`DEC_RECORD_IN_CORE`): a record is text handed to
 //! the run's caller, and text handed back.
@@ -28,18 +29,24 @@ use toml_edit::{ArrayOfTables, Document, DocumentMut, InlineTable, Item, Table, 
 use crate::context::{Context, ContextType, InvalidTypeName};
 use crate::id::{ContextId, IdSource};
 use crate::reader::line_and_column;
-use crate::run::{Arguments, OutputRefusal, Run, StartRefusal, Step};
+use crate::run::{
+    Arguments, Call, CallRefusal, Event, Exchange, OutputRefusal, Run, StartRefusal, Step,
+};
 use crate::workflow::WorkflowDefinition;
 
 /// The version of the record this module writes, and the only one it reads.
-const VERSION: &str = "1";
+///
+/// Version 1 held outputs and nothing between them. A record of it is refused
+/// rather than read as a run that made no model call, since resuming it as one
+/// would pay again for every answer it had (`DEC_RECORD_HOLDS_EXCHANGES`).
+const VERSION: &str = "2";
 
 /// What a record says of a source that has issued every identifier it has.
 const EXHAUSTED: &str = "exhausted";
 
 /// The keys a record holds at its top, and nothing else.
 const TOP: [&str; 7] = [
-    "version", "budget", "spent", "source", "argument", "output", "context",
+    "version", "budget", "spent", "source", "argument", "event", "context",
 ];
 
 /// Why a record was not resumed.
@@ -71,9 +78,22 @@ pub enum ResumeRefusal {
         /// How the workflow disagrees.
         divergence: Divergence,
     },
+    /// A recorded call the workflow would not accept from the activation that
+    /// made it, and the run's refusal of it
+    /// (`CREQ_RECORD_REFUSES_UNDECLARED_CALL`).
+    CallRefused {
+        /// The instance whose activation the record says made it.
+        instance: String,
+        /// The call, by the provider's identifier the record holds.
+        call: String,
+        /// Why the run refuses it.
+        refusal: CallRefusal,
+    },
     /// The activations recorded as spent are not what a run with the recorded
-    /// outputs could have spent: fewer than its outputs, more than one beyond
-    /// them, or one beyond them where the workflow would offer nothing more.
+    /// events could have spent: fewer than its outputs, or more than the
+    /// activations it would have outstanding afterwards - the one performing,
+    /// and the one waiting on its call - where the workflow would offer
+    /// nothing more.
     SpentDisagrees {
         /// The activations the record says were spent.
         spent: usize,
@@ -232,6 +252,14 @@ impl fmt::Display for ResumeRefusal {
                 f,
                 "recorded output {output}, of {instance}, is not one the workflow would have produced: {divergence}"
             ),
+            Self::CallRefused {
+                instance,
+                call,
+                refusal,
+            } => write!(
+                f,
+                "recorded call {call}, of {instance}, is not one the workflow would accept: {refusal}"
+            ),
             Self::SpentDisagrees { spent, outputs } => write!(
                 f,
                 "{spent} activations recorded as spent for {outputs} outputs, which no run of the workflow could have spent"
@@ -342,26 +370,24 @@ impl<'a, F> Run<'a, F> {
         }
         record["argument"] = Item::ArrayOfTables(arguments);
 
-        let mut outputs = ArrayOfTables::new();
-        for (activation, context) in state.accepted {
-            let mut output = Table::new();
-            output["instance"] = value(activation.instance());
-            output["context"] = value(context.id().value().to_string());
-            let mut inputs = InlineTable::new();
-            for (parameter, given) in activation.inputs() {
-                inputs.insert(parameter, given.id().value().to_string().into());
-            }
-            output["inputs"] = value(inputs);
-            outputs.push(output);
+        let mut events = ArrayOfTables::new();
+        for event in state.log {
+            events.push(written_event(event));
         }
-        record["output"] = Item::ArrayOfTables(outputs);
+        record["event"] = Item::ArrayOfTables(events);
 
-        let mut ids: Vec<ContextId> = state.held.keys().copied().collect();
+        let held: HashMap<ContextId, &Context> = state
+            .held
+            .iter()
+            .flat_map(|contexts| contexts.iter())
+            .map(|(id, context)| (*id, context))
+            .collect();
+        let mut ids: Vec<ContextId> = held.keys().copied().collect();
         ids.sort_by_key(|id| id.value());
         let mut contexts = Table::new();
         contexts.set_implicit(true);
         for id in ids {
-            let context = &state.held[&id];
+            let context = held[&id];
             let mut written = Table::new();
             written["type"] = value(context.declared_type().as_str());
             match context.separator() {
@@ -388,10 +414,15 @@ impl<'a, F> Run<'a, F> {
     /// be.
     ///
     /// The run is started from the recorded arguments and budget and handed
-    /// each recorded output in turn, and each time it must offer the recorded
-    /// instance with the recorded inputs and accept the output
-    /// (`DEC_RESUME_BY_REPLAY`). Then, if an activation was outstanding when the
-    /// record was taken, it is offered again - counted once, as it was before
+    /// each recorded event in turn, in the activation the record says it
+    /// happened in (`DEC_RESUME_REPLAYS_CALLS`): an output, which the run must
+    /// offer the recorded activation with the recorded inputs for and accept; a
+    /// call, which it must accept from that activation, or the record is refused
+    /// naming the call (`CREQ_RECORD_REFUSES_UNDECLARED_CALL`); and an exchange,
+    /// which it holds with the activation as it held it before
+    /// (`CREQ_RECORD_KEEPS_EXCHANGES`). Then whatever was outstanding when the
+    /// record was taken - the activation performing, and the call it waited on -
+    /// is offered again, counted once, as it was before
     /// (`CREQ_RECORD_CONTINUES_THE_RUN`). Nothing is performed: the recorded
     /// outputs are the ones the run holds, so the caller's next step is the
     /// work the recorded run had not done.
@@ -399,7 +430,7 @@ impl<'a, F> Run<'a, F> {
     /// The source is the only way to go on making contexts for the run: a fresh
     /// one would issue identifiers the run holds, and every output made from it
     /// would be refused.
-    // @A record replayed through the run,IMPL_RECORD_RESUME,impl,[CREQ_RECORD_CONTINUES_THE_RUN, CREQ_RECORD_REFUSES_DIVERGENCE, CREQ_RECORD_REFUSES_WHAT_START_REFUSES]
+    // @A record replayed through the run,IMPL_RECORD_RESUME,impl,[CREQ_RECORD_CONTINUES_THE_RUN, CREQ_RECORD_REFUSES_DIVERGENCE, CREQ_RECORD_REFUSES_WHAT_START_REFUSES, CREQ_RECORD_KEEPS_EXCHANGES, CREQ_RECORD_REFUSES_UNDECLARED_CALL]
     pub fn resume(
         definition: &'a WorkflowDefinition,
         record: &str,
@@ -408,12 +439,17 @@ impl<'a, F> Run<'a, F> {
             .read()
             .map_err(ResumeRefusal::Unreadable)?;
 
-        let outputs = read.outputs.len();
-        if read.spent < outputs || read.spent > outputs + 1 {
-            return Err(ResumeRefusal::SpentDisagrees {
-                spent: read.spent,
-                outputs,
-            });
+        let outputs = read
+            .events
+            .iter()
+            .filter(|event| matches!(event.what, Happened::Output { .. }))
+            .count();
+        let disagrees = ResumeRefusal::SpentDisagrees {
+            spent: read.spent,
+            outputs,
+        };
+        if read.spent < outputs {
+            return Err(disagrees);
         }
 
         let mut arguments = Arguments::new();
@@ -423,48 +459,72 @@ impl<'a, F> Run<'a, F> {
         let mut run =
             Run::start(definition, arguments, read.budget).map_err(ResumeRefusal::Start)?;
 
-        for (index, recorded) in read.outputs.iter().enumerate() {
+        let mut replayed = 0;
+        for recorded in &read.events {
             let diverged = |divergence| ResumeRefusal::Diverged {
-                output: index,
+                output: replayed,
                 instance: recorded.instance.clone(),
                 divergence,
             };
-            let activation = match run.step() {
-                Step::Activate(activation) => activation,
-                Step::Ended(_) => return Err(diverged(Divergence::NothingOffered)),
-            };
-            if activation.instance() != recorded.instance {
-                return Err(diverged(Divergence::OtherOffered {
-                    offered: activation.instance().to_owned(),
-                }));
+            let activation = run
+                .reached(&recorded.instance, recorded.performing.as_deref())
+                .map_err(diverged)?;
+
+            match &recorded.what {
+                Happened::Output { context, inputs } => {
+                    let mut offered: Vec<(String, ContextId)> = activation
+                        .inputs()
+                        .iter()
+                        .map(|(parameter, context)| (parameter.clone(), context.id()))
+                        .collect();
+                    offered.sort_by(|a, b| a.0.cmp(&b.0));
+                    if offered != *inputs {
+                        return Err(diverged(Divergence::InputsDiffer {
+                            recorded: inputs.clone(),
+                            offered,
+                        }));
+                    }
+                    run.produced(read.contexts[context].clone())
+                        .map_err(|refusal| diverged(Divergence::Refused(refusal)))?;
+                    replayed += 1;
+                }
+                Happened::Call(call) => {
+                    run.call(call.clone())
+                        .map_err(|refusal| ResumeRefusal::CallRefused {
+                            instance: recorded.instance.clone(),
+                            call: call.id().to_owned(),
+                            refusal,
+                        })?;
+                }
+                Happened::Exchange(exchange) => {
+                    if let Err(refusal) = run.exchange(exchange.clone()) {
+                        // An activation is outstanding - it was just reached -
+                        // and every context of a record is the one context under
+                        // its identifier, so the run has nothing to refuse.
+                        unreachable!("a record's exchange is refused: {refusal}");
+                    }
+                }
             }
-            let mut offered: Vec<(String, ContextId)> = activation
-                .inputs()
-                .iter()
-                .map(|(parameter, context)| (parameter.clone(), context.id()))
-                .collect();
-            offered.sort_by(|a, b| a.0.cmp(&b.0));
-            if offered != recorded.inputs {
-                return Err(diverged(Divergence::InputsDiffer {
-                    recorded: recorded.inputs.clone(),
-                    offered,
-                }));
-            }
-            run.produced(read.contexts[&recorded.context].clone())
-                .map_err(|refusal| diverged(Divergence::Refused(refusal)))?;
         }
 
-        if read.spent > outputs && !matches!(run.step(), Step::Activate(_)) {
-            return Err(ResumeRefusal::SpentDisagrees {
-                spent: read.spent,
-                outputs,
-            });
+        // Whatever was outstanding when the record was taken is offered again,
+        // counted once as it was: the activation performing, and the call it was
+        // waiting on. Each step has to offer something new.
+        while run.recorded().spent < read.spent {
+            let before = run.recorded().spent;
+            if !matches!(run.step(), Step::Activate(_)) || run.recorded().spent == before {
+                return Err(disagrees);
+            }
+        }
+        if run.recorded().spent != read.spent {
+            return Err(disagrees);
         }
 
         // Asked last because only the run knows what it holds, once every
-        // argument and output has been brought in.
+        // argument and event has been brought in.
         let held = run.recorded().held;
-        if let Some(stray) = read.order.iter().find(|id| !held.contains_key(id)) {
+        let holds = |id: &ContextId| held.iter().any(|contexts| contexts.contains_key(id));
+        if let Some(stray) = read.order.iter().find(|id| !holds(id)) {
             let key = context_key(*stray);
             return Err(ResumeRefusal::Unreadable(read.reading.fault(
                 read.spans[stray].clone(),
@@ -476,6 +536,99 @@ impl<'a, F> Run<'a, F> {
     }
 }
 
+impl<F> Run<'_, F> {
+    /// The activation for `instance` performing `performing` - outstanding
+    /// already, or offered by the next step - or how the run disagrees.
+    ///
+    /// What a recorded event is replayed into: it happened in that activation,
+    /// so the run has to be in it, and a run that offers another, or nothing,
+    /// is not the run the record is of.
+    fn reached(
+        &mut self,
+        instance: &str,
+        performing: Option<&str>,
+    ) -> Result<crate::Activation, Divergence> {
+        let is_it = |activation: &crate::Activation| {
+            activation.instance() == instance && activation.call() == performing
+        };
+        if let Some(outstanding) = self.outstanding() {
+            return if is_it(outstanding) {
+                Ok(outstanding.clone())
+            } else {
+                Err(Divergence::OtherOffered {
+                    offered: outstanding.instance().to_owned(),
+                })
+            };
+        }
+        match self.step() {
+            Step::Activate(activation) if is_it(&activation) => Ok(activation),
+            Step::Activate(activation) => Err(Divergence::OtherOffered {
+                offered: activation.instance().to_owned(),
+            }),
+            Step::Ended(_) => Err(Divergence::NothingOffered),
+        }
+    }
+}
+
+/// One event as a record writes it: the instance its activation is for, the call
+/// that activation performs when it is a call's, and what happened - an output
+/// with its activation's inputs, an exchange, or a call.
+///
+/// Every context by identifier, and a call's identifier as the provider issued
+/// it (`CREQ_RECORD_HOLDS_EXCHANGES`). A window is written by identifier too, so
+/// its parts - which of them was an answer, which a call's output - are in the
+/// context table rather than flattened into its rendering.
+// @Exchanges and calls and outputs written in the order accepted,IMPL_RECORD_EVENTS,impl,[CREQ_RECORD_HOLDS_EXCHANGES, CREQ_RECORD_HOLDS_THE_RUN]
+fn written_event(event: &Event) -> Table {
+    let id = |context: &Context| context.id().value().to_string();
+    let inputs = |given: &[(String, Context)]| {
+        let mut inputs = InlineTable::new();
+        for (parameter, context) in given {
+            inputs.insert(parameter, id(context).into());
+        }
+        inputs
+    };
+
+    let mut entry = Table::new();
+    match event {
+        Event::Output { activation, output } => {
+            entry["instance"] = value(activation.instance());
+            if let Some(call) = activation.call() {
+                entry["performing"] = value(call);
+            }
+            entry["output"] = value(id(output));
+            entry["inputs"] = value(inputs(activation.inputs()));
+        }
+        Event::Exchange {
+            instance,
+            performing,
+            exchange,
+        } => {
+            entry["instance"] = value(instance);
+            if let Some(call) = performing {
+                entry["performing"] = value(call);
+            }
+            let mut written = InlineTable::new();
+            let offer: toml_edit::Array = exchange.offer().iter().map(id).collect();
+            written.insert("offer", offer.into());
+            written.insert("window", id(exchange.window()).into());
+            written.insert("answer", id(exchange.answer()).into());
+            let calls: toml_edit::Array = exchange.calls().iter().map(String::as_str).collect();
+            written.insert("calls", calls.into());
+            entry["exchange"] = value(written);
+        }
+        Event::Call { instance, call } => {
+            entry["instance"] = value(instance);
+            let mut written = InlineTable::new();
+            written.insert("id", call.id().into());
+            written.insert("node_type", call.node_type().into());
+            written.insert("inputs", inputs(call.inputs()).into());
+            entry["call"] = value(written);
+        }
+    }
+    entry
+}
+
 /// A record's content once read: its values, and every context it holds made.
 struct Read<'t> {
     reading: Reading<'t>,
@@ -483,7 +636,7 @@ struct Read<'t> {
     spent: usize,
     source: Option<u64>,
     arguments: Vec<(String, String, ContextId)>,
-    outputs: Vec<RecordedOutput>,
+    events: Vec<Recorded>,
     contexts: HashMap<ContextId, Context>,
     /// The contexts' identifiers in the order the record writes them, so that a
     /// fault found among several names the first.
@@ -492,12 +645,29 @@ struct Read<'t> {
     spans: HashMap<ContextId, Option<Range<usize>>>,
 }
 
-/// One recorded output: the instance, its context, and its activation's inputs
-/// ordered by parameter.
-struct RecordedOutput {
+/// How a record's reader turns an item naming a context into its identifier,
+/// refusing one the record does not hold.
+type Known<'k> = dyn Fn(&Item, &[&str]) -> Result<ContextId, RecordFault> + 'k;
+
+/// One recorded event: the activation it belongs to - the instance it is for, and
+/// the call it performs when it is a call's - and what happened.
+struct Recorded {
     instance: String,
-    context: ContextId,
-    inputs: Vec<(String, ContextId)>,
+    performing: Option<String>,
+    what: Happened,
+}
+
+/// What one recorded event says happened.
+enum Happened {
+    /// An output, and its activation's inputs ordered by parameter.
+    Output {
+        context: ContextId,
+        inputs: Vec<(String, ContextId)>,
+    },
+    /// An exchange, its contexts made.
+    Exchange(Exchange),
+    /// A call, its contexts made.
+    Call(Call),
 }
 
 /// One context as the record writes it, before it is made.
@@ -620,27 +790,9 @@ impl<'t> Reading<'t> {
             ));
         }
 
-        let mut outputs = Vec::new();
-        for (index, output) in self.entries(top.get("output"), "output")? {
-            let at = index.to_string();
-            let place = output.span();
-            self.only(output, &["output", &at], &["instance", "context", "inputs"])?;
-            let instance = self.needed(output, place.clone(), &["output", &at, "instance"])?;
-            let context = self.needed(output, place.clone(), &["output", &at, "context"])?;
-            let written = self.needed(output, place, &["output", &at, "inputs"])?;
-            let mut inputs = Vec::new();
-            for (parameter, given) in self.table(written, &["output", &at, "inputs"])?.iter() {
-                let key = ["output", at.as_str(), "inputs", parameter];
-                inputs.push((parameter.to_owned(), known(given, &key)?));
-            }
-            inputs.sort_by(|a, b| a.0.cmp(&b.0));
-            outputs.push(RecordedOutput {
-                instance: self
-                    .string(instance, &["output", &at, "instance"])?
-                    .to_owned(),
-                context: known(context, &["output", &at, "context"])?,
-                inputs,
-            });
+        let mut events = Vec::new();
+        for (index, event) in self.entries(top.get("event"), "event")? {
+            events.push(self.event(index, event, &known, &contexts)?);
         }
 
         Ok(Read {
@@ -649,11 +801,141 @@ impl<'t> Reading<'t> {
             spent,
             source,
             arguments,
-            outputs,
+            events,
             contexts,
             order,
             spans,
         })
+    }
+
+    /// One `[[event]]` entry: the instance, the call it performs if any, and
+    /// exactly one of an output with its inputs, an exchange, or a call.
+    fn event(
+        &self,
+        index: usize,
+        event: &Table,
+        known: &Known<'_>,
+        contexts: &HashMap<ContextId, Context>,
+    ) -> Result<Recorded, RecordFault> {
+        let at = index.to_string();
+        let at = at.as_str();
+        let place = event.span();
+        let instance = self.needed(event, place.clone(), &["event", at, "instance"])?;
+        let instance = self
+            .string(instance, &["event", at, "instance"])?
+            .to_owned();
+        let performing = match event.get("performing") {
+            None => None,
+            Some(item) => Some(self.string(item, &["event", at, "performing"])?.to_owned()),
+        };
+        let inputs_of =
+            |item: &Item, key: &[&str]| -> Result<Vec<(String, ContextId)>, RecordFault> {
+                let mut inputs = Vec::new();
+                for (parameter, given) in self.table(item, key)?.iter() {
+                    let mut key = key.to_vec();
+                    key.push(parameter);
+                    inputs.push((parameter.to_owned(), known(given, &key)?));
+                }
+                Ok(inputs)
+            };
+
+        let what = if let Some(output) = event.get("output") {
+            self.only(
+                event,
+                &["event", at],
+                &["instance", "performing", "output", "inputs"],
+            )?;
+            let written = self.needed(event, place, &["event", at, "inputs"])?;
+            let mut inputs = inputs_of(written, &["event", at, "inputs"])?;
+            inputs.sort_by(|a, b| a.0.cmp(&b.0));
+            Happened::Output {
+                context: known(output, &["event", at, "output"])?,
+                inputs,
+            }
+        } else if let Some(written) = event.get("exchange") {
+            self.only(
+                event,
+                &["event", at],
+                &["instance", "performing", "exchange"],
+            )?;
+            let key = ["event", at, "exchange"];
+            let fields = self.table(written, &key)?;
+            self.only(fields, &key, &["offer", "window", "answer", "calls"])?;
+            let window =
+                self.needed(fields, written.span(), &["event", at, "exchange", "window"])?;
+            let answer =
+                self.needed(fields, written.span(), &["event", at, "exchange", "answer"])?;
+            let mut exchange = Exchange::new(
+                contexts[&known(window, &["event", at, "exchange", "window"])?].clone(),
+                contexts[&known(answer, &["event", at, "exchange", "answer"])?].clone(),
+            );
+            let mut offer = Vec::new();
+            for (position, item) in
+                self.strings(fields.get("offer"), &["event", at, "exchange", "offer"])?
+            {
+                let position = position.to_string();
+                let key = ["event", at, "exchange", "offer", position.as_str()];
+                offer.push(contexts[&known(&item, &key)?].clone());
+            }
+            exchange = exchange.offering(offer);
+            for (position, item) in
+                self.strings(fields.get("calls"), &["event", at, "exchange", "calls"])?
+            {
+                let position = position.to_string();
+                let key = ["event", at, "exchange", "calls", position.as_str()];
+                exchange = exchange.calling(self.string(&item, &key)?);
+            }
+            Happened::Exchange(exchange)
+        } else if let Some(written) = event.get("call") {
+            self.only(event, &["event", at], &["instance", "performing", "call"])?;
+            let key = ["event", at, "call"];
+            let fields = self.table(written, &key)?;
+            self.only(fields, &key, &["id", "node_type", "inputs"])?;
+            let id = self.needed(fields, written.span(), &["event", at, "call", "id"])?;
+            let node_type =
+                self.needed(fields, written.span(), &["event", at, "call", "node_type"])?;
+            let inputs = self.needed(fields, written.span(), &["event", at, "call", "inputs"])?;
+            let mut call = Call::new(
+                self.string(id, &["event", at, "call", "id"])?,
+                self.string(node_type, &["event", at, "call", "node_type"])?,
+            );
+            for (parameter, given) in inputs_of(inputs, &["event", at, "call", "inputs"])? {
+                call = call.input(&parameter, contexts[&given].clone());
+            }
+            Happened::Call(call)
+        } else {
+            return Err(self.fault(
+                place,
+                RecordFaultKind::MissingKey {
+                    key: owned(&["event", at, "output"]),
+                },
+            ));
+        };
+
+        Ok(Recorded {
+            instance,
+            performing,
+            what,
+        })
+    }
+
+    /// The items of an array the record may leave out, each with its place.
+    fn strings(
+        &self,
+        item: Option<&Item>,
+        key: &[&str],
+    ) -> Result<Vec<(usize, Item)>, RecordFault> {
+        let Some(item) = item else {
+            return Ok(Vec::new());
+        };
+        let Some(array) = item.as_array() else {
+            return Err(self.wrong_type(item.span(), key, "array", item.type_name()));
+        };
+        Ok(array
+            .iter()
+            .map(|value| Item::Value(value.clone()))
+            .enumerate()
+            .collect())
     }
 
     /// Every context the record holds, made - each once, however many hold it -
@@ -1121,7 +1403,7 @@ fn holds_the_run() {
     // the text holds and not what a reader makes of it.
     let text = run.record(&source);
     let record: DocumentMut = text.parse().expect("a record is TOML");
-    assert_eq!(record["version"].as_str(), Some("1"));
+    assert_eq!(record["version"].as_str(), Some("2"));
     assert_eq!(record["budget"].as_str(), Some("7"));
     // Two outputs and one activation outstanding.
     assert_eq!(record["spent"].as_str(), Some("3"));
@@ -1134,14 +1416,14 @@ fn holds_the_run() {
     assert_eq!(argument["parameter"].as_str(), Some("input"));
     assert_eq!(argument["context"].as_str(), Some("0"));
 
-    let outputs = record["output"].as_array_of_tables().expect("outputs");
-    let outputs: Vec<(&str, &str, &str)> = outputs
+    let events = record["event"].as_array_of_tables().expect("events");
+    let outputs: Vec<(&str, &str, &str)> = events
         .iter()
-        .map(|output| {
+        .map(|event| {
             (
-                output["instance"].as_str().expect("an instance"),
-                output["context"].as_str().expect("a context"),
-                output["inputs"]["input"].as_str().expect("an input"),
+                event["instance"].as_str().expect("an instance"),
+                event["output"].as_str().expect("an output"),
+                event["inputs"]["input"].as_str().expect("an input"),
             )
         })
         .collect();
@@ -1572,7 +1854,7 @@ fn unreadable_refused() {
             + 1
     };
 
-    let not_toml = fault(Run::<()>::resume(&workflow, "version = \"1\"\nbudget = \n"));
+    let not_toml = fault(Run::<()>::resume(&workflow, "version = \"2\"\nbudget = \n"));
     assert!(
         matches!(not_toml.kind(), RecordFaultKind::Syntax { .. }),
         "{not_toml}"
@@ -1580,9 +1862,9 @@ fn unreadable_refused() {
     assert_eq!(not_toml.line(), 2);
 
     assert_eq!(
-        damaged("version = \"1\"", "version = \"2\"").kind(),
+        damaged("version = \"2\"", "version = \"3\"").kind(),
         &RecordFaultKind::Version {
-            found: "2".to_owned()
+            found: "3".to_owned()
         }
     );
     assert_eq!(
@@ -1692,8 +1974,287 @@ fn identifiers_only_with_a_source() {
         resumed
             .recorded()
             .held
-            .keys()
+            .iter()
+            .flat_map(|held| held.keys())
             .any(|id| id.value() == u64::MAX)
     );
     assert_eq!(again.issue(), Err(crate::SourceExhausted));
+}
+
+// --- calls and exchanges -------------------------------------------------------
+
+/// A workflow of instances that may each call `lookup`, which takes one `query`,
+/// the last designated.
+#[cfg(test)]
+fn asking(instances: usize) -> WorkflowDefinition {
+    let types = vec![
+        node_type("ask", &[], "note"),
+        node_type("lookup", &[("query", "note")], "note"),
+    ];
+    let names: Vec<String> = (0..instances).map(|n| format!("a{n}")).collect();
+    let nodes = names
+        .iter()
+        .map(|name| instance(name, "ask", &[]).with_calls(&["lookup"]))
+        .collect();
+    definition(types, nodes, &[names.last().expect("one at least")])
+}
+
+/// The events of a record's text, read as TOML rather than resumed.
+#[cfg(test)]
+fn events_of(text: &str) -> Vec<Table> {
+    let record: DocumentMut = text.parse().expect("a record is TOML");
+    record["event"]
+        .as_array_of_tables()
+        .expect("events")
+        .iter()
+        .cloned()
+        .collect()
+}
+
+#[cfg(test)]
+#[test]
+fn holds_exchanges() {
+    let workflow = asking(1);
+    let mut source = IdSource::new();
+    let mut run = Run::<()>::start(&workflow, Arguments::new(), 10).expect("sound");
+    let Step::Activate(_) = run.step() else {
+        panic!("the asker is offered")
+    };
+
+    // An answer that made no call, then a window composing the first exchange
+    // and an answer making three calls under three providers' identifiers.
+    let prompt = note(&mut source, "prompt");
+    let first = note(&mut source, "first");
+    run.exchange(Exchange::new(prompt.clone(), first.clone()))
+        .expect("an exchange that made no call");
+    let window = Context::compose(&mut source, context_type("note"), [&prompt, &first], "")
+        .expect("a fresh source issues");
+    let offer = note(&mut source, "lookup");
+    let long = "9f".repeat(16);
+    let ids = ["call_7", "toolu_7", long.as_str()];
+    let mut exchange =
+        Exchange::new(window.clone(), note(&mut source, "calls")).offering(vec![offer.clone()]);
+    for id in ids {
+        exchange = exchange.calling(id);
+    }
+    run.exchange(exchange)
+        .expect("an exchange that made three calls");
+    for id in ids {
+        let query = note(&mut source, id);
+        run.call(Call::new(id, "lookup").input("query", query))
+            .expect("declared");
+        let Step::Activate(called) = run.step() else {
+            panic!("the call is offered")
+        };
+        assert_eq!(called.call(), Some(id));
+        run.produced(note(&mut source, "found"))
+            .expect("lookup's output");
+    }
+
+    let text = run.record(&source);
+    let record: DocumentMut = text.parse().expect("a record is TOML");
+    assert_eq!(record["version"].as_str(), Some("2"));
+    let events = events_of(&text);
+    let kinds: Vec<&str> = events
+        .iter()
+        .map(|event| {
+            ["exchange", "call", "output"]
+                .into_iter()
+                .find(|kind| event.contains_key(kind))
+                .expect("one kind each")
+        })
+        .collect();
+    assert_eq!(
+        kinds,
+        [
+            "exchange", "exchange", "call", "output", "call", "output", "call", "output"
+        ]
+    );
+
+    let id = |context: &Context| context.id().value().to_string();
+    let second = &events[1]["exchange"];
+    assert_eq!(second["window"].as_str(), Some(id(&window).as_str()));
+    let calls: Vec<&str> = second["calls"]
+        .as_array()
+        .expect("calls")
+        .iter()
+        .filter_map(|call| call.as_str())
+        .collect();
+    assert_eq!(calls, ids, "each identifier as the provider gave it");
+    let offered: Vec<&str> = second["offer"]
+        .as_array()
+        .expect("an offer")
+        .iter()
+        .filter_map(|offered| offered.as_str())
+        .collect();
+    assert_eq!(offered, [id(&offer).as_str()]);
+    for (event, id) in [
+        (&events[2], "call_7"),
+        (&events[4], "toolu_7"),
+        (&events[6], long.as_str()),
+    ] {
+        assert_eq!(event["call"]["id"].as_str(), Some(id));
+        assert_eq!(event["call"]["node_type"].as_str(), Some("lookup"));
+    }
+    for (event, id) in [
+        (&events[3], "call_7"),
+        (&events[5], "toolu_7"),
+        (&events[7], long.as_str()),
+    ] {
+        assert_eq!(event["performing"].as_str(), Some(id));
+    }
+
+    // The window is its parts, not its rendering.
+    let written = &record["context"][id(&window).as_str()];
+    assert!(written.get("text").is_none(), "{written}");
+    let parts: Vec<&str> = written["parts"]
+        .as_array()
+        .expect("parts")
+        .iter()
+        .filter_map(|part| part.as_str())
+        .collect();
+    assert_eq!(parts, [id(&prompt).as_str(), id(&first).as_str()]);
+}
+
+#[cfg(test)]
+#[test]
+fn version_one_refused() {
+    // A record of version 1, as it was written before exchanges existed.
+    let written = "version = \"1\"\nbudget = \"5\"\nspent = \"1\"\nsource = \"1\"\n\n\
+                   [[argument]]\ninstance = \"n0\"\nparameter = \"input\"\ncontext = \"0\"\n\n\
+                   [context.0]\ntype = \"note\"\ntext = \"hello\"\n";
+    let refused = fault(Run::<()>::resume(&chain(2), written));
+    assert_eq!(
+        refused.kind(),
+        &RecordFaultKind::Version {
+            found: "1".to_owned()
+        }
+    );
+    assert_eq!((refused.line(), refused.column()), (1, 11));
+}
+
+#[cfg(test)]
+#[test]
+fn undeclared_call_refused() {
+    let workflow = asking(1);
+    let mut source = IdSource::new();
+    let mut run = Run::<()>::start(&workflow, Arguments::new(), 10).expect("sound");
+    let Step::Activate(_) = run.step() else {
+        panic!("the asker is offered")
+    };
+    run.exchange(
+        Exchange::new(note(&mut source, "window"), note(&mut source, "answer")).calling("call_1"),
+    )
+    .expect("held");
+    let query = note(&mut source, "q");
+    run.call(Call::new("call_1", "lookup").input("query", query))
+        .expect("declared");
+    let Step::Activate(_) = run.step() else {
+        panic!("the call is offered")
+    };
+    // Taken while the called node type is outstanding - performed by a person,
+    // say - so its output is nowhere in the record.
+    let record = run.record(&source);
+
+    let mut undeclaring = workflow.clone();
+    undeclaring.instances[0].calls.clear();
+    match Run::<()>::resume(&undeclaring, &record) {
+        Err(ResumeRefusal::CallRefused {
+            instance,
+            call,
+            refusal,
+        }) => {
+            assert_eq!((instance.as_str(), call.as_str()), ("a0", "call_1"));
+            assert_eq!(
+                refusal,
+                CallRefusal::Undeclared {
+                    instance: "a0".to_owned(),
+                    node_type: "lookup".to_owned(),
+                }
+            );
+        }
+        Err(other) => panic!("expected the call refused, got {other:?}"),
+        Ok(_) => panic!("expected the call refused, and it resumed"),
+    }
+
+    // Against the workflow unchanged it resumes with the call outstanding,
+    // counted once.
+    let (mut resumed, _) = Run::<()>::resume(&workflow, &record).expect("resumes");
+    assert_eq!(resumed.recorded().spent, 2);
+    let Step::Activate(called) = resumed.step() else {
+        panic!("the call is offered again")
+    };
+    assert_eq!((called.instance(), called.call()), ("a0", Some("call_1")));
+    assert_eq!(resumed.recorded().spent, 2, "not counted again");
+}
+
+#[cfg(test)]
+proptest! {
+    /// For any run whose instances exchange and call - some calls exchanging in
+    /// turn - resumed from every record it can be written as, the resumed run
+    /// holds the same exchanges with the same activations in the same order: it
+    /// is written again as the same text, byte for byte, and its outstanding
+    /// activation holds the exchanges the recorded one held.
+    #[test]
+    fn exchanges_kept(
+        plans in proptest::collection::vec(
+            proptest::collection::vec((0..3usize, any::<bool>()), 0..=3),
+            1..=2,
+        ),
+    ) {
+        let workflow = asking(plans.len());
+        let mut source = IdSource::new();
+        let mut run = Run::<()>::start(&workflow, Arguments::new(), 50).expect("sound");
+        let mut records = Vec::new();
+        let mut windows = Vec::new();
+
+        let take = |run: &Run<'_, ()>, source: &IdSource| {
+            let held: Vec<u64> = run.exchanges().iter().map(|e| e.window().id().value()).collect();
+            (run.record(source), held)
+        };
+        records.push(take(&run, &source));
+        for (instance, plan) in plans.iter().enumerate() {
+            let Step::Activate(activation) = run.step() else {
+                return Err(TestCaseError::fail("each instance is offered"));
+            };
+            prop_assert_eq!(activation.instance(), format!("a{instance}"));
+            for (exchange, &(calls, callee_exchanges)) in plan.iter().enumerate() {
+                let window = note(&mut source, "window");
+                windows.push(window.clone());
+                let mut made = Exchange::new(window, note(&mut source, "answer"));
+                let ids: Vec<String> = (0..calls).map(|call| format!("a{instance}-{exchange}-{call}")).collect();
+                for id in &ids {
+                    made = made.calling(id);
+                }
+                run.exchange(made).expect("held");
+                records.push(take(&run, &source));
+                for id in &ids {
+                    let query = note(&mut source, id);
+                    run.call(Call::new(id, "lookup").input("query", query)).expect("declared");
+                    records.push(take(&run, &source));
+                    let Step::Activate(_) = run.step() else {
+                        return Err(TestCaseError::fail("the call is offered"));
+                    };
+                    records.push(take(&run, &source));
+                    if callee_exchanges {
+                        run.exchange(Exchange::new(note(&mut source, "w"), note(&mut source, "a")))
+                            .expect("the callee's own");
+                        records.push(take(&run, &source));
+                    }
+                    run.produced(note(&mut source, "found")).expect("lookup's output");
+                    records.push(take(&run, &source));
+                }
+            }
+            run.produced(note(&mut source, "output")).expect("the instance's output");
+            records.push(take(&run, &source));
+        }
+
+        for (record, held) in &records {
+            let (resumed, again) = Run::<()>::resume(&workflow, record)
+                .map_err(|refused| TestCaseError::fail(format!("{refused}\n{record}")))?;
+            prop_assert_eq!(&resumed.record(&again), record);
+            let resumed_held: Vec<u64> = resumed.exchanges().iter().map(|e| e.window().id().value()).collect();
+            prop_assert_eq!(&resumed_held, held);
+        }
+    }
 }
