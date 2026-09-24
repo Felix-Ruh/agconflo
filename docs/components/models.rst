@@ -35,26 +35,33 @@ component requirement whose subject is anything else.
    - **The mapping read once and kept.** A caller changing the mapping between
      runs, which is the whole of provider choice, changes nothing.
 
-.. comp_req:: A call sends its prompt and nothing else
-   :id: CREQ_ROSTER_ONE_MESSAGE
+.. comp_req:: A call sends its contexts whole and nothing else
+   :id: CREQ_ROSTER_CONTEXTS_WHOLE
    :derived_from: FEAT_MODEL_WINDOW_IS_THE_PROMPT
    :allocated_to: COMP_MODEL_ROSTER
    :ears_pattern: ubiquitous
-   :statement: Model roster shall send a call's prompt as one user message holding the prompt's rendering and no other content.
+   :statement: Model roster shall send a call no text but the renderings of the contexts the call is made with, whole and byte for byte.
 
    Measured, ``genai`` adds parameters and no text
    (``EVD_GENAI_TWO_FORMATS_EXACT``), so this is a requirement on the roster's
-   own restraint.
+   own restraint. How the text is divided into messages is not this
+   requirement's: ``DEC_PROMPT_IS_A_CONTEXT`` sends a prompt's rendering as one
+   user message.
 
    Failure modes:
 
    - **A system prompt added.** The window then holds text no wire brought.
-   - **The prompt trimmed, normalised or re-encoded.** A trailing space or a
+   - **The text trimmed, normalised or re-encoded.** A trailing space or a
      line ending changed is a different window, and a model can answer it
      differently.
-   - **The prompt's parts sent as separate messages.** A composition renders as
-     one text, and splitting it into messages changes what the model sees at
-     the seams.
+   - **Part of a context left out.** A window cut down to fit is one nobody
+     wired, and the model answers a question it was not asked.
+
+   Revised under ``DEC_CHANGE_MODEL_WINDOW`` with its parent, and renamed from
+   ``CREQ_ROSTER_ONE_MESSAGE``. It had said "as one user message holding the
+   prompt's rendering and no other content", and counted a prompt's parts sent
+   as separate messages among its failure modes. Into how many messages the
+   text goes is a choice, and the decision makes it.
 
 .. comp_req:: A call to an unmapped role fails without reaching a provider
    :id: CREQ_ROSTER_UNMAPPED_ROLE

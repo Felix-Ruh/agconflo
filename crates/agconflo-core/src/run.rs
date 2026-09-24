@@ -438,7 +438,7 @@ pub enum OutputRefusal {
     /// No activation was outstanding, so there is no instance the output could
     /// be filed against.
     NothingOutstanding,
-    /// The output is not of the type the instance's node type declares
+    /// The output is not of the type the activation's node type declares
     /// (`CREQ_RUN_REFUSES_UNDECLARED_OUTPUT`). Measured accepted and handed on to
     /// a parameter declared for another type (`EVD_RUN_ACCEPTS_UNDECLARED_OUTPUT`).
     UndeclaredType {
@@ -522,7 +522,7 @@ pub enum RunEnding<F> {
         /// What the caller said went wrong.
         failure: F,
     },
-    /// The run had activated as many instances as its budget allows
+    /// The run had made as many activations as its budget allows
     /// (`CREQ_RUN_STOPS_AT_BUDGET`).
     BudgetExceeded {
         /// The budget it was held to.
@@ -718,7 +718,7 @@ impl<'a, F> Run<'a, F> {
     /// Report what the outstanding activation produced.
     ///
     /// Refused, and nothing recorded, when the output is not of the type the
-    /// instance's node type declares, carries an identifier the run already
+    /// activation's node type declares, carries an identifier the run already
     /// holds, or was composed from a second context under an identifier the run
     /// or the output holds for another. Each way the activation stays
     /// outstanding and is not counted again (`DEC_REFUSED_OUTPUT_OUTSTANDING`): asking for the next

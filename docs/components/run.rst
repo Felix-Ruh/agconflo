@@ -224,7 +224,7 @@ component requirement whose subject is anything else.
    :derived_from: FEAT_RUN_BUDGET_STOPS
    :allocated_to: COMP_WORKFLOW_RUN
    :ears_pattern: unwanted
-   :statement: If a run has activated as many instances as its budget allows, then Workflow run shall end that run without offering another activation.
+   :statement: If a run has made as many activations as its budget allows, then Workflow run shall end that run without offering another activation.
 
    The count is of activations, because that is what costs money
    (``DEC_BUDGET_COUNTS_ACTIVATIONS``), and the run keeps it exactly because
@@ -247,6 +247,10 @@ component requirement whose subject is anything else.
    - **The budget ending a run whose result already exists.** Completion is
      checked first, or a run that finished on its last permitted activation is
      reported as a runaway.
+
+   Revised under ``DEC_CHANGE_RUN_STOPS_AT_BUDGET``. It had said "activated as
+   many instances", which also reads as a count of instances, the third failure
+   mode above; it now says in its statement what its body always said.
 
 .. comp_req:: A run that can do nothing more ends and says what was waiting
    :id: CREQ_RUN_ENDS_QUIESCENT
@@ -337,7 +341,7 @@ component requirement whose subject is anything else.
    :derived_from: FEAT_RUN_OUTPUT_OF_DECLARED_TYPE
    :allocated_to: COMP_WORKFLOW_RUN
    :ears_pattern: unwanted
-   :statement: If an output reported for an activation is not of the context type its instance's node type declares, then Workflow run shall refuse that output naming the instance, the declared type and the reported type.
+   :statement: If an output reported for an activation is not of the context type that activation's node type declares for its output, then Workflow run shall refuse that output naming the instance, the declared type and the reported type.
 
    The comparison is with the declaration, which the run can read, rather than
    with whatever consumes the output, which it need not have: the designated
@@ -366,6 +370,13 @@ component requirement whose subject is anything else.
    Must pass unreported: an output of the declared type, including a composition
    whose parts are of other types, since a composition's type is the one it was
    declared with whatever its parts' types are (``CREQ_VALUE_DECLARED_TYPE``).
+
+   The instance named is the one the activation is performed for, as in the
+   run's other refusals.
+
+   Revised under ``DEC_CHANGE_RUN_REFUSES_UNDECLARED_OUTPUT``. It had compared
+   the output with the type "its instance's node type declares", reaching the
+   node type through the instance where its parent names the node type itself.
 
 .. comp_req:: An output the run already holds is refused
    :id: CREQ_RUN_REFUSES_HELD_IDENTIFIER

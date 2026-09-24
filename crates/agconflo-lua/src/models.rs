@@ -54,7 +54,7 @@ impl Roster {
     ///
     /// A role mapped to nothing fails before anything is sent: sending the role
     /// as a model name would reach whatever provider the name resembles.
-    // @One role one model one message,IMPL_MODELS_CALL,impl,[CREQ_ROSTER_ROLE_TO_MODEL, CREQ_ROSTER_ONE_MESSAGE, CREQ_ROSTER_UNMAPPED_ROLE, CREQ_ROSTER_PROVIDER_FAILURE, CREQ_ROSTER_ANSWER_AS_SENT]
+    // @One role one model one message,IMPL_MODELS_CALL,impl,[CREQ_ROSTER_ROLE_TO_MODEL, CREQ_ROSTER_CONTEXTS_WHOLE, CREQ_ROSTER_UNMAPPED_ROLE, CREQ_ROSTER_PROVIDER_FAILURE, CREQ_ROSTER_ANSWER_AS_SENT]
     pub(crate) async fn call(&self, role: &str, prompt: &Context) -> Result<String, ModelFailure> {
         let Some(model) = self.roles.get(role) else {
             return Err(ModelFailure::Unmapped {
