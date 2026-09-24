@@ -68,7 +68,7 @@ be shown to pass.
    :id: TEST_ID_CANNOT_BE_FORGED
    :verifies: CREQ_SOURCE_SOLE_ISSUER
    :test_kind: error_path
-   :coverage: full
+   :coverage: partial
 
    Code that builds an identifier other than by asking a source fails to
    compile, by each route a derive or an impl could open: the constructor, a
@@ -76,6 +76,10 @@ be shown to pass.
    names it as private, and each other refusal names what is missing. As above,
    the error is asserted, not merely the failure, and an identifier obtained
    through a context must compile, so that each refusal is about its route.
+
+   Partial since resuming a run's record became the requirement's one exception:
+   that its identifiers come back only beside a source past them is
+   ``TEST_RECORD_IDENTIFIERS_ONLY_WITH_A_SOURCE``.
 
 .. test_case:: Text reads back as it was given
    :id: TEST_CONTEXT_TEXT_ROUND_TRIPS

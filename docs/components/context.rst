@@ -89,19 +89,26 @@ being infallible is a design choice, and it gets asserted like any other.
    :derived_from: FEAT_CONTEXT_IDENTITY
    :allocated_to: COMP_IDENTIFIER_SOURCE
    :ears_pattern: ubiquitous
-   :statement: Identifier source shall be the only means of obtaining a context identifier.
+   :statement: Identifier source shall be the only means of obtaining a context identifier, except by resuming a run's record together with a source positioned past every identifier the record holds.
 
    A source that never repeats guarantees nothing if an identifier can be made
    without it. This closes the gap the requirement above leaves open.
+
+   The exception was added with ``STKH_RESUMABLE_RUN``, which needs identifiers
+   read back from storage: a resumed run holds the contexts it was recorded with
+   (``FEAT_RESUME_KEEPS_CONTEXTS``). It keeps the promise rather than breaking
+   it, because a record's identifiers come back only beside a source that will
+   never issue them (``CREQ_RECORD_SOURCE_CONTINUES``), and a record holding
+   one at or past that source's position is refused. Code outside the core
+   still has no route to an identifier but these two.
 
    Failure modes:
 
    - **Code constructs an identifier directly.** Refused when the code is
      compiled, because an identifier has no constructor outside the source.
-
-   Not yet answered: reading an identifier back from storage is a second way to
-   obtain one, and resuming an interrupted run will need it. That arrives with
-   ``STKH_RESUMABLE_RUN`` and has to be answered there, against this requirement.
+   - **A record's identifiers resumed without a source past them.** A record
+     naming an identifier its source had not reached yet is resumed, and the
+     source then issues it a second time.
 
 .. comp_req:: Text reads back exactly
    :id: CREQ_VALUE_TEXT_EXACT
