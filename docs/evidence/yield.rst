@@ -168,3 +168,47 @@ context of 15,104 tokens, the one model it had loaded.
    ``ToolCall`` as sent, and two calls in one turn as two. Whatever is checked
    about a call - that its name was offered, that its arguments fill the
    parameters - has to be checked by Agconflo.
+
+.. evd:: genai rewrites a call's JSON and keeps its string values
+   :id: EVD_GENAI_REWRITES_CALL_JSON
+   :evd_kind: measurement
+   :observed_on: 2026-09-24
+   :observation: A call whose arguments a stub wrote with spaces, an escape, 1.50 and 1e2 was sent back reformatted in both formats. Eight string values came back identical once decoded; a lone surrogate failed the whole response.
+
+   Taken by the stub against ``genai`` 0.7.0-beta.24 alone, with request bodies
+   kept as text rather than parsed. Arguments written as
+   ``{"zeta": "caf\u00e9",  "alpha": 1.50, "n": 1e2}`` came back in the
+   continuation as ``{"zeta":"café","alpha":1.5,"n":100.0}``: as the string
+   OpenAI's format carries, and as the object Anthropic's does. Key order was
+   kept, because ``genai`` turns on ``serde_json``'s ``preserve_order``; spaces,
+   the escape and both numbers were not. The OpenAI adapter sends
+   ``fn_arguments.to_string()``, a rendering of the parsed value, so nothing of
+   the text the model wrote survives but what parsing keeps.
+
+   Then one call per case, each with a stub of its own, whose one string value
+   was written as: ``"plain"``, ``" padded "``, ``"line\r\nend"``, a tab, an
+   escaped quote and an escaped backslash, ``"caf\u00e9 and café"``, an emoji
+   escaped as a surrogate pair beside the same emoji written out, ``"\u2028sep"``
+   and ``"nul\u0000byte"``. Each came back decoding to the same string, byte for
+   byte. ``"lone \ud800 surrogate"``, which no Rust string can hold, failed the
+   response, as arguments that are not JSON did in
+   ``EVD_GENAI_PASSES_MALFORMED_CALLS``.
+
+   So a call's string values are what survives the round trip exactly, and the
+   JSON around them is ``genai``'s to write.
+
+.. evd:: The local model writes its call's arguments compactly
+   :id: EVD_LOCAL_MODEL_WRITES_COMPACT_ARGUMENTS
+   :evd_kind: measurement
+   :observed_on: 2026-09-24
+   :observation: In three calls, qwen3.8-27b-ridge on LM Studio wrote each call's arguments exactly as genai re-renders them, so what it wrote and what was sent back were identical.
+
+   Asked to look up "amber-7", "café-ß" and ``north "gate"``, it wrote
+   ``{"query":"amber-7"}``, ``{"query":"café-ß"}`` and ``{"query":"north
+   gate"}``, read from the response body, each equal to ``genai``'s rendering of
+   the parsed arguments, in 0.9 to 1.7 s a call. The third dropped the quotes it
+   was asked about, which is the model's choice rather than a loss.
+
+   ``EVD_GENAI_REWRITES_CALL_JSON`` shows the two can differ; this shows that
+   for this model they did not. It is one model and three calls, and says
+   nothing of a hosted provider.
