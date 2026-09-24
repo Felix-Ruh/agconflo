@@ -22,6 +22,10 @@ could this be false while its parent is true? The body of each says how. Two
 parents are judgements rather than readings, and those bodies say why the parent
 is the one it is: the instruction limit's and the refusal before a run starts.
 
+Two statements were narrowed a day later by ``features/person``: a node type
+the caller names as performed by a person has no script, and its activations
+run none. Everything else here is unchanged by that.
+
 The feature's architecture closes the file. It realises all seven requirements
 and names the two components they are divided between, which are defined in
 ``components/behaviour``.
@@ -37,7 +41,7 @@ already been looked at again for a feature with the same shape.
    :derived_from: STKH_LIVE_BEHAVIOUR
    :ears_pattern: ubiquitous
    :verification_method: test
-   :statement: Agconflo shall perform each activation by running the script its caller supplied for the node type when starting the run.
+   :statement: Agconflo shall perform each activation of a node type its caller supplied a script for by running that script.
 
    The parent asks that behaviour change without recompiling the engine. This
    says how: the behaviour is text handed over when a run starts
@@ -177,7 +181,7 @@ already been looked at again for a feature with the same shape.
    :derived_from: STKH_WIRING_CHECKED
    :ears_pattern: unwanted
    :verification_method: test
-   :statement: If a node type named by an instance of a workflow has no script or its script does not compile, then Agconflo shall refuse to start the run.
+   :statement: If a node type named by an instance of a workflow has neither a script nor a person performing it or has a script that does not compile, then Agconflo shall refuse to start the run.
 
    This derivation is a judgement too, and the reason for the parent is in its
    body: the value of refusing an invalid workflow before any node runs is that a

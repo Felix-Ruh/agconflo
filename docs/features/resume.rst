@@ -10,10 +10,10 @@ requirement here derives from a goal in ``stakeholder/execution`` or
 
 What resuming does not do here is what keeps this a slice. Nothing stores a
 record: the core hands its caller text, and where the text is kept is the
-caller's (``DEC_RECORD_IN_CORE``). No person takes part in a run yet, so the
-wait that makes ``STKH_RESUMABLE_RUN`` load-bearing is not built here, only
-what makes surviving one possible. And a resumed run is the run it was: no
-output it recorded is revisited, and nothing about its workflow can be changed
+caller's (``DEC_RECORD_IN_CORE``). No person takes part in a run in this slice,
+so the wait that makes ``STKH_RESUMABLE_RUN`` load-bearing is not built here,
+only what makes surviving one possible; ``features/person`` builds it. And a
+resumed run is the run it was: no output it recorded is revisited, and nothing about its workflow can be changed
 that would have changed what it already did.
 
 Each requirement was checked by hand against the question no rule can ask:
