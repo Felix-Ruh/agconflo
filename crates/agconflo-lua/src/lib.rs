@@ -13,6 +13,10 @@
 //! caller mapped, and under a limit on the instructions it executes, the memory
 //! it allocates and the model calls it makes.
 //!
+//! A node type can instead be named as performed by a person. A scripted run
+//! then stops at each of its activations and hands it to its caller, and goes
+//! on from its record once the caller supplies the person's answer as text.
+//!
 //! A comment of the form `// @<title>,<IMPL id>,impl,[<requirement ids>]` is a
 //! trace marker, read into the requirements graph by
 //! `docs/code/agconflo-lua.rst`; see `agconflo-core` for what that checks.
@@ -25,4 +29,4 @@ mod scripted;
 pub use behaviours::{BehaviourFault, Behaviours};
 pub use host::{Limits, ScriptFailure};
 pub use models::{ModelFailure, Roster};
-pub use scripted::{ScriptedRefusal, resume_scripted, run_scripted};
+pub use scripted::{Outcome, ScriptedRefusal, answer_scripted, resume_scripted, run_scripted};

@@ -1,5 +1,6 @@
-//! The behaviour set: the scripts a run is started with, and whether they can
-//! run at all - answered before the run starts, without running any of them.
+//! The behaviour set: what performs each node type a run is started with - a
+//! script, or a person - and whether the scripts can run at all, answered
+//! before the run starts without running any of them.
 
 use std::fmt;
 
@@ -7,8 +8,8 @@ use agconflo_core::WorkflowDefinition;
 
 use crate::host;
 
-/// The scripts a run is started with, each for one node type and each with the
-/// name of the document it came from.
+/// What performs each node type a run is started with: a script, with the name
+/// of the document it came from, or a person (`DEC_PERSON_NAMED_BY_CALLER`).
 ///
 /// Every script supplied is kept, including a second one for a node type that
 /// already has one. Keeping only the last would decide which script runs by the
@@ -19,6 +20,8 @@ use crate::host;
 #[derive(Clone, Debug, Default)]
 pub struct Behaviours {
     scripts: Vec<Script>,
+    /// The node types a person performs, each as often as it was named.
+    people: Vec<String>,
 }
 
 /// One script: the node type it is the behaviour of, the document it came from,
@@ -51,6 +54,28 @@ impl Behaviours {
         self
     }
 
+    /// The same behaviours, with `node_type` performed by a person rather than
+    /// by a script.
+    ///
+    /// A scripted run hands each of its activations to its caller rather than
+    /// running anything for it, and takes the person's answer back with the
+    /// run's record (`DEC_SCRIPTED_RUN_RETURNS_TO_AWAIT`). Any node type can be
+    /// named, and nothing here can tell whether whoever answers is a person:
+    /// the step is the caller's to perform.
+    ///
+    /// Naming a type twice is one answer given twice, and is not a fault.
+    /// Naming it and giving it a script is two answers, and is
+    /// (`CREQ_BEHAVIOURS_PERSON_OR_SCRIPT`).
+    pub fn person(mut self, node_type: &str) -> Self {
+        self.people.push(node_type.to_owned());
+        self
+    }
+
+    /// Whether a person performs `node_type`.
+    pub(crate) fn performed_by_person(&self, node_type: &str) -> bool {
+        self.people.iter().any(|named| named == node_type)
+    }
+
     /// The one script for `node_type`, when there is exactly one - which a run
     /// has already been refused for when there is not.
     pub(crate) fn script_for(&self, node_type: &str) -> Option<&Script> {
@@ -69,9 +94,12 @@ impl Behaviours {
     /// does not have at all is ignored rather than refused: a caller may share
     /// one set of scripts across several workflows.
     ///
+    /// A type a person performs needs no script, and must not have one: two
+    /// answers to what performs it are refused as two scripts are.
+    ///
     /// Each type yields at most one fault, and every type is asked, so a caller
     /// with three faults learns three (`CREQ_BEHAVIOURS_EVERY_FAULT`).
-    // @Every instantiated type has one script that compiles,IMPL_BEHAVIOURS_CHECK,impl,[CREQ_BEHAVIOURS_REFUSE_MISSING, CREQ_BEHAVIOURS_REFUSE_TWICE, CREQ_BEHAVIOURS_EVERY_FAULT]
+    // @Every instantiated type has one script that compiles or a person,IMPL_BEHAVIOURS_CHECK,impl,[CREQ_BEHAVIOURS_REFUSE_MISSING, CREQ_BEHAVIOURS_REFUSE_TWICE, CREQ_BEHAVIOURS_EVERY_FAULT, CREQ_BEHAVIOURS_PERSON_OR_SCRIPT]
     pub(crate) fn faults(&self, definition: &WorkflowDefinition) -> Vec<BehaviourFault> {
         let mut asked: Vec<&str> = Vec::new();
         let mut faults = Vec::new();
@@ -88,9 +116,15 @@ impl Behaviours {
                 .iter()
                 .filter(|s| s.node_type == node_type)
                 .collect();
+            let person = self.performed_by_person(node_type);
             let fault = match scripts.as_slice() {
+                [] if person => None,
                 [] => Some(BehaviourFault::Missing {
                     node_type: node_type.to_owned(),
+                }),
+                given if person => Some(BehaviourFault::PersonAndScript {
+                    node_type: node_type.to_owned(),
+                    documents: given.iter().map(|s| s.document.clone()).collect(),
                 }),
                 [script] => compile(script)
                     .err()
@@ -143,8 +177,8 @@ fn compile(script: &Script) -> Result<(), String> {
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum BehaviourFault {
-    /// An instance names this node type and no script was supplied for it
-    /// (`CREQ_BEHAVIOURS_REFUSE_MISSING`).
+    /// An instance names this node type, no script was supplied for it, and it
+    /// was not named as performed by a person (`CREQ_BEHAVIOURS_REFUSE_MISSING`).
     Missing {
         /// The node type with no script.
         node_type: String,
@@ -165,6 +199,15 @@ pub enum BehaviourFault {
         /// The node type given several scripts.
         node_type: String,
         /// The documents they came from, in the order they were supplied.
+        documents: Vec<String>,
+    },
+    /// This node type was named as performed by a person and given a script
+    /// as well (`CREQ_BEHAVIOURS_PERSON_OR_SCRIPT`).
+    PersonAndScript {
+        /// The node type given both.
+        node_type: String,
+        /// The documents its scripts came from, in the order they were
+        /// supplied.
         documents: Vec<String>,
     },
 }
@@ -190,6 +233,14 @@ impl fmt::Display for BehaviourFault {
                 documents.len(),
                 documents.join(", ")
             ),
+            Self::PersonAndScript {
+                node_type,
+                documents,
+            } => write!(
+                f,
+                "{node_type} is performed by a person and was given a script too: {}",
+                documents.join(", ")
+            ),
         }
     }
 }
@@ -203,9 +254,7 @@ use crate::scripted::{ScriptedRefusal, failed, rendered, run_with, workflow};
 
 /// The script faults a refusal carries, or a panic naming what came instead.
 #[cfg(test)]
-fn faults_of(
-    ending: Result<agconflo_core::RunEnding<ScriptFailure>, ScriptedRefusal>,
-) -> Vec<BehaviourFault> {
+fn faults_of(ending: Result<crate::Outcome, ScriptedRefusal>) -> Vec<BehaviourFault> {
     match ending {
         Err(ScriptedRefusal::Behaviours(faults)) => faults,
         other => panic!("expected the scripts to be refused, got {other:?}"),
@@ -445,5 +494,68 @@ fn checking_runs_nothing() {
     assert!(
         matches!(&failure, ScriptFailure::Raised { message } if message.contains("ran during the check")),
         "{failure:?}"
+    );
+}
+
+#[cfg(test)]
+#[test]
+fn person_needs_no_script() {
+    let definition = workflow(TWINS_TYPES, TWINS);
+    let scripted = Behaviours::new().define("twin", "twin.lua", MAKES);
+
+    // `lone` has no script and a person performs it: the run starts, and stops
+    // at its instance `c` to hand it over.
+    let outcome = run_with(&definition, &scripted.clone().person("lone"), None);
+    match outcome {
+        Ok(crate::Outcome::Awaiting(activation)) => assert_eq!(activation.instance(), "c"),
+        other => panic!("expected the person's step handed over, got {other:?}"),
+    }
+
+    // The control: the same scripts without the naming are refused for it.
+    assert_eq!(
+        faults_of(run_with(&definition, &scripted, None)),
+        vec![BehaviourFault::Missing {
+            node_type: "lone".to_owned()
+        }]
+    );
+}
+
+#[cfg(test)]
+#[test]
+fn person_and_script_refused() {
+    let definition = workflow(TWINS_TYPES, TWINS);
+    let ran = "error('ran')";
+
+    // `twin` is named for a person and given two scripts, each of which fails
+    // if it runs; `lone` has neither. Both faults, once each, in one refusal.
+    let behaviours = Behaviours::new()
+        .define("twin", "one.lua", ran)
+        .person("twin")
+        .define("twin", "two.lua", ran);
+    assert_eq!(
+        faults_of(run_with(&definition, &behaviours, None)),
+        vec![
+            BehaviourFault::PersonAndScript {
+                node_type: "twin".to_owned(),
+                documents: vec!["one.lua".to_owned(), "two.lua".to_owned()],
+            },
+            BehaviourFault::Missing {
+                node_type: "lone".to_owned()
+            },
+        ]
+    );
+
+    // Controls that start: `lone` named for a person twice, and `unused` -
+    // which no instance names - both named for a person and given a script.
+    let behaviours = Behaviours::new()
+        .define("twin", "twin.lua", MAKES)
+        .person("lone")
+        .person("lone")
+        .person("unused")
+        .define("unused", "unused.lua", ran);
+    let outcome = run_with(&definition, &behaviours, None);
+    assert!(
+        matches!(&outcome, Ok(crate::Outcome::Awaiting(activation)) if activation.instance() == "c"),
+        "{outcome:?}"
     );
 }

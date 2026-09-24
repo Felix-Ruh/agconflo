@@ -79,8 +79,10 @@ and how an activation is performed.
      and the run refuses it (``CREQ_RUN_REFUSES_HELD_IDENTIFIER``).
    - **The text changed on the way.** Trimmed, or its line endings converted:
      the run holds bytes the person did not write.
-   - **The activation charged again.** A run whose budget was exactly enough
-     ends on its budget instead of completing.
+   - **An exhausted source met with a panic, or the answer dropped.** A record
+     can carry a source that has issued every identifier, and the text then
+     has none to be issued under. The step fails carrying that, as a script's
+     does when the functions it calls cannot issue one.
    - **A record not handed over after it.** An interruption after the person
      answered and before the next output loses the answer.
 
