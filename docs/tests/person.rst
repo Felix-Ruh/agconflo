@@ -13,7 +13,9 @@ script host's in its module ``scripted``, which drives a run.
 No person takes part in a test. Where one would answer, the test supplies text
 in their place, which is all a person's answer is to the run - a context
 arriving from outside it - and a new process is stood in for as the resume
-cases do: a run built from the record's text and nothing else.
+cases do: a run built from the record's text and nothing else. A step answered
+in a real second process, against a real model, was measured once outside the
+tests (``EVD_PERSON_ANSWERED_IN_A_NEW_PROCESS``).
 
 Every failure mode listed in ``components/person`` is named by the case that
 catches it, and one case checks the narrowed ``CREQ_BEHAVIOURS_REFUSE_MISSING``
@@ -66,7 +68,7 @@ from the side it was narrowed on.
    :id: TEST_SCRIPTED_PERSON_TEXT_BECOMES_OUTPUT
    :verifies: CREQ_HOST_TAKES_PERSON_TEXT
    :test_kind: property
-   :coverage: full
+   :coverage: partial
 
    For any text - empty, whitespace at either end, line endings of both kinds,
    characters outside ASCII - the chain above with a passing third script,
@@ -75,8 +77,21 @@ from the side it was narrowed on.
    rendering exactly the text, a record was handed over after the answer and
    after the third output, and the record after the answer resumes.
 
-   Catches: a context from a fresh source; the text changed on the way; the
-   activation charged again; a record not handed over after it.
+   Catches: a context from a fresh source; the text changed on the way; a
+   record not handed over after it.
+
+.. test_case:: A person's answer to a record with an exhausted source fails the step
+   :id: TEST_SCRIPTED_EXHAUSTED_SOURCE_FAILS_THE_STEP
+   :verifies: CREQ_HOST_TAKES_PERSON_TEXT
+   :test_kind: error_path
+   :coverage: partial
+
+   The chain above parked at the person's step, its record's source rewritten
+   as exhausted - a sound record, since such a source has issued every
+   identifier it holds - and answered. The run ends with the person's step
+   failed, carrying that the source was exhausted.
+
+   Catches: an exhausted source met with a panic, or the answer dropped.
 
 .. test_case:: An answer for a step the run does not await is refused, with nothing run
    :id: TEST_SCRIPTED_ANSWER_ELSEWHERE_REFUSED
@@ -85,16 +100,16 @@ from the side it was narrowed on.
    :coverage: full
 
    Each script in these runs raises an error if it runs, so running one ends
-   the run on a failure rather than refusing. Answered for the person's
-   instance, a record whose run next offers a script's step is refused naming
-   both instances; a record awaiting the person, answered for another instance
-   or for one the workflow does not have, is refused naming the person's; and a
-   record of a run that has completed is refused naming none. No record is
-   handed over for any of them.
+   the run on a failure rather than refusing. A record whose run next offers a
+   script's step is refused, answered for the person's instance and for the
+   script's own, naming the script's; a record awaiting the person, answered
+   for another instance or for one the workflow does not have, is refused
+   naming the person's; and a record of a run that has completed is refused
+   naming none. No record is handed over for any of them.
 
    A record that is not a record of the workflow is refused as a resume
-   refuses it, and behaviours with a fault as their check refuses them, whatever
-   the answer names.
+   refuses it, and behaviours with a fault as their check refuses them, whether
+   or not the answer names the step the run awaits.
 
    Catches: taken for a script's step; scripts run until the instance comes
    up; dropped for a run that has ended; refused without naming what the run

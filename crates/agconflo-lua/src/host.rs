@@ -6,7 +6,7 @@ use std::cell::{Cell, RefCell};
 use std::fmt;
 use std::rc::Rc;
 
-use agconflo_core::{Activation, Context, ContextType, IdSource, OutputRefusal};
+use agconflo_core::{Activation, Context, ContextType, IdSource, OutputRefusal, SourceExhausted};
 use mlua::prelude::*;
 
 use crate::behaviours::Script;
@@ -85,6 +85,11 @@ pub enum ScriptFailure {
     /// The script returned a context the run refused
     /// (`CREQ_HOST_OUTPUT_REFUSAL_CARRIED`), and this is the run's refusal.
     OutputRefused(OutputRefusal),
+    /// A person answered a step and the identifier source had nothing left to
+    /// issue the answer's context under (`CREQ_HOST_TAKES_PERSON_TEXT`). A
+    /// script meeting the same source raises an error from the function it
+    /// called, which is carried as [`ScriptFailure::Raised`].
+    SourceExhausted(SourceExhausted),
 }
 
 impl fmt::Display for ScriptFailure {
@@ -99,6 +104,9 @@ impl fmt::Display for ScriptFailure {
             Self::ModelCallLimit => f.write_str("the script exceeded its model call limit"),
             Self::ModelFailed(failure) => write!(f, "a model call failed: {failure}"),
             Self::OutputRefused(refusal) => write!(f, "the run refused the output: {refusal}"),
+            Self::SourceExhausted(exhausted) => {
+                write!(f, "the person's answer could not be kept: {exhausted}")
+            }
         }
     }
 }

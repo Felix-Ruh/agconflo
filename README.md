@@ -15,7 +15,7 @@ where did every byte come from?"* has an exact answer.
 
 ## Status
 
-**Pre-alpha. Nodes run as scripts, call models, and a run survives an interruption** — no loops, no tools. What
+**Pre-alpha. Nodes run as scripts, call models or wait for a person, and a run survives an interruption** — no loops, no tools. What
 exists is the development process around it and the first slices of code through it: a
 requirements project under `docs/` with a validated metamodel behind it, a commit gate, continuous
 integration, and two crates.
@@ -38,7 +38,10 @@ through [`genai`](https://github.com/jeremychone/rust-genai), so the same workfl
 another provider by changing that mapping. The prompt is a context and is all the model is shown;
 the answer comes back as a context of its own. A scripted run hands its caller a record when it starts
 and after every output, so a run interrupted mid-call is resumed without repeating any call that was
-answered. Each crate is traced from its requirements to the code and back from the tests that check it.
+answered. A node type can instead be performed by a person: the run stops at that step and hands it to
+its caller, who answers later - from the run's record, in another process if need be - with text that
+becomes the step's output. Each crate is traced from its requirements to the code and back from the
+tests that check it.
 
 Expect the public API to change without warning. Breaking changes, yes; force-pushes to `main`, no —
 those are blocked outright, along with direct pushes to it.

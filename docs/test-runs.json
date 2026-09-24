@@ -30,6 +30,24 @@
           "title": "agconflo-lua behaviours::missing_script_is_refused",
           "type": "test_run"
         },
+        "RUN_BEHAVIOURS_PERSON_AND_SCRIPT_REFUSED": {
+          "executes": [
+            "TEST_BEHAVIOURS_PERSON_AND_SCRIPT_REFUSED"
+          ],
+          "id": "RUN_BEHAVIOURS_PERSON_AND_SCRIPT_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-lua behaviours::person_and_script_refused",
+          "type": "test_run"
+        },
+        "RUN_BEHAVIOURS_PERSON_NEEDS_NO_SCRIPT": {
+          "executes": [
+            "TEST_BEHAVIOURS_PERSON_NEEDS_NO_SCRIPT"
+          ],
+          "id": "RUN_BEHAVIOURS_PERSON_NEEDS_NO_SCRIPT",
+          "test_outcome": "passed",
+          "title": "agconflo-lua behaviours::person_needs_no_script",
+          "type": "test_run"
+        },
         "RUN_BEHAVIOURS_TWO_SCRIPTS_ARE_REFUSED": {
           "executes": [
             "TEST_BEHAVIOURS_TWO_SCRIPTS_ARE_REFUSED"
@@ -1182,6 +1200,15 @@
           "title": "agconflo-core scheduler::unresolved_source_never_ready",
           "type": "test_run"
         },
+        "RUN_SCRIPTED_ANSWER_ELSEWHERE_REFUSED": {
+          "executes": [
+            "TEST_SCRIPTED_ANSWER_ELSEWHERE_REFUSED"
+          ],
+          "id": "RUN_SCRIPTED_ANSWER_ELSEWHERE_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-lua scripted::answer_elsewhere_refused",
+          "type": "test_run"
+        },
         "RUN_SCRIPTED_ARGUMENTS_FROM_ANOTHER_SOURCE_FAIL": {
           "executes": [
             "TEST_SCRIPTED_ARGUMENTS_FROM_ANOTHER_SOURCE_FAIL"
@@ -1189,6 +1216,15 @@
           "id": "RUN_SCRIPTED_ARGUMENTS_FROM_ANOTHER_SOURCE_FAIL",
           "test_outcome": "passed",
           "title": "agconflo-lua scripted::arguments_from_another_source_fail",
+          "type": "test_run"
+        },
+        "RUN_SCRIPTED_AWAITING_IS_NOT_QUIESCENT": {
+          "executes": [
+            "TEST_SCRIPTED_AWAITING_IS_NOT_QUIESCENT"
+          ],
+          "id": "RUN_SCRIPTED_AWAITING_IS_NOT_QUIESCENT",
+          "test_outcome": "passed",
+          "title": "agconflo-lua scripted::awaiting_is_not_quiescent",
           "type": "test_run"
         },
         "RUN_SCRIPTED_CHANGED_SCRIPT_CHANGES_THE_RESULT": {
@@ -1200,6 +1236,15 @@
           "title": "agconflo-lua scripted::changed_script_changes_the_result",
           "type": "test_run"
         },
+        "RUN_SCRIPTED_EXHAUSTED_SOURCE_FAILS_THE_STEP": {
+          "executes": [
+            "TEST_SCRIPTED_EXHAUSTED_SOURCE_FAILS_THE_STEP"
+          ],
+          "id": "RUN_SCRIPTED_EXHAUSTED_SOURCE_FAILS_THE_STEP",
+          "test_outcome": "passed",
+          "title": "agconflo-lua scripted::exhausted_source_fails_the_step",
+          "type": "test_run"
+        },
         "RUN_SCRIPTED_INTERRUPTED_RUN_RESUMES": {
           "executes": [
             "TEST_SCRIPTED_INTERRUPTED_RUN_RESUMES"
@@ -1207,6 +1252,33 @@
           "id": "RUN_SCRIPTED_INTERRUPTED_RUN_RESUMES",
           "test_outcome": "passed",
           "title": "agconflo-lua scripted::interrupted_run_resumes",
+          "type": "test_run"
+        },
+        "RUN_SCRIPTED_PERSON_BETWEEN_MODEL_CALLS": {
+          "executes": [
+            "TEST_SCRIPTED_PERSON_BETWEEN_MODEL_CALLS"
+          ],
+          "id": "RUN_SCRIPTED_PERSON_BETWEEN_MODEL_CALLS",
+          "test_outcome": "passed",
+          "title": "agconflo-lua scripted::person_between_model_calls",
+          "type": "test_run"
+        },
+        "RUN_SCRIPTED_PERSON_STEP_HANDED_OVER": {
+          "executes": [
+            "TEST_SCRIPTED_PERSON_STEP_HANDED_OVER"
+          ],
+          "id": "RUN_SCRIPTED_PERSON_STEP_HANDED_OVER",
+          "test_outcome": "passed",
+          "title": "agconflo-lua scripted::person_step_handed_over",
+          "type": "test_run"
+        },
+        "RUN_SCRIPTED_PERSON_TEXT_BECOMES_OUTPUT": {
+          "executes": [
+            "TEST_SCRIPTED_PERSON_TEXT_BECOMES_OUTPUT"
+          ],
+          "id": "RUN_SCRIPTED_PERSON_TEXT_BECOMES_OUTPUT",
+          "test_outcome": "passed",
+          "title": "agconflo-lua scripted::person_text_becomes_output",
           "type": "test_run"
         },
         "RUN_SCRIPTED_RECORDS_HANDED_OVER": {

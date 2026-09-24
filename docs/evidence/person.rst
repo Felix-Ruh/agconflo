@@ -96,3 +96,27 @@ record and one on the result's lineage, and seen to fail on each.
    passed. Nothing in either could see the other: a resumed run is built from
    its record's text and nothing else, and the core stores nothing
    (``DEC_RECORD_IN_CORE``).
+
+The last was taken the same day, once the scripted run could hand a person's
+step over, and is the one measurement here of a person's step outliving the
+process that reached it: against the local model the models feature was
+measured on (``EVD_GENAI_REAL_LOCAL_MODEL``), from a scratch binary built on the
+crates at the head of the implementation.
+
+.. evd:: A person's step handed over by one process was answered in another
+   :id: EVD_PERSON_ANSWERED_IN_A_NEW_PROCESS
+   :evd_kind: measurement
+   :observed_on: 2026-09-24
+   :observation: A process drafted a poem with qwen3.8-27b-ridge, stopped at a person's review of it and exited; a new process answered from the kept record, made one call to revise the draft, and completed holding the draft as first made.
+
+   Three node types: a draft written by the model, a review performed by a
+   person, and a revision the model wrote from both. The first process kept
+   each record it was handed in a file, and stopped 8.2 s in, returning the
+   review step with the draft as its input under identifier 1, and exited
+   normally.
+
+   A second process read the file and supplied a review as text, and
+   completed 31.1 s later. Its result held the draft as the first process had
+   shown it, byte for byte, under identifier 1, so the draft was not written
+   again; the review under identifier 2, as a ``verdict``; and the revision.
+   The run spent three activations for three nodes.
