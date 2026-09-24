@@ -60,6 +60,7 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    decisions/models
    decisions/resume
    decisions/person
+   decisions/yield
    decisions/toolchain
    decisions/requirements
    decisions/changes

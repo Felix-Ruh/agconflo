@@ -21,7 +21,7 @@ log's, which does not exist yet.
 
 .. dec:: A run is recorded as its outputs and the inputs each was made from
    :id: DEC_RECORD_IS_OUTPUTS
-   :dec_status: accepted
+   :dec_status: superseded
    :decided_on: 2026-09-23
    :supported_by: EVD_RUN_STATE_DERIVABLE, EVD_REPLAY_BY_NAME_ACCEPTS_REWIRING
    :statement: Agconflo shall record a run as its budget, the activations it spent, its arguments, and each output it accepted together with the inputs that output's activation was given.
@@ -46,9 +46,13 @@ log's, which does not exist yet.
    run has done - a typo fixed while a run waits for a person - describes the
    same run so far, and the inputs say so where equality would refuse it.
 
+   Superseded by ``DEC_RECORD_HOLDS_EXCHANGES``, which records every model
+   call as well, since a call is a point a run can be written down at and it
+   lies inside an activation.
+
 .. dec:: A run is resumed by replaying its record through the run
    :id: DEC_RESUME_BY_REPLAY
-   :dec_status: accepted
+   :dec_status: superseded
    :decided_on: 2026-09-23
    :supported_by: EVD_REPLAY_BY_NAME_ACCEPTS_REWIRING
    :statement: Agconflo shall resume a run by starting it from its recorded arguments and reporting each recorded output to it in the recorded order, refusing a record whose outputs the run would not have been offered with the recorded inputs.
@@ -68,6 +72,9 @@ log's, which does not exist yet.
    The inputs are compared by identifier, and a context under a recorded
    identifier is the one the record holds, so an input compared equal is the
    same value.
+
+   Superseded by ``DEC_RESUME_REPLAYS_CALLS``, which replays a record's
+   calls with its outputs.
 
 .. dec:: A record is a TOML document holding each context once by identifier
    :id: DEC_RECORD_IN_TOML
@@ -150,7 +157,7 @@ log's, which does not exist yet.
 
 .. dec:: A scripted run hands its caller a record after every output
    :id: DEC_SCRIPTED_RUN_HANDS_RECORDS
-   :dec_status: accepted
+   :dec_status: superseded
    :decided_on: 2026-09-23
    :supported_by: EVD_INTERRUPTED_RUN_REPEATS_CALLS
    :statement: Agconflo shall hand the caller of a scripted run the run's record when the run starts and each time the run accepts an output.
@@ -165,3 +172,6 @@ log's, which does not exist yet.
    run interrupted in its first activation is otherwise begun again by hand.
    Not before each activation, because nothing has changed since the output
    before it.
+
+   Superseded by ``DEC_RECORD_AFTER_EACH_ANSWER``, which hands one over
+   after every answered model call as well.
