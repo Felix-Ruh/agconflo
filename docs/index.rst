@@ -43,6 +43,7 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    components/models
    components/resume
    components/person
+   components/yield
    tests/context
    tests/wiring
    tests/topology
