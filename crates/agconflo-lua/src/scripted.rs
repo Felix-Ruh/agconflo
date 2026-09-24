@@ -417,11 +417,20 @@ pub(crate) fn block<F: std::future::Future>(future: F) -> F::Output {
         .block_on(future)
 }
 
-/// A roster mapping no role, for runs whose scripts call no model. Building a
-/// client reaches nothing.
+/// A roster mapping no role, for runs whose scripts call no model.
+///
+/// Built once per thread and cloned. Building a client reaches no network, and
+/// is still not free: on Linux it took about 36 ms, measured in a container with
+/// four CPUs, where Windows was far cheaper. Built afresh for every case, the
+/// property tests that run a workflow hundreds of times took 19 s and 10 s
+/// there, against 0.6 s and 0.5 s with one client, and the first was killed at
+/// the 20 s limit in CI.
 #[cfg(test)]
 pub(crate) fn offline() -> Roster {
-    Roster::new(genai::Client::builder().build().expect("a client"))
+    thread_local! {
+        static OFFLINE: Roster = Roster::new(genai::Client::builder().build().expect("a client"));
+    }
+    OFFLINE.with(Roster::clone)
 }
 
 /// A context of type `declared` holding `text`, from `source`.
