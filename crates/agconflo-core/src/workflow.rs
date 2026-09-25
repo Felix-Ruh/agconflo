@@ -48,6 +48,10 @@ pub struct Parameter {
 pub struct NodeType {
     /// The name an instance names to reach this declaration.
     pub name: String,
+    /// What a node of this type does, in the words of its declaration, or empty
+    /// when it gives none. A model offered this type as a tool is shown it
+    /// (`DEC_TOOLS_OFFERED_AS_CONTEXTS`).
+    pub description: String,
     /// Parameters a node of this type cannot run without.
     pub required: Vec<Parameter>,
     /// Parameters a node of this type uses when they are wired.
@@ -145,6 +149,7 @@ pub(crate) fn context_type(name: &str) -> ContextType {
 pub(crate) fn node_type(name: &str, required: &[(&str, &str)], output: &str) -> NodeType {
     NodeType {
         name: name.to_owned(),
+        description: String::new(),
         required: parameters(required),
         optional: Vec::new(),
         globals: Vec::new(),
@@ -157,6 +162,12 @@ impl NodeType {
     /// The same declaration, also accepting `optional`.
     pub(crate) fn with_optional(mut self, optional: &[(&str, &str)]) -> Self {
         self.optional = parameters(optional);
+        self
+    }
+
+    /// The same declaration, described as `description`.
+    pub(crate) fn described(mut self, description: &str) -> Self {
+        self.description = description.to_owned();
         self
     }
 

@@ -34,7 +34,9 @@ Reading and writing
    An instance declaring three calls, one of them twice, reads them in the
    order written, the repeat kept. An instance with no calls key declares none.
    A calls key on a node type document is kept as a key the reader does not
-   name, and gives no instance a call.
+   name, and gives no instance a call. The same document's description of a
+   node type - what a model it is offered to is shown - is read as written, and
+   one without is read as empty.
 
    Catches: the key left unread; a calls key on a node type document read as
    calls.
@@ -424,7 +426,12 @@ The script host
    For a run whose nodes yield, resumed in a fresh run from every record it
    hands over, the resumed run ends with the same output, and the requests the
    stub receives across both are each the first of their kind: no window the
-   record answered is sent again. Resumed with a model call limit equal to the
+   record answered is sent again, and no call whose output the record holds is
+   performed again - the resumed run ends holding the events the uninterrupted
+   one held. Among the runs is one whose called node type asks a model of its
+   own, so that some records are taken while it is being performed, its answer
+   held and its caller's continuation not yet sent. Resumed with a model call
+   limit equal to the
    requests the record answered, the next new request fails at the limit, as
    it would have in the run that was recorded.
 

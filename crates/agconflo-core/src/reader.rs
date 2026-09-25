@@ -176,9 +176,10 @@ impl std::error::Error for ReadFault {}
 /// Each type is a table under `types`, keyed by its name, holding up to three
 /// tables and an array - `required` and `optional`, each keying a parameter's
 /// context type by the parameter's name, and `globals`, the context types read
-/// by declaration - and `output`, the one context type it produces. Only
-/// `output` is needed; an absent list is an empty one, and a document without
-/// `types` declares none.
+/// by declaration - and `output`, the one context type it produces, and may hold
+/// a `description` of what it does, shown to a model it is offered to. Only
+/// `output` is needed; an absent list is an empty one, an absent description is
+/// empty, and a document without `types` declares none.
 ///
 /// Parameters come back in the order they are written, whether a list is
 /// written as a header table, an inline table or dotted keys. Nothing here
@@ -483,8 +484,16 @@ impl<'t> Reading<'t> {
         let optional = self.parameters(declaration, &key, "optional")?;
         self.declared_once(declaration, &key, &required, &optional)?;
 
+        let description = match declaration.get("description") {
+            None => String::new(),
+            Some(item) => self
+                .string(item, &[&key[..], &["description"]].concat())?
+                .to_owned(),
+        };
+
         Ok(NodeType {
             name: name.to_owned(),
+            description,
             required,
             optional,
             globals: self.globals(declaration, &key)?,
@@ -1021,7 +1030,7 @@ fn three_lists_kept_apart() {
 zoom = 2
 
 [types.review]
-description = \"summarises a diff\"
+colour = \"teal\"
 globals = [\"policy\", \"style\"]
 optional = { hint = \"note\" }
 required = { diff = \"diff\", notes = \"summary\" }
@@ -1571,10 +1580,17 @@ fn calls_read_in_order() {
     // resolving is the validator's.
     let types = read_node_types(
         "types.toml",
-        "[types.lookup]\noutput = \"note\"\ncalls = [\"sink\"]\n",
+        "[types.lookup]\noutput = \"note\"\ncalls = [\"sink\"]\ndescription = \" Looks a term up. \"\n\n[types.bare]\noutput = \"note\"\n",
     )
     .expect("a node type with an unread key reads");
-    assert_eq!(types.node_types(), &[node_type("lookup", &[], "note")]);
+    // The description as written, spaces and all; none is empty.
+    assert_eq!(
+        types.node_types(),
+        &[
+            node_type("lookup", &[], "note").described(" Looks a term up. "),
+            node_type("bare", &[], "note"),
+        ]
+    );
 
     let text = r#"name = "w"
 output = "b"

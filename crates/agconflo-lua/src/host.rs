@@ -6,11 +6,16 @@ use std::cell::{Cell, RefCell};
 use std::fmt;
 use std::rc::Rc;
 
-use agconflo_core::{Activation, Context, ContextType, IdSource, OutputRefusal, SourceExhausted};
+use std::collections::HashMap;
+
+use agconflo_core::{
+    Activation, Call, CallRefusal, Context, ContextType, Exchange, ExchangeRefusal, IdSource,
+    NodeType, OutputRefusal, SourceExhausted,
+};
 use mlua::prelude::*;
 
 use crate::behaviours::Script;
-use crate::models::{ModelFailure, Roster};
+use crate::models::{Asked, ModelFailure, Offered, Part, Roster};
 
 /// What one activation's script may spend.
 ///
@@ -90,6 +95,70 @@ pub enum ScriptFailure {
     /// script meeting the same source raises an error from the function it
     /// called, which is carried as [`ScriptFailure::Raised`].
     SourceExhausted(SourceExhausted),
+    /// A model's answer made a call Agconflo refuses, and none of that answer's
+    /// calls was performed (`CREQ_HOST_REFUSES_MALFORMED_CALL`).
+    MalformedCall {
+        /// The name the model called.
+        node_type: String,
+        /// Which fault it was.
+        fault: ModelCallFault,
+    },
+    /// The run refused a call the model made (`CREQ_HOST_CALL_REFUSAL_CARRIED`),
+    /// and this is the run's refusal.
+    CallRefused(CallRefusal),
+    /// The run refused an exchange the model made, and this is the run's
+    /// refusal. Every context of an exchange is issued by the run's own source
+    /// or read from its record, so nothing here is expected to produce one.
+    ExchangeRefused(ExchangeRefusal),
+    /// An activation resumed from its record sent a window or an offer other
+    /// than the one its record holds at that point, and nothing was sent
+    /// (`CREQ_HOST_REPLAY_DIVERGED`).
+    Diverged {
+        /// Which of the activation's recorded exchanges it differs from, the
+        /// first being 0.
+        exchange: usize,
+        /// Whether what differs is the offer rather than the window.
+        offer: bool,
+    },
+}
+
+/// What is wrong with a call a model made (`DEC_MALFORMED_CALL_FAILS`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ModelCallFault {
+    /// The name is not one of the node types offered.
+    NotOffered,
+    /// The arguments are not a JSON object.
+    NotAnObject,
+    /// An argument names a parameter the node type does not declare.
+    UndeclaredParameter {
+        /// The parameter as the model named it.
+        parameter: String,
+    },
+    /// A required parameter has no argument.
+    RequiredMissing {
+        /// The parameter.
+        parameter: String,
+    },
+    /// An argument is not a string, so there is no text to make its context of.
+    NotAString {
+        /// The parameter.
+        parameter: String,
+    },
+}
+
+impl fmt::Display for ModelCallFault {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::NotOffered => f.write_str("it was not offered"),
+            Self::NotAnObject => f.write_str("its arguments are not an object"),
+            Self::UndeclaredParameter { parameter } => {
+                write!(f, "it declares no parameter {parameter}")
+            }
+            Self::RequiredMissing { parameter } => write!(f, "{parameter} is required"),
+            Self::NotAString { parameter } => write!(f, "{parameter} is not a string"),
+        }
+    }
 }
 
 impl fmt::Display for ScriptFailure {
@@ -107,6 +176,18 @@ impl fmt::Display for ScriptFailure {
             Self::SourceExhausted(exhausted) => {
                 write!(f, "the person's answer could not be kept: {exhausted}")
             }
+            Self::MalformedCall { node_type, fault } => {
+                write!(f, "the model's call to {node_type} is refused: {fault}")
+            }
+            Self::CallRefused(refusal) => write!(f, "the run refused a call: {refusal}"),
+            Self::ExchangeRefused(refusal) => {
+                write!(f, "the run refused an exchange: {refusal}")
+            }
+            Self::Diverged { exchange, offer } => write!(
+                f,
+                "resumed, the script sent another {} than its record holds for exchange {exchange}",
+                if *offer { "offer" } else { "window" }
+            ),
         }
     }
 }
@@ -191,9 +272,76 @@ impl LuaUserData for Handed {
 /// error that stopped the script.
 #[derive(Default)]
 struct Calls {
+    /// Requests counted against the limit, answered from the record included.
     made: Cell<u32>,
     over_limit: Cell<bool>,
-    failed: RefCell<Option<ModelFailure>>,
+    /// How many of the activation's recorded exchanges have been answered from.
+    replayed: Cell<usize>,
+    failed: RefCell<Option<ScriptFailure>>,
+}
+
+/// What the script host asks of the run while it performs an activation - the
+/// one way a model's call reaches the run (`DEC_CALL_IS_AN_ACTIVATION`).
+pub(crate) enum Asking {
+    /// Hold this exchange with the activation, and hand the caller a record.
+    Exchange(Exchange),
+    /// Perform this call as an activation of the run, and give back its output.
+    Call(Call),
+}
+
+/// What the run gives back.
+pub(crate) enum Given {
+    /// The exchange is held.
+    Held,
+    /// The call's output.
+    Output(Context),
+    /// The run stopped here - a refusal, a failure, a person's step, its budget
+    /// - and the script is to end; its caller knows which.
+    Stop,
+}
+
+/// Where the script host leaves what it asks and finds what it was given.
+///
+/// A script's host functions own what they hold, since a model call is awaited
+/// and a scoped function cannot be, and the run borrows its workflow, so it
+/// cannot be held by them. So the host asks and waits, and whatever polls the
+/// script answers from the run it has (`DEC_RUN_IS_DRIVEN`): the yield is to
+/// the driver, as the call is a step of the run.
+#[derive(Default)]
+pub(crate) struct Mailbox {
+    pub(crate) asking: RefCell<Option<Asking>>,
+    pub(crate) given: RefCell<Option<Given>>,
+}
+
+/// Ask `asking` of the run and wait for what it gives.
+///
+/// Pending until the answer is in the mailbox. No waker is kept: whatever polls
+/// the script sees the question, answers it, and polls again.
+async fn ask(mailbox: &Rc<Mailbox>, asking: Asking) -> Given {
+    *mailbox.asking.borrow_mut() = Some(asking);
+    std::future::poll_fn(|_| match mailbox.given.borrow_mut().take() {
+        Some(given) => std::task::Poll::Ready(given),
+        None => std::task::Poll::Pending,
+    })
+    .await
+}
+
+/// What an activation resumed from its record is answered from: the exchanges
+/// the record holds for it, in order, and the output of each of their calls the
+/// record holds, by the provider's identifier (`DEC_SCRIPT_REPLAYED_FROM_ITS_RECORD`).
+#[derive(Clone, Debug, Default)]
+pub(crate) struct Replay {
+    pub(crate) exchanges: Vec<Exchange>,
+    pub(crate) outputs: HashMap<String, Context>,
+}
+
+/// What an activation is performed with besides its script and its limits:
+/// the node types its model may call, what its record holds for it, and the
+/// mailbox the run answers through.
+pub(crate) struct Performing {
+    pub(crate) callees: Vec<NodeType>,
+    pub(crate) replay: Replay,
+    pub(crate) mailbox: Rc<Mailbox>,
 }
 
 /// Perform `activation` by running `script`, or say how it failed.
@@ -225,12 +373,14 @@ pub(crate) async fn perform(
     source: &Rc<RefCell<IdSource>>,
     roster: &Roster,
     limits: Limits,
+    performing: Performing,
 ) -> Result<Context, ScriptFailure> {
     let lua = sandbox().map_err(raised)?;
     lua.set_memory_limit(limits.memory).map_err(raised)?;
     let calls = Rc::new(Calls::default());
 
-    let host = host_functions(&lua, activation, source, roster, &calls, limits).map_err(raised)?;
+    let host = host_functions(&lua, activation, source, roster, &calls, limits, performing)
+        .map_err(raised)?;
     close_coroutines(&lua).map_err(raised)?;
     let given = lua.create_table().map_err(raised)?;
     for (parameter, context) in activation.inputs() {
@@ -262,6 +412,7 @@ pub(crate) async fn perform(
 /// takes its prompt as a context and nothing else (`CREQ_HOST_PROMPT_IS_A_CONTEXT`),
 /// and gives the answer back as a new context of the type the script names, or
 /// of its output's declared type when it names none (`CREQ_HOST_MODEL_ANSWER`).
+/// Between the two, its model may yield: see [`complete`].
 // @A model call through the host,IMPL_HOST_COMPLETE,impl,[CREQ_HOST_MODEL_ANSWER, CREQ_HOST_PROMPT_IS_A_CONTEXT, CREQ_HOST_MODEL_CALL_LIMIT]
 fn host_functions(
     lua: &Lua,
@@ -270,6 +421,7 @@ fn host_functions(
     roster: &Roster,
     calls: &Rc<Calls>,
     limits: Limits,
+    performing: Performing,
 ) -> LuaResult<LuaTable> {
     let host = lua.create_table()?;
     host.raw_set("output", activation.output().as_str())?;
@@ -305,10 +457,16 @@ fn host_functions(
         )?,
     )?;
 
-    let issuing = source.clone();
-    let roster = roster.clone();
-    let calls = calls.clone();
-    let output = activation.output().as_str().to_owned();
+    let completing = Rc::new(Completing {
+        source: source.clone(),
+        roster: roster.clone(),
+        calls: calls.clone(),
+        limits,
+        output: activation.output().as_str().to_owned(),
+        callees: performing.callees,
+        replay: performing.replay,
+        mailbox: performing.mailbox,
+    });
     host.raw_set(
         "complete",
         lua.create_async_function(
@@ -317,32 +475,284 @@ fn host_functions(
                 // cannot be held across the call, and a prompt that is not a
                 // context is refused before any call is made.
                 let prompt = prompt.borrow::<Handed>().map(|handed| handed.0.clone());
-                let declared = declared.unwrap_or_else(|| output.clone());
-                let (issuing, roster, calls) = (issuing.clone(), roster.clone(), calls.clone());
+                let completing = completing.clone();
                 async move {
                     let prompt = prompt?;
+                    let declared = declared.unwrap_or_else(|| completing.output.clone());
                     let declared = ContextType::new(&declared).map_err(LuaError::external)?;
-                    if calls.made.get() >= limits.model_calls {
-                        calls.over_limit.set(true);
-                        return Err(LuaError::runtime("model call limit exceeded"));
-                    }
-                    calls.made.set(calls.made.get() + 1);
-                    match roster.call(&role, &prompt).await {
-                        Ok(answer) => Context::text(&mut issuing.borrow_mut(), declared, answer)
-                            .map(Handed)
-                            .map_err(LuaError::external),
-                        Err(failure) => {
-                            let message = failure.to_string();
-                            *calls.failed.borrow_mut() = Some(failure);
-                            Err(LuaError::runtime(message))
-                        }
-                    }
+                    complete(&completing, &role, prompt, declared)
+                        .await
+                        .map(Handed)
                 }
             },
         )?,
     )?;
 
     Ok(host)
+}
+
+/// Everything one activation's `host.complete` needs, owned.
+struct Completing {
+    source: Rc<RefCell<IdSource>>,
+    roster: Roster,
+    calls: Rc<Calls>,
+    limits: Limits,
+    output: String,
+    callees: Vec<NodeType>,
+    replay: Replay,
+    mailbox: Rc<Mailbox>,
+}
+
+impl Completing {
+    /// End the script with `failure`, which is what it will be reported as.
+    fn fail(&self, failure: ScriptFailure) -> LuaError {
+        let message = failure.to_string();
+        *self.calls.failed.borrow_mut() = Some(failure);
+        LuaError::runtime(message)
+    }
+}
+
+/// One `host.complete`: the model asked about `prompt` and answering as a
+/// context of `declared`, yielding to each call it makes.
+///
+/// The model is offered the node types the activation's instance declares calls
+/// to, as contexts of the prompt's type made from their declarations
+/// (`CREQ_HOST_OFFERS_DECLARED`). Every request counts against the model call
+/// limit, checked before it is sent (`DEC_EVERY_TURN_COUNTED`). An answer is
+/// reported to the run - window, offer, answer and every call - before any of its
+/// calls is performed, and the run hands its caller a record holding it
+/// (`CREQ_HOST_REPORTS_EXCHANGES`, `CREQ_HOST_RECORD_AFTER_ANSWER`); but first
+/// every call of it is checked, and one that is malformed fails the activation
+/// with none reported (`CREQ_HOST_REFUSES_MALFORMED_CALL`). The calls are then
+/// performed by the run in the order the answer gives them
+/// (`CREQ_HOST_PERFORMS_CALLS`), and the model is sent a window composing the
+/// last one, the answer, each call's contexts and each call's output
+/// (`CREQ_HOST_NEXT_WINDOW`), until it answers without calling.
+///
+/// An activation resumed from its record answers each request its record holds
+/// from the record instead, counted all the same, and each call the record holds
+/// an output for from that output (`CREQ_HOST_ANSWERS_FROM_RECORD`) - once the
+/// window and the offer are seen to be the ones recorded, by type and content,
+/// since the identifiers a replay makes are new. A difference fails the
+/// activation before anything is sent (`CREQ_HOST_REPLAY_DIVERGED`). When they
+/// agree the activation goes on with the recorded contexts.
+// @A model's calls performed and the next window composed,IMPL_HOST_YIELD,impl,[CREQ_HOST_OFFERS_DECLARED, CREQ_HOST_PERFORMS_CALLS, CREQ_HOST_NEXT_WINDOW, CREQ_HOST_REFUSES_MALFORMED_CALL, CREQ_HOST_REPORTS_EXCHANGES, CREQ_HOST_ANSWERS_FROM_RECORD, CREQ_HOST_REPLAY_DIVERGED, CREQ_HOST_MODEL_CALL_LIMIT]
+async fn complete(
+    completing: &Completing,
+    role: &str,
+    prompt: Context,
+    declared: ContextType,
+) -> LuaResult<Context> {
+    let issuing = &completing.source;
+    let calls = &completing.calls;
+    let kind = prompt.declared_type().clone();
+    let (offered, offer) = offer_for(issuing, &kind, &completing.callees)?;
+    let mut parts = vec![Part::User(prompt.clone())];
+    let mut window = prompt;
+
+    loop {
+        if calls.made.get() >= completing.limits.model_calls {
+            calls.over_limit.set(true);
+            return Err(LuaError::runtime("model call limit exceeded"));
+        }
+        calls.made.set(calls.made.get() + 1);
+
+        let cursor = calls.replayed.get();
+        let (answer, made) = if let Some(recorded) = completing.replay.exchanges.get(cursor) {
+            calls.replayed.set(cursor + 1);
+            if !same(recorded.window(), &window) {
+                return Err(completing.fail(ScriptFailure::Diverged {
+                    exchange: cursor,
+                    offer: false,
+                }));
+            }
+            let recorded_offer = recorded.offer();
+            if recorded_offer.len() != offer.len()
+                || !recorded_offer.iter().zip(&offer).all(|(a, b)| same(a, b))
+            {
+                return Err(completing.fail(ScriptFailure::Diverged {
+                    exchange: cursor,
+                    offer: true,
+                }));
+            }
+            window = recorded.window().clone();
+            (recorded.answer().clone(), recorded.calls().to_vec())
+        } else {
+            let answered = match completing.roster.send(role, &parts, &offered).await {
+                Ok(answered) => answered,
+                Err(failure) => return Err(completing.fail(ScriptFailure::ModelFailed(failure))),
+            };
+            let made = match checked(&answered.calls, &completing.callees, issuing) {
+                Ok(made) => made?,
+                Err((node_type, fault)) => {
+                    return Err(completing.fail(ScriptFailure::MalformedCall { node_type, fault }));
+                }
+            };
+            let answer = Context::text(&mut issuing.borrow_mut(), declared.clone(), answered.text)
+                .map_err(LuaError::external)?;
+            let mut exchange =
+                Exchange::new(window.clone(), answer.clone()).offering(offer.clone());
+            for call in &made {
+                exchange = exchange.calling(call.clone());
+            }
+            if !matches!(
+                ask(&completing.mailbox, Asking::Exchange(exchange)).await,
+                Given::Held
+            ) {
+                return Err(stopped());
+            }
+            (answer, made)
+        };
+
+        if made.is_empty() {
+            return Ok(answer);
+        }
+
+        let mut outputs = Vec::new();
+        for call in &made {
+            let output = match completing.replay.outputs.get(call.id()) {
+                Some(output) => output.clone(),
+                None => match ask(&completing.mailbox, Asking::Call(call.clone())).await {
+                    Given::Output(output) => output,
+                    _ => return Err(stopped()),
+                },
+            };
+            outputs.push((call.id().to_owned(), output));
+        }
+
+        let mut composed: Vec<&Context> = vec![&window, &answer];
+        for call in &made {
+            composed.extend(call.inputs().iter().map(|(_, given)| given));
+        }
+        composed.extend(outputs.iter().map(|(_, output)| output));
+        let next = Context::compose(&mut issuing.borrow_mut(), kind.clone(), composed, "")
+            .map_err(LuaError::external)?;
+
+        parts.push(Part::Answer {
+            answer,
+            calls: made,
+        });
+        for (call, output) in outputs {
+            parts.push(Part::Result { call, output });
+        }
+        window = next;
+    }
+}
+
+/// The error a script ends with when the run stopped the activation; what
+/// stopped it is the caller's to know.
+fn stopped() -> LuaError {
+    LuaError::runtime("the run stopped this activation")
+}
+
+/// Whether two contexts are the same by type and content.
+fn same(a: &Context, b: &Context) -> bool {
+    a.declared_type() == b.declared_type() && a.render() == b.render()
+}
+
+/// The offer: for each node type the instance declares a call to, once, a
+/// composition of text contexts of `kind` - its name, its description, and each
+/// parameter's name, required ones first - and the same contexts as the roster
+/// sends them (`DEC_TOOLS_OFFERED_AS_CONTEXTS`).
+fn offer_for(
+    issuing: &Rc<RefCell<IdSource>>,
+    kind: &ContextType,
+    callees: &[NodeType],
+) -> LuaResult<(Vec<Offered>, Vec<Context>)> {
+    let mut source = issuing.borrow_mut();
+    let mut text =
+        |text: &str| Context::text(&mut source, kind.clone(), text).map_err(LuaError::external);
+    let mut offered = Vec::new();
+    for callee in callees {
+        let name = text(&callee.name)?;
+        let description = text(&callee.description)?;
+        let mut parameters = Vec::new();
+        for (parameter, required) in (callee.required.iter().map(|p| (p, true)))
+            .chain(callee.optional.iter().map(|p| (p, false)))
+        {
+            parameters.push((text(&parameter.name)?, required));
+        }
+        offered.push(Offered {
+            name,
+            description,
+            parameters,
+        });
+    }
+    let mut offer = Vec::new();
+    for tool in &offered {
+        let mut parts = vec![&tool.name, &tool.description];
+        parts.extend(tool.parameters.iter().map(|(parameter, _)| parameter));
+        offer.push(
+            Context::compose(&mut source, kind.clone(), parts, "").map_err(LuaError::external)?,
+        );
+    }
+    Ok((offered, offer))
+}
+
+/// Every call of an answer checked against what was offered, and only then made
+/// into calls: each argument a text context of the type its parameter is
+/// declared for, in the order the model gave them
+/// (`DEC_CALL_CARRIES_STRING_VALUES`). The first fault found is the one
+/// reported, and no call is made when there is one.
+#[allow(clippy::type_complexity)]
+fn checked(
+    asked: &[Asked],
+    callees: &[NodeType],
+    issuing: &Rc<RefCell<IdSource>>,
+) -> Result<LuaResult<Vec<Call>>, (String, ModelCallFault)> {
+    let mut filled = Vec::new();
+    for call in asked {
+        let fault = |fault| (call.name.clone(), fault);
+        let Some(callee) = callees.iter().find(|callee| callee.name == call.name) else {
+            return Err(fault(ModelCallFault::NotOffered));
+        };
+        let Some(arguments) = call.arguments.as_object() else {
+            return Err(fault(ModelCallFault::NotAnObject));
+        };
+        let mut inputs = Vec::new();
+        for (parameter, value) in arguments {
+            let Some(declared) = callee
+                .required
+                .iter()
+                .chain(&callee.optional)
+                .find(|declared| declared.name == *parameter)
+            else {
+                return Err(fault(ModelCallFault::UndeclaredParameter {
+                    parameter: parameter.clone(),
+                }));
+            };
+            let Some(text) = value.as_str() else {
+                return Err(fault(ModelCallFault::NotAString {
+                    parameter: parameter.clone(),
+                }));
+            };
+            inputs.push((declared.clone(), text.to_owned()));
+        }
+        if let Some(missing) = callee
+            .required
+            .iter()
+            .find(|required| !arguments.contains_key(&required.name))
+        {
+            return Err(fault(ModelCallFault::RequiredMissing {
+                parameter: missing.name.clone(),
+            }));
+        }
+        filled.push((call.id.clone(), callee.name.clone(), inputs));
+    }
+
+    let mut source = issuing.borrow_mut();
+    Ok(filled
+        .into_iter()
+        .map(|(id, node_type, inputs)| {
+            let mut made = Call::new(&id, &node_type);
+            for (parameter, text) in inputs {
+                let given = Context::text(&mut source, parameter.context_type, text)
+                    .map_err(LuaError::external)?;
+                made = made.input(&parameter.name, given);
+            }
+            Ok(made)
+        })
+        .collect())
 }
 
 /// Take the coroutine library back out of the script's reach.
@@ -408,7 +818,7 @@ fn outcome(
         return Err(ScriptFailure::ModelCallLimit);
     }
     if let Some(failed) = calls.failed.borrow_mut().take() {
-        return Err(ScriptFailure::ModelFailed(failed));
+        return Err(failed);
     }
     returned.map_err(failure).and_then(one_context)
 }
