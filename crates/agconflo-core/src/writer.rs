@@ -1,10 +1,5 @@
 //! The topology writer: a definition put into the workflow document it was read
-//! from, by editing that document in place.
-//!
-//! Editing rather than writing anew is the whole design. A document regenerated
-//! from a definition reads back as that definition and has lost every comment
-//! and every key the definition does not carry (`EVD_TOML_EDIT_KEEPS_COMMENTS`),
-//! so everything here changes the least it can: a value only where it differs,
+//! from, by editing that document in place - a value only where it differs,
 //! with what surrounds it kept, and a table only where one was added or removed.
 
 use std::collections::HashSet;
@@ -18,23 +13,13 @@ use crate::workflow::{Binding, NodeInstance, WorkflowDefinition};
 /// Puts `definition` into `document`, or refuses to write it at all, naming
 /// every shape it holds that a workflow document cannot express.
 ///
-/// What is written is the definition's name, instances, bindings and output.
-/// Its node types are not: they live in documents of their own
-/// (`DEC_TYPES_IN_OWN_DOCUMENTS`), and writing one is authoring a type.
-///
-/// Instances and bindings the document already holds keep their place in it,
-/// and ones the definition adds are appended (`DEC_DOCUMENT_KEEPS_ITS_ORDER`).
-/// An instance the definition no longer holds goes, with everything written
-/// under it and the comments above and beside it; a renamed one is, as far as a
-/// definition can say, one removed and one added.
-///
-/// A refusal leaves the document exactly as it was: every shape is looked for
-/// before anything is edited. And nothing is refused for being a wiring defect -
-/// an instance of an unknown type, a binding to an instance that is not there,
-/// no output at all - since each of those can be written, and a writer refusing
-/// them would be a validator it is not, and would make a half-finished workflow
-/// impossible to save.
-// @Every change written into the document and nothing refused but the unwritable,IMPL_WRITER_EDIT,impl,[CREQ_WRITER_WRITES]
+/// What is written is the definition's name, instances, bindings, calls and
+/// output; its node types are not. Instances and bindings the document already
+/// holds keep their place, ones the definition adds are appended, and an
+/// instance it no longer holds goes with everything written under it and the
+/// comments above and beside it. A refusal leaves the document exactly as it
+/// was, and a wiring defect is written rather than refused.
+// @Every change written into the document and nothing refused but the unwritable,IMPL_WRITER_EDIT,impl,[CREQ_WRITER_WRITES],[DEC_TOPOLOGY_IN_TOML, DEC_TYPES_IN_OWN_DOCUMENTS, DEC_DOCUMENT_KEEPS_ITS_ORDER]
 pub fn write_workflow(
     document: &mut WorkflowDocument,
     definition: &WorkflowDefinition,
@@ -57,15 +42,9 @@ pub fn write_workflow(
 }
 
 /// Every shape `definition` holds that a workflow document cannot express,
-/// each named once.
-///
-/// Three of them, and each is ruled out by the format rather than by a check of
-/// ours: every name is a table key (`DEC_NAMES_AS_KEYS`), so two instances under
-/// one name or a parameter bound twice would be a key written twice; and the
-/// output is one key naming one instance (`DEC_ONE_OUTPUT_KEY`). Writing any of
-/// them means dropping one of the things it holds, which is why they are refused
-/// rather than written as nearly as possible.
-// @Every unwritable shape named before anything is edited,IMPL_WRITER_REFUSE,impl,[CREQ_WRITER_UNWRITABLE_REFUSED]
+/// each named once: two instances under one name, a parameter bound twice, and
+/// more than one output.
+// @Every unwritable shape named before anything is edited,IMPL_WRITER_REFUSE,impl,[CREQ_WRITER_UNWRITABLE_REFUSED],[DEC_NAMES_AS_KEYS, DEC_ONE_OUTPUT_KEY]
 fn unwritable_shapes(definition: &WorkflowDefinition) -> Vec<UnwritableShape> {
     let mut shapes = Vec::new();
 
@@ -153,13 +132,9 @@ fn write_instance(written: &mut dyn TableLike, instance: &NodeInstance) {
     write_calls(written, &instance.calls);
 }
 
-/// The calls of one instance made to be exactly `calls`, in their order.
-///
-/// A list the document already holds is left alone when it names the same node
-/// types in the same order, however it is written, and replaced whole
-/// otherwise, keeping what surrounds it. An empty list removes the key rather
-/// than writing an empty array: absent already reads as no calls, and the
-/// writer adds nothing a definition does not carry.
+/// The calls of one instance made to be exactly `calls`, in their order: a list
+/// naming the same node types in the same order is left alone however it is
+/// written, another replaced whole, and an empty one removes the key.
 // @An instance's calls written as the definition lists them,IMPL_WRITER_CALLS,impl,[CREQ_WRITER_WRITES]
 fn write_calls(written: &mut dyn TableLike, calls: &[String]) {
     if calls.is_empty() {
@@ -213,13 +188,8 @@ fn remove_all_but(table: &mut dyn TableLike, kept: &HashSet<&str>) {
     }
 }
 
-/// `new` written under `key`, changing the document only if the value differs.
-///
-/// A value equal to the one written is left alone rather than written again,
-/// because a value written anew is quoted the default way and `'sink'` would
-/// come back as `"sink"`. A value that does change takes over the old one's
-/// decor - the space and comment around it - which assigning alone drops
-/// (`EVD_TOML_EDIT_ASSIGNING_LOSES_FORMAT`).
+/// `new` written under `key`, changing the document only if the value differs,
+/// and then keeping the old value's decor.
 // @A value written only where it changed with what surrounds it kept,IMPL_WRITER_KEEP,impl,[CREQ_WRITER_KEEPS_UNREAD]
 fn set_value(table: &mut dyn TableLike, key: &str, new: Value) {
     match table.get_mut(key) {
@@ -252,10 +222,9 @@ fn same(written: &Value, new: &Value) -> bool {
     }
 }
 
-/// A new instance, as a table of its own. Inserted into an inline table of
-/// instances it becomes an inline table, and into any other it is written under
-/// its own header, after the instances already there
-/// (`EVD_TOML_EDIT_WHOLE_TABLES`).
+/// A new instance, as a table of its own: an inline table in an inline table of
+/// instances, and under its own header after the others otherwise.
+// @A new instance appended as a table,TRACE_WRITER_NEW_INSTANCE,trace,[],[DEC_DOCUMENT_KEEPS_ITS_ORDER]
 fn new_instance(instance: &NodeInstance) -> Item {
     let mut table = Table::new();
     table.insert(
@@ -298,13 +267,8 @@ fn implicit_table() -> Table {
     table
 }
 
-/// The document's text as it now stands, in the line endings it was read with.
-///
-/// toml_edit writes every line ending as LF (`EVD_TOML_EDIT_WRITES_LF`), so a
-/// document saved on Windows would come back with every line changed. One read
-/// with a CRLF anywhere in it is written with CRLF throughout - exactly its own
-/// text for a document written one way, which is what an editor writes; one
-/// that mixed the two comes back all CRLF.
+/// The document's text as it now stands: with CRLF throughout when the text read
+/// held a CRLF anywhere, and LF otherwise.
 // @Line endings written as they were read,IMPL_WRITER_LINE_ENDINGS,impl,[CREQ_WRITER_KEEPS_UNREAD]
 impl fmt::Display for WorkflowDocument {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -332,9 +296,6 @@ impl UnwritableDefinition {
 }
 
 /// One shape the in-memory model can hold and a workflow document cannot.
-///
-/// The model holds them deliberately: a definition built by other means can
-/// carry any of them, and the validator has to see a shape to refuse it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum UnwritableShape {
@@ -396,7 +357,7 @@ impl fmt::Display for UnwritableShape {
 impl std::error::Error for UnwritableDefinition {}
 
 // --- tests -------------------------------------------------------------------
-// Bare functions named after their test cases, for the reason given in id.rs.
+// Bare functions named after their test cases.
 
 #[cfg(test)]
 use crate::WiringDefect;
@@ -417,9 +378,8 @@ use std::collections::BTreeMap;
 
 /// A definition as reading a written document back is compared with it: its
 /// name and output, how many instances it holds, and each instance, its
-/// bindings and its calls under their names rather than in order, since a
-/// document keeps its own order (`DEC_DOCUMENT_KEEPS_ITS_ORDER`). An instance's
-/// calls are in the order it lists them, which is the definition's.
+/// bindings and its calls under their names rather than in order; an instance's
+/// calls in the order it lists them.
 #[cfg(test)]
 type ByName = (
     String,
@@ -587,8 +547,7 @@ fn apply(definition: &mut WorkflowDefinition, change: &Change) {
 }
 
 /// Names the documents changed here draw from, some of which resolve to
-/// nothing - the writer writes names, and whether they resolve is not its
-/// business.
+/// nothing.
 #[cfg(test)]
 const WRITTEN: Pools = Pools {
     types: &["source", "sink", "ghost"],
@@ -651,8 +610,7 @@ bindings = { input = \"summarise\" }
         read_workflow("pipeline.toml", text, &catalogue).expect("it reads");
 
     // An instance removed, a binding removed, the output removed, and an
-    // instance renamed - each what an edit rewriting only what the definition
-    // still has leaves behind.
+    // instance renamed.
     definition
         .instances
         .retain(|instance| instance.name != "fetch");
@@ -782,14 +740,8 @@ zoom = 2   # the editor's own
 proptest! {
     /// For any annotated document, repointing any one binding and writing the
     /// definition back changes that binding's value and nothing else in the
-    /// text: the expected text is the same document written with the new
-    /// source in that one place.
-    ///
-    /// The binding that changes is always under a header of its own, with a
-    /// comment after its value - the one comment a writer changing exactly the
-    /// right value can still lose - and on an instance carrying keys of its own,
-    /// since a writer rewriting that instance's table whole keeps every other
-    /// instance and loses exactly those.
+    /// text. The binding that changes is under a header of its own, with a
+    /// comment after its value, on an instance carrying keys of its own.
     #[test]
     fn unread_keys_survive_a_change(
         shapes in vec((vec(0..5usize, 1..=3), any::<bool>()), 1..=4),
@@ -845,9 +797,7 @@ bindings = { input = \"a\" }
         read_workflow("w.toml", text, &catalogue()).expect("it reads");
     let before = document.to_string();
 
-    // All three shapes at once, because a writer naming the first it meets
-    // passes a case holding one. And a change a writer could make before it
-    // noticed, so that one refusing halfway through leaves a trace.
+    // All three shapes at once, and a change made before them.
     definition.name = "renamed".to_owned();
     definition.instances.push(instance("a", "sink", &[]));
     definition.instances[1].bindings.push(Binding {

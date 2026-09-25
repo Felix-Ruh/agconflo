@@ -119,5 +119,17 @@ error, since code comes after its requirement; the review report
    carrying a type disagreement fell from 13.8% to 6.8%; with ``0..10`` a fifth
    share one, and 8.4% carry a disagreement.
 
+.. code_note:: The reader is tried on nearly valid text
+   :id: NOTE_READER_NEAR_VALID_TEXT
+
+   Arbitrary text almost never parses far enough to reach a value the reader
+   interprets, which is where an ``unwrap`` would sit; a valid document nearly
+   broken is what gets there. So the reader's property is tried on valid
+   documents with characters deleted, inserted or swapped, or one value
+   replaced by a value of another kind. The replaced value is there because
+   the other three changes almost never make one: measured over 512 documents,
+   they gave faults in the syntax and missing keys, and not one value of the
+   wrong kind.
+
 .. src-trace::
    :project: agconflo-core
