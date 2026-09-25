@@ -55,6 +55,7 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    tests/resume
    tests/person
    tests/yield
+   tests/runner
    code/agconflo-core
    code/agconflo-lua
    code/junit-to-needs
