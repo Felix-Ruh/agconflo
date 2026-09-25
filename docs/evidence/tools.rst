@@ -228,3 +228,14 @@ than to its design.
 
    Kernel ``6.18.33.2-microsoft-standard-WSL2``. The four fields are the real,
    effective, saved and file-system ids.
+
+.. evd:: Starting and removing a locked-down container costs about half a second
+   :id: EVD_CONTAINER_START_COST
+   :evd_kind: measurement
+   :observed_on: 2026-09-26
+   :observation: Over five containers started with --init and locked down as a tool's is, docker run -d took 297 to 322 ms, the first exec in each 177 to 182 ms, and docker rm -f 186 to 221 ms, while docker image inspect took 147 ms and 137 ms.
+
+   Each container ran ``sleep 60`` from ``alpine:3`` by its digest with
+   ``--pull never``, and its first command was ``true`` as uid 1000. The two
+   ``image inspect`` times are for that digest, present, and for a digest of
+   zeros, absent.

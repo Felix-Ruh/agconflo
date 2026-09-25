@@ -71,6 +71,7 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    decisions/person
    decisions/yield
    decisions/runner
+   decisions/tools
    decisions/code
    decisions/toolchain
    decisions/requirements
