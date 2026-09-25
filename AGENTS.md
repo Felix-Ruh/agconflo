@@ -382,10 +382,18 @@ takes a list of maps because the output would otherwise be refused` is a
 decision, or a note if it is local to this code.
 
 **Tests.** Why a test exists and what it catches is its `test_case`'s body. A
-comment in a test says what a step sets up or asserts.
+comment in a test says what a step sets up or asserts. A test with no
+`test_case`, as in the tooling crates, keeps its reasons in a `code_note`.
 
-**Moving an existing comment.** Nothing is deleted until what it says is found
-in a need, or moved into one in the same commit. A comment that restated a
+**An example of an id's format is an id too.** The gate cannot tell
+`TEST_LINEAGE_REACHES_EACH_ONCE` as an example from the same id as a relation,
+and neither can a reader. Write the format: `TEST_` followed by the path.
+
+**Moving an existing comment.** A crate's markers count only once it has a
+codelinks project in `docs/ubproject.toml` and a `docs/code/<crate>.rst` with
+its `src-trace`; without them its markers are ignored without a word. Nothing
+is deleted until what it says is found in a need, or moved into one in the
+same commit. A comment that restated a
 decision loses the restatement and gains the marker link; a reason that no
 need holds becomes a decision first. `sh scripts/comment-rules.sh --report`
 lists the long blocks to start from, and `--crate <name>` shows what a crate
