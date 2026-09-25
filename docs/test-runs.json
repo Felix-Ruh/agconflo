@@ -489,6 +489,51 @@
           "title": "agconflo-core id::source_cannot_be_copied",
           "type": "test_run"
         },
+        "RUN_KEEPER_EXISTING_FILE_REFUSED": {
+          "executes": [
+            "TEST_KEEPER_EXISTING_FILE_REFUSED"
+          ],
+          "id": "RUN_KEEPER_EXISTING_FILE_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner keeper::existing_file_refused",
+          "type": "test_run"
+        },
+        "RUN_KEEPER_HELD_FILE_REFUSED": {
+          "executes": [
+            "TEST_KEEPER_HELD_FILE_REFUSED"
+          ],
+          "id": "RUN_KEEPER_HELD_FILE_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner keeper::held_file_refused",
+          "type": "test_run"
+        },
+        "RUN_KEEPER_KILLED_HOLDER_RELEASES": {
+          "executes": [
+            "TEST_KEEPER_KILLED_HOLDER_RELEASES"
+          ],
+          "id": "RUN_KEEPER_KILLED_HOLDER_RELEASES",
+          "test_outcome": "passed",
+          "title": "agconflo-runner keeper::killed_holder_releases",
+          "type": "test_run"
+        },
+        "RUN_KEEPER_RECORD_REPLACED_WHOLE": {
+          "executes": [
+            "TEST_KEEPER_RECORD_REPLACED_WHOLE"
+          ],
+          "id": "RUN_KEEPER_RECORD_REPLACED_WHOLE",
+          "test_outcome": "passed",
+          "title": "agconflo-runner keeper::record_replaced_whole",
+          "type": "test_run"
+        },
+        "RUN_KEEPER_UNKEPT_RECORD_TOLD": {
+          "executes": [
+            "TEST_KEEPER_UNKEPT_RECORD_TOLD"
+          ],
+          "id": "RUN_KEEPER_UNKEPT_RECORD_TOLD",
+          "test_outcome": "passed",
+          "title": "agconflo-runner keeper::unkept_record_told",
+          "type": "test_run"
+        },
         "RUN_LINEAGE_DEEP_NESTING_WALKS": {
           "executes": [
             "TEST_LINEAGE_DEEP_NESTING_WALKS"

@@ -280,7 +280,7 @@ fn client(targets: HashMap<String, Target>) -> Result<Client, ModelsFault> {
 // Bare functions named after their test cases.
 
 #[cfg(test)]
-use crate::testing::{Request, Scratch, Stub};
+use crate::testing::{Request, Scratch, Stub, without_keys};
 #[cfg(test)]
 use agconflo_core::{
     Arguments, IdSource, RunEnding, TypeCatalogue, WorkflowDefinition, read_node_types,
@@ -413,17 +413,19 @@ fn roles_reach_their_models() {
 #[test]
 fn default_key_never_sent() {
     if std::env::var_os("AGCONFLO_RUNNER_TEST_CHILD").is_none() {
-        let child = std::process::Command::new(std::env::current_exe().expect("the test binary"))
-            .args([
-                "--exact",
-                "model_map::default_key_never_sent",
-                "--nocapture",
-            ])
-            .env("AGCONFLO_RUNNER_TEST_CHILD", "1")
-            .env("ANTHROPIC_API_KEY", "planted-anthropic-key")
-            .env("OPENAI_API_KEY", "planted-openai-key-of-another-length")
-            .output()
-            .expect("the child ran");
+        let child = without_keys(&mut std::process::Command::new(
+            std::env::current_exe().expect("the test binary"),
+        ))
+        .args([
+            "--exact",
+            "model_map::default_key_never_sent",
+            "--nocapture",
+        ])
+        .env("AGCONFLO_RUNNER_TEST_CHILD", "1")
+        .env("ANTHROPIC_API_KEY", "planted-anthropic-key")
+        .env("OPENAI_API_KEY", "planted-openai-key-of-another-length")
+        .output()
+        .expect("the child ran");
         let out = String::from_utf8_lossy(&child.stdout);
         assert!(child.status.success(), "{out}");
         assert!(out.contains("1 passed"), "the child ran no test: {out}");

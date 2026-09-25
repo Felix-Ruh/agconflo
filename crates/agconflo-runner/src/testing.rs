@@ -2,7 +2,8 @@
 //! and a stub provider on the loopback interface.
 
 use std::io::{Read, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::sync::{Arc, Mutex};
 
 /// A directory for one test's files, emptied when it is made and removed when
@@ -27,6 +28,11 @@ impl Scratch {
         self.root.join(file)
     }
 
+    /// The directory itself.
+    pub(crate) fn root(&self) -> &Path {
+        &self.root
+    }
+
     /// `text` written to `file` in the directory, its directories made first.
     pub(crate) fn write(&self, file: &str, text: impl AsRef<[u8]>) -> PathBuf {
         let path = self.path(file);
@@ -36,6 +42,17 @@ impl Scratch {
         std::fs::write(&path, text).expect("the file written");
         path
     }
+}
+
+/// `command` with every variable named `*_API_KEY` removed from the
+/// environment it will run in.
+pub(crate) fn without_keys(command: &mut Command) -> &mut Command {
+    for (name, _) in std::env::vars_os() {
+        if name.to_string_lossy().ends_with("_API_KEY") {
+            command.env_remove(name);
+        }
+    }
+    command
 }
 
 impl Drop for Scratch {
