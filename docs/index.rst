@@ -35,6 +35,7 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    features/resume
    features/person
    features/yield
+   features/runner
    components/context
    components/wiring
    components/topology
@@ -44,6 +45,7 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    components/resume
    components/person
    components/yield
+   components/runner
    tests/context
    tests/wiring
    tests/topology
