@@ -68,5 +68,25 @@ error, since code comes after its requirement; the review report
    way, and puts it back advanced past every identifier the run issued however
    the run ends, an early return included.
 
+.. code_note:: The order a scripted run asks its refusals in
+   :id: NOTE_SCRIPTED_REFUSAL_ORDER
+
+   Whatever the run itself refuses comes first - a workflow and its arguments,
+   or a record - then the scripts, and last, when a person's answer was
+   supplied, whether the run awaits it. The scripts are asked about only once
+   the run would start: a workflow with a wiring defect may name a node type
+   that does not exist, and whether it has a script is not a question worth
+   answering first.
+
+.. code_note:: The tests share one model client per thread
+   :id: NOTE_SCRIPTED_ONE_TEST_CLIENT
+
+   Building a client reaches no network, and is still not free: on Linux it
+   took about 36 ms, measured in a container with four CPUs, where Windows was
+   far cheaper. Built afresh for every case, the property tests that run a
+   workflow hundreds of times took 19 s and 10 s there, against 0.6 s and 0.5 s
+   with one client, and the first was killed at the 20 s limit in CI. So a
+   roster mapping no role is built once per thread and cloned.
+
 .. src-trace::
    :project: agconflo-lua

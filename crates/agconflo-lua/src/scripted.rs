@@ -1,11 +1,6 @@
 //! A run driven from its start to its ending by scripts: each activation the run
 //! offers is performed by the script host, and what came of it is reported back
 //! - or, for a step a person performs, handed to the caller to answer later.
-//!
-//! Not a component of its own. `ARCH_BEHAVIOUR` gives the reason, the one
-//! `ARCH_RUN` gave for the activation it dropped: nothing about driving a run is
-//! true or false taken alone, and every requirement it could carry is already
-//! the run's, the behaviour set's or the host's.
 
 use std::cell::RefCell;
 use std::fmt;
@@ -25,23 +20,18 @@ use crate::models::Roster;
 /// Asked in order: whatever the run itself refuses a workflow or its arguments
 /// for - or, resuming, whatever it refuses a record for - then the scripts, and
 /// last, when a person's answer was supplied, whether the run awaits it.
-/// The scripts are asked about only once the run would start, because a
-/// workflow with a wiring defect may name a node type that does not exist, and
-/// whether it has a script is not a question worth answering first.
+// @Refusals asked in order,TRACE_SCRIPTED_REFUSAL,trace,[],[NOTE_SCRIPTED_REFUSAL_ORDER, DEC_FAILURES_NON_EXHAUSTIVE]
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ScriptedRefusal {
     /// The run refused to start: the workflow's wiring or its arguments.
     Start(StartRefusal),
-    /// The scripts cannot run, every fault of them
-    /// (`CREQ_BEHAVIOURS_EVERY_FAULT`).
+    /// The scripts cannot run, every fault of them.
     Behaviours(Vec<BehaviourFault>),
-    /// The run refused to resume from the record it was given
-    /// (`FEAT_RESUME_REFUSES_ANOTHER_RUN`).
+    /// The run refused to resume from the record it was given.
     Resume(ResumeRefusal),
     /// A person's text was supplied for an instance whose step the record's
-    /// run does not await (`CREQ_HOST_REFUSES_ANSWER_ELSEWHERE`). Nothing was
-    /// run and no record handed over.
+    /// run does not await. Nothing was run and no record handed over.
     NotAwaited {
         /// The instance the text was supplied for.
         answered: String,
@@ -79,13 +69,12 @@ impl std::error::Error for ScriptedRefusal {}
 /// Where a scripted run stopped: at its ending, or at a step a person performs.
 #[derive(Clone, Debug)]
 pub enum Outcome {
-    /// The run ended, and this is how (`DEC_RUN_ENDS_ONE_WAY`).
+    /// The run ended, and this is how.
     Ended(RunEnding<ScriptFailure>),
-    /// The run awaits a person's answer for this activation
-    /// (`FEAT_PERSON_STEP_HANDED_OVER`): which instance, what it was given, and
-    /// the type of context it produces. The run has not ended and is not stuck
-    /// (`FEAT_PERSON_WAIT_NOT_STUCK`); the answer goes to [`answer_scripted`]
-    /// with the last record the run handed over.
+    /// The run awaits a person's answer for this activation: which instance,
+    /// what it was given, and the type of context it produces. The run has not
+    /// ended and is not stuck; the answer goes to [`answer_scripted`] with the
+    /// last record the run handed over.
     Awaiting(Activation),
 }
 
@@ -97,32 +86,29 @@ pub enum Outcome {
 /// and the run is as the last record it handed over describes.
 ///
 /// Nothing is performed before every refusal has been asked: the run's own,
-/// then the scripts' (`FEAT_BEHAVIOUR_REFUSED_BEFORE_START`). After that the run
-/// decides what activates and how it ends, exactly as for any caller, and a
-/// script's failure is carried in the run's ending as a [`ScriptFailure`].
+/// then the scripts'. After that the run decides what activates and how it
+/// ends, exactly as for any caller, and a script's failure is carried in the
+/// run's ending as a [`ScriptFailure`].
 ///
 /// Model calls go through `roster`, which maps the roles scripts name to the
-/// caller's models (`DEC_MODELS_BY_ROLE`); a run whose scripts call no model can
-/// be given a roster mapping nothing.
+/// caller's models; a run whose scripts call no model can be given a roster
+/// mapping nothing.
 ///
 /// `keep` is handed the run's record once it starts, again each time it accepts
-/// an output, and again each time a model call is answered
-/// (`DEC_RECORD_AFTER_EACH_ANSWER`). A caller keeping the latest can give it to
-/// [`resume_scripted`] after an interruption and lose at most the script's own
-/// work since the last answer, which is run again, and no answer it paid for;
-/// one that needs no record ignores it.
+/// an output, and again each time a model call is answered. A caller keeping the
+/// latest can give it to [`resume_scripted`] after an interruption and lose at
+/// most the script's own work since the last answer, which is run again, and no
+/// answer it paid for; one that needs no record ignores it.
 ///
-/// Asynchronous, because a model call is awaited (`DEC_BEHAVIOUR_ASYNC`). The
-/// future is not `Send` - a Lua state is not (`EVD_RUN_IS_SEND`) - so it runs on
-/// the thread that polls it: a current-thread runtime, or a local set. Dropping
-/// it interrupts the run, and nothing after the drop runs.
+/// The future is not `Send`, so it runs on the thread that polls it: a
+/// current-thread runtime, or a local set. Dropping it interrupts the run, and
+/// nothing after the drop runs.
 ///
 /// `source` issues the identifiers of every context the scripts make, and must
-/// be the one `arguments` were made from: two sources repeat each other's
-/// identifiers, and the run refuses an output carrying one it already holds.
-/// It is lent to the scripts for the length of the run and handed back when it
-/// ends, however it ends.
-// @Refused before anything runs,IMPL_SCRIPTED_REFUSAL,impl,[CREQ_BEHAVIOURS_REFUSE_MISSING, CREQ_BEHAVIOURS_REFUSE_UNCOMPILABLE, CREQ_BEHAVIOURS_REFUSE_TWICE]
+/// be the one `arguments` were made from; the run refuses an output carrying an
+/// identifier it already holds. It is lent to the scripts for the length of the
+/// run and handed back when it ends, however it ends.
+// @Refused before anything runs,IMPL_SCRIPTED_REFUSAL,impl,[CREQ_BEHAVIOURS_REFUSE_MISSING, CREQ_BEHAVIOURS_REFUSE_UNCOMPILABLE, CREQ_BEHAVIOURS_REFUSE_TWICE],[DEC_MODELS_BY_ROLE, DEC_BEHAVIOUR_ASYNC, DEC_RECORD_AFTER_EACH_ANSWER]
 #[allow(clippy::too_many_arguments)]
 pub async fn run_scripted(
     definition: &WorkflowDefinition,
@@ -144,17 +130,17 @@ pub async fn run_scripted(
 /// Resume the run `record` is a record of, against `definition`, and run it to
 /// its ending as [`run_scripted`] would have - or refuse to.
 ///
-/// No activation whose output the record holds is performed again
-/// (`FEAT_RESUME_REPEATS_NO_OUTPUT`): the run is rebuilt from the record, and
-/// the first activation performed is the one the recorded run had not
-/// finished. The record is refused before any script runs if it does not
-/// describe a run of `definition` (`FEAT_RESUME_REFUSES_ANOTHER_RUN`), and the
-/// scripts are asked about as for a start.
+/// No activation whose output the record holds is performed again: the run is
+/// rebuilt from the record, and the first activation performed is the one the
+/// recorded run had not finished. The record is refused before any script runs
+/// if it does not describe a run of `definition`, and the scripts are asked
+/// about as for a start.
 ///
 /// Hands back where the run stopped with the identifier source that came back
-/// with the run, advanced past everything the resumed run issued, since
-/// whatever the caller makes next must continue from it. A record whose run
-/// awaits a person stops at once, handing that step back again.
+/// with the run, advanced past everything the resumed run issued, for whatever
+/// the caller makes next. A record whose run awaits a person stops at once,
+/// handing that step back again.
+// @A run rebuilt from its record and driven on,TRACE_SCRIPTED_RESUME,trace,[],[DEC_RESUME_REPLAYS_CALLS, DEC_SCRIPT_REPLAYED_FROM_ITS_RECORD]
 pub async fn resume_scripted(
     definition: &WorkflowDefinition,
     behaviours: &Behaviours,
@@ -183,18 +169,17 @@ pub async fn resume_scripted(
 /// would - or refuse to.
 ///
 /// The text becomes a context of the type that step declares, issued by the
-/// source resumed with the record (`DEC_PERSON_SUPPLIES_TEXT`), and is kept
-/// exactly as given. The run then hands its caller a record, as after any
-/// output, and runs on to its ending or to the next step a person performs.
+/// source resumed with the record, and is kept exactly as given. The run then
+/// hands its caller a record, as after any output, and runs on to its ending or
+/// to the next step a person performs.
 ///
 /// Refused, with nothing run and no record handed over, unless the record's
 /// run next offers an activation of `instance` by a node type a person
-/// performs (`CREQ_HOST_REFUSES_ANSWER_ELSEWHERE`) - asked after everything a
-/// resume refuses, and after the scripts.
+/// performs - asked after everything a resume refuses, and after the scripts.
 ///
 /// Answering one record twice gives two runs sharing identifiers, each sound
-/// on its own. Keeping to one answer per record is the caller's, since the
-/// caller is what keeps records (`DEC_ANSWER_ONCE_BY_THE_KEEPER`).
+/// on its own; keeping to one answer per record is the caller's.
+// @A person's answer resumed from the record,TRACE_SCRIPTED_ANSWER,trace,[],[DEC_PERSON_SUPPLIES_TEXT, DEC_ANSWER_ONCE_BY_THE_KEEPER]
 #[allow(clippy::too_many_arguments)]
 pub async fn answer_scripted(
     definition: &WorkflowDefinition,
@@ -228,7 +213,7 @@ pub async fn answer_scripted(
 ///
 /// `answer`, when given, is the instance a person's text was supplied for and
 /// the text, taken as the output of the first activation the run offers.
-// @A record handed over at the start and after each output,IMPL_SCRIPTED_RECORDS,impl,[CREQ_HOST_HANDS_RECORDS]
+// @A record handed over at the start and after each output,IMPL_SCRIPTED_RECORDS,impl,[CREQ_HOST_HANDS_RECORDS],[DEC_RECORD_AFTER_EACH_ANSWER]
 #[allow(clippy::too_many_arguments)]
 async fn drive(
     mut run: Run<'_, ScriptFailure>,
@@ -331,15 +316,14 @@ enum Stop {
 /// is answered with the run this holds: an exchange held and a record handed
 /// over, or a call performed as the run's next activation - the called node
 /// type's own script performed by this same function, or its step handed to a
-/// person (`DEC_CALL_IS_AN_ACTIVATION`). A script waiting on anything else - a
-/// provider - is waited on.
+/// person. A script waiting on anything else - a provider - is waited on.
 ///
 /// What the activation's record holds is handed to the script to be answered
-/// from (`DEC_SCRIPT_REPLAYED_FROM_ITS_RECORD`), and what its model may call is
-/// what its instance declares - nothing, for a call's own activation.
+/// from, and what its model may call is what its instance declares - nothing,
+/// for a call's own activation.
 ///
 /// Boxed, because performing a call's activation is this function again.
-// @A script's questions answered from the run it is performed for,IMPL_SCRIPTED_YIELD,impl,[CREQ_HOST_PERFORMS_CALLS, CREQ_HOST_RECORD_AFTER_ANSWER, CREQ_HOST_CALL_REFUSAL_CARRIED, CREQ_HOST_HANDS_OVER_PERSON_STEP]
+// @A script's questions answered from the run it is performed for,IMPL_SCRIPTED_YIELD,impl,[CREQ_HOST_PERFORMS_CALLS, CREQ_HOST_RECORD_AFTER_ANSWER, CREQ_HOST_CALL_REFUSAL_CARRIED, CREQ_HOST_HANDS_OVER_PERSON_STEP],[DEC_CALL_IS_AN_ACTIVATION, DEC_SCRIPT_REPLAYED_FROM_ITS_RECORD]
 fn perform_activation<'f>(
     run: &'f mut Run<'_, ScriptFailure>,
     activation: &'f Activation,
@@ -521,12 +505,9 @@ fn answered(
 }
 
 /// The caller's identifier source, lent to the scripts for the length of a run.
-///
-/// Each host function owns its handle to the source rather than borrowing it
-/// for a scope, since a model call is awaited and a scoped function cannot be.
 /// Dropping the loan puts the source back where it came from, advanced past
-/// every identifier the run issued - on every way out of the run, an early
-/// return included.
+/// every identifier the run issued.
+// @The caller's source lent and put back,TRACE_SCRIPTED_LENT,trace,[],[NOTE_HOST_OWNED_HANDLES]
 struct Lent<'a> {
     home: &'a mut IdSource,
     source: Rc<RefCell<IdSource>>,
@@ -545,13 +526,8 @@ impl Drop for Lent<'_> {
     }
 }
 
-/// End `run` with `failure` for the activation it has outstanding.
-///
-/// A refused output is not answered again. The run would take another answer
-/// (`DEC_REFUSED_OUTPUT_OUTSTANDING`), but a script run twice on the same inputs
-/// has no reason to give a different one, and a refusal is not counted against
-/// the budget - so trying again is a loop nothing ends
-/// (`CREQ_HOST_OUTPUT_REFUSAL_CARRIED`).
+/// End `run` with `failure` for the activation it has outstanding. A refused
+/// output is not answered again.
 // @A refused output fails its activation,IMPL_SCRIPTED_FAIL,impl,[CREQ_HOST_OUTPUT_REFUSAL_CARRIED]
 fn fail(run: Run<'_, ScriptFailure>, failure: ScriptFailure) -> RunEnding<ScriptFailure> {
     match run.fail(failure) {
@@ -563,7 +539,7 @@ fn fail(run: Run<'_, ScriptFailure>, failure: ScriptFailure) -> RunEnding<Script
 }
 
 // --- test builders -----------------------------------------------------------
-// Used by every module's tests, so they live beside the function they drive.
+// For every module's tests.
 
 #[cfg(test)]
 use agconflo_core::{ContextType, TypeCatalogue, read_node_types, read_workflow};
@@ -587,11 +563,9 @@ pub(crate) const SMALL: Limits = Limits {
     model_calls: 2,
 };
 
-/// Drive `future` to its end on a runtime of its own, on this thread.
-///
-/// Current-thread because a scripted run is not `Send` (`EVD_RUN_IS_SEND`), and
-/// with its drivers enabled because a model call reaches the network - a stub
-/// on the loopback interface, in these tests.
+/// Drive `future` to its end on a current-thread runtime of its own, its drivers
+/// enabled for the stub a model call reaches.
+// @A scripted run driven on this thread,TRACE_SCRIPTED_BLOCK,trace,[],[DEC_BEHAVIOUR_ASYNC]
 #[cfg(test)]
 pub(crate) fn block<F: std::future::Future>(future: F) -> F::Output {
     tokio::runtime::Builder::new_current_thread()
@@ -601,14 +575,9 @@ pub(crate) fn block<F: std::future::Future>(future: F) -> F::Output {
         .block_on(future)
 }
 
-/// A roster mapping no role, for runs whose scripts call no model.
-///
-/// Built once per thread and cloned. Building a client reaches no network, and
-/// is still not free: on Linux it took about 36 ms, measured in a container with
-/// four CPUs, where Windows was far cheaper. Built afresh for every case, the
-/// property tests that run a workflow hundreds of times took 19 s and 10 s
-/// there, against 0.6 s and 0.5 s with one client, and the first was killed at
-/// the 20 s limit in CI.
+/// A roster mapping no role, for runs whose scripts call no model, built once
+/// per thread and cloned.
+// @One test client per thread,TRACE_SCRIPTED_ONE_TEST_CLIENT,trace,[],[NOTE_SCRIPTED_ONE_TEST_CLIENT]
 #[cfg(test)]
 pub(crate) fn offline() -> Roster {
     thread_local! {
@@ -729,8 +698,7 @@ fn arguments_from_another_source_fail() {
     // Two scripts, two shapes. The first makes its output directly, so the
     // output itself repeats the argument's identifier. The second composes its
     // input with a word, so the word - a part - repeats it and the output does
-    // not; that one the run once accepted, measured
-    // (`EVD_RUN_PART_SHARES_IDENTIFIER`).
+    // not.
     let direct = "local given, host = ...\nreturn host.text(host.output, 'made')";
     for (script, shared_in_a_part) in [(direct, false), (appending("seeded").as_str(), true)] {
         let behaviours = Behaviours::new().define("seed", "seed.lua", script).define(
@@ -882,9 +850,7 @@ fn source_handed_back_advanced() {
         panic!("expected completion")
     };
 
-    // What the caller's source issues next is new to everything the run made:
-    // handed back reset, it would repeat the argument's identifier and the
-    // run's own.
+    // What the caller's source issues next is new to everything the run made.
     let after = note(&mut source, "note", "later");
     let mut issued: Vec<_> = result.lineage().iter().map(|c| c.id()).collect();
     issued.push(result.id());
@@ -921,9 +887,7 @@ fn records_handed_over() {
 
         // One at the start and one after each accepted output, the one after
         // the i-th holding i outputs and no later one; and each a record of a
-        // run of this workflow - which one claiming the fresh source that
-        // stands in the caller's place during a run would not be, every
-        // identifier it holds being past it.
+        // run of this workflow.
         assert_eq!(records.len(), expected, "{step}");
         for (outputs, record) in records.iter().enumerate() {
             assert_eq!(outputs_in(record), outputs, "{record}");
@@ -936,8 +900,8 @@ fn records_handed_over() {
 #[cfg(test)]
 #[test]
 fn interrupted_run_resumes() {
-    // The measured shape (EVD_INTERRUPTED_RUN_REPEATS_CALLS): three nodes each
-    // calling a model, the provider answering two calls and holding the third.
+    // Three nodes each calling a model, the provider answering two calls and
+    // holding the third.
     let calling = "local given, host = ...\nlocal answer = host.complete('drafting', given.input)\nreturn host.compose(host.output, {given.input, answer}, ' ')";
     let behaviours = Behaviours::new()
         .define("seed", "seed.lua", calling)
@@ -1874,8 +1838,7 @@ fn malformed_call_fails() {
             "{arguments}"
         );
         // Nothing reported, performed or spent for the well-formed call before
-        // it - no record was handed over after the one at the start, since
-        // nothing happened to hold - and the model not asked again.
+        // it, no record after the one at the start, and the model not asked again.
         assert_eq!(stub.requests().len(), 1, "{arguments}");
         assert_eq!(records.len(), 1, "{arguments}: {records:?}");
         assert!(kinds(&records[0]).is_empty());
@@ -1885,9 +1848,8 @@ fn malformed_call_fails() {
 #[cfg(test)]
 #[test]
 fn refused_call_fails_with_the_refusal() {
-    // The host checks every call before the run sees it, so a call the run
-    // refuses is made on purpose: the host's offer comes from a workflow that
-    // declares the call, and the run's from one that does not.
+    // The host's offer comes from a workflow that declares the call, and the
+    // run's from one that does not.
     let declaring = workflow(YIELD_TYPES, YIELDING);
     let undeclaring = workflow(
         YIELD_TYPES,
@@ -2034,8 +1996,7 @@ proptest::proptest! {
     /// own, some of those records are taken while it is being performed, its
     /// answer held and the caller's continuation not yet sent. And resumed with
     /// a model call limit equal to the requests the record answered, the next
-    /// new request fails at the limit - asked of the caller alone, since each
-    /// activation has a limit of its own.
+    /// new request fails at the limit - asked of the caller alone.
     #[test]
     fn resumed_mid_call_asks_nothing_twice(
         rounds in 1..=2usize,
@@ -2238,9 +2199,7 @@ fn person_as_callee() {
 #[cfg(test)]
 #[test]
 fn interrupted_call_resumes() {
-    // The measured shape (EVD_WORK_INSIDE_AN_ACTIVATION_REPEATS) the other way
-    // round: two model calls in one script, the run dropped while the second
-    // waits.
+    // Two model calls in one script, the run dropped while the second waits.
     let definition = workflow(
         YIELD_TYPES,
         "name = \"plain\"\noutput = \"asker\"\n\n[instances.asker]\nnode_type = \"ask\"\n",
