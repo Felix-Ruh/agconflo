@@ -615,6 +615,51 @@
           "title": "agconflo-lua models::window_parts_as_messages",
           "type": "test_run"
         },
+        "RUN_MODEL_MAP_DEFAULT_KEY_NEVER_SENT": {
+          "executes": [
+            "TEST_MODEL_MAP_DEFAULT_KEY_NEVER_SENT"
+          ],
+          "id": "RUN_MODEL_MAP_DEFAULT_KEY_NEVER_SENT",
+          "test_outcome": "passed",
+          "title": "agconflo-runner model_map::default_key_never_sent",
+          "type": "test_run"
+        },
+        "RUN_MODEL_MAP_ROLES_REACH_THEIR_MODELS": {
+          "executes": [
+            "TEST_MODEL_MAP_ROLES_REACH_THEIR_MODELS"
+          ],
+          "id": "RUN_MODEL_MAP_ROLES_REACH_THEIR_MODELS",
+          "test_outcome": "passed",
+          "title": "agconflo-runner model_map::roles_reach_their_models",
+          "type": "test_run"
+        },
+        "RUN_MODEL_MAP_UNNAMESPACED_REFUSED": {
+          "executes": [
+            "TEST_MODEL_MAP_UNNAMESPACED_REFUSED"
+          ],
+          "id": "RUN_MODEL_MAP_UNNAMESPACED_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner model_map::unnamespaced_refused",
+          "type": "test_run"
+        },
+        "RUN_MODEL_MAP_UNREADABLE_REFUSED": {
+          "executes": [
+            "TEST_MODEL_MAP_UNREADABLE_REFUSED"
+          ],
+          "id": "RUN_MODEL_MAP_UNREADABLE_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner model_map::unreadable_refused",
+          "type": "test_run"
+        },
+        "RUN_MODEL_MAP_UNSET_VARIABLE_REFUSED": {
+          "executes": [
+            "TEST_MODEL_MAP_UNSET_VARIABLE_REFUSED"
+          ],
+          "id": "RUN_MODEL_MAP_UNSET_VARIABLE_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner model_map::unset_variable_refused",
+          "type": "test_run"
+        },
         "RUN_PROJECT_FAULTS_CARRY_THEIR_PLACE": {
           "executes": [
             "TEST_PROJECT_FAULTS_CARRY_THEIR_PLACE"

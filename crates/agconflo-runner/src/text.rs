@@ -268,7 +268,7 @@ pub(crate) fn path(key: &[String], name: &str) -> Vec<String> {
 }
 
 /// A kind of value as toml_edit names it, with its article.
-fn article(kind: &str) -> String {
+pub(crate) fn article(kind: &str) -> String {
     match kind.chars().next() {
         Some('a' | 'e' | 'i' | 'o' | 'u') => format!("an {kind}"),
         _ => format!("a {kind}"),
