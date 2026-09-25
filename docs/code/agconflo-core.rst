@@ -87,5 +87,37 @@ error, since code comes after its requirement; the review report
    dependent crate would. A refusal is evidence only beside a neighbouring
    snippet that is seen to compile.
 
+.. code_note:: A workflow definition holds every malformed shape
+   :id: NOTE_WORKFLOW_SHAPE
+
+   Every field of a definition is public and nothing is checked on the way in,
+   the opposite of how a context is built, and deliberately so. A definition has
+   to hold every malformed shape, or the defects the validator reports could not
+   be written down: a binding naming an instance that was deleted, an instance
+   of a type nobody supplied, a designated output naming nothing, no designated
+   output or several, two instances sharing a name. A constructor refusing them
+   would move the refusal to where only the first defect is ever seen, which is
+   what ``FEAT_WIRING_ALL_DEFECTS`` rules out. So bindings and calls are names
+   rather than handles: a wire to nowhere is a defect to report rather than a
+   value nobody can build.
+
+   An entry node is a flag on the instance rather than a list of entry instance
+   names on the definition, or a second kind of binding source. Either of those
+   is one more kind of name that can resolve to nothing, and what a validator
+   owes an unresolved entry name is a question no requirement answers yet. The
+   workflow's typed parameters are the parameters declared by the types its
+   entry instances name, and nothing there can dangle.
+
+.. code_note:: The range a shared instance name is drawn from in the validator's property
+   :id: NOTE_WIRING_GENERATOR_RANGE
+
+   The generator gives each node the index of an earlier node whose name it
+   takes, and an index at or past its own position keeps a name of its own. The
+   range is wide on purpose. Nothing behind a shared name is checked, so every
+   definition sharing one hides the other classes on those nodes. Measured over
+   4000 definitions: with ``0..6`` a third of them shared a name, and the share
+   carrying a type disagreement fell from 13.8% to 6.8%; with ``0..10`` a fifth
+   share one, and 8.4% carry a disagreement.
+
 .. src-trace::
    :project: agconflo-core

@@ -7,29 +7,12 @@ use crate::defect::WiringDefect;
 use crate::workflow::{Binding, NodeInstance, NodeType, Parameter, WorkflowDefinition};
 
 /// Every wiring defect `definition` carries, and nothing at all for one that
-/// carries none.
+/// carries none, in the definition's own order: each instance in turn, then the
+/// signature.
 ///
-/// A report rather than a refusal: the caller decides what a defect costs, and
-/// an empty report is the answer for a well-formed workflow
-/// (`CREQ_VALIDATOR_ACCEPTS_WELL_FORMED`).
-///
-/// The order is the definition's own - each instance in turn, then the
-/// signature - so two runs over one definition produce the same report. Nothing
-/// requires that, and it is worth having anyway: a report whose order came from
-/// a hash map would make a duplicate defect hard to see and a test of the report
-/// flaky.
-///
-/// Nothing here returns early, and that is the requirement rather than a
-/// stylistic preference. A validator that stops at the first defect reports each
-/// of them perfectly and still turns ten defects into ten rounds of edit,
-/// revalidate and read, for an author that pays per round trip. The signature is
-/// checked with everything else for the same reason, rather than refusing the
-/// definition before its wiring is looked at.
-///
-/// Two things are not looked behind, and neither is the walk stopping: an
-/// instance whose name another carries too, and the wires of a parameter bound
-/// more than once. Each is reported, and anything more said about it would name
-/// a place that picks out two things.
+/// Nothing here returns early, and the signature is checked with everything
+/// else. An instance whose name another carries too, and the wires of a
+/// parameter bound more than once, are reported and not looked behind.
 // @Every instance walked and everything collected,IMPL_WIRING_WALK,impl,[CREQ_VALIDATOR_EVERY_DEFECT, CREQ_VALIDATOR_ACCEPTS_WELL_FORMED]
 pub fn validate_wiring(definition: &WorkflowDefinition) -> Vec<WiringDefect> {
     let mut defects = Vec::new();
@@ -58,13 +41,6 @@ pub fn validate_wiring(definition: &WorkflowDefinition) -> Vec<WiringDefect> {
 }
 
 /// A lookup from a name to the first thing carrying it.
-///
-/// Which one never matters for an instance: a name several instances share is
-/// reported on its own and resolved no further, so for instances this only
-/// answers whether a name is there at all. For node types it is the answer, and
-/// it is asserted nowhere. Two declarations sharing a name within a definition
-/// is recorded as still open under `CREQ_VALIDATOR_BINDING_RESOLVES`, so the name
-/// has to resolve to something rather than stop the walk.
 fn by_name<'a, T>(items: &'a [T], name: impl Fn(&'a T) -> &'a str) -> HashMap<&'a str, &'a T> {
     let mut by_name = HashMap::new();
     for item in items {
@@ -83,17 +59,8 @@ fn repeated<'a>(names: impl IntoIterator<Item = &'a str>) -> HashSet<&'a str> {
 }
 
 /// An instance whose name another instance carries too: the name is reported
-/// the first time it is met, and the instance is not looked at further.
-///
-/// A name reaching several instances is no place, so nothing about any of them
-/// can be said through it. Walking each as if the name were its own was
-/// measured reporting one defect twice word for word, and two defects at one
-/// place; walking the first alone judged a wire from the name by whichever
-/// instance happened to be written first. The author untangles the name and
-/// learns what is behind it from the next report.
-///
-/// Once per name, however many instances carry it: three sharing one are one
-/// name to change.
+/// the first time it is met, once however many instances carry it, and the
+/// instance is not looked at further.
 // @A shared name reported once and nothing behind it checked,IMPL_WIRING_INSTANCE_NAMED_ONCE,impl,[CREQ_VALIDATOR_INSTANCE_NAMED_ONCE]
 fn report_shared_name<'a>(
     instance: &'a NodeInstance,
@@ -107,13 +74,8 @@ fn report_shared_name<'a>(
     }
 }
 
-/// One instance against the declaration it names.
-///
-/// The declaration is resolved first, and an instance without one is reported
-/// and left: its parameters are unknowable, so an unbound-parameter defect
-/// about it would be invented rather than found, and so would a disagreement
-/// about a wire whose declared types nobody can read. The missing type is in the
-/// report, and the rest of the definition is still walked.
+/// One instance against the declaration it names. An instance without one is
+/// reported and left, and the rest of the definition is still walked.
 // @An instance checked against the type it names,IMPL_WIRING_INSTANCE_TYPE,impl,[CREQ_VALIDATOR_BINDING_RESOLVES]
 fn check_instance(
     instance: &NodeInstance,
@@ -141,23 +103,10 @@ fn check_instance(
     );
 }
 
-/// Every parameter the declaration requires carries a binding.
-///
-/// The walk runs over the declaration rather than over the bindings, and that is
-/// the whole difference between finding this defect and never seeing it: a
-/// parameter with no binding is exactly the one a walk over the bindings never
-/// visits.
-///
-/// Optional parameters and declared globals are not required to be bound.
-/// Demanding a binding for an optional makes the second declared list
-/// meaningless, and demanding one for a global refuses a workflow that is
-/// correct - globals are read by declaration rather than wired
-/// (`DEC_DECLARED_PARAMETERS`).
-///
-/// An entry node is left alone: its parameters are the workflow's own, supplied
-/// when the workflow is invoked rather than by a wire
-/// (`DEC_WORKFLOW_SIGNATURE`).
-// @Every required parameter carries a binding,IMPL_WIRING_REQUIRED_BOUND,impl,[CREQ_VALIDATOR_REQUIRED_BOUND]
+/// Every parameter the declaration requires carries a binding, walked over the
+/// declaration rather than the bindings. Optional parameters, declared globals
+/// and an entry node's parameters need none.
+// @Every required parameter carries a binding,IMPL_WIRING_REQUIRED_BOUND,impl,[CREQ_VALIDATOR_REQUIRED_BOUND],[DEC_DECLARED_PARAMETERS, DEC_WORKFLOW_SIGNATURE]
 fn check_required_bound(
     instance: &NodeInstance,
     declaration: &NodeType,
@@ -182,22 +131,9 @@ fn check_required_bound(
 }
 
 /// Every binding fills a parameter its instance's type declares, and names an
-/// instance the definition carries.
-///
-/// One defect per binding rather than one per name that failed to resolve.
-/// Deduplicating by the name is the tidy-looking version of this and leaves
-/// every wire but one unnamed: five parameters bound to a deleted instance are
-/// five wires to repoint.
-///
-/// Both ends are looked at whatever the other turned out to be. A binding to an
-/// undeclared parameter from an instance that is not there is two fixes, the
-/// parameter renamed and the source repointed, and a walk moving on after the
-/// first leaves the second for the next round trip.
-///
-/// A parameter is looked at once, at its first binding, however many it has. A
-/// source several instances share resolves - to more than one thing, which is
-/// reported where the name is - and its type is not compared, since which of
-/// those instances would produce it is the question the author has to settle.
+/// instance the definition carries: one defect per binding, both ends looked at
+/// whatever the other is. A parameter is looked at once, at its first binding,
+/// and a source several instances share has its type left uncompared.
 // @Every binding's source resolved,IMPL_WIRING_BINDING_SOURCE,impl,[CREQ_VALIDATOR_BINDING_RESOLVES]
 fn check_bindings(
     instance: &NodeInstance,
@@ -241,14 +177,8 @@ fn check_bindings(
 }
 
 /// Whether the parameter `binding` fills is bound more than once on its
-/// instance - and if it is, a defect saying so.
-///
-/// Its caller then checks none of that parameter's bindings for a source or a
-/// type. Each would be a check of a wire the author may be about to delete, and
-/// checking them was measured reporting one defect twice, two defects at one
-/// place, or - with both sources sound - nothing at all. Whether the parameter
-/// is declared is checked before this, since that does not depend on which
-/// binding is kept.
+/// instance - and if it is, a defect saying so. Its caller then checks none of
+/// that parameter's bindings for a source or a type.
 // @A parameter bound twice reported once and none of its wires checked,IMPL_WIRING_PARAMETER_BOUND_ONCE,impl,[CREQ_VALIDATOR_PARAMETER_BOUND_ONCE]
 fn bound_more_than_once(
     instance: &NodeInstance,
@@ -266,20 +196,10 @@ fn bound_more_than_once(
     twice
 }
 
-/// The parameter `binding` fills, as its instance's type declares it - or
-/// nothing, and a defect saying so, where the type declares no parameter by
-/// that name.
-///
-/// Both lists are searched, required and optional, and nothing else is. A
-/// requested global is a context type read by declaration rather than a
-/// parameter, so a binding spelled like one fills nothing
-/// (`DEC_DECLARED_PARAMETERS`).
-///
-/// Only an instance whose declaration resolved gets here, and that is the only
-/// kind whose parameters are knowable: for one of a type nobody supplied,
-/// "undeclared" would be invented, and its missing type is in the report
-/// already.
-// @Every bound parameter declared by its instance's type,IMPL_WIRING_PARAMETER_DECLARED,impl,[CREQ_VALIDATOR_PARAMETER_DECLARED]
+/// The parameter `binding` fills, as its instance's type declares it in either
+/// list - or nothing, and a defect saying so. A requested global is not a
+/// parameter. Only an instance whose declaration resolved gets here.
+// @Every bound parameter declared by its instance's type,IMPL_WIRING_PARAMETER_DECLARED,impl,[CREQ_VALIDATOR_PARAMETER_DECLARED],[DEC_DECLARED_PARAMETERS]
 fn declared_parameter<'d>(
     instance: &NodeInstance,
     declaration: &'d NodeType,
@@ -301,26 +221,9 @@ fn declared_parameter<'d>(
 }
 
 /// The type declared for a parameter and the type declared for the output wired
-/// to it are the same name, exactly.
-///
-/// Exactly, because every way of loosening the comparison - ignoring case,
-/// trimming, matching a prefix - makes two distinct types compare as one, and a
-/// node handed the wrong context produces a confident wrong answer rather than
-/// failing.
-///
-/// Two ends are never compared, and each is deliberate. A parameter the type
-/// does not declare has no declared type, so its binding never gets here: it is
-/// reported as undeclared, and a disagreement with a stand-in type would be
-/// invented. And a producer of a node type the definition does not carry has no
-/// declared output at all: its missing type is already in the report, and
-/// comparing against a stand-in for one - an empty name, a default - would make
-/// every wire out of it disagree and send the author to change a type that is
-/// not wrong.
-///
-/// The check is reached for every binding whose wire can be compared, including
-/// one whose instance already carries an unbound-parameter defect. A walk that
-/// moved on after an instance's first defect would hide every disagreement below
-/// it.
+/// to it are the same name, exactly. Reached for every binding whose wire can be
+/// compared; a parameter the type does not declare, and a producer of a node
+/// type the definition does not carry, are never compared.
 // @Both ends of a wire declare one context type,IMPL_WIRING_TYPES_AGREE,impl,[CREQ_VALIDATOR_TYPES_AGREE]
 fn check_binding_type(
     instance: &NodeInstance,
@@ -345,21 +248,11 @@ fn check_binding_type(
 }
 
 /// Every node type an instance declares a call to is one the definition
-/// carries, and has a name both providers accept as a tool's.
-///
-/// Checked whatever the instance's own node type turned out to be: whether a
-/// call resolves does not depend on the caller's declaration, and leaving it for
-/// the next report is the round trip `FEAT_WIRING_ALL_DEFECTS` rules out. For the
-/// same reason a name is checked against the rule whether or not it resolves,
-/// since adding the node type would not make it acceptable.
-///
-/// A name listed twice is looked at once: it is one name to fix, and reporting it
-/// twice would be one defect word for word at one place.
-///
-/// The rule is `^[a-zA-Z0-9_-]{1,64}$` (`DEC_TOOL_NAMES_PORTABLE`), matched
-/// whole and counted in characters, which for the characters it allows are
-/// bytes.
-// @Every call resolved and its name one every provider accepts,IMPL_WIRING_CALLS,impl,[CREQ_VALIDATOR_CALL_RESOLVES, CREQ_VALIDATOR_CALL_NAME]
+/// carries, and has a name matching `^[a-zA-Z0-9_-]{1,64}$`, whole and counted
+/// in characters. Checked whatever the instance's own node type turned out to
+/// be, the name whether or not it resolves; a name listed twice is looked at
+/// once.
+// @Every call resolved and its name one every provider accepts,IMPL_WIRING_CALLS,impl,[CREQ_VALIDATOR_CALL_RESOLVES, CREQ_VALIDATOR_CALL_NAME],[DEC_TOOL_NAMES_PORTABLE]
 fn check_calls(
     instance: &NodeInstance,
     declarations: &HashMap<&str, &NodeType>,
@@ -393,20 +286,9 @@ pub(crate) fn portable(name: &str) -> bool {
             .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
 }
 
-/// A workflow is wired into another through its signature
-/// (`DEC_WORKFLOW_SIGNATURE`), so one designating no output, or several, cannot
-/// be composed and is malformed on its own terms.
-///
-/// Counting rather than testing for absence: a definition designating two is a
-/// workflow whose result is whichever output a caller happens to bind, which is
-/// the half a check written as "is one missing" passes.
-///
-/// It runs here, in the walk, rather than where a definition is assembled.
-/// Refusing a definition for its signature before its wiring is examined tells
-/// the author about the signature and nothing else, and they learn the rest only
-/// after fixing it - which is the round trip `FEAT_WIRING_ALL_DEFECTS` exists to
-/// prevent.
-// @Exactly one designated output,IMPL_WIRING_SIGNATURE,impl,[CREQ_VALIDATOR_ONE_OUTPUT]
+/// The definition designates exactly one output: counted rather than tested for
+/// absence, and checked in the walk with everything else.
+// @Exactly one designated output,IMPL_WIRING_SIGNATURE,impl,[CREQ_VALIDATOR_ONE_OUTPUT],[DEC_WORKFLOW_SIGNATURE]
 fn check_signature(definition: &WorkflowDefinition, defects: &mut Vec<WiringDefect>) {
     let designated = definition.designated_outputs.len();
     if designated != 1 {
@@ -417,19 +299,9 @@ fn check_signature(definition: &WorkflowDefinition, defects: &mut Vec<WiringDefe
     }
 }
 
-/// The one output a definition designates names one of its instances.
-///
-/// Only one: a definition designating several is refused for that by the check
-/// above, and which of them was meant is what its author decides first.
-/// Resolving each as well would name the definition once per designation, and a
-/// document cannot hold several (`DEC_ONE_OUTPUT_KEY`).
-///
-/// Reported as a signature defect of its own rather than as designating
-/// nothing, because a count of nought loses the name the author typed - the one
-/// thing tying the defect to what has to be changed. A name several instances
-/// share does resolve, to more than one thing, and that is reported where the
-/// name is rather than here.
-// @The one designated output resolved,IMPL_WIRING_OUTPUT_RESOLVES,impl,[CREQ_VALIDATOR_OUTPUT_RESOLVES]
+/// The one output a definition designates names one of its instances, checked
+/// only when there is exactly one, and reported with the name as written.
+// @The one designated output resolved,IMPL_WIRING_OUTPUT_RESOLVES,impl,[CREQ_VALIDATOR_OUTPUT_RESOLVES],[DEC_ONE_OUTPUT_KEY]
 fn check_output_resolves(
     definition: &WorkflowDefinition,
     instances: &HashMap<&str, &NodeInstance>,
@@ -447,7 +319,7 @@ fn check_output_resolves(
 }
 
 // --- tests -------------------------------------------------------------------
-// Bare functions named after their test cases, for the reason given in id.rs.
+// Bare functions named after their test cases.
 
 #[cfg(test)]
 use crate::workflow::{DEFINITION_NAME, definition, instance, node_type};
@@ -461,12 +333,6 @@ use proptest::prelude::*;
 /// may or may not be declared or agree on a type, instance names that may be
 /// shared, parameters that may be bound more than once, and nought, one or two
 /// designated outputs that may or may not name an instance.
-///
-/// The two sharing shapes were once held fixed, a parameter bound twice as
-/// outside the model and a shared name as unanswered. The model holds both, and
-/// they are the shapes where checking what a name picks out one thing at a time
-/// reports it twice - so a property of the report that never met them would
-/// prove nothing about them.
 #[cfg(test)]
 pub(crate) fn any_definition() -> impl Strategy<Value = WorkflowDefinition> {
     const CONTEXT_TYPES: [&str; 2] = ["note", "diff"];
@@ -479,12 +345,7 @@ pub(crate) fn any_definition() -> impl Strategy<Value = WorkflowDefinition> {
     // Per node: its type, whether it is an entry node, its bindings, whether a
     // parameter may be bound more than once, and an earlier node whose name it
     // takes - an index at or past its own position keeps a name of its own.
-    //
-    // The range for that index is wide on purpose. Nothing behind a shared name
-    // is checked, so every definition sharing one hides the other classes on
-    // those nodes. Measured over 4000 definitions: with 0..6 a third of them
-    // shared a name, and the share carrying a disagreement fell from 13.8% to
-    // 6.8%; with 0..10 a fifth share one, and 8.4% carry a disagreement.
+    // @The range a shared name is drawn from,TRACE_WIRING_GENERATOR_RANGE,trace,[],[NOTE_WIRING_GENERATOR_RANGE]
     let nodes = vec(
         (
             0..4usize,
@@ -662,14 +523,8 @@ fn bound_twice(instance: &str, parameter: &str) -> WiringDefect {
 #[cfg(test)]
 proptest! {
     /// Each instance is of a type of its own, declaring required parameters,
-    /// optional parameters and requested globals together - a walk that reports
-    /// an optional or a global is over-blocking, and a definition built from
-    /// required parameters alone would never show it. The first instance is
-    /// given no bindings whatever its mask says, because an instance a walk over
-    /// the bindings never visits is the case this exists to catch.
-    ///
-    /// What the report should be is worked out from the masks, which is a
-    /// different computation from the walk under test.
+    /// optional parameters and requested globals together; the first instance is
+    /// given no bindings. The expected report is worked out from the masks.
     #[test]
     fn every_unbound_required_is_reported(
         shapes in vec((1..=3usize, 0..=2usize, 0..=2usize, any::<u8>()), 1..=4)
@@ -751,15 +606,7 @@ proptest! {
     /// optional parameters and requested globals in any number, or of a type
     /// nobody supplied, and binds names from one pool: every name either list
     /// could declare, names spelled like the globals, and a name nothing
-    /// declares. Declared and undeclared names therefore sit side by side on one
-    /// instance, which is where a check reading one list short, or reading the
-    /// globals as parameters, gets some of them wrong and not all.
-    ///
-    /// What the report should say is worked out from which names each shape
-    /// declares, a different computation from the walk under test. Only
-    /// undeclared-parameter defects are compared: every binding is wired to an
-    /// instance that resolves and agrees on its type, and the unbound
-    /// parameters beside them are another case's business.
+    /// declares. Only undeclared-parameter defects are compared.
     #[test]
     fn every_undeclared_parameter_is_reported(
         shapes in vec(
@@ -820,11 +667,8 @@ proptest! {
     }
 
     /// One wire between two declared type names, the second derived from the
-    /// first by each way a comparison gets loosened: the same name, the same
-    /// name upper-cased, the same name with a leading or a trailing space, and
-    /// the same name with a character appended so that one is a prefix of the
-    /// other. Two unrelated random names would prove only that unrelated names
-    /// differ, which no comparison anyone would write gets wrong.
+    /// first by each way a comparison gets loosened: the same name, upper-cased,
+    /// with a leading or a trailing space, and with a character appended.
     #[test]
     fn type_names_compare_exactly(name in "[a-z]{1,6}", variation in 0..5usize) {
         let produced = match variation {
@@ -855,13 +699,8 @@ proptest! {
         }
     }
 
-    /// A report that grows without saying more is what an author paying per
-    /// round trip reads.
-    ///
-    /// Equality alone is not the whole assertion: a defect reported once per
-    /// direction of a binding, or once per check that touched it, carries a
-    /// different message about the same wire and would pass it. So no place may
-    /// be named twice by defects of one class either.
+    /// No defect is reported twice, and no place is named twice by defects of one
+    /// class.
     #[test]
     fn no_defect_is_reported_twice(workflow in any_definition()) {
         let report = validate_wiring(&workflow);
@@ -884,17 +723,10 @@ proptest! {
         }
     }
 
-    /// The control the other cases are measured against: a validator that
-    /// refuses every workflow satisfies every requirement that says what must be
-    /// refused, and only this one notices.
-    ///
-    /// The shapes a strict validator refuses by accident are built into every
-    /// generated definition rather than left to chance, because a generator
-    /// producing only trees would pass against exactly such a validator: a cycle
-    /// of two nodes, a pair of nodes no entry node reaches, an unbound optional
-    /// parameter, a declared global that no binding carries, an output bound by
-    /// several parameters, and an entry node whose required parameter is the
-    /// workflow's own rather than a wire.
+    /// The control: generated sound definitions, each holding a cycle of two
+    /// nodes, a pair no entry node reaches, an unbound optional parameter, an
+    /// unbound global, an output bound by several parameters, and an entry node
+    /// whose required parameter is the workflow's own, are reported clean.
     #[test]
     fn well_formed_definitions_pass(workflow in well_formed_definition()) {
         prop_assert_eq!(validate_wiring(&workflow), Vec::new());
@@ -962,8 +794,7 @@ fn all_four_classes_reported() {
     let instances = vec![
         instance("a", "differ", &[]),
         // Two defects on one instance: an unbound required parameter and a wire
-        // whose ends disagree. A walk that moves on once an instance has a
-        // defect reports three rather than four.
+        // whose ends disagree.
         instance("b", "pair", &[("left", "a")]),
         instance("c", "sink", &[("input", "ghost")]),
     ];
@@ -1028,11 +859,8 @@ fn malformed_definition_still_reports() {
     ];
 
     for workflow in &malformed {
-        // Not ending the run is the whole assertion, and deliberately the whole
-        // of it: which defect the first two earn is recorded as still open, and
-        // asserting a class here would pin behaviour no requirement asks for.
-        // The report is read rather than discarded, so a defect that cannot say
-        // anything fails this.
+        // Returning a report whose every defect says something is the whole
+        // assertion.
         for defect in validate_wiring(workflow) {
             assert!(!defect.to_string().is_empty(), "{defect:?} says nothing");
         }
@@ -1053,9 +881,7 @@ fn type_disagreement_is_reported() {
         &["b"],
     );
 
-    // Both names are asserted on, because what a reader has to act on is which
-    // type was expected and which arrived; a defect saying only that the two
-    // differ sends them back to the declarations to find out.
+    // Both names are asserted on.
     assert_eq!(
         validate_wiring(&crossed),
         vec![disagreement("b", "input", "summary", "diff")]
@@ -1073,9 +899,7 @@ fn agreeing_wires_pass() {
         vec![
             instance("a", "source", &[]),
             // One output bound by several parameters, and by several
-            // instances: fan-out, which the model allows
-            // (`DEC_BINDING_BY_PORT`). A check recording one consumer per
-            // output refuses this while comparing every name correctly.
+            // instances.
             instance("b", "pair", &[("left", "a"), ("right", "a")]),
             instance("c", "pair", &[("left", "a"), ("right", "b")]),
         ],
@@ -1098,10 +922,8 @@ fn unwired_instance_is_reported() {
     ];
     let report = validate_wiring(&definition(types, instances, &["a"]));
 
-    // The granularity is the assertion: one defect saying the instance is
-    // unwired would leave the author to work out which parameters it meant.
-    // What holds afterwards is that the walk continues - c's own unbound
-    // parameter is in the same report.
+    // One defect per parameter, and c's own unbound parameter in the same
+    // report.
     assert_eq!(
         report,
         vec![
@@ -1144,9 +966,7 @@ fn binding_to_missing_instance_is_reported() {
         &["b"],
     );
 
-    // What must not also appear is the point of the case: the parameter is
-    // bound, so no unbound-parameter defect is reported for it, and a report
-    // carrying both would send the author to add a wire that is already there.
+    // The parameter is bound, so no unbound-parameter defect is reported for it.
     assert_eq!(
         validate_wiring(&broken),
         vec![unresolved("b", "input", "renamed")]
@@ -1165,13 +985,8 @@ fn instance_of_missing_type_is_reported() {
     ];
     let report = validate_wiring(&definition(types, instances, &["b"]));
 
-    // Nothing else about that instance is reported, which is the half that can
-    // regress quietly: without its declaration nothing about its parameters is
-    // knowable, so every other defect about it would be invented - and so would
-    // a disagreement about the wire it feeds, where comparing against a stand-in
-    // for the type it does not declare sends the author to change a type that is
-    // not wrong. The rest of the definition is still walked, so c's own defect
-    // is in the same report.
+    // Nothing else about that instance is reported, and c's own defect is in the
+    // same report.
     assert_eq!(
         report,
         vec![
@@ -1195,8 +1010,7 @@ fn self_binding_and_shared_types_pass() {
     assert_eq!(validate_wiring(&looping), Vec::new());
 
     // Two instances of one node type, which share a declaration and nothing
-    // else. A resolver written as if the definition were a tree of distinct
-    // nodes refuses both of these by accident.
+    // else.
     let shared = definition(
         vec![
             node_type("source", &[], "note"),
@@ -1244,10 +1058,8 @@ fn legal_signatures_pass() {
     );
     assert_eq!(validate_wiring(&closed), Vec::new());
 
-    // A designated output whose node also feeds another node. Feeding
-    // something does not make it less terminal, and it is the ordinary shape of
-    // a loop (`DEC_BACK_EDGES_ALLOWED`), where the designated output feeds the
-    // node that starts the next pass.
+    // A designated output whose node also feeds another node, the ordinary shape
+    // of a loop.
     let feeding = definition(
         vec![
             node_type("source", &[], "note"),
@@ -1275,8 +1087,7 @@ fn undeclared_parameter_is_reported() {
     let instances = vec![
         instance("a", "source", &[]),
         // What the undeclared bindings are wired from: an output no declared
-        // parameter shares, so comparing one against a stand-in type would
-        // report a disagreement nobody could fix.
+        // parameter shares.
         instance("z", "differ", &[]),
         // A typo of the optional parameter, and a binding spelled like the
         // requested global. Nothing else about b is wrong.
@@ -1291,9 +1102,7 @@ fn undeclared_parameter_is_reported() {
         instance("d", "lenient", &[("input", "a"), ("stray", "ghost")]),
     ];
 
-    // c and d are the two where one defect hides another: the unbound
-    // parameter says what is missing and not which binding was meant for it,
-    // and the unresolved source is a second fix beside the renamed parameter.
+    // c and d are the two where one defect hides another.
     assert_eq!(
         validate_wiring(&definition(types, instances, &["b"])),
         vec![
@@ -1309,9 +1118,7 @@ fn undeclared_parameter_is_reported() {
 
 #[test]
 fn declared_parameters_pass() {
-    // The optional parameter bound beside the required one: a check searching
-    // the required list alone reports it, and one searching the optional list
-    // alone reports the other.
+    // The optional parameter bound beside the required one.
     let fed = definition(
         vec![
             node_type("source", &[], "note"),
@@ -1363,10 +1170,7 @@ fn resolving_outputs_pass() {
     );
     assert_eq!(validate_wiring(&entered), Vec::new());
 
-    // An output naming an instance whose name is not its type's. A check
-    // resolving the output against the node types passes every definition
-    // whose instances are named after their types, which is how short examples
-    // get written.
+    // An output naming an instance whose name is not its type's.
     let named_apart = definition(
         vec![
             node_type("source", &[], "note"),
@@ -1403,13 +1207,8 @@ fn shared_instance_name_is_reported() {
         definition(types.clone(), instances, &["a"])
     };
 
-    // Two orders. The producers are swapped between them, so a validator
-    // resolving a to whichever producer comes first reports a disagreement for
-    // exactly one. And a different instance comes first in each - in the second
-    // the one with its parameter unbound - so one walking only the first
-    // instance carrying the name reports it there. Everything else absent from
-    // the report is what walking each instance as if the name were its own
-    // produces, each about a node the author cannot find.
+    // Two orders, the producers swapped between them and a different instance
+    // first in each.
     for copies in [
         ["differ", "source", "sink", "not-supplied"],
         ["sink", "not-supplied", "source", "differ"],
@@ -1441,9 +1240,7 @@ fn names_of_different_kinds_pass() {
         &["sink"],
     );
 
-    // A check gathering every name into one set before looking for repeats
-    // refuses this, and it is how a definition with one instance of each type
-    // is naturally written.
+    // Names shared across kinds and never within one: reported clean.
     assert_eq!(validate_wiring(&named_alike), Vec::new());
 }
 
@@ -1475,11 +1272,7 @@ fn parameter_bound_twice_is_reported() {
         ),
     ];
 
-    // Checking each binding reports b twice and d as a disagreement, and
-    // passes c; checking only the first reports b's source; one defect per
-    // binding beyond the first reports c twice. And e keeps the one check that
-    // still runs on a parameter bound twice, which a walk skipping everything
-    // about it loses.
+    // b, c and d each once, and e's undeclared parameter still reported.
     assert_eq!(
         validate_wiring(&definition(types, instances, &["a"])),
         vec![
@@ -1534,9 +1327,7 @@ fn name_defects_reported_together() {
     // And an output naming no instance.
     let broken = definition(types, instances, &["nowhere"]);
 
-    // A walk leaving an instance once a binding repeats reports fewer than
-    // three for b, and one leaving the definition once a name is shared reports
-    // only the first.
+    // Three defects for b, and the shared name and the output after them.
     assert_eq!(
         validate_wiring(&broken),
         vec![
@@ -1553,9 +1344,7 @@ fn name_defects_reported_together() {
 fn empty_definition_is_refused_for_its_signature() {
     let report = validate_wiring(&definition(Vec::new(), Vec::new(), &[]));
 
-    // The count and the class, not merely that something was reported: an empty
-    // definition has nothing to wire and nothing to designate, so it is the case
-    // where two requirements could quietly both fire.
+    // The count and the class: exactly one signature defect.
     assert_eq!(report, vec![signature_defect(0)]);
 }
 
@@ -1677,12 +1466,8 @@ fn unportable_call_name_is_reported() {
 #[cfg(test)]
 proptest! {
     /// For any name a call gives, the validator reports it exactly when it does
-    /// not match `^[a-zA-Z0-9_-]{1,64}$`.
-    ///
-    /// The expected verdict comes from how the name was built rather than from
-    /// a second copy of the rule: a run of legal characters of a chosen length,
-    /// with one character outside the set put in or not. Lengths are drawn near
-    /// the edges - nought, one, 64 and 65 - where a rule off by one shows.
+    /// not match `^[a-zA-Z0-9_-]{1,64}$`, the verdict coming from how the name
+    /// was built, with lengths near the edges.
     #[test]
     fn call_names_match_the_rule(
         length in prop_oneof![Just(0usize), Just(1), Just(63), Just(64), Just(65), 0..130usize],

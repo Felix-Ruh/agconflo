@@ -1,29 +1,14 @@
 //! What a workflow is made of: the node types it names, the instances wired
 //! into them, and the outputs it designates.
 //!
-//! Data rather than behaviour. `ARCH_WIRING` allocates no requirement to these
-//! types - they are what the validator reads, and the other layer it reads them
-//! against (`DEC_TWO_LAYERS`) - so nothing here carries a trace marker and
-//! nothing here is tested on its own. What holds them to their shape is the
-//! validator's cases.
-//!
-//! Every field is public and nothing is checked on the way in, which is the
-//! opposite of how a `Context` is built and deliberately so. A definition has
-//! to be able to hold every malformed shape there is, or the defects the
-//! validator exists to report could not be written down: a binding naming an
-//! instance that was deleted, an instance of a type nobody supplied, a
-//! designated output naming nothing, two instances sharing a name. A
-//! constructor refusing them would move the refusal to where only the first
-//! defect is ever seen, which is what `FEAT_WIRING_ALL_DEFECTS` rules out.
+//! Data, with every field public and nothing checked on the way in: a
+//! definition holds every malformed shape, and the validator reports them.
 
 use crate::ContextType;
 
 /// One parameter a node type declares: its name, and the context type it is
 /// declared for.
-///
-/// Ordered within its list and typed, which is what lets a node assemble its
-/// own inputs rather than take them in the order edges arrive
-/// (`DEC_DECLARED_PARAMETERS`).
+// @A parameter declared by name and type,TRACE_WORKFLOW_PARAMETER,trace,[],[DEC_DECLARED_PARAMETERS]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Parameter {
     /// The name a binding uses to reach this parameter.
@@ -33,24 +18,16 @@ pub struct Parameter {
 }
 
 /// What one kind of node consumes and produces, declared once and instantiated
-/// as often as a workflow likes (`DEC_TWO_LAYERS`).
-///
-/// Three declared lists rather than one, and each is load-bearing
-/// (`DEC_DECLARED_PARAMETERS`): `required` is what a workflow is checked
-/// against, `optional` is what lets a node be useful with less than everything
-/// wired, and `globals` are the context types this kind of node reads by
-/// declaration rather than through a wire.
-///
-/// One output, and it is typed: a node produces exactly one thing
-/// (`STKH_ONE_OUTPUT`), and the type declared for it is what a consuming
-/// parameter is compared against without running anything.
+/// as often as a workflow likes: required and optional parameters, the global
+/// context types it reads by declaration, and one typed output.
+// @A node type declared once,TRACE_WORKFLOW_NODE_TYPE,trace,[],[DEC_TWO_LAYERS, DEC_DECLARED_PARAMETERS]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NodeType {
     /// The name an instance names to reach this declaration.
     pub name: String,
     /// What a node of this type does, in the words of its declaration, or empty
-    /// when it gives none. A model offered this type as a tool is shown it
-    /// (`DEC_TOOLS_OFFERED_AS_CONTEXTS`).
+    /// when it gives none.
+    // @A node type's description,TRACE_WORKFLOW_DESCRIPTION,trace,[],[DEC_TOOLS_OFFERED_AS_CONTEXTS]
     pub description: String,
     /// Parameters a node of this type cannot run without.
     pub required: Vec<Parameter>,
@@ -62,13 +39,9 @@ pub struct NodeType {
     pub output: ContextType,
 }
 
-/// One parameter of one instance, wired to the output of a named instance.
-///
-/// Both ends are names the definition carries (`DEC_BINDING_BY_PORT`):
-/// `parameter` is declared by the consuming instance's node type, and `source`
-/// is the instance whose one output arrives there. Names rather than handles,
-/// deliberately - a wire to nowhere is a defect to report rather than a value
-/// nobody can build.
+/// One parameter of one instance, wired to the output of a named instance: both
+/// ends are names the definition carries.
+// @A binding by names,TRACE_WORKFLOW_BINDING,trace,[],[DEC_BINDING_BY_PORT, NOTE_WORKFLOW_SHAPE]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Binding {
     /// The parameter of the consuming instance this binding fills.
@@ -86,38 +59,21 @@ pub struct NodeInstance {
     /// The node type this is an instance of.
     pub node_type: String,
     /// Whether this is an entry node, whose parameters are the workflow's own
-    /// rather than wires (`DEC_WORKFLOW_SIGNATURE`).
-    ///
-    /// A flag rather than a list of entry instance names on the definition, and
-    /// rather than a second kind of binding source, because either of those is
-    /// a fourth kind of name that can resolve to nothing - and what a validator
-    /// owes an unresolved entry name is a question no requirement answers yet.
-    /// Nothing is resolved here, so nothing can dangle: the workflow's typed
-    /// parameter list is the parameters declared by the types its entry
-    /// instances name.
+    /// rather than wires.
+    // @An entry node as a flag,TRACE_WORKFLOW_ENTRY,trace,[],[DEC_WORKFLOW_SIGNATURE, NOTE_WORKFLOW_SHAPE]
     pub entry: bool,
     /// The bindings that fill this instance's parameters.
     pub bindings: Vec<Binding>,
     /// The node types a model performing this instance may call, in the order
-    /// the workflow lists them (`DEC_CALLS_DECLARED_ON_THE_INSTANCE`).
-    ///
-    /// On the instance rather than on its node type, because what a node may
-    /// call is wiring, and one node type used in two workflows may call
-    /// different things in each. Names rather than handles, as a binding's are:
-    /// a call to a node type nobody supplied is a defect to report
-    /// (`CREQ_VALIDATOR_CALL_RESOLVES`). A name listed twice is kept twice, as
-    /// written.
+    /// the workflow lists them, a name listed twice kept twice.
+    // @Calls declared on the instance,TRACE_WORKFLOW_CALLS,trace,[],[DEC_CALLS_DECLARED_ON_THE_INSTANCE]
     pub calls: Vec<String>,
 }
 
 /// A workflow definition: the node types it carries, the instances wired into
-/// it, and the outputs it designates.
-///
-/// `designated_outputs` holds instance names, and holds as many as it was
-/// given. None and several are exactly the shapes `CREQ_VALIDATOR_ONE_OUTPUT`
-/// refuses, and a designation naming no instance is what
-/// `CREQ_VALIDATOR_OUTPUT_RESOLVES` refuses: all of them have to be
-/// representable here to be checkable there.
+/// it, and the outputs it designates - as many as it was given, naming
+/// instances or not.
+// @A definition holding every malformed shape,TRACE_WORKFLOW_DEFINITION,trace,[],[NOTE_WORKFLOW_SHAPE]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WorkflowDefinition {
     /// What this definition is called, which is the place a signature defect
@@ -132,10 +88,7 @@ pub struct WorkflowDefinition {
 }
 
 // --- test builders -----------------------------------------------------------
-// Used by the validator's tests and by the defect's, so they live beside the
-// types they build rather than in either module. They are not tests themselves:
-// this module has none, because every test in the crate is imported as a run
-// naming the case it ran, and the cases are per component.
+// Used by the validator's tests and by the defect's.
 
 /// A context type, from a name the caller knows is not empty.
 #[cfg(test)]

@@ -4,47 +4,22 @@ use std::fmt;
 
 use crate::ContextType;
 
-/// One thing wrong with one workflow definition.
-///
-/// A value rather than a message. Every defect carries the place it concerns in
-/// fields of its own, so a caller acts on it without parsing prose - and the
-/// caller this feature was written for is an agent correcting its own workflow
-/// (`CREQ_DEFECT_NAMES_PLACE`). The message exists too, through [`fmt::Display`],
-/// and says the same thing for a person reading a report.
-///
-/// The place is not the same shape for every defect, and flattening it into one
-/// would be the defect this is written to avoid. A defect about a wire concerns
-/// a node instance and one of its parameters; a defect about an instance whose
-/// node type is missing concerns that instance and no parameter, because its
-/// declaration is what is missing and its parameter list is therefore
-/// unknowable; a name several instances share concerns that name and no
-/// parameter, since it is the one place such a defect can give; a defect about
-/// the signature concerns the definition and no node in it. A variant that
-/// carried an instance or a parameter anyway would send an author to a place
-/// that is not wrong.
-///
-/// A name that resolved to nothing is carried as it was written, and is the one
-/// field that names something the definition does not have. It is the only thing
-/// tying the defect to what the author typed.
-///
-/// `#[non_exhaustive]` because the classes are not finished: the shapes still
-/// recorded as open under `CREQ_VALIDATOR_BINDING_RESOLVES` - declarations a
-/// definition carries twice, and a binding into an entry node - may each earn a
-/// variant of their own.
+/// One thing wrong with one workflow definition, carrying the place it
+/// concerns as values - a node instance and a parameter, an instance alone, or
+/// the definition itself - and saying the same through [`fmt::Display`]. A name
+/// that resolved to nothing is carried as it was written.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
-// @A place carried as a value,IMPL_DEFECT_PLACE,impl,[CREQ_DEFECT_NAMES_PLACE]
+// @A place carried as a value,IMPL_DEFECT_PLACE,impl,[CREQ_DEFECT_NAMES_PLACE],[DEC_FAILURES_NON_EXHAUSTIVE]
 pub enum WiringDefect {
-    /// A required parameter of an instance carries no binding
-    /// (`CREQ_VALIDATOR_REQUIRED_BOUND`).
+    /// A required parameter of an instance carries no binding.
     RequiredParameterUnbound {
         /// The instance whose parameter is unwired.
         instance: String,
         /// The required parameter carrying no binding.
         parameter: String,
     },
-    /// A binding names an instance the definition does not carry
-    /// (`CREQ_VALIDATOR_BINDING_RESOLVES`).
+    /// A binding names an instance the definition does not carry.
     UnresolvedInstance {
         /// The instance consuming the binding.
         instance: String,
@@ -53,9 +28,7 @@ pub enum WiringDefect {
         /// The instance name that resolved to nothing, as it was written.
         unresolved: String,
     },
-    /// An instance names a node type the definition does not carry
-    /// (`CREQ_VALIDATOR_BINDING_RESOLVES`). It concerns the instance, whose
-    /// parameters are unknowable without the declaration, so it carries no
+    /// An instance names a node type the definition does not carry; it carries no
     /// parameter.
     UnresolvedNodeType {
         /// The instance whose declaration is missing.
@@ -64,37 +37,28 @@ pub enum WiringDefect {
         unresolved: String,
     },
     /// A binding names a parameter that the node type of its instance declares
-    /// neither as required nor as optional
-    /// (`CREQ_VALIDATOR_PARAMETER_DECLARED`).
+    /// neither as required nor as optional.
     UndeclaredParameter {
         /// The instance carrying the binding.
         instance: String,
         /// The parameter it names, as it was written.
         parameter: String,
     },
-    /// More than one instance carries one name
-    /// (`CREQ_VALIDATOR_INSTANCE_NAMED_ONCE`). Reported once for the name,
-    /// however many carry it, and nothing about any of them is reported
-    /// besides: a place naming several instances is no place.
+    /// More than one instance carries one name, reported once for the name.
     RepeatedInstance {
         /// The name the instances share.
         instance: String,
     },
-    /// An instance binds one parameter more than once
-    /// (`CREQ_VALIDATOR_PARAMETER_BOUND_ONCE`). Reported once for the
-    /// parameter, however many bindings it has.
+    /// An instance binds one parameter more than once, reported once for the
+    /// parameter.
     RepeatedBinding {
         /// The instance carrying the bindings.
         instance: String,
         /// The parameter bound more than once.
         parameter: String,
     },
-    /// A binding joins an output to a parameter declared for another context
-    /// type (`CREQ_VALIDATOR_TYPES_AGREE`).
-    ///
-    /// Both type names are carried, because what a reader acts on is which type
-    /// was expected and which arrived; a defect saying only that the two differ
-    /// sends them back to the declarations to find out.
+    /// A binding joins an output to a parameter declared for another context type,
+    /// carrying both type names.
     ContextTypeDisagreement {
         /// The instance consuming the binding.
         instance: String,
@@ -105,27 +69,24 @@ pub enum WiringDefect {
         /// The context type the wired output is declared to produce.
         produced: ContextType,
     },
-    /// The definition designates no output, or designates more than one
-    /// (`CREQ_VALIDATOR_ONE_OUTPUT`). It concerns the definition itself, so it
-    /// carries no instance and no parameter.
+    /// The definition designates no output, or more than one; it carries no
+    /// instance and no parameter.
     SignatureOutputs {
         /// The definition whose signature is malformed.
         definition: String,
         /// How many outputs it designates, where exactly one is required.
         designated: usize,
     },
-    /// The one output the definition designates names no instance of it
-    /// (`CREQ_VALIDATOR_OUTPUT_RESOLVES`). A signature defect, so it concerns
-    /// the definition and carries no instance, though it names one.
+    /// The one output the definition designates names no instance of it: a
+    /// signature defect, carrying no instance though it names one.
     UnresolvedOutput {
         /// The definition whose output names nothing.
         definition: String,
         /// The instance name that resolved to nothing, as it was written.
         unresolved: String,
     },
-    /// An instance declares a call to a node type the definition does not carry
-    /// (`CREQ_VALIDATOR_CALL_RESOLVES`). It concerns the instance, and no
-    /// parameter.
+    /// An instance declares a call to a node type the definition does not carry;
+    /// it carries no parameter.
     UnresolvedCall {
         /// The instance declaring the call.
         instance: String,
@@ -133,9 +94,7 @@ pub enum WiringDefect {
         unresolved: String,
     },
     /// An instance declares a call to a node type whose name is not one both
-    /// providers accept as a tool's (`CREQ_VALIDATOR_CALL_NAME`). Reported
-    /// whether or not the node type resolves, since the name is refused either
-    /// way.
+    /// providers accept as a tool's, whether or not the node type resolves.
     UnportableCallName {
         /// The instance declaring the call.
         instance: String,
@@ -277,7 +236,7 @@ impl fmt::Display for WiringDefect {
 }
 
 // --- tests -------------------------------------------------------------------
-// Bare functions named after their test cases, for the reason given in id.rs.
+// Bare functions named after their test cases.
 
 #[cfg(test)]
 use crate::validate_wiring;
@@ -291,21 +250,13 @@ use proptest::prelude::*;
 #[cfg(test)]
 proptest! {
     /// Every defect that concerns a wire names its consumer and the parameter,
-    /// read from the defect itself rather than from its rendering. A place that
-    /// can be recovered only by parsing a message is a place an agent
-    /// correcting its own workflow cannot use, and the two are
-    /// indistinguishable to a human reading the output - which is how this
-    /// requirement would be lost without anyone noticing.
-    ///
-    /// Each also names something the definition carries: the instance is one of
-    /// its own, and the parameter is either declared by the type that instance
-    /// names or written in one of its bindings.
+    /// read from the defect itself rather than from its rendering, and each names
+    /// something the definition carries.
     #[test]
     fn names_instance_and_parameter(workflow in any_definition()) {
         for defect in validate_wiring(&workflow) {
-            // Exhaustive on purpose, though the enum is `non_exhaustive`: a
-            // class added later has to be filed as concerning a wire or not
-            // concerning one, rather than escaping this property in silence.
+            // Exhaustive, so that a class added later is filed as concerning a wire
+            // or not.
             match defect {
                 WiringDefect::RequiredParameterUnbound { .. }
                 | WiringDefect::UnresolvedInstance { .. }
@@ -363,9 +314,7 @@ fn signature_names_the_definition() {
     let [defect] = report.as_slice() else {
         panic!("a definition designating no output reports one defect: {report:?}");
     };
-    // The absence is the assertion. A defect shaped so that every one of them
-    // has an instance forces this one to name some node, and the author is then
-    // sent to a node that has nothing to do with it.
+    // The absence is the assertion.
     assert_eq!(defect.instance(), None, "{defect:?}");
     assert_eq!(defect.parameter(), None, "{defect:?}");
     assert!(
@@ -373,10 +322,8 @@ fn signature_names_the_definition() {
         "it names the definition: {defect:?}"
     );
 
-    // An output naming no instance names an instance - the one that is not
-    // there - and still concerns the definition. Filing the name it carries as
-    // the instance the defect is about would send the author to a node that
-    // does not exist.
+    // An output naming no instance names that missing instance and still
+    // concerns the definition.
     let renamed = definition(
         vec![node_type("source", &[], "note")],
         vec![instance("a", "source", &[])],
