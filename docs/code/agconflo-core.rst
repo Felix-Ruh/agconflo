@@ -131,5 +131,35 @@ error, since code comes after its requirement; the review report
    they gave faults in the syntax and missing keys, and not one value of the
    wrong kind.
 
+.. code_note:: An unbound parameter is absent from an activation
+   :id: NOTE_SCHEDULER_ABSENT_PARAMETER
+
+   A parameter the definition leaves unbound is absent from the activation's
+   inputs rather than present and empty. That is the only way an optional
+   parameter left unwired can be told from one bound to something that rendered
+   to nothing, and a script host hands it on the same way, as a name with no
+   value.
+
+.. code_note:: A run keeps one ordered list of what it accepted
+   :id: NOTE_RUN_ONE_EVENT_LIST
+
+   Exchanges, calls and outputs go into one list rather than one per kind,
+   because the order between kinds is part of what happened: an exchange
+   reported after a call belongs to the activation outstanding then, and
+   replayed before the call it would belong to another. The record writes that
+   list and a resume replays it in order.
+
+.. code_note:: What a caller builds holds its malformed shapes
+   :id: NOTE_RUN_VALUES_HOLD_MALFORMED
+
+   A run's arguments and a model's call are built by the caller and checked
+   when the run is given them, so each holds every shape it can be given, the
+   faulty ones included. Every argument supplied is kept, a second one for the
+   same entry instance and parameter too: a map keyed by the pair would drop
+   one without a word, and a parameter given two arguments is exactly the fault
+   a run refuses to start on, so it has to survive being built to be reported.
+   A call holds whatever a model sent, or what the run refuses of a call could
+   not be put to it.
+
 .. src-trace::
    :project: agconflo-core

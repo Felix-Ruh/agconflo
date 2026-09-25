@@ -1,12 +1,6 @@
 //! The run scheduler: from a definition, the arguments a run was started with
 //! and what has been produced so far, which instance may activate next and what
-//! that activation carries.
-//!
-//! There is no history in it. The same definition, the same arguments and the
-//! same produced outputs give the same answer however a run reached them, which
-//! is what makes the answer independent of the order a definition happens to
-//! carry its instances in - the one defect measured on the prototype this was
-//! built from (`EVD_RUN_OPTIONAL_BY_ORDER`).
+//! that activation carries - the same answer however a run reached them.
 
 use std::collections::HashMap;
 
@@ -20,17 +14,9 @@ pub(crate) type Produced = HashMap<String, Context>;
 /// One node about to run: which instance it is for, the node type it performs,
 /// the context for each parameter it is given, and the context type it is
 /// declared to produce - and, for a node type a model called, which call it
-/// performs.
-///
-/// Held by value rather than by reference into the definition, because the
-/// caller performs the activation (`DEC_RUN_IS_DRIVEN`) and a `Context` is a
-/// handle - cloning one shares the value rather than copying it.
-///
-/// It carries no identifier of its own. No instance activates twice in a run
-/// (`DEC_ACTIVATION_ONCE_PER_RUN`), so the instance name says which of an
-/// instance's own activations this is, and a called node type's activation is
-/// told apart by the call it performs: the provider's identifier for it, which
-/// the provider issued once (`DEC_CALL_IS_AN_ACTIVATION`).
+/// performs. Held by value, and told apart by instance and call rather than by
+/// an identifier of its own.
+// @An activation told apart by instance and call,TRACE_SCHEDULER_ACTIVATION,trace,[],[DEC_RUN_IS_DRIVEN, DEC_ACTIVATION_ONCE_PER_RUN, DEC_CALL_IS_AN_ACTIVATION]
 #[derive(Clone, Debug)]
 pub struct Activation {
     pub(crate) instance: String,
@@ -61,43 +47,23 @@ impl Activation {
 
     /// One context per parameter the instance is given, each named by that
     /// parameter, in the order its node type declares them: the required list in
-    /// its own order, then the optional list in its own.
-    ///
-    /// Declared order rather than the order the definition binds them in, and
-    /// rather than sorted: a node assembles its own inputs from its declared
-    /// parameter list (`DEC_DECLARED_PARAMETERS`), so the order is part of what
-    /// an activation is.
-    ///
-    /// A parameter the definition leaves unbound is absent rather than empty,
-    /// which is the only way an optional parameter can be distinguished from one
-    /// bound to something that rendered to nothing.
+    /// its own order, then the optional list in its own. A parameter the
+    /// definition leaves unbound is absent rather than empty.
+    // @Inputs in declared order and an unbound one absent,TRACE_SCHEDULER_INPUTS,trace,[],[DEC_DECLARED_PARAMETERS, NOTE_SCHEDULER_ABSENT_PARAMETER]
     pub fn inputs(&self) -> &[(String, Context)] {
         &self.inputs
     }
 
     /// The context type the activation's node type declares for its one output,
-    /// which is the type the run accepts an output of
-    /// (`CREQ_RUN_REFUSES_UNDECLARED_OUTPUT`).
-    ///
-    /// Carried here rather than looked up again when the output is reported: the
-    /// declaration was already in hand when the activation was built, and a
-    /// caller performing the activation needs to know it just as much.
+    /// which is the type the run accepts an output of.
     pub fn output(&self) -> &ContextType {
         &self.output
     }
 }
 
-/// The next instance that may activate, or `None` when none may.
-///
-/// `None` is quiescence, and it is reached by asking every instance rather than
-/// by inspecting the graph - which is what makes it true of a cycle nobody
-/// detected as readily as of a workflow whose every instance has produced. What
-/// a run does about it is the run's (`CREQ_RUN_ENDS_QUIESCENT`); this only says
-/// that nothing may.
-///
-/// Which of several offerable instances is returned is the order the definition
-/// carries them in, and that choice is deliberately the only thing order decides:
-/// what any instance would be given does not depend on it.
+/// The next instance that may activate, or `None` when none may, found by
+/// asking every instance. Of several offerable instances, the first in the
+/// definition's order is returned.
 // @Nothing may activate,IMPL_SCHEDULER_NONE_READY,impl,[CREQ_SCHEDULER_NONE_READY]
 pub(crate) fn next_activation(
     definition: &WorkflowDefinition,
@@ -110,26 +76,12 @@ pub(crate) fn next_activation(
         .find_map(|instance| activation_for(definition, arguments, produced, instance))
 }
 
-/// The activation `instance` may have now, or `None` when it may not activate.
-///
-/// Readiness and what the activation carries are one answer rather than two
-/// steps, and they could not sensibly be separated: knowing that every parameter
-/// an instance binds has a context *is* gathering those contexts. That is why
-/// `ARCH_RUN` has no component for an activation.
-///
-/// An instance may activate when it has not already produced and every parameter
-/// it binds has a context, whether that parameter is declared required or
-/// optional (`DEC_BINDING_IS_AWAITED`). A parameter left unbound by the
-/// definition is skipped when it is optional and blocks for ever when it is
-/// required, the latter being a wiring defect a run refuses to start on.
-///
-/// Two shapes are the run's to refuse before anything reaches here, and are read
-/// rather than guarded so that the refusal stays in one place: an entry
-/// instance's parameters are taken from the arguments alone, so a binding on one
-/// is not read (`CREQ_RUN_REFUSES_UNFILLED_SIGNATURE`), and a parameter declared
-/// both required and optional by one node type is read twice, which is the shape
-/// the reader already refuses a document for.
-// @Readiness and the activation it carries,IMPL_SCHEDULER_READY,impl,[CREQ_SCHEDULER_READY_WHEN_BOUND, CREQ_SCHEDULER_ACTIVATION_CARRIES]
+/// The activation `instance` may have now, or `None` when it may not activate:
+/// when it has not already produced and every parameter it binds has a context,
+/// required or optional. A parameter left unbound is skipped when it is optional
+/// and blocks for ever when it is required. An entry instance's parameters are
+/// taken from the arguments alone.
+// @Readiness and the activation it carries,IMPL_SCHEDULER_READY,impl,[CREQ_SCHEDULER_READY_WHEN_BOUND, CREQ_SCHEDULER_ACTIVATION_CARRIES],[DEC_BINDING_IS_AWAITED]
 pub(crate) fn activation_for(
     definition: &WorkflowDefinition,
     arguments: &Arguments,
@@ -178,10 +130,7 @@ enum Filling<'c> {
 }
 
 /// Where one parameter of one instance gets its context, and whether it has one.
-///
-/// A requested global context type is not a parameter and never reaches here: a
-/// node type declares the global types it reads and nothing supplies them, so a
-/// context arriving under that heading would have been invented.
+/// A requested global context type is not a parameter and never reaches here.
 fn filling<'c>(
     arguments: &'c Arguments,
     produced: &'c Produced,
@@ -240,23 +189,8 @@ fn given(activation: &Activation) -> Vec<&str> {
         .collect()
 }
 
-/// What every activation was given, over a whole sequence of them, as sorted
-/// text.
-///
-/// The scheduler is **driven to quiescence** rather than asked once per
-/// instance, and that is the whole point of the helper. Asked one instance at a
-/// time the answer cannot depend on the definition's order at all, so a property
-/// built that way passes against the very defect it exists to catch - measured:
-/// written the careless way, reverting readiness to the required parameters
-/// alone left it green.
-///
-/// The run is deliberately not used. It refuses a definition carrying wiring
-/// defects and most generated ones carry some, which would leave the property
-/// comparing two empty lists.
-///
-/// Sorted, because which instance is offered first legitimately depends on the
-/// order; what each is given does not. Text rather than the values, because a
-/// `ContextId` is deliberately not `Ord`.
+/// What every activation was given, over a whole sequence of them driven to
+/// quiescence, as sorted text.
 #[cfg(test)]
 fn answers(workflow: &WorkflowDefinition) -> Vec<String> {
     let mut source = IdSource::new();
@@ -491,8 +425,7 @@ fn globals_are_not_given() {
 fn partial_inputs_still_quiescent() {
     let mut source = IdSource::new();
     // Three instances in a cycle, each holding one of its two inputs and waiting
-    // for the other. A reading that reports quiescence only when no instance
-    // holds any context at all never fires here.
+    // for the other.
     let types = vec![
         node_type("Entry", &[], "note"),
         node_type("Step", &[("held", "note"), ("awaited", "note")], "note"),
@@ -512,17 +445,10 @@ fn partial_inputs_still_quiescent() {
 #[cfg(test)]
 proptest! {
     /// Permuting the order a definition carries its instances in changes neither
-    /// which instances are activated nor what each is given. The property form
-    /// of the measured defect, which was visible only because one line moved.
+    /// which instances are activated nor what each is given.
     #[test]
     fn inputs_ignore_instance_order(workflow in any_definition()) {
-        // Definitions in which two instances share a name are excluded, and the
-        // exclusion is the finding rather than a convenience. What has produced
-        // is keyed by instance name, so a shared name makes one key stand for
-        // two instances and which of them is offered first does depend on the
-        // order - the property is simply false there. A run never meets the
-        // shape: a shared name is a wiring defect and the run refuses to start
-        // (`CREQ_VALIDATOR_INSTANCE_NAMED_ONCE`, `CREQ_RUN_REFUSES_DEFECTS`).
+        // Definitions in which two instances share a name are excluded.
         let mut names: Vec<&str> =
             workflow.instances.iter().map(|node| node.name.as_str()).collect();
         names.sort_unstable();
@@ -586,9 +512,7 @@ proptest! {
         }
     }
 
-    /// Quiescence and offering nothing are one answer. A scheduler reporting
-    /// that no instance may activate while one is offerable would end a run
-    /// whose result was still reachable.
+    /// Quiescence and offering nothing are one answer.
     #[test]
     fn none_ready_only_when_none(workflow in any_definition(), taken in any::<u64>()) {
         let mut source = IdSource::new();
@@ -608,10 +532,7 @@ proptest! {
         prop_assert_eq!(offered.is_some(), any_offerable);
 
         if let Some(activation) = offered {
-            // Some instance carrying that name is offerable. Not "the first one
-            // carrying it": two instances may share a name, and the first is
-            // then not necessarily the one that was offered - which is what this
-            // property caught when it was written the careless way.
+            // Some instance carrying that name is offerable.
             prop_assert!(
                 workflow
                     .instances

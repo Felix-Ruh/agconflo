@@ -92,6 +92,13 @@ single requirement to verify.
    that asks readiness of the required parameters alone fails it, because the
    instance found first differs between permutations.
 
+   Definitions in which two instances share a name are excluded, and the
+   exclusion is a finding rather than a convenience. What has produced is keyed
+   by instance name, so a shared name makes one key stand for two instances,
+   and which of them is offered first does depend on the order: the property is
+   false there. A run never meets the shape, since a shared name is a wiring
+   defect and the run refuses to start on it.
+
 .. test_case:: An unbound optional parameter does not hold an instance back
    :id: TEST_SCHEDULER_UNBOUND_OPTIONAL_IS_READY
    :verifies: CREQ_SCHEDULER_READY_WHEN_BOUND

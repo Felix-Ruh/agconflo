@@ -1,11 +1,6 @@
 //! A run of one workflow definition: what it is started with, how its caller
-//! drives it, and the one way it ends.
-//!
-//! The run decides what may activate and what a node is given; performing the
-//! activation is the caller's (`DEC_RUN_IS_DRIVEN`). Nothing here opens a file,
-//! calls a provider, spawns a thread or awaits anything, which is what keeps a
-//! runtime, a script language and a provider client out of this crate until
-//! there is a requirement for them.
+//! drives it, and the one way it ends. The run decides what may activate and
+//! what a node is given; performing the activation is the caller's.
 
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -16,19 +11,10 @@ use crate::scheduler::{Activation, Produced, next_activation};
 use crate::workflow::{NodeType, WorkflowDefinition};
 use crate::{Context, ContextId, ContextType, validate_wiring};
 
-/// The contexts a run supplies to its workflow's entry parameters.
-///
-/// Addressed by the entry instance *and* the parameter each one fills, never by
-/// the parameter name alone (`DEC_ARGUMENTS_PER_ENTRY`). Two instances of one
-/// node type necessarily declare the same parameter names, so a name on its own
-/// names two parameters - measured handing one context to both, with the run
-/// completing and nothing reported (`EVD_RUN_ENTRY_NAME_SHARED`).
-///
-/// Every argument supplied is kept, including a second one for a pair already
-/// supplied. A map keyed by the pair would drop one without a word, and a
-/// parameter given two arguments is exactly the "not exactly one source" fault a
-/// run refuses to start on (`CREQ_RUN_REFUSES_UNFILLED_SIGNATURE`), so it has to
-/// survive being built to be reported at all.
+/// The contexts a run supplies to its workflow's entry parameters, each
+/// addressed by the entry instance and the parameter it fills. Every argument
+/// supplied is kept, a second one for the same pair included.
+// @Arguments addressed per entry and all kept,TRACE_RUN_ARGUMENTS,trace,[],[DEC_ARGUMENTS_PER_ENTRY, NOTE_RUN_VALUES_HOLD_MALFORMED]
 #[derive(Clone, Debug, Default)]
 pub struct Arguments {
     supplied: Vec<Argument>,
@@ -51,9 +37,6 @@ impl Arguments {
 
     /// The same arguments, also supplying `context` for `parameter` of
     /// `instance`.
-    ///
-    /// Chainable rather than taking `&mut self`, because a run's arguments are
-    /// built once and read afterwards.
     pub fn supply(mut self, instance: &str, parameter: &str, context: Context) -> Self {
         self.supplied.push(Argument {
             instance: instance.to_owned(),
@@ -64,11 +47,7 @@ impl Arguments {
     }
 
     /// The context supplied for that instance's parameter, or `None` when none
-    /// was.
-    ///
-    /// The first, when more than one was supplied. Which one is arbitrary and
-    /// deliberately never reached: a run whose entry parameter has two arguments
-    /// is refused before anything reads them.
+    /// was; the first, when more than one was, which a run refuses before reading.
     pub(crate) fn context_for(&self, instance: &str, parameter: &str) -> Option<&Context> {
         self.supplied
             .iter()
@@ -77,9 +56,6 @@ impl Arguments {
     }
 
     /// How many arguments were supplied for that instance's parameter.
-    ///
-    /// More than one is a fault to report rather than a value to choose between
-    /// (`CREQ_RUN_REFUSES_UNFILLED_SIGNATURE`), which is why they are all kept.
     pub(crate) fn count_for(&self, instance: &str, parameter: &str) -> usize {
         self.supplied
             .iter()
@@ -96,30 +72,19 @@ impl Arguments {
     }
 }
 
-/// Why a run was not started.
-///
-/// A refusal is not one of the four ways a run ends (`DEC_RUN_ENDS_ONE_WAY`).
-/// It is about what the caller supplied, it is known before any instance has
-/// been looked at, and nothing happened - so a caller can tell a workflow it
-/// must fix from a run that took place
-/// (`DEC_RUN_REFUSED_BEFORE_IT_STARTS`).
-///
-/// `#[non_exhaustive]` because the classes are not finished, which is the
-/// opposite of [`RunEnding`] and for the opposite reason.
+/// Why a run was not started: about what the caller supplied, known before any
+/// instance has been looked at, and none of the four ways a run ends.
+// @A refusal before the run starts,TRACE_RUN_START_REFUSAL,trace,[],[DEC_RUN_REFUSED_BEFORE_IT_STARTS, DEC_FAILURES_NON_EXHAUSTIVE]
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum StartRefusal {
-    /// The workflow carries wiring defects, all of them
-    /// (`CREQ_RUN_REFUSAL_NAMES_EVERY_DEFECT`).
+    /// The workflow carries wiring defects, all of them.
     Wiring(Vec<WiringDefect>),
     /// The workflow's wiring is sound and its entry parameters are not each
-    /// filled by exactly one context of their declared type
-    /// (`CREQ_RUN_REFUSES_UNFILLED_SIGNATURE`).
+    /// filled by exactly one context of their declared type.
     Signature(Vec<SignatureFault>),
     /// Different contexts among the arguments, or among what they were composed
-    /// from, share these identifiers, each named once in the order found
-    /// (`CREQ_RUN_REFUSES_SHARED_ARGUMENT_IDENTIFIER`). Not a signature fault:
-    /// a shared identifier belongs to no one entry parameter.
+    /// from, share these identifiers, each named once in the order found.
     SharedIdentifiers(Vec<ContextId>),
 }
 
@@ -141,22 +106,12 @@ impl fmt::Display for StartRefusal {
 impl std::error::Error for StartRefusal {}
 
 /// One thing wrong with what a run was started with, rather than with the
-/// workflow itself.
-///
-/// A value rather than a message, for the same reason a wiring defect is one: an
-/// agent correcting its own call reads the place, not the prose. Every variant
-/// names the entry instance and the parameter it concerns, because an argument
-/// is addressed by that pair and never by a parameter name alone
-/// (`DEC_ARGUMENTS_PER_ENTRY`).
-///
-/// `#[non_exhaustive]`: an entry instance's signature is the part of the model
-/// still moving, and the shapes `components/wiring` records as open concern
-/// exactly it.
+/// workflow itself, naming the entry instance and the parameter it concerns.
+// @A signature fault as values,TRACE_RUN_SIGNATURE_FAULT,trace,[],[DEC_ARGUMENTS_PER_ENTRY, DEC_FAILURES_NON_EXHAUSTIVE]
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum SignatureFault {
-    /// A required entry parameter that no argument fills. Measured reading as a
-    /// stuck run when nothing checked it (`EVD_RUN_MISSING_ARGUMENT_QUIESCES`).
+    /// A required entry parameter that no argument fills.
     ParameterUnfilled {
         /// The entry instance whose parameter is unfilled.
         instance: String,
@@ -166,8 +121,7 @@ pub enum SignatureFault {
         expected: ContextType,
     },
     /// An argument whose context type is not the one the parameter is declared
-    /// for. The wiring validator refuses this between two instances and cannot
-    /// see it here, because there is no binding to look at.
+    /// for.
     ArgumentTypeDisagrees {
         /// The entry instance the argument was addressed to.
         instance: String,
@@ -178,10 +132,7 @@ pub enum SignatureFault {
         /// The context type the argument actually carries.
         supplied: ContextType,
     },
-    /// An entry parameter that also carries a binding, so it has two sources
-    /// and no ground to prefer either. Sound wiring - `components/wiring`
-    /// records it among the shapes still open - and what a loop closing back
-    /// onto an entry node draws.
+    /// An entry parameter that also carries a binding, so it has two sources.
     ParameterAlsoBound {
         /// The entry instance whose parameter is both supplied and wired.
         instance: String,
@@ -197,7 +148,7 @@ pub enum SignatureFault {
         parameter: String,
     },
     /// An argument addressed to an instance or a parameter the workflow has no
-    /// entry parameter for. Ignoring it is what makes a typo silent.
+    /// entry parameter for.
     ArgumentMatchesNothing {
         /// The instance the argument named.
         instance: String,
@@ -254,15 +205,9 @@ impl fmt::Display for SignatureFault {
 impl std::error::Error for SignatureFault {}
 
 /// Every way the arguments fail to fill the workflow's entry parameters exactly
-/// once each.
-///
-/// Every entry parameter is looked at and every argument is looked at, so a
-/// caller with three faults learns three - the same reason the validator reports
-/// every wiring defect rather than the first.
-///
-/// The order is the definition's: its entry instances in the order it carries
-/// them, each instance's parameters as its node type declares them, and then the
-/// arguments that matched no parameter, in the order they were supplied.
+/// once each, every entry parameter and every argument looked at: in the
+/// definition's order, then the arguments that matched nothing in the order
+/// supplied.
 // @A run whose signature is not filled does not start,IMPL_RUN_SIGNATURE,impl,[CREQ_RUN_REFUSES_UNFILLED_SIGNATURE]
 fn signature_faults(definition: &WorkflowDefinition, arguments: &Arguments) -> Vec<SignatureFault> {
     let mut faults = Vec::new();
@@ -283,8 +228,7 @@ fn signature_faults(definition: &WorkflowDefinition, arguments: &Arguments) -> V
         for (parameter, required) in listed {
             matched.push((&node.name, &parameter.name));
 
-            // A wire is a second source whatever else is there, and preferring
-            // either silently is the answer this refuses.
+            // A wire is a second source whatever else is there.
             if node.bindings.iter().any(|b| b.parameter == parameter.name) {
                 faults.push(SignatureFault::ParameterAlsoBound {
                     instance: node.name.clone(),
@@ -312,8 +256,7 @@ fn signature_faults(definition: &WorkflowDefinition, arguments: &Arguments) -> V
                     });
                 }
                 Some(_) => {}
-                // An optional entry parameter may go unsupplied: refusing it
-                // would make a workflow unusable that is not wrong.
+                // An optional entry parameter may go unsupplied.
                 None if required => faults.push(SignatureFault::ParameterUnfilled {
                     instance: node.name.clone(),
                     parameter: parameter.name.clone(),
@@ -337,13 +280,7 @@ fn signature_faults(definition: &WorkflowDefinition, arguments: &Arguments) -> V
 }
 
 /// Everything the run's arguments hold, or every identifier that different
-/// contexts among them share.
-///
-/// Each argument is brought in as an output would be, against what the
-/// arguments before it brought, so one context supplied twice is one context,
-/// and two contexts under one identifier are found wherever in the arguments
-/// they sit. Every shared identifier is collected, named once each, so that a
-/// caller whose arguments came from two sources learns all of it at once.
+/// contexts among them share, each named once.
 // @Arguments hold one context per identifier,IMPL_RUN_HELD_ARGUMENTS,impl,[CREQ_RUN_REFUSES_SHARED_ARGUMENT_IDENTIFIER]
 fn held_arguments(arguments: &Arguments) -> Result<HashMap<ContextId, Context>, Vec<ContextId>> {
     let mut held = HashMap::new();
@@ -368,19 +305,9 @@ fn held_arguments(arguments: &Arguments) -> Result<HashMap<ContextId, Context>, 
 /// contexts and those of each activation in progress: every context reachable
 /// from it, itself included, that none of them holds - and every identifier
 /// under which it reaches a context other than the one they, or an earlier step
-/// of the same walk, have under that identifier.
-///
-/// A held context reached again is the very context held, and the walk stops
-/// there: its own parts were brought in when it was. So a walk costs what the
-/// context brings in rather than its whole ancestry, and passing an input on by
-/// composing it (`DEC_COMPOSITION_BY_REFERENCE`) brings in nothing but the
-/// composition. "The very context" is the value's identity, since by identifier
-/// a second context and the held one are indistinguishable
-/// (`DEC_IDENTIFIER_NAMES_ONE_CONTEXT`).
-///
-/// A stack of its own rather than recursion, for the reason the lineage walker
-/// has one.
-// @A second context under a held identifier is found,IMPL_RUN_BROUGHT_IN,impl,[CREQ_RUN_REFUSES_SHARED_ARGUMENT_IDENTIFIER, CREQ_RUN_REFUSES_SHARED_OUTPUT_IDENTIFIER]
+/// of the same walk, have under that identifier. A held context reached again is
+/// the very context held, and the walk stops there; it keeps a stack of its own.
+// @A second context under a held identifier is found,IMPL_RUN_BROUGHT_IN,impl,[CREQ_RUN_REFUSES_SHARED_ARGUMENT_IDENTIFIER, CREQ_RUN_REFUSES_SHARED_OUTPUT_IDENTIFIER],[DEC_COMPOSITION_BY_REFERENCE, DEC_IDENTIFIER_NAMES_ONE_CONTEXT, NOTE_CONTEXT_NO_RECURSION]
 fn brought_in(
     known: &[&HashMap<ContextId, Context>],
     context: &Context,
@@ -450,10 +377,8 @@ fn call_faults(declared: &NodeType, call: &Call) -> Vec<CallFault> {
     faults
 }
 
-/// Reporting an outcome when the run had offered no activation.
-///
-/// There is no instance to file it against, and choosing one would attribute
-/// work to a node that never ran.
+/// Reporting an outcome when the run had offered no activation, so there is no
+/// instance to file it against.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct NothingOutstanding;
 
@@ -465,25 +390,16 @@ impl fmt::Display for NothingOutstanding {
 
 impl std::error::Error for NothingOutstanding {}
 
-/// Why an output reported for an activation was not accepted.
-///
-/// Refusing an output ends nothing: the activation stays outstanding, counted
-/// once, and the caller either reports an output the run accepts or reports the
-/// activation failed (`DEC_REFUSED_OUTPUT_OUTSTANDING`). A fifth ending would
-/// supersede the decision that there are four, and ending the run as a node's
-/// failure would need a failure of the caller's type, which the run cannot make.
-///
-/// `#[non_exhaustive]` for the reason [`StartRefusal`] is: what a run can find
-/// wrong with an output is not finished, where the ways it can end are.
+/// Why an output reported for an activation was not accepted. Refusing an
+/// output ends nothing: the activation stays outstanding, counted once.
+// @A refused output leaves its activation outstanding,TRACE_RUN_OUTPUT_REFUSAL,trace,[],[DEC_REFUSED_OUTPUT_OUTSTANDING, DEC_FAILURES_NON_EXHAUSTIVE]
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum OutputRefusal {
     /// No activation was outstanding, so there is no instance the output could
     /// be filed against.
     NothingOutstanding,
-    /// The output is not of the type the activation's node type declares
-    /// (`CREQ_RUN_REFUSES_UNDECLARED_OUTPUT`). Measured accepted and handed on to
-    /// a parameter declared for another type (`EVD_RUN_ACCEPTS_UNDECLARED_OUTPUT`).
+    /// The output is not of the type the activation's node type declares.
     UndeclaredType {
         /// The instance the output was reported for.
         instance: String,
@@ -493,9 +409,7 @@ pub enum OutputRefusal {
         reported: ContextType,
     },
     /// The output carries an identifier the run already holds, or that the
-    /// activation waiting on this one's call holds
-    /// (`CREQ_RUN_REFUSES_HELD_IDENTIFIER`), which would credit one context to
-    /// two producers (`EVD_RUN_ACCEPTS_HELD_IDENTIFIER`).
+    /// activation waiting on this one's call holds.
     IdentifierHeld {
         /// The instance the output was reported for.
         instance: String,
@@ -503,9 +417,7 @@ pub enum OutputRefusal {
         id: ContextId,
     },
     /// A context the output was composed from carries an identifier the run,
-    /// or the output itself, holds for a different context
-    /// (`CREQ_RUN_REFUSES_SHARED_OUTPUT_IDENTIFIER`). Measured accepted, and the
-    /// result's lineage then lost a context (`EVD_RUN_PART_SHARES_IDENTIFIER`).
+    /// or the output itself, holds for a different context.
     IdentifierShared {
         /// The instance the output was reported for.
         instance: String,
@@ -544,11 +456,10 @@ impl std::error::Error for OutputRefusal {}
 
 /// One call a model made during an activation, as the activation's performer
 /// reports it: the provider's identifier for it, the node type called, and a
-/// context for each parameter the call fills (`DEC_CALL_CARRIES_STRING_VALUES`).
-///
-/// Built with [`Call::new`] and [`Call::input`], and checked only when it is
-/// reported: a call has to be able to hold every shape a model can send, or what
-/// [`Run::call`] refuses could not be put to it.
+/// context for each parameter the call fills. Built with [`Call::new`] and
+/// [`Call::input`], it holds any shape a model can send, and is checked only
+/// when it is reported.
+// @A call holding any shape a model sends,TRACE_RUN_CALL_VALUE,trace,[],[DEC_CALL_CARRIES_STRING_VALUES, NOTE_RUN_VALUES_HOLD_MALFORMED]
 #[derive(Clone, Debug)]
 pub struct Call {
     id: String,
@@ -591,16 +502,9 @@ impl Call {
 
 /// What an activation's performer sent out and got back: the offer and the
 /// window a model call was made with, the answer, and the calls the answer made,
-/// each with the provider's identifier, the node type and the contexts it was
-/// made with (`DEC_RECORD_HOLDS_EXCHANGES`).
-///
-/// The calls are held whole rather than by identifier, because what a model asked
-/// for is part of its answer: a run interrupted after the answer and before its
-/// calls were reported can go on from the exchange alone, without asking again.
-///
-/// The core knows nothing of models. An exchange is contexts an activation sent
-/// and a context that came back, which is what makes it the run's to hold and
-/// its record's to write.
+/// each whole - the provider's identifier, the node type and the contexts it was
+/// made with.
+// @An exchange of contexts,TRACE_RUN_EXCHANGE_VALUE,trace,[],[DEC_RECORD_HOLDS_EXCHANGES]
 #[derive(Clone, Debug)]
 pub struct Exchange {
     offer: Vec<Context>,
@@ -664,12 +568,10 @@ impl Exchange {
     }
 }
 
-/// Why a reported call was not accepted.
-///
-/// A refused call is no activation: nothing is offered, the budget is not
-/// spent, and the activation that made it stays outstanding.
-///
-/// `#[non_exhaustive]` for the reason [`OutputRefusal`] is.
+/// Why a reported call was not accepted. A refused call is no activation:
+/// nothing is offered, the budget is not spent, and the activation that made it
+/// stays outstanding.
+// @A refused call spends nothing,TRACE_RUN_CALL_REFUSAL,trace,[],[DEC_CALL_IS_AN_ACTIVATION, DEC_FAILURES_NON_EXHAUSTIVE]
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum CallRefusal {
@@ -677,16 +579,14 @@ pub enum CallRefusal {
     /// call could be checked against.
     NothingOutstanding,
     /// The outstanding activation's instance does not declare a call to that
-    /// node type (`CREQ_RUN_REFUSES_UNDECLARED_CALL`).
+    /// node type.
     Undeclared {
         /// The instance whose activation made the call.
         instance: String,
         /// The node type called.
         node_type: String,
     },
-    /// The outstanding activation is itself a call's, and a called node type has
-    /// no instance of its own to declare calls, so calls go one deep
-    /// (`CREQ_RUN_REFUSES_UNDECLARED_CALL`).
+    /// The outstanding activation is itself a call's, and calls go one deep.
     CalledFromACall {
         /// The instance the calling activation is for.
         instance: String,
@@ -694,7 +594,7 @@ pub enum CallRefusal {
         node_type: String,
     },
     /// The call does not fill the node type's parameters as it declares them,
-    /// each fault named (`CREQ_RUN_REFUSES_UNFILLED_CALL`).
+    /// each fault named.
     Unfilled {
         /// The instance whose activation made the call.
         instance: String,
@@ -705,7 +605,7 @@ pub enum CallRefusal {
         faults: Vec<CallFault>,
     },
     /// A context the call gives shares its identifier with a different context
-    /// the run holds (`CREQ_RUN_REFUSES_SHARED_CALL_IDENTIFIER`).
+    /// the run holds.
     IdentifierShared {
         /// The instance whose activation made the call.
         instance: String,
@@ -801,7 +701,7 @@ pub enum ExchangeRefusal {
     /// No activation was outstanding to hold it with.
     NothingOutstanding,
     /// A context of the exchange shares its identifier with a different context
-    /// the run holds (`CREQ_RUN_REFUSES_SHARED_CALL_IDENTIFIER`).
+    /// the run holds.
     IdentifierShared {
         /// The instance the outstanding activation is for.
         instance: String,
@@ -824,14 +724,8 @@ impl fmt::Display for ExchangeRefusal {
 
 impl std::error::Error for ExchangeRefusal {}
 
-/// An activation being performed, with what it has brought into the run so far.
-///
-/// What an activation brings in while it is performed - its exchanges, the
-/// contexts its calls give - is held with it (`CREQ_RUN_HOLDS_EXCHANGES`) and
-/// becomes the run's when its output is accepted. Until then its own output may
-/// be one of them - a model's answer returned as it came - where a context the
-/// run or another activation in progress holds may not, since that would credit
-/// one context to two producers (`CREQ_RUN_REFUSES_HELD_IDENTIFIER`).
+/// An activation being performed, with what it has brought into the run so far,
+/// which becomes the run's when its output is accepted.
 #[derive(Clone, Debug)]
 struct InProgress {
     activation: Activation,
@@ -849,38 +743,27 @@ impl InProgress {
     }
 }
 
-/// The one way a run ended.
-///
-/// Four, and the set is closed on purpose (`DEC_RUN_ENDS_ONE_WAY`): a caller
-/// handling these four has handled everything that can become of a run that
-/// started. Deliberately **not** `#[non_exhaustive]`, because saying the set may
-/// grow would contradict the decision.
-///
-/// Generic over the caller's own failure type, which is what makes "which
-/// failure occurred" a value rather than a message
-/// (`CREQ_RUN_ENDS_ON_FAILURE`). A caller that reports no failure names
-/// [`std::convert::Infallible`], which says so.
+/// The one way a run ended: one of four, generic over the caller's own failure
+/// type. A caller that reports no failure names [`std::convert::Infallible`].
+// @Four endings and a typed failure,TRACE_RUN_ENDING,trace,[],[DEC_RUN_ENDS_ONE_WAY]
 #[derive(Clone, Debug)]
 pub enum RunEnding<F> {
-    /// The designated instance produced, and this is what it produced
-    /// (`CREQ_RUN_COMPLETES`).
+    /// The designated instance produced, and this is what it produced.
     Completed(Context),
-    /// The caller reported an activation as failed
-    /// (`CREQ_RUN_ENDS_ON_FAILURE`).
+    /// The caller reported an activation as failed.
     NodeFailed {
         /// The instance whose activation failed.
         instance: String,
         /// What the caller said went wrong.
         failure: F,
     },
-    /// The run had made as many activations as its budget allows
-    /// (`CREQ_RUN_STOPS_AT_BUDGET`).
+    /// The run had made as many activations as its budget allows.
     BudgetExceeded {
         /// The budget it was held to.
         budget: usize,
     },
     /// Nothing more could activate and the designated instance had produced
-    /// nothing (`CREQ_RUN_ENDS_QUIESCENT`).
+    /// nothing.
     Quiescent {
         /// Every instance that produced nothing, in the order the definition
         /// carries them.
@@ -893,13 +776,13 @@ pub enum RunEnding<F> {
 pub enum Step<F> {
     /// Perform this activation and report back with [`Run::produced`].
     Activate(Activation),
-    /// The run is over, this is how (`DEC_RUN_ENDS_ONE_WAY`).
+    /// The run is over, and this is how.
     Ended(RunEnding<F>),
 }
 
 /// A run's state as its record writes it: everything it was started with and
-/// everything it has accepted since, and nothing that can be derived from those
-/// (`EVD_RUN_STATE_DERIVABLE`).
+/// everything it has accepted since, and nothing that can be derived from those.
+// @A run's state as its record writes it,TRACE_RUN_RECORDED,trace,[],[DEC_RECORD_HOLDS_EXCHANGES]
 pub(crate) struct Recorded<'r> {
     /// The budget the run is held to.
     pub(crate) budget: usize,
@@ -916,12 +799,9 @@ pub(crate) struct Recorded<'r> {
     pub(crate) held: Vec<&'r HashMap<ContextId, Context>>,
 }
 
-/// One thing a run accepted, in the order it accepted it - what a record writes
-/// and a resume replays (`DEC_RESUME_REPLAYS_CALLS`).
-///
-/// One list rather than one per kind, because the order between kinds is part
-/// of what happened: an exchange reported after a call belongs to the activation
-/// outstanding then, and replayed before the call it would belong to another.
+/// One thing a run accepted, in the order it accepted it, in one list for every
+/// kind - what a record writes and a resume replays.
+// @One ordered list of what a run accepted,TRACE_RUN_EVENT,trace,[],[DEC_RESUME_REPLAYS_CALLS, NOTE_RUN_ONE_EVENT_LIST]
 #[derive(Clone, Debug)]
 pub(crate) enum Event {
     /// An exchange held with the activation for `instance` performing `call`,
@@ -940,21 +820,17 @@ pub(crate) enum Event {
     },
 }
 
-/// One run of one workflow definition.
-///
-/// Borrows the definition rather than owning it: a run reads it and never
-/// changes it, and cloning one would copy the whole graph per run.
+/// One run of one workflow definition, which it borrows and never changes.
 pub struct Run<'a, F> {
     definition: &'a WorkflowDefinition,
     arguments: Arguments,
     produced: Produced,
     /// Every context the run holds - its arguments, the outputs it has
     /// accepted, and everything any of them was composed from - each under its
-    /// identifier, which names it alone (`DEC_IDENTIFIER_NAMES_ONE_CONTEXT`).
+    /// identifier.
     held: HashMap<ContextId, Context>,
     /// Every exchange, call and output accepted, in the order they were
-    /// accepted - what a record needs of a run's history that `produced` does
-    /// not keep (`DEC_RECORD_HOLDS_EXCHANGES`).
+    /// accepted.
     log: Vec<Event>,
     /// The exchanges each accepted activation made, in the order accepted.
     settled_exchanges: Vec<Vec<Exchange>>,
@@ -969,9 +845,7 @@ pub struct Run<'a, F> {
     failure: PhantomData<fn() -> F>,
 }
 
-/// Written out rather than derived: a derived one would demand `F: Debug` of
-/// every caller, though the failure type is only ever named here and never
-/// held - a run that has failed has ended.
+/// The run's state, requiring nothing of the failure type.
 impl<F> fmt::Debug for Run<'_, F> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Run")
@@ -991,24 +865,11 @@ impl<F> fmt::Debug for Run<'_, F> {
 }
 
 impl<'a, F> Run<'a, F> {
-    /// A run of `definition`, or a refusal saying why it cannot be started.
-    ///
-    /// The wiring is checked first and the run refuses on every defect the
-    /// workflow carries. This is where `STKH_WIRING_CHECKED` stops being about
-    /// what makes a workflow invalid and starts being about enforcement: the
-    /// validator answers when something asks, and a run is the first thing in
-    /// this project that can be said to have started, so it is the first place
-    /// a refusal can come before anything.
-    ///
-    /// The signature is checked second and only when the wiring is sound, since
-    /// an entry instance whose node type is missing has no parameter list to
-    /// check arguments against - the faults would be derived from a graph
-    /// already known to be broken.
-    ///
-    /// The arguments' identifiers are checked third, against each other and
-    /// against everything they were composed from: they are made before the run
-    /// exists, and so are the first place a second identifier source enters.
-    // @A run of a defective workflow does not start,IMPL_RUN_REFUSES_DEFECTS,impl,[CREQ_RUN_REFUSES_DEFECTS, CREQ_RUN_REFUSAL_NAMES_EVERY_DEFECT]
+    /// A run of `definition`, or a refusal saying why it cannot be started: the
+    /// wiring checked first, refusing on every defect; the signature second, only
+    /// when the wiring is sound; and the arguments' identifiers third, against
+    /// each other and everything they were composed from.
+    // @A run of a defective workflow does not start,IMPL_RUN_REFUSES_DEFECTS,impl,[CREQ_RUN_REFUSES_DEFECTS, CREQ_RUN_REFUSAL_NAMES_EVERY_DEFECT],[DEC_RUN_REFUSED_BEFORE_IT_STARTS]
     pub fn start(
         definition: &'a WorkflowDefinition,
         arguments: Arguments,
@@ -1042,23 +903,13 @@ impl<'a, F> Run<'a, F> {
         })
     }
 
-    /// The next activation to perform, or the run's ending.
-    ///
-    /// Completion is asked before the budget, or a run that finished on its last
-    /// permitted activation would be reported as a runaway. The budget is asked
-    /// before an activation is offered, or the run would spend one more than it
-    /// was allowed - which for a node that calls a provider is one unbudgeted
-    /// call on every run that reaches the limit.
-    ///
-    /// Asked again before an outcome is reported, it hands back the activation
-    /// it is already holding rather than choosing a second one, so the budget is
-    /// spent once per activation rather than once per question.
-    ///
-    /// A call accepted since the last step is offered before any instance the
-    /// scheduler would choose, and counted as every activation is: the model
-    /// that made it is waiting on it (`DEC_CALL_IS_AN_ACTIVATION`). With the
-    /// budget spent it is not offered, and the run ends as over budget.
-    // @Completion then the budget then a call then quiescence,IMPL_RUN_STEP,impl,[CREQ_RUN_COMPLETES, CREQ_RUN_STOPS_AT_BUDGET, CREQ_RUN_ENDS_QUIESCENT, CREQ_RUN_CALL_OFFERED]
+    /// The next activation to perform, or the run's ending: completion asked
+    /// first, then the budget, then a call accepted since the last step, then the
+    /// scheduler. Asked again before an outcome is reported, it hands back the
+    /// activation it is already holding, so the budget is spent once per
+    /// activation. A call found with the budget spent is not offered, and the run
+    /// ends as over budget.
+    // @Completion then the budget then a call then quiescence,IMPL_RUN_STEP,impl,[CREQ_RUN_COMPLETES, CREQ_RUN_STOPS_AT_BUDGET, CREQ_RUN_ENDS_QUIESCENT, CREQ_RUN_CALL_OFFERED],[DEC_CALL_IS_AN_ACTIVATION]
     pub fn step(&mut self) -> Step<F> {
         if let Some(result) = self.result() {
             return Step::Ended(RunEnding::Completed(result));
@@ -1092,21 +943,10 @@ impl<'a, F> Run<'a, F> {
         }
     }
 
-    /// Report that the outstanding activation failed, which ends the run.
-    ///
-    /// The failure is the caller's own type, carried into the ending as a value
-    /// (`CREQ_RUN_ENDS_ON_FAILURE`). What went wrong is the caller's to say; that
-    /// it ends the run, and that the ending carries it along with the instance
-    /// it was reported for, is the run's.
-    ///
-    /// Consumes the run, so that no further activation can be offered - the
-    /// failure mode is ruled out by the type rather than by a test. A run whose
-    /// result is already unreachable should not go on spending activations, and
-    /// for a node that calls a provider each one costs.
-    ///
-    /// Refused when no activation is outstanding: there is no instance to file
-    /// the failure against, and choosing one would attribute it to a node that
-    /// never ran.
+    /// Report that the outstanding activation failed, which ends the run with the
+    /// caller's own failure value and the instance it was reported for. Consumes
+    /// the run, so no further activation can be offered. Refused when no
+    /// activation is outstanding.
     // @A failed activation ends the run,IMPL_RUN_FAILED,impl,[CREQ_RUN_ENDS_ON_FAILURE]
     pub fn fail(self, failure: F) -> Result<RunEnding<F>, NothingOutstanding> {
         let outstanding = self.outstanding.ok_or(NothingOutstanding)?;
@@ -1121,21 +961,14 @@ impl<'a, F> Run<'a, F> {
     /// Refused, and nothing recorded, when the output is not of the type the
     /// activation's node type declares, carries an identifier the run already
     /// holds, or was composed from a second context under an identifier the run
-    /// or the output holds for another. Each way the activation stays
-    /// outstanding and is not counted again (`DEC_REFUSED_OUTPUT_OUTSTANDING`): asking for the next
-    /// step hands it back, so a refusal cannot be stepped past, and the caller
-    /// answers again or reports the activation failed.
-    ///
-    /// An output may be a context its own activation brought in - a model's
-    /// answer returned as it came - and not one another activation in progress
-    /// holds: a called node type handing back the context it was called with
-    /// would credit it to two producers.
+    /// or the output holds for another; the activation then stays outstanding and
+    /// is not counted again. An output may be a context its own activation
+    /// brought in, and not one another activation in progress holds.
     ///
     /// Accepted for a call's activation, the output is the called node type's
     /// and no instance's: the calling activation is outstanding again, and the
-    /// output goes to it alone, filed under no instance for a binding to read or
-    /// for the run to complete on (`CREQ_RUN_CALL_OUTPUT_TO_CALLER`).
-    // @An output is checked before it is recorded,IMPL_RUN_PRODUCED,impl,[CREQ_RUN_REFUSES_UNDECLARED_OUTPUT, CREQ_RUN_REFUSES_HELD_IDENTIFIER, CREQ_RUN_REFUSES_SHARED_OUTPUT_IDENTIFIER, CREQ_RUN_REFUSED_OUTPUT_OUTSTANDING, CREQ_RUN_CALL_OUTPUT_TO_CALLER]
+    /// output goes to it alone.
+    // @An output is checked before it is recorded,IMPL_RUN_PRODUCED,impl,[CREQ_RUN_REFUSES_UNDECLARED_OUTPUT, CREQ_RUN_REFUSES_HELD_IDENTIFIER, CREQ_RUN_REFUSES_SHARED_OUTPUT_IDENTIFIER, CREQ_RUN_REFUSED_OUTPUT_OUTSTANDING, CREQ_RUN_CALL_OUTPUT_TO_CALLER],[DEC_REFUSED_OUTPUT_OUTSTANDING, DEC_CALL_IS_AN_ACTIVATION]
     pub fn produced(&mut self, context: Context) -> Result<(), OutputRefusal> {
         let outstanding = self
             .outstanding
@@ -1189,7 +1022,7 @@ impl<'a, F> Run<'a, F> {
     }
 
     /// Report a call the outstanding activation's model made, to be performed as
-    /// an activation of the node type called (`DEC_CALL_IS_AN_ACTIVATION`).
+    /// an activation of the node type called.
     ///
     /// Accepted, the calling activation waits beneath the call, and the next
     /// step offers the node type's activation for the calling instance, given
@@ -1202,9 +1035,8 @@ impl<'a, F> Run<'a, F> {
     /// itself a call's, when its instance does not declare a call to that node
     /// type, when the call does not fill the node type's parameters as declared,
     /// naming every such parameter, or when a context it gives is a second one
-    /// under an identifier the run holds. The checks are the performer's too
-    /// (`CREQ_HOST_REFUSES_MALFORMED_CALL`); the run makes them whoever reports.
-    // @A call checked and offered as the next activation,IMPL_RUN_CALL,impl,[CREQ_RUN_CALL_OFFERED, CREQ_RUN_REFUSES_UNDECLARED_CALL, CREQ_RUN_REFUSES_UNFILLED_CALL, CREQ_RUN_REFUSES_SHARED_CALL_IDENTIFIER]
+    /// under an identifier the run holds.
+    // @A call checked and offered as the next activation,IMPL_RUN_CALL,impl,[CREQ_RUN_CALL_OFFERED, CREQ_RUN_REFUSES_UNDECLARED_CALL, CREQ_RUN_REFUSES_UNFILLED_CALL, CREQ_RUN_REFUSES_SHARED_CALL_IDENTIFIER],[DEC_CALL_IS_AN_ACTIVATION]
     pub fn call(&mut self, call: Call) -> Result<(), CallRefusal> {
         let Some(outstanding) = &self.outstanding else {
             return Err(CallRefusal::NothingOutstanding);
@@ -1288,13 +1120,10 @@ impl<'a, F> Run<'a, F> {
     }
 
     /// Report an exchange the outstanding activation made, to be held with it
-    /// (`CREQ_RUN_HOLDS_EXCHANGES`) and, once its output is accepted, with the
-    /// run.
-    ///
-    /// Refused, holding nothing of it, when nothing is outstanding or when a
-    /// context of it is a second one under an identifier the run holds. A
-    /// context held already - an earlier window a later one composes - is the
-    /// very one held, and brings nothing in.
+    /// and, once its output is accepted, with the run. Refused, holding nothing
+    /// of it, when nothing is outstanding or when a context of it is a second
+    /// one under an identifier the run holds; a context held already brings
+    /// nothing in.
     // @An exchange held with its activation,IMPL_RUN_EXCHANGE,impl,[CREQ_RUN_HOLDS_EXCHANGES, CREQ_RUN_REFUSES_SHARED_CALL_IDENTIFIER]
     pub fn exchange(&mut self, exchange: Exchange) -> Result<(), ExchangeRefusal> {
         let Some(outstanding) = &self.outstanding else {
@@ -1336,10 +1165,6 @@ impl<'a, F> Run<'a, F> {
 
     /// The output accepted for the call `id` the outstanding activation made, or
     /// `None` when it made no such call or its output has not been accepted.
-    ///
-    /// What an activation resumed mid-call is answered from: its script runs
-    /// again, and a call the record holds an output for is not performed again
-    /// (`CREQ_HOST_ANSWERS_FROM_RECORD`).
     pub fn called(&self, id: &str) -> Option<&Context> {
         let caller = self.outstanding()?;
         if caller.call().is_some() {
@@ -1364,8 +1189,7 @@ impl<'a, F> Run<'a, F> {
         known
     }
 
-    /// What a record of this run holds, read without changing it
-    /// (`CREQ_RECORD_HOLDS_THE_RUN`).
+    /// What a record of this run holds, read without changing it.
     pub(crate) fn recorded(&self) -> Recorded<'_> {
         Recorded {
             budget: self.budget,
@@ -1384,28 +1208,14 @@ impl<'a, F> Run<'a, F> {
     }
 
     /// Whether the run holds a context under `id`: an argument, an accepted
-    /// output, or anything either was composed from.
-    ///
-    /// Asked of the whole run rather than of the outstanding instance's inputs:
-    /// a caller holding any context of the run can hand it back, including the
-    /// output of an instance not wired to this one, or a part of its own input.
-    /// A composition holding a held context by reference has an identifier of
-    /// its own, and is the one sanctioned way to pass an input on.
+    /// output, or anything either was composed from - asked of the whole run.
     // @Everything a run holds,IMPL_RUN_HOLDS,impl,[CREQ_RUN_REFUSES_HELD_IDENTIFIER]
     fn holds(&self, id: ContextId) -> bool {
         self.held.contains_key(&id)
     }
 
     /// The context the designated instance produced, when it has.
-    ///
-    /// Completion is a question about the designated output alone rather than
-    /// about the graph (`DEC_COMPLETION_IS_DESIGNATED_OUTPUT`), which is why a
-    /// run finishes while instances no route to the result passes through sit
-    /// idle - measured, and not a defect (`EVD_RUN_COMPLETES_WITH_IDLE`).
-    ///
-    /// Exactly one output is designated and it names an instance that exists,
-    /// both of which the validator has already refused a workflow for, so this
-    /// reads the one designation there is.
+    // @Completion is the designated output alone,TRACE_RUN_RESULT,trace,[],[DEC_COMPLETION_IS_DESIGNATED_OUTPUT]
     fn result(&self) -> Option<Context> {
         let designated = self.definition.designated_outputs.first()?;
         self.produced.get(designated).cloned()
@@ -1442,15 +1252,8 @@ fn ctx(source: &mut IdSource, type_name: &str) -> Context {
 }
 
 /// Drive a run to its ending, producing a fresh context of the declared output
-/// type for each activation.
-///
-/// The declared type rather than a fixed one: until the run checked outputs, a
-/// fixed `note` here let `well_formed_runs_complete` pass on workflows whose
-/// types declare other outputs, by feeding every consumer a mistyped context.
-///
-/// Returns the ending and, in order, every instance activated with the
-/// identifier of what it produced - so that a test can assert on what the run
-/// spent as well as on how it ended.
+/// type for each activation, and return the ending with every instance activated
+/// and the identifier of what it produced, in order.
 #[cfg(test)]
 fn drive(
     workflow: &WorkflowDefinition,
@@ -1521,9 +1324,7 @@ fn defective_workflow_is_refused() {
     };
     assert!(!defects.is_empty());
 
-    // No activation was offered, and nothing could have been: `start` handed
-    // back no run at all, so the type system is what holds this rather than an
-    // assertion that could go stale.
+    // No activation was offered: `start` handed back no run at all.
 
     // The control: the same shape with the wire repaired starts.
     let sound = definition(
@@ -1562,9 +1363,7 @@ fn refusal_carries_every_defect() {
         panic!("every one of these is a wiring defect: {refusal:?}")
     };
 
-    // Compared against the validator's own report as a whole rather than
-    // counted, so a run forwarding the right number of the wrong defects fails,
-    // and so that adding a defect class later does not leave this stale.
+    // Compared against the validator's own report as a whole.
     assert_eq!(defects, validate_wiring(&broken));
     assert_eq!(defects.len(), 5);
 }
@@ -1579,10 +1378,7 @@ fn completes_on_designated_output() {
     assert_eq!(names(&activated), ["n0", "n1"]);
     match ending {
         RunEnding::Completed(result) => {
-            // The context itself, which the case reads content and type from,
-            // rather than an identifier a caller would have to hold the run to
-            // resolve. Compared by identity as well, so that a different context
-            // holding the same bytes would fail.
+            // The context itself, compared by identity as well.
             assert_eq!(result.render(), "x");
             assert_eq!(result.declared_type().as_str(), "note");
             assert_eq!(result.id(), activated[1].1);
@@ -1623,9 +1419,7 @@ fn result_is_the_designated_context() {
         node_type("Src", &[], "note"),
         node_type("Pair", &[("left", "note"), ("right", "note")], "note"),
     ];
-    // Three instances produce before the run completes, so a run returning any
-    // produced context other than the designated instance's gives a different
-    // answer.
+    // Three instances produce before the run completes.
     let instances = vec![
         instance("p", "Src", &[]),
         instance("q", "Src", &[]),
@@ -1796,9 +1590,6 @@ proptest! {
     /// A well-formed definition, every entry parameter supplied and a generous
     /// budget, completes - and its result is what its designated instance
     /// produced.
-    ///
-    /// The counterweight to a file of refusals: a run that refused everything
-    /// and offered nothing would satisfy almost every other case here.
     #[test]
     fn well_formed_runs_complete(workflow in well_formed_definition()) {
         let mut source = IdSource::new();
@@ -1860,9 +1651,7 @@ fn missing_argument_is_refused() {
     let workflow = one_entry("note");
 
     // Which answer came back is the assertion, not merely that the run did not
-    // complete: measured, this shape reads as a stuck run naming every waiting
-    // instance (EVD_RUN_MISSING_ARGUMENT_QUIESCES), and a weaker assertion
-    // passes against that.
+    // complete.
     let refusal = Run::<Infallible>::start(&workflow, Arguments::new(), 10)
         .expect_err("a required entry parameter with no argument is refused");
     assert_eq!(
@@ -1987,9 +1776,7 @@ fn argument_for_no_parameter_is_refused() {
         }]
     );
 
-    // Both typos at once are two faults, not the first of them. A caller that
-    // learns its faults one round trip at a time is the cost this exists to
-    // avoid, and nothing else here has more than one fault to report.
+    // Both typos at once are two faults.
     let arguments = Arguments::new()
         .supply("e", "seed", ctx(&mut source, "note"))
         .supply("ee", "seed", ctx(&mut source, "note"))
@@ -2016,10 +1803,8 @@ fn argument_for_no_parameter_is_refused() {
 fn signature_filled_exactly_starts() {
     let mut source = IdSource::new();
     // Two entry instances whose node types each declare a parameter called the
-    // same thing, for two different context types - the shape measured handing
-    // one context to both (EVD_RUN_ENTRY_NAME_SHARED). They are two parameters.
-    // `p` and `p2` are two instances of one node type, so they necessarily
-    // declare the same parameter names and are two parameters all the same.
+    // same thing, for two different context types, and `p` and `p2`, two
+    // instances of one node type: separate parameters, all of them.
     let types = vec![
         node_type("Alpha", &[("seed", "note")], "note"),
         node_type("Beta", &[("seed", "diff")], "note").with_optional(&[("hint", "note")]),
@@ -2042,8 +1827,7 @@ fn signature_filled_exactly_starts() {
     let workflow = definition(types, instances, &["j"]);
 
     // One argument per required entry parameter, each of the declared type, and
-    // `q`'s optional parameter deliberately unsupplied: refusing that would make
-    // a workflow unusable that is not wrong.
+    // `q`'s optional parameter unsupplied.
     let alpha_seed = ctx(&mut source, "note");
     let beta_seed = ctx(&mut source, "diff");
     let (alpha_id, beta_id) = (alpha_seed.id(), beta_seed.id());
@@ -2091,9 +1875,7 @@ fn signature_filled_exactly_starts() {
     assert_eq!(seen, ["p", "q", "p2", "j"]);
 }
 
-/// A caller's own failure type. Named variants rather than a string, because
-/// asserting which failure occurred is what every error-path case here owes
-/// (`STKH_TYPED_FAILURE`), and prose cannot be asserted on.
+/// A caller's own failure type, with named variants.
 #[cfg(test)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum NodeTrouble {
@@ -2126,9 +1908,7 @@ fn failed_activation_ends_the_run() {
         .fail(NodeTrouble::Refused("the node said no"))
         .expect("an activation was outstanding");
 
-    // The instance is named, and the failure is carried as the caller's own
-    // value: matched here rather than read out of a message, which is what a
-    // rendered failure would force and what this exists to rule out.
+    // The instance is named, and the failure matched as the caller's own value.
     match ending {
         RunEnding::NodeFailed { instance, failure } => {
             assert_eq!(instance, "a");
@@ -2137,9 +1917,8 @@ fn failed_activation_ends_the_run() {
         other => panic!("a reported failure ends the run as a failure, not {other:?}"),
     }
 
-    // That the run offers nothing further is held by the type rather than by an
-    // assertion: `fail` consumes the run, so carrying on does not compile. A
-    // test could only check that this caller did not carry on.
+    // That the run offers nothing further: `fail` consumes the run, so carrying
+    // on does not compile.
     crate::compile_fail::assert_refused(
         "run_continues_after_failing",
         "fn after(mut run: agconflo_core::Run<'static, ()>) { let _ = run.fail(()); let _ = run.step(); }",
@@ -2147,10 +1926,8 @@ fn failed_activation_ends_the_run() {
         "moved value",
     );
 
-    // `b` was ready the whole time, which is what makes the case bite: without
-    // another instance waiting, a run that carried on would be indistinguishable
-    // from one that stopped. The same workflow driven without a failure goes on
-    // to activate it.
+    // `b` was ready the whole time; the same workflow driven without a failure
+    // goes on to activate it.
     let (_, activated) = drive(&workflow, Arguments::new(), 10, &mut source);
     assert_eq!(names(&activated), ["a"]);
 
@@ -2205,8 +1982,7 @@ fn undeclared_output_is_refused() {
     let mut run = Run::<Infallible>::start(&workflow, Arguments::new(), 10).expect("sound");
 
     assert_eq!(offered(&mut run).instance(), "n0");
-    // The measured defect (EVD_RUN_ACCEPTS_UNDECLARED_OUTPUT): `n0`'s type
-    // declares `note`, and it is answered with a `diff`.
+    // `n0`'s type declares `note`, and it is answered with a `diff`.
     let refusal = run
         .produced(ctx(&mut source, "diff"))
         .expect_err("an output of an undeclared type is refused");
@@ -2892,10 +2668,8 @@ fn declared_call_is_offered_next() {
         "the call is an activation, counted"
     );
 
-    // The calling activation survives its call: once the called output is
-    // accepted, the same activation is outstanding again - not offered anew,
-    // which would spend the budget twice and lose what it had exchanged - and
-    // its own output is its own.
+    // Once the called output is accepted, the same activation is outstanding
+    // again - not offered anew - and its own output is its own.
     run.produced(ctx(&mut source, "note"))
         .expect("lookup's output");
     let again = offered(&mut run);
@@ -3223,11 +2997,7 @@ proptest! {
     /// However many calls the instances of a run make, the activations the run
     /// offers - the called ones counted - never exceed its budget, and a call
     /// reported with the budget spent ends the run as over budget without its
-    /// activation being offered.
-    ///
-    /// Each instance's calls are to one node type, so a node type called twice
-    /// by one instance is two activations: counted per instance, a run of two
-    /// instances each calling twice would count two where it spent six.
+    /// activation being offered. Each instance's calls are to one node type.
     #[test]
     fn activations_with_calls_never_exceed_budget(
         budget in 0..10usize,
