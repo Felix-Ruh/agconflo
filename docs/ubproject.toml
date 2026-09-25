@@ -649,3 +649,30 @@ needs_fields = [
     { name = "implements", type = "list[str]", default = [] },
     { name = "follows", type = "list[str]", default = [] },
 ]
+
+# The same shape for junit-to-needs, whose markers are all traces (DEC_TRACE_MARKERS).
+[codelinks.projects.junit-to-needs]
+remote_url_pattern = "https://github.com/Felix-Ruh/agconflo/blob/{commit}/{path}#L{line}"
+
+[codelinks.projects.junit-to-needs.source_discover]
+src_dir = "../crates"
+include = ["**/junit-to-needs/src/**/*.rs"]
+comment_type = "rust"
+
+[codelinks.projects.junit-to-needs.analyse]
+get_oneline_needs = true
+get_need_id_refs = false
+
+[codelinks.projects.junit-to-needs.analyse.oneline_comment_style]
+start_sequence = "@"
+end_sequence = "\n"
+field_split_char = ","
+# `implements` in the place of the default `links`: see [needs.links.implements].
+# `follows` after it: see [needs.links.follows].
+needs_fields = [
+    { name = "title", type = "str" },
+    { name = "id", type = "str" },
+    { name = "type", type = "str", default = "impl" },
+    { name = "implements", type = "list[str]", default = [] },
+    { name = "follows", type = "list[str]", default = [] },
+]

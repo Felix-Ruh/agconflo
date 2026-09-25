@@ -1,16 +1,16 @@
 //! `junit-to-needs --crate <name>... <junit.xml>` prints the needs file for the
 //! tests of the named crates in a nextest JUnit report.
 //!
-//! The file goes to stdout and nothing is written anywhere else, so a caller
-//! comparing it with a committed copy can never overwrite that copy by mistake.
-//! Exit status: 0 with the file printed; 1 when the report cannot be read or
-//! imported, with nothing printed; 2 for a malformed command line.
+//! The file goes to stdout, and nothing is written anywhere else. Exit status:
+//! 0 with the file printed; 1 when the report cannot be read or imported, with
+//! nothing printed; 2 for a malformed command line.
 
 use std::io::Write;
 use std::process::ExitCode;
 
 const USAGE: &str = "usage: junit-to-needs --crate <name> [--crate <name>...] <junit.xml>";
 
+// @Prints the needs file and writes nothing,TRACE_MAIN_PRINTS_ONLY,trace,[],[DEC_RUNS_COMMITTED]
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let (crates, path) = match parse(&args) {

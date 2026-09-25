@@ -7,10 +7,8 @@ use quick_junit::{DeserializeError, Report, TestCaseStatus};
 use crate::id;
 use crate::needs::{Outcome, Run, Runs};
 
-/// Why a report was not imported.
-///
-/// Nothing is imported when any of these occurs: a file holding some of a
-/// report's runs would read exactly like one holding all of them.
+/// Why a report was not imported. Nothing is imported when any of these occurs.
+// @A report imported whole or refused,TRACE_IMPORT_REFUSALS,trace,[],[DEC_IMPORT_WHOLE_OR_REFUSED]
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum ImportError {
@@ -49,12 +47,9 @@ pub enum ImportError {
 
 /// The runs of the tests of `crates` in `xml`, a nextest JUnit report.
 ///
-/// Every other crate's tests are left out. nextest writes one report for the
-/// whole workspace, and a crate whose tests trace to no test case - this one,
-/// for instance - would otherwise contribute runs of cases that do not exist.
-///
-/// Each named crate must have a test in the report. A misspelt name would
-/// otherwise match nothing and import an empty file that looks like a clean one.
+/// Every other crate's tests are left out, and each named crate must have a
+/// test in the report.
+// @The named crates read and each required,TRACE_IMPORT_NAMED_CRATES,trace,[],[DEC_IMPORT_WHOLE_OR_REFUSED]
 pub fn import(xml: &str, crates: &[&str]) -> Result<Runs, ImportError> {
     let crates: BTreeSet<&str> = crates.iter().copied().collect();
     if crates.is_empty() {
@@ -87,8 +82,7 @@ pub fn import(xml: &str, crates: &[&str]) -> Result<Runs, ImportError> {
             };
             let outcome = outcome(&case.status, &test)?;
             if let Some(earlier) = runs.insert(Run::new(test_case.clone(), test.clone(), outcome)) {
-                // In name order, so the message does not depend on which of the
-                // two finished first.
+                // In title order, whichever of the two finished first.
                 let mut pair = [earlier.title().to_owned(), test];
                 pair.sort();
                 let [first, second] = pair;
@@ -109,9 +103,9 @@ pub fn import(xml: &str, crates: &[&str]) -> Result<Runs, ImportError> {
     Ok(runs)
 }
 
-/// A failure and an error both count as failed: the graph asks whether a test
-/// passes, and nextest already reports a timeout as a failure
-/// (EVD_NEXTEST_TIMEOUT).
+/// Passed for a success, failed for a failure or an error, a timeout among them;
+/// refused for a skipped or retried test.
+// @An error or a timeout is a failure,TRACE_IMPORT_OUTCOME,trace,[],[DEC_TESTS_UNDER_NEXTEST, DEC_IMPORT_WHOLE_OR_REFUSED]
 fn outcome(status: &TestCaseStatus, test: &str) -> Result<Outcome, ImportError> {
     match status {
         TestCaseStatus::Success { flaky_runs } if flaky_runs.is_empty() => Ok(Outcome::Passed),
@@ -142,9 +136,9 @@ use proptest::prelude::*;
 use quick_junit::{FlakyOrRerun, NonSuccessKind, TestCase, TestRerun, TestSuite};
 
 /// This repository's own report, verbatim: `target/nextest/default/junit.xml`
-/// as a run of the 19 tests of agconflo-core wrote it. Its ids are the ones
-/// `docs/tests/context.rst` declares, which is what makes it worth keeping;
-/// re-copy it from a run if the tests are ever renamed.
+/// as a run of the 19 tests of agconflo-core wrote it, whose ids
+/// `docs/tests/context.rst` declares. Re-copy it from a run if those tests are
+/// renamed.
 #[cfg(test)]
 const REAL: &str = include_str!("../testdata/agconflo-core.xml");
 
@@ -177,8 +171,8 @@ impl Test {
         self.path.join("::")
     }
 
-    /// Put together from the generated parts, rather than by splitting the
-    /// names the importer reads.
+    /// The id, put together from the generated parts.
+    // @Expected ids built from the generated parts,TRACE_IMPORT_EXPECTED_ID,trace,[],[NOTE_IMPORT_GENERATED_TESTS]
     fn expected_id(&self) -> String {
         let parts = self.file.iter().chain(&self.path);
         let upper = parts.map(|part| part.to_ascii_uppercase());
@@ -218,10 +212,9 @@ fn any_test() -> impl Strategy<Value = Test> {
         })
 }
 
-/// Generated tests, led by one in each traced crate so that neither is ever
-/// missing. At most one traced test per id: two paths joining to the same id
-/// are a case of their own, below. The untraced crate's tests may repeat freely,
-/// since none of them should be read.
+/// Generated tests: one in each traced crate first, then at most one traced test
+/// per id, with the untraced crate's tests repeating freely.
+// @Generated tests led by each traced crate,TRACE_IMPORT_GENERATED_TESTS,trace,[],[NOTE_IMPORT_GENERATED_TESTS]
 #[cfg(test)]
 fn any_tests() -> impl Strategy<Value = Vec<Test>> {
     vec(any_test(), 0..24).prop_map(|generated| {
