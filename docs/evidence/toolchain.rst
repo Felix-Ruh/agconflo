@@ -360,3 +360,74 @@ against.
    It matters because every fixture in ``docs-selftest/`` is a document, while
    every real run arrives as JSON. Without this, the rules would be known to
    hold only for needs nobody will write by hand.
+
+.. evd:: The source's comments, counted
+   :id: EVD_SOURCE_COMMENTS_COUNTED
+   :evd_kind: measurement
+   :observed_on: 2026-09-25
+   :observation: At 5ad676a the Rust source held 19,371 lines, 3,552 of them comments, in 1,174 blocks; 672 blocks ran over a line, 3,050 lines together, and 187 of those named a need id in prose. 74 lines were code markers.
+
+   A block is a run of consecutive lines starting ``//``, ``///`` or ``//!``,
+   one kind at a time, code markers left out. Of the blocks over a line, 329
+   were outside tests (1,952 lines, 163 naming an id) and 343 in them (1,098
+   lines, 24 naming an id). By crate: 469 in ``agconflo-core``, 180 in
+   ``agconflo-lua`` and 23 in ``junit-to-needs``. An id is any word starting
+   with one of this project's need prefixes.
+
+.. evd:: A code marker can carry a second list link
+   :id: EVD_CODELINKS_SECOND_LIST
+   :evd_kind: measurement
+   :observed_on: 2026-09-25
+   :observation: On ubc 0.35.0 a oneline marker with a second list field after implements gave both links, [] left the first empty, a trailing list could be left out, and a dead id in the second list failed the check.
+
+   Taken in a scratch clone with ``follows`` declared as a link and as a fifth
+   ``list[str]`` field of both crates' ``needs_fields``. The marker
+   ``@Both lists given,IMPL_PROBE_BOTH,impl,[CREQ_ROSTER_ROLE_TO_MODEL],[DEC_WINDOW_IS_A_CONTEXT]``
+   had an ``implements`` and a ``follows`` relationship in Cypher, and a list of
+   two decisions gave two ``follows``. A marker naming ``DEC_NOT_THERE`` in the
+   second list was ``needs.dead_link``, which fails at ``--deny warning``. A
+   marker naming only a decision was refused by the existing rule that an
+   implementation implements a component requirement.
+
+.. evd:: A code marker can make a need of a second type
+   :id: EVD_CODELINKS_SECOND_TYPE
+   :evd_kind: measurement
+   :observed_on: 2026-09-25
+   :observation: On ubc 0.35.0 a oneline marker naming a second declared need type in its type field became a need of that type with its follows link; a type registered as code collided with a built-in directive.
+
+   Same clone. With a type registered under the directive ``code``, the marker
+   ``@Only a decision,CODE_PROBE_DEC_ONLY,code,[],[DEC_WINDOW_IS_A_CONTEXT]``
+   gave a need with a ``follows`` relationship and nothing else. The check also
+   reported ``config.conflicting_content_model``: the registration was ignored
+   for documents, since ``code`` is a built-in directive, and at
+   ``--deny warning`` that fails.
+
+.. evd:: A code marker with a comma in its title vanishes
+   :id: EVD_CODELINKS_COMMA_DROPS_MARKER
+   :evd_kind: measurement
+   :observed_on: 2026-09-25
+   :observation: On ubc 0.35.0 a oneline marker whose title held a comma produced no need and no diagnostic, while a marker written in a /// doc comment produced its need.
+
+   Same clone. ``@A title, with a comma,IMPL_PROBE_COMMA,impl,[...]`` matched
+   no need by its id, and no need whose title began ``A title``; the check was
+   clean. The comma splits the title into two fields, so every field after it
+   moves one place and the marker is no longer one. Nothing reports that, so a
+   marker's shape can be held only by something that reads the source itself.
+
+.. evd:: A need written inside a comment is not read
+   :id: EVD_CODELINKS_MARKED_RST_INERT
+   :evd_kind: measurement
+   :observed_on: 2026-09-25
+   :observation: On ubc 0.35.0 a need directive between marked-rst sequences in a Rust comment never reached the graph, in // lines or a block comment, with or without oneline markers; 0.35.0 was the newest release offered.
+
+   Same clone, with ``get_rst = true``. ``ubc config`` showed the option and the
+   sequences taken. Tried with the default ``@rst`` and ``@endrst``, which the
+   check warns overlap the oneline marker's ``@``, and with ``<rst>`` and
+   ``</rst>``, which it accepts silently; as ``//`` lines and inside
+   ``/* */``; with oneline markers on and off. The need's id matched nothing in
+   Cypher each time, and the check was otherwise clean. ``ubc agent-skill``
+   documents no such feature.
+
+   The download server gave 200 for 0.35.0 and 403 for 0.35.1, 0.35.2, 0.36.0,
+   0.36.1, 0.37.0, 0.38.0, 0.40.0 and 1.0.0, so no newer release was there to
+   try.

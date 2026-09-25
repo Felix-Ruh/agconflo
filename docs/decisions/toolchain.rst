@@ -190,3 +190,97 @@ body, and every rule needs a fixture because the tool ignores a malformed one.
    dead link until the case is renamed to match. A deleted test is quieter - its
    case simply has no run - which is a question for a query rather than an
    error, for the same reason coverage is never gated here.
+
+.. dec:: Code names the decisions it follows in its marker
+   :id: DEC_CODE_FOLLOWS_BY_MARKER
+   :dec_status: accepted
+   :decided_on: 2026-09-25
+   :supported_by: EVD_CODELINKS_SECOND_LIST, EVD_NEED_ID_REFS_KEEP_FIRST
+   :statement: Agconflo's requirements project shall link code to each decision or note it follows by a list in that code's one-line marker.
+
+   ``STKH_REASONS_IN_THE_GRAPH`` puts the reason for code in the graph, and a
+   link is what makes the code findable from the reason. The link is
+   ``follows``, the marker's fifth field, after ``implements``:
+   ``// @<title>,<id>,<type>,[<requirements>],[<decisions or notes>]``. Measured,
+   both lists fill their own links, ``[]`` leaves the first empty, a trailing
+   list may be left out, and a dead id fails the check
+   (``EVD_CODELINKS_SECOND_LIST``).
+
+   A need-id reference was the alternative, and keeps only the first place that
+   names a need (``EVD_NEED_ID_REFS_KEEP_FIRST``). An id written in a comment's
+   prose was the state of things, and no query reaches it.
+
+.. dec:: Code that implements no requirement is traced by a trace marker
+   :id: DEC_TRACE_MARKERS
+   :dec_status: accepted
+   :decided_on: 2026-09-25
+   :supported_by: EVD_CODELINKS_SECOND_TYPE
+   :statement: Agconflo's requirements project shall produce a trace need from a one-line marker for code that follows a decision or a note and implements no component requirement.
+
+   Code shaped by a decision is not always where a requirement is met: a test
+   helper, a parser's error path, a pinned constant. An implementation must
+   implement a component requirement, and loosening that rule to a requirement
+   or a decision would be a shape of rule never measured here. A second type
+   leaves the implementation's rule as it is and gives the new one its own:
+   ``trace``, prefix ``TRACE_``, following at least one decision or note.
+   Measured, a marker can make a need of any declared type
+   (``EVD_CODELINKS_SECOND_TYPE``); the name ``code`` collides with a built-in
+   directive, which is why it is not the name.
+
+.. dec:: An explanation local to code is a note in its crate's code document
+   :id: DEC_NOTES_BESIDE_THE_CRATE
+   :dec_status: accepted
+   :decided_on: 2026-09-25
+   :supported_by: EVD_CODELINKS_MARKED_RST_INERT
+   :statement: Agconflo's requirements project shall hold an explanation local to one piece of code as a note need in that crate's code document.
+
+   Some code needs more explaining than a comment should hold, and the
+   explanation belongs to that code alone: no decision chose it and no
+   requirement asks for it. The place meant for it is a need written inside
+   the comment, next to the code, and on the newest ubc such a need is never
+   read (``EVD_CODELINKS_MARKED_RST_INERT``). So the note is written in
+   ``docs/code/<crate>.rst``, the document that already brings the crate's code
+   into the graph, and the code names it in the ``follows`` list of its marker.
+   The note, its links and its body would move into the source unchanged once
+   ubc reads needs there.
+
+   An explanation of how code relates to something else is not a note: it
+   belongs to the need that owns the relation, a decision's or a requirement's
+   body. A choice between alternatives is not a note either, but a decision.
+
+.. dec:: Comments and docstrings say what the code does
+   :id: DEC_COMMENTS_SAY_WHAT
+   :dec_status: accepted
+   :decided_on: 2026-09-25
+   :supported_by: EVD_SOURCE_COMMENTS_COUNTED
+   :statement: Agconflo's comments and docstrings shall describe what its code does, and not why it does so or which needs it relates to.
+
+   The split ``STKH_REASONS_IN_THE_GRAPH`` draws, applied to each comment. A
+   docstring says what its item does, what it takes, what it gives back and how
+   it fails, and may take several lines to; it says nothing of how the item
+   does it, which is what the item hides, nor why, which is the graph's. A
+   comment inside a body clarifies the code at that point, in a line or two.
+
+   It is judged case by case, against the guidelines in ``AGENTS.md``, because
+   whether a sentence is a what or a why is not something text shows. A length
+   limit was the alternative, and the stakeholder turned it down: an argument
+   list is long for a good reason.
+
+.. dec:: The commit gate refuses a need id in a comment and a malformed marker
+   :id: DEC_COMMENT_CHECKS
+   :dec_status: accepted
+   :decided_on: 2026-09-25
+   :supported_by: EVD_CODELINKS_COMMA_DROPS_MARKER, EVD_SOURCE_COMMENTS_COUNTED
+   :statement: Agconflo's commit gate shall refuse a need id in a Rust comment that is not a code marker, and a code marker line that does not have the marker's shape.
+
+   The two parts of ``DEC_COMMENTS_SAY_WHAT`` a machine can hold without a
+   false alarm. A need id in a comment is a relation written as prose, which is
+   what the marker's lists exist for, so it is never right. A marker that is
+   not of the marker's shape is dropped by ubc without a word
+   (``EVD_CODELINKS_COMMA_DROPS_MARKER``), so only a check reading the source
+   itself can see it.
+
+   The length of a comment is reported for review, not gated: whether a long
+   block holds a reason is a question whose honest answer is sometimes no. Each
+   crate is held once its comments have been brought to the decisions above,
+   so the gate is green on every commit of the way there.
