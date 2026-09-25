@@ -15,7 +15,8 @@ where did every byte come from?"* has an exact answer.
 
 ## Status
 
-**Pre-alpha. Nodes run as scripts, call models or wait for a person, and a run survives an interruption** — no loops, no tools. What
+**Pre-alpha. Nodes run as scripts, call models or wait for a person, a model can call another node
+type, and a run survives an interruption** — no loops, and no tools outside the engine yet. What
 exists is the development process around it and the first slices of code through it: a
 requirements project under `docs/` with a validated metamodel behind it, a commit gate, continuous
 integration, and two crates.
@@ -35,10 +36,13 @@ for the node type, in a state made for that one activation, with nothing to reac
 the context API, and under a limit on instructions, memory and model calls. A script calls a model
 by a role - `host.complete('drafting', prompt)` - and the caller maps each role to a provider's model
 through [`genai`](https://github.com/jeremychone/rust-genai), so the same workflow runs against
-another provider by changing that mapping. The prompt is a context and is all the model is shown;
-the answer comes back as a context of its own. A scripted run hands its caller a record when it starts
-and after every output, so a run interrupted mid-call is resumed without repeating any call that was
-answered. A node type can instead be performed by a person: the run stops at that step and hands it to
+another provider by changing that mapping. What a model is shown is contexts and nothing else, and
+its answer comes back as a context of its own. A model may call the node types its instance
+declares, offered to it as tools: each call runs as a step of the run - counted against the budget,
+performed by that node type's own script or by a person - and the model goes on with its output. A
+scripted run hands its caller a record when it starts, after every output and after every answer,
+so a run interrupted mid-call is resumed without asking again for any answer its record holds. A
+node type can instead be performed by a person: the run stops at that step and hands it to
 its caller, who answers later - from the run's record, in another process if need be - with text that
 becomes the step's output. Each crate is traced from its requirements to the code and back from the
 tests that check it.
