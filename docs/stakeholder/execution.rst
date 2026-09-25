@@ -196,3 +196,34 @@ run one. Several of these constrain each other, or a goal in
 
    It names no interface. A command line, a website and a tool a model calls
    can each meet it, and which of them is the main one is a goal of its own.
+
+.. stkh_req:: A tool changes nothing it was not granted
+   :id: STKH_TOOLS_CONFINED
+   :stakeholder: user
+   :statement: Agconflo shall keep a tool a model uses from changing anything outside what the person running the workflow granted it.
+
+   The models this is wanted with are often small local ones, and a small
+   model given a tool that can write files or run commands will sooner or
+   later use it wrongly: delete a folder it was not asked about, overwrite a
+   file it misread, run a command it made up. A workflow that reaches the
+   world through tools is only worth running with such a model if its mistakes
+   stay inside what the person meant it to touch.
+
+   What is granted is the person's to say when they run the workflow - which
+   folders a tool may read, which it may change, what it may run - and not the
+   workflow's or the model's. Inside a grant a tool may do anything the grant
+   allows, mistakes included; this goal is about everything outside it.
+
+   Accident, not attack. The goal is met against a model that misuses a tool
+   it was given, not against code built to break out of whatever confines it -
+   an exploit of the operating system's kernel, say. A requirement below it
+   that claimed the second would claim more than this goal needs.
+
+   It is separate from ``STKH_TOOLS_AS_NODES`` because either can hold without
+   the other. A tool wrapped in a node is reached the way anything else a model
+   calls is, and can still change whatever the process running it can; and a
+   tool confined to its grant could still be handed to a model directly. It
+   leans on ``STKH_NO_PRIVILEGED_TYPES``: granting is the person's for any node
+   type alike, one Agconflo ships included, and ``STKH_RUN_FROM_DOCUMENTS``
+   says who that person is - the one running the workflow, not a program they
+   wrote.
