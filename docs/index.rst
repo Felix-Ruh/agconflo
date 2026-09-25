@@ -58,6 +58,8 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    tests/runner
    code/agconflo-core
    code/agconflo-lua
+   code/agconflo-runner
+   code/agconflo-cli
    code/junit-to-needs
    decisions/context
    decisions/workflow

@@ -284,12 +284,13 @@ catches it.
    :test_kind: error_path
    :coverage: full
 
-   Five records handed to a keeper, the third and fourth while the path of its
+   Four records handed to a keeper, the third and fourth while the path of its
    temporary file is taken by a directory, so that each write fails on every
-   system. Let go after the fourth, it reports that the file holds the second
-   record of four, and the file holds the second's text. Handed the fifth after
-   the directory is gone, and let go, it reports nothing, and the file holds
-   the fifth. No record's handing over panics.
+   system. Let go, it reports that the file holds the second record of four,
+   and the file holds the second's text. A keeper resumed from that file is
+   handed a record while the directory is there and another once it is gone;
+   let go, it reports nothing, and the file holds the last. No record's handing
+   over panics.
 
    Catches: every failure forgotten; a failure reported after the file caught
    up; the run stopped at the first failure.

@@ -22,7 +22,7 @@ export LC_ALL
 
 root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 
-HELD='junit-to-needs agconflo-lua agconflo-core'
+HELD='junit-to-needs agconflo-lua agconflo-core agconflo-runner agconflo-cli'
 
 # The report's thresholds: a comment over this many lines, a docstring over that.
 LONG_COMMENT=3

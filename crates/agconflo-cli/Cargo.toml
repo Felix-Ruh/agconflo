@@ -1,0 +1,29 @@
+[package]
+name = "agconflo-cli"
+description = "The agconflo command: checks, runs, resumes and answers an Agconflo workflow from the documents that describe it."
+version.workspace = true
+edition.workspace = true
+# Its own rather than the workspace's: agconflo-runner declares 1.89.
+rust-version = "1.89"
+license.workspace = true
+authors.workspace = true
+readme.workspace = true
+
+[[bin]]
+name = "agconflo"
+path = "src/main.rs"
+
+[dependencies]
+agconflo-core = { path = "../agconflo-core" }
+agconflo-lua = { path = "../agconflo-lua" }
+agconflo-runner = { path = "../agconflo-runner" }
+clap = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+
+# `unsafe_code = "forbid"` and clippy's `all` group, from the workspace. Without
+# this table a member crate inherits none of them, silently.
+[lints]
+workspace = true

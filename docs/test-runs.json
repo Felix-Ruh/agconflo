@@ -138,6 +138,87 @@
           "title": "agconflo-core catalogue::repeated_name_names_every_document",
           "type": "test_run"
         },
+        "RUN_COMMAND_ANSWERED_IN_A_NEW_PROCESS": {
+          "executes": [
+            "TEST_COMMAND_ANSWERED_IN_A_NEW_PROCESS"
+          ],
+          "id": "RUN_COMMAND_ANSWERED_IN_A_NEW_PROCESS",
+          "test_outcome": "passed",
+          "title": "agconflo-cli::command answered_in_a_new_process",
+          "type": "test_run"
+        },
+        "RUN_COMMAND_COMMANDS_REACH_THE_RUNNER": {
+          "executes": [
+            "TEST_COMMAND_COMMANDS_REACH_THE_RUNNER"
+          ],
+          "id": "RUN_COMMAND_COMMANDS_REACH_THE_RUNNER",
+          "test_outcome": "passed",
+          "title": "agconflo-cli::command commands_reach_the_runner",
+          "type": "test_run"
+        },
+        "RUN_COMMAND_EXIT_STATUS_PER_ENDING": {
+          "executes": [
+            "TEST_COMMAND_EXIT_STATUS_PER_ENDING"
+          ],
+          "id": "RUN_COMMAND_EXIT_STATUS_PER_ENDING",
+          "test_outcome": "passed",
+          "title": "agconflo-cli::command exit_status_per_ending",
+          "type": "test_run"
+        },
+        "RUN_COMMAND_FAILURE_ON_STANDARD_ERROR": {
+          "executes": [
+            "TEST_COMMAND_FAILURE_ON_STANDARD_ERROR"
+          ],
+          "id": "RUN_COMMAND_FAILURE_ON_STANDARD_ERROR",
+          "test_outcome": "passed",
+          "title": "agconflo-cli::command failure_on_standard_error",
+          "type": "test_run"
+        },
+        "RUN_COMMAND_HELD_RECORD_REFUSED": {
+          "executes": [
+            "TEST_COMMAND_HELD_RECORD_REFUSED"
+          ],
+          "id": "RUN_COMMAND_HELD_RECORD_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-cli::command held_record_refused",
+          "type": "test_run"
+        },
+        "RUN_COMMAND_MISUSE_EXITS_2": {
+          "executes": [
+            "TEST_COMMAND_MISUSE_EXITS_2"
+          ],
+          "id": "RUN_COMMAND_MISUSE_EXITS_2",
+          "test_outcome": "passed",
+          "title": "agconflo-cli::command misuse_exits_2",
+          "type": "test_run"
+        },
+        "RUN_COMMAND_RESULT_ON_STANDARD_OUTPUT": {
+          "executes": [
+            "TEST_COMMAND_RESULT_ON_STANDARD_OUTPUT"
+          ],
+          "id": "RUN_COMMAND_RESULT_ON_STANDARD_OUTPUT",
+          "test_outcome": "passed",
+          "title": "agconflo-cli::command result_on_standard_output",
+          "type": "test_run"
+        },
+        "RUN_COMMAND_RESUMED_AFTER_A_KILL": {
+          "executes": [
+            "TEST_COMMAND_RESUMED_AFTER_A_KILL"
+          ],
+          "id": "RUN_COMMAND_RESUMED_AFTER_A_KILL",
+          "test_outcome": "passed",
+          "title": "agconflo-cli::command resumed_after_a_kill",
+          "type": "test_run"
+        },
+        "RUN_COMMAND_UNKEPT_RECORD_TOLD": {
+          "executes": [
+            "TEST_COMMAND_UNKEPT_RECORD_TOLD"
+          ],
+          "id": "RUN_COMMAND_UNKEPT_RECORD_TOLD",
+          "test_outcome": "passed",
+          "title": "agconflo-cli::command unkept_record_told",
+          "type": "test_run"
+        },
         "RUN_CONTEXT_DEEP_NESTING_DROPS": {
           "executes": [
             "TEST_CONTEXT_DEEP_NESTING_DROPS"
@@ -489,6 +570,51 @@
           "title": "agconflo-core id::source_cannot_be_copied",
           "type": "test_run"
         },
+        "RUN_KEEPER_EXISTING_FILE_REFUSED": {
+          "executes": [
+            "TEST_KEEPER_EXISTING_FILE_REFUSED"
+          ],
+          "id": "RUN_KEEPER_EXISTING_FILE_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner keeper::existing_file_refused",
+          "type": "test_run"
+        },
+        "RUN_KEEPER_HELD_FILE_REFUSED": {
+          "executes": [
+            "TEST_KEEPER_HELD_FILE_REFUSED"
+          ],
+          "id": "RUN_KEEPER_HELD_FILE_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner keeper::held_file_refused",
+          "type": "test_run"
+        },
+        "RUN_KEEPER_KILLED_HOLDER_RELEASES": {
+          "executes": [
+            "TEST_KEEPER_KILLED_HOLDER_RELEASES"
+          ],
+          "id": "RUN_KEEPER_KILLED_HOLDER_RELEASES",
+          "test_outcome": "passed",
+          "title": "agconflo-runner keeper::killed_holder_releases",
+          "type": "test_run"
+        },
+        "RUN_KEEPER_RECORD_REPLACED_WHOLE": {
+          "executes": [
+            "TEST_KEEPER_RECORD_REPLACED_WHOLE"
+          ],
+          "id": "RUN_KEEPER_RECORD_REPLACED_WHOLE",
+          "test_outcome": "passed",
+          "title": "agconflo-runner keeper::record_replaced_whole",
+          "type": "test_run"
+        },
+        "RUN_KEEPER_UNKEPT_RECORD_TOLD": {
+          "executes": [
+            "TEST_KEEPER_UNKEPT_RECORD_TOLD"
+          ],
+          "id": "RUN_KEEPER_UNKEPT_RECORD_TOLD",
+          "test_outcome": "passed",
+          "title": "agconflo-runner keeper::unkept_record_told",
+          "type": "test_run"
+        },
         "RUN_LINEAGE_DEEP_NESTING_WALKS": {
           "executes": [
             "TEST_LINEAGE_DEEP_NESTING_WALKS"
@@ -613,6 +739,132 @@
           "id": "RUN_MODELS_WINDOW_PARTS_AS_MESSAGES",
           "test_outcome": "passed",
           "title": "agconflo-lua models::window_parts_as_messages",
+          "type": "test_run"
+        },
+        "RUN_MODEL_MAP_DEFAULT_KEY_NEVER_SENT": {
+          "executes": [
+            "TEST_MODEL_MAP_DEFAULT_KEY_NEVER_SENT"
+          ],
+          "id": "RUN_MODEL_MAP_DEFAULT_KEY_NEVER_SENT",
+          "test_outcome": "passed",
+          "title": "agconflo-runner model_map::default_key_never_sent",
+          "type": "test_run"
+        },
+        "RUN_MODEL_MAP_ROLES_REACH_THEIR_MODELS": {
+          "executes": [
+            "TEST_MODEL_MAP_ROLES_REACH_THEIR_MODELS"
+          ],
+          "id": "RUN_MODEL_MAP_ROLES_REACH_THEIR_MODELS",
+          "test_outcome": "passed",
+          "title": "agconflo-runner model_map::roles_reach_their_models",
+          "type": "test_run"
+        },
+        "RUN_MODEL_MAP_UNNAMESPACED_REFUSED": {
+          "executes": [
+            "TEST_MODEL_MAP_UNNAMESPACED_REFUSED"
+          ],
+          "id": "RUN_MODEL_MAP_UNNAMESPACED_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner model_map::unnamespaced_refused",
+          "type": "test_run"
+        },
+        "RUN_MODEL_MAP_UNREADABLE_REFUSED": {
+          "executes": [
+            "TEST_MODEL_MAP_UNREADABLE_REFUSED"
+          ],
+          "id": "RUN_MODEL_MAP_UNREADABLE_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner model_map::unreadable_refused",
+          "type": "test_run"
+        },
+        "RUN_MODEL_MAP_UNSET_VARIABLE_REFUSED": {
+          "executes": [
+            "TEST_MODEL_MAP_UNSET_VARIABLE_REFUSED"
+          ],
+          "id": "RUN_MODEL_MAP_UNSET_VARIABLE_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner model_map::unset_variable_refused",
+          "type": "test_run"
+        },
+        "RUN_PROJECT_FAULTS_CARRY_THEIR_PLACE": {
+          "executes": [
+            "TEST_PROJECT_FAULTS_CARRY_THEIR_PLACE"
+          ],
+          "id": "RUN_PROJECT_FAULTS_CARRY_THEIR_PLACE",
+          "test_outcome": "passed",
+          "title": "agconflo-runner project::faults_carry_their_place",
+          "type": "test_run"
+        },
+        "RUN_PROJECT_LIMITS_DEFAULT_WHEN_ABSENT": {
+          "executes": [
+            "TEST_PROJECT_LIMITS_DEFAULT_WHEN_ABSENT"
+          ],
+          "id": "RUN_PROJECT_LIMITS_DEFAULT_WHEN_ABSENT",
+          "test_outcome": "passed",
+          "title": "agconflo-runner project::limits_default_when_absent",
+          "type": "test_run"
+        },
+        "RUN_PROJECT_MISSING_FILE_NAMED": {
+          "executes": [
+            "TEST_PROJECT_MISSING_FILE_NAMED"
+          ],
+          "id": "RUN_PROJECT_MISSING_FILE_NAMED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner project::missing_file_named",
+          "type": "test_run"
+        },
+        "RUN_PROJECT_MISSING_OR_MISTYPED_KEY_REFUSED": {
+          "executes": [
+            "TEST_PROJECT_MISSING_OR_MISTYPED_KEY_REFUSED"
+          ],
+          "id": "RUN_PROJECT_MISSING_OR_MISTYPED_KEY_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner project::missing_or_mistyped_key_refused",
+          "type": "test_run"
+        },
+        "RUN_PROJECT_PATHS_FROM_THE_MANIFEST": {
+          "executes": [
+            "TEST_PROJECT_PATHS_FROM_THE_MANIFEST"
+          ],
+          "id": "RUN_PROJECT_PATHS_FROM_THE_MANIFEST",
+          "test_outcome": "passed",
+          "title": "agconflo-runner project::paths_from_the_manifest",
+          "type": "test_run"
+        },
+        "RUN_PROJECT_READS_WHAT_IT_NAMES": {
+          "executes": [
+            "TEST_PROJECT_READS_WHAT_IT_NAMES"
+          ],
+          "id": "RUN_PROJECT_READS_WHAT_IT_NAMES",
+          "test_outcome": "passed",
+          "title": "agconflo-runner project::reads_what_it_names",
+          "type": "test_run"
+        },
+        "RUN_PROJECT_SCRIPTS_KEPT_EXACTLY": {
+          "executes": [
+            "TEST_PROJECT_SCRIPTS_KEPT_EXACTLY"
+          ],
+          "id": "RUN_PROJECT_SCRIPTS_KEPT_EXACTLY",
+          "test_outcome": "passed",
+          "title": "agconflo-runner project::scripts_kept_exactly",
+          "type": "test_run"
+        },
+        "RUN_PROJECT_UNDECODABLE_FILE_REFUSED": {
+          "executes": [
+            "TEST_PROJECT_UNDECODABLE_FILE_REFUSED"
+          ],
+          "id": "RUN_PROJECT_UNDECODABLE_FILE_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner project::undecodable_file_refused",
+          "type": "test_run"
+        },
+        "RUN_PROJECT_UNKNOWN_KEY_REFUSED": {
+          "executes": [
+            "TEST_PROJECT_UNKNOWN_KEY_REFUSED"
+          ],
+          "id": "RUN_PROJECT_UNKNOWN_KEY_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner project::unknown_key_refused",
           "type": "test_run"
         },
         "RUN_READER_ABSENT_OUTPUT_IS_NO_OUTPUT": {
@@ -865,6 +1117,87 @@
           "id": "RUN_RECORD_VERSION_ONE_REFUSED",
           "test_outcome": "passed",
           "title": "agconflo-core record::version_one_refused",
+          "type": "test_run"
+        },
+        "RUN_RUNNER_ANSWERS_THE_AWAITED_STEP": {
+          "executes": [
+            "TEST_RUNNER_ANSWERS_THE_AWAITED_STEP"
+          ],
+          "id": "RUN_RUNNER_ANSWERS_THE_AWAITED_STEP",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::answers_the_awaited_step",
+          "type": "test_run"
+        },
+        "RUN_RUNNER_ANSWER_ELSEWHERE_LEAVES_THE_FILE": {
+          "executes": [
+            "TEST_RUNNER_ANSWER_ELSEWHERE_LEAVES_THE_FILE"
+          ],
+          "id": "RUN_RUNNER_ANSWER_ELSEWHERE_LEAVES_THE_FILE",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::answer_elsewhere_leaves_the_file",
+          "type": "test_run"
+        },
+        "RUN_RUNNER_ARGUMENTS_KEPT_EXACTLY": {
+          "executes": [
+            "TEST_RUNNER_ARGUMENTS_KEPT_EXACTLY"
+          ],
+          "id": "RUN_RUNNER_ARGUMENTS_KEPT_EXACTLY",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::arguments_kept_exactly",
+          "type": "test_run"
+        },
+        "RUN_RUNNER_CHECK_RUNS_NOTHING": {
+          "executes": [
+            "TEST_RUNNER_CHECK_RUNS_NOTHING"
+          ],
+          "id": "RUN_RUNNER_CHECK_RUNS_NOTHING",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::check_runs_nothing",
+          "type": "test_run"
+        },
+        "RUN_RUNNER_ENDINGS_HANDED_BACK": {
+          "executes": [
+            "TEST_RUNNER_ENDINGS_HANDED_BACK"
+          ],
+          "id": "RUN_RUNNER_ENDINGS_HANDED_BACK",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::endings_handed_back",
+          "type": "test_run"
+        },
+        "RUN_RUNNER_REFUSED_START_TAKES_NOTHING": {
+          "executes": [
+            "TEST_RUNNER_REFUSED_START_TAKES_NOTHING"
+          ],
+          "id": "RUN_RUNNER_REFUSED_START_TAKES_NOTHING",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::refused_start_takes_nothing",
+          "type": "test_run"
+        },
+        "RUN_RUNNER_RESUMES_AN_INTERRUPTED_RUN": {
+          "executes": [
+            "TEST_RUNNER_RESUMES_AN_INTERRUPTED_RUN"
+          ],
+          "id": "RUN_RUNNER_RESUMES_AN_INTERRUPTED_RUN",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::resumes_an_interrupted_run",
+          "type": "test_run"
+        },
+        "RUN_RUNNER_RUNS_TO_COMPLETION": {
+          "executes": [
+            "TEST_RUNNER_RUNS_TO_COMPLETION"
+          ],
+          "id": "RUN_RUNNER_RUNS_TO_COMPLETION",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::runs_to_completion",
+          "type": "test_run"
+        },
+        "RUN_RUNNER_UNKNOWN_ARGUMENT_REFUSED": {
+          "executes": [
+            "TEST_RUNNER_UNKNOWN_ARGUMENT_REFUSED"
+          ],
+          "id": "RUN_RUNNER_UNKNOWN_ARGUMENT_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::unknown_argument_refused",
           "type": "test_run"
         },
         "RUN_RUN_ACCEPTED_OUTPUTS_ARE_ALL_NEW": {
