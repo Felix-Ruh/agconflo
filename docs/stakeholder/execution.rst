@@ -3,8 +3,9 @@ Running a workflow
 ==================
 
 What happens when a workflow actually runs: what it can be made of, what it may
-integrate with, and the ways a run is allowed to end. Several of these constrain
-each other, or a goal in ``stakeholder/context``, and the bodies say where.
+integrate with, the ways a run is allowed to end, and what a person needs to
+run one. Several of these constrain each other, or a goal in
+``stakeholder/context``, and the bodies say where.
 
 .. stkh_req:: The provider is not baked in
    :id: STKH_PROVIDER_CHOICE
@@ -163,3 +164,35 @@ each other, or a goal in ``stakeholder/context``, and the bodies say where.
    It is separate from the requirement above because either can hold without
    the other. A model could yield to nodes and still be handed tools directly
    on the side, and tools could be wrapped in nodes that no model can call.
+
+.. stkh_req:: A workflow runs from its documents alone
+   :id: STKH_RUN_FROM_DOCUMENTS
+   :stakeholder: user
+   :statement: Agconflo shall let a person run a workflow from the documents that describe it without writing a program that hosts the run.
+
+   A workflow is written as documents: its topology, the node types it uses,
+   and the scripts that perform them. Running it has meant writing one thing
+   more - a program against the engine's libraries that reads those documents,
+   starts the run, keeps its record and hands a person their step - and
+   building it before anything runs. Everything a workflow is made of is out
+   of reach of the engine's toolchain but the one step that uses it.
+
+   The program meant is the host of a run, not a node's script. A script is
+   one of the documents, and writing it is authoring the workflow; what this
+   rules out is having to write the host as well.
+
+   Running a workflow includes carrying the run to its end. Resuming it after
+   an interruption (``STKH_RESUMABLE_RUN``) and a person answering the step it
+   awaits (``STKH_HUMAN_IN_RUN``) are part of running it, so a way of running
+   that can start a run but not resume it or take the answer does not meet
+   this.
+
+   It is separate from ``STKH_LIVE_BEHAVIOUR`` because either can hold without
+   the other. A node's behaviour changes without recompiling the engine while
+   every run still needs a host written for it, and a host could be supplied
+   for workflows whose behaviour is compiled in. It is also the first thing
+   ``STKH_SELF_HOSTING`` asks, which is that the engine be usable before it
+   builds itself.
+
+   It names no interface. A command line, a website and a tool a model calls
+   can each meet it, and which of them is the main one is a goal of its own.
