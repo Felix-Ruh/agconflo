@@ -18,6 +18,9 @@ serde_json = { workspace = true }
 [dev-dependencies]
 proptest = { workspace = true }
 tokio = { workspace = true }
+# Reads a run's record as the TOML it is, where a test asserts on what the text
+# holds rather than on what resuming it makes of it.
+toml_edit = { workspace = true }
 
 # `unsafe_code = "forbid"` and clippy's `all` group, from the workspace. Without
 # this table a member crate inherits none of them, silently.

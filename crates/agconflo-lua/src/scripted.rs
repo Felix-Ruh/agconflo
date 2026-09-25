@@ -12,8 +12,8 @@ use std::fmt;
 use std::rc::Rc;
 
 use agconflo_core::{
-    Activation, Arguments, Context, IdSource, NothingOutstanding, ResumeRefusal, Run, RunEnding,
-    StartRefusal, Step, WorkflowDefinition,
+    Activation, Arguments, Context, IdSource, NodeType, NothingOutstanding, ResumeRefusal, Run,
+    RunEnding, StartRefusal, Step, WorkflowDefinition,
 };
 
 use crate::behaviours::{BehaviourFault, Behaviours};
@@ -105,11 +105,12 @@ pub enum Outcome {
 /// caller's models (`DEC_MODELS_BY_ROLE`); a run whose scripts call no model can
 /// be given a roster mapping nothing.
 ///
-/// `keep` is handed the run's record once it starts and again each time it
-/// accepts an output (`DEC_SCRIPTED_RUN_HANDS_RECORDS`). A caller keeping the
-/// latest can give it to [`resume_scripted`] after an interruption and lose at
-/// most the activation that was in progress; one that needs no record ignores
-/// it.
+/// `keep` is handed the run's record once it starts, again each time it accepts
+/// an output, and again each time a model call is answered
+/// (`DEC_RECORD_AFTER_EACH_ANSWER`). A caller keeping the latest can give it to
+/// [`resume_scripted`] after an interruption and lose at most the script's own
+/// work since the last answer, which is run again, and no answer it paid for;
+/// one that needs no record ignores it.
 ///
 /// Asynchronous, because a model call is awaited (`DEC_BEHAVIOUR_ASYNC`). The
 /// future is not `Send` - a Lua state is not (`EVD_RUN_IS_SEND`) - so it runs on
@@ -222,7 +223,8 @@ pub async fn answer_scripted(
 
 /// Perform `run`'s activations until it ends or reaches a step a person
 /// performs, handing `keep` a record when it starts and after each accepted
-/// output - or refuse it for its scripts, or for an answer it does not await.
+/// output - and, through [`serve`], after each answer - or refuse it for its
+/// scripts, or for an answer it does not await.
 ///
 /// `answer`, when given, is the instance a person's text was supplied for and
 /// the text, taken as the output of the first activation the run offers.
@@ -246,7 +248,7 @@ async fn drive(
     }
 
     if let Some((instance, text)) = answer {
-        let reported = answered(&mut run, definition, behaviours, &lent, instance, text)?;
+        let reported = answered(&mut run, behaviours, &lent, instance, text)?;
         if let Err(failure) = reported {
             return Ok(Outcome::Ended(fail(run, failure)));
         }
@@ -254,45 +256,229 @@ async fn drive(
 
     // The position is read from the loan, which is the source the scripts
     // draw from: what stands in the caller's place meanwhile is a fresh one.
-    keep(run.record(&lent.source.borrow()));
+    let mut env = Env {
+        definition,
+        behaviours,
+        roster,
+        limits,
+        source: lent.source.clone(),
+        keep: &mut keep,
+    };
+    (env.keep)(run.record(&env.source.borrow()));
     loop {
         let activation = match run.step() {
             Step::Ended(ending) => return Ok(Outcome::Ended(ending)),
             Step::Activate(activation) => activation,
         };
 
-        let node_type = node_type_of(definition, &activation);
         // @A person's step handed to the caller with nothing run for it,IMPL_SCRIPTED_PERSON_STEP,impl,[CREQ_HOST_HANDS_OVER_PERSON_STEP]
-        if behaviours.performed_by_person(node_type) {
+        if behaviours.performed_by_person(activation.node_type()) {
             return Ok(Outcome::Awaiting(activation));
         }
-        // The behaviour set has refused the run unless each type it
-        // instantiates has a person or exactly one script, and not both.
-        let script = behaviours
-            .script_for(node_type)
-            .expect("every instantiated type a person does not perform has exactly one script");
 
-        let outcome = host::perform(script, &activation, &lent.source, roster, limits)
-            .await
-            .and_then(|output| run.produced(output).map_err(ScriptFailure::OutputRefused));
-        if let Err(failure) = outcome {
-            return Ok(Outcome::Ended(fail(run, failure)));
+        match perform_activation(&mut run, &activation, &mut env).await {
+            Performed::Output(output) => {
+                if let Err(refusal) = run.produced(output) {
+                    return Ok(Outcome::Ended(fail(
+                        run,
+                        ScriptFailure::OutputRefused(refusal),
+                    )));
+                }
+                (env.keep)(run.record(&env.source.borrow()));
+            }
+            Performed::Stopped(Stop::Failed(failure)) => {
+                return Ok(Outcome::Ended(fail(run, failure)));
+            }
+            Performed::Stopped(Stop::Awaiting(step)) => return Ok(Outcome::Awaiting(step)),
+            Performed::Stopped(Stop::Ended(ending)) => return Ok(Outcome::Ended(ending)),
         }
-        keep(run.record(&lent.source.borrow()));
     }
 }
 
-/// The node type of the instance `activation` is for.
+/// What a scripted run is driven with, besides the run itself.
+struct Env<'e> {
+    definition: &'e WorkflowDefinition,
+    behaviours: &'e Behaviours,
+    roster: &'e Roster,
+    limits: Limits,
+    source: Rc<RefCell<IdSource>>,
+    keep: &'e mut dyn FnMut(String),
+}
+
+/// How performing an activation came out.
+enum Performed {
+    /// Its output, not yet reported to the run.
+    Output(Context),
+    /// The run cannot go on from it as it would from an output.
+    Stopped(Stop),
+}
+
+/// Why performing an activation stopped the run, or where.
+enum Stop {
+    /// The activation failed, with the run's outstanding activation - the
+    /// called one, when a call failed - still to be failed with it.
+    Failed(ScriptFailure),
+    /// A call reached a node type a person performs: the run awaits them.
+    Awaiting(Activation),
+    /// A call found the budget spent, and the run ended.
+    Ended(RunEnding<ScriptFailure>),
+}
+
+/// Perform `activation` by running its node type's script, answering from `run`
+/// whatever the script asks of it while it runs.
 ///
-/// Always found: the run offers only instances of a sound definition, whose
-/// names are unique and whose types are declared.
-fn node_type_of<'d>(definition: &'d WorkflowDefinition, activation: &Activation) -> &'d str {
-    definition
+/// The script is polled here, and whenever it waits on the mailbox the question
+/// is answered with the run this holds: an exchange held and a record handed
+/// over, or a call performed as the run's next activation - the called node
+/// type's own script performed by this same function, or its step handed to a
+/// person (`DEC_CALL_IS_AN_ACTIVATION`). A script waiting on anything else - a
+/// provider - is waited on.
+///
+/// What the activation's record holds is handed to the script to be answered
+/// from (`DEC_SCRIPT_REPLAYED_FROM_ITS_RECORD`), and what its model may call is
+/// what its instance declares - nothing, for a call's own activation.
+///
+/// Boxed, because performing a call's activation is this function again.
+// @A script's questions answered from the run it is performed for,IMPL_SCRIPTED_YIELD,impl,[CREQ_HOST_PERFORMS_CALLS, CREQ_HOST_RECORD_AFTER_ANSWER, CREQ_HOST_CALL_REFUSAL_CARRIED, CREQ_HOST_HANDS_OVER_PERSON_STEP]
+fn perform_activation<'f>(
+    run: &'f mut Run<'_, ScriptFailure>,
+    activation: &'f Activation,
+    env: &'f mut Env<'_>,
+) -> std::pin::Pin<Box<dyn std::future::Future<Output = Performed> + 'f>> {
+    Box::pin(async move {
+        // The behaviour set has refused the run unless each type it names has
+        // a person or exactly one script, and not both; a person's step never
+        // reaches here.
+        let script = env
+            .behaviours
+            .script_for(activation.node_type())
+            .expect("every named type a person does not perform has exactly one script");
+        let callees = callees_of(env.definition, activation);
+        let mut replay = host::Replay {
+            exchanges: run.exchanges().to_vec(),
+            ..host::Replay::default()
+        };
+        for exchange in &replay.exchanges {
+            for call in exchange.calls() {
+                if let Some(output) = run.called(call.id()) {
+                    replay.outputs.insert(call.id().to_owned(), output.clone());
+                }
+            }
+        }
+        let mailbox = Rc::new(host::Mailbox::default());
+        let performing = host::Performing {
+            callees,
+            replay,
+            mailbox: mailbox.clone(),
+        };
+
+        let source = env.source.clone();
+        let roster = env.roster.clone();
+        let mut script = std::pin::pin!(host::perform(
+            script, activation, &source, &roster, env.limits, performing
+        ));
+        let mut stop = None;
+        let performed = loop {
+            let polled = std::future::poll_fn(|cx| match script.as_mut().poll(cx) {
+                std::task::Poll::Ready(done) => std::task::Poll::Ready(Some(done)),
+                std::task::Poll::Pending if mailbox.asking.borrow().is_some() => {
+                    std::task::Poll::Ready(None)
+                }
+                std::task::Poll::Pending => std::task::Poll::Pending,
+            })
+            .await;
+            match polled {
+                Some(done) => break done,
+                None => {
+                    let asking = mailbox.asking.borrow_mut().take();
+                    let given = match asking {
+                        Some(asking) => serve(run, asking, env, &mut stop).await,
+                        None => host::Given::Stop,
+                    };
+                    *mailbox.given.borrow_mut() = Some(given);
+                }
+            }
+        };
+
+        match (stop, performed) {
+            (Some(stop), _) => Performed::Stopped(stop),
+            (None, Ok(output)) => Performed::Output(output),
+            (None, Err(failure)) => Performed::Stopped(Stop::Failed(failure)),
+        }
+    })
+}
+
+/// Answer one thing a script asked of `run`, noting in `stop` why the run cannot
+/// go on when that is the answer.
+async fn serve(
+    run: &mut Run<'_, ScriptFailure>,
+    asking: host::Asking,
+    env: &mut Env<'_>,
+    stop: &mut Option<Stop>,
+) -> host::Given {
+    let mut stopping = |why: Stop| {
+        *stop = Some(why);
+        host::Given::Stop
+    };
+    match asking {
+        host::Asking::Exchange(exchange) => match run.exchange(exchange) {
+            Ok(()) => {
+                (env.keep)(run.record(&env.source.borrow()));
+                host::Given::Held
+            }
+            Err(refusal) => stopping(Stop::Failed(ScriptFailure::ExchangeRefused(refusal))),
+        },
+        host::Asking::Call(call) => {
+            if let Err(refusal) = run.call(call) {
+                return stopping(Stop::Failed(ScriptFailure::CallRefused(refusal)));
+            }
+            let called = match run.step() {
+                Step::Ended(ending) => return stopping(Stop::Ended(ending)),
+                Step::Activate(called) => called,
+            };
+            if env.behaviours.performed_by_person(called.node_type()) {
+                // Handed over with a record holding the call, which is what the
+                // person's answer resumes from.
+                (env.keep)(run.record(&env.source.borrow()));
+                return stopping(Stop::Awaiting(called));
+            }
+            match perform_activation(run, &called, env).await {
+                Performed::Output(output) => match run.produced(output.clone()) {
+                    Ok(()) => {
+                        (env.keep)(run.record(&env.source.borrow()));
+                        host::Given::Output(output)
+                    }
+                    Err(refusal) => stopping(Stop::Failed(ScriptFailure::OutputRefused(refusal))),
+                },
+                Performed::Stopped(why) => stopping(why),
+            }
+        }
+    }
+}
+
+/// The node types the model performing `activation` may call: those its
+/// instance declares, each once, in the order declared - and none for a call's
+/// own activation, which has no instance of its own.
+fn callees_of(definition: &WorkflowDefinition, activation: &Activation) -> Vec<NodeType> {
+    if activation.call().is_some() {
+        return Vec::new();
+    }
+    let declared = definition
         .instances
         .iter()
         .find(|instance| instance.name == activation.instance())
-        .map(|instance| instance.node_type.as_str())
-        .expect("the run offers only instances the definition carries")
+        .map(|instance| instance.calls.clone())
+        .unwrap_or_default();
+    let mut callees: Vec<NodeType> = Vec::new();
+    for name in declared {
+        if callees.iter().any(|callee| callee.name == name) {
+            continue;
+        }
+        if let Some(callee) = definition.node_types.iter().find(|t| t.name == name) {
+            callees.push(callee.clone());
+        }
+    }
+    callees
 }
 
 /// Report `text` as the output of the step a person performs for `instance`,
@@ -305,7 +491,6 @@ fn node_type_of<'d>(definition: &'d WorkflowDefinition, activation: &Activation)
 // @A person's text taken as the awaited step's output,IMPL_SCRIPTED_ANSWER,impl,[CREQ_HOST_TAKES_PERSON_TEXT, CREQ_HOST_REFUSES_ANSWER_ELSEWHERE]
 fn answered(
     run: &mut Run<'_, ScriptFailure>,
-    definition: &WorkflowDefinition,
     behaviours: &Behaviours,
     lent: &Lent<'_>,
     instance: &str,
@@ -319,8 +504,7 @@ fn answered(
         Step::Ended(_) => return Err(refused(None)),
         Step::Activate(activation) => activation,
     };
-    if activation.instance() != instance
-        || !behaviours.performed_by_person(node_type_of(definition, &activation))
+    if activation.instance() != instance || !behaviours.performed_by_person(activation.node_type())
     {
         return Err(refused(Some(activation.instance())));
     }
@@ -1296,4 +1480,808 @@ output = \"note\"
             .any(|context| context.id() == drafted),
         "the result holds the first half's output under its recorded identifier"
     );
+}
+
+// --- a model yielding ------------------------------------------------------------
+
+#[cfg(test)]
+use crate::models::{Reply, Stub, client_for, sent_messages, sent_tools};
+
+/// Node types for a model yielding: `ask`, which asks; `lookup`, described, one
+/// required parameter and one optional; and `search`, which nothing declares a
+/// call to.
+#[cfg(test)]
+pub(crate) const YIELD_TYPES: &str = "\
+[types.ask]
+output = \"note\"
+
+[types.lookup]
+description = \"Looks a codeword up.\"
+required = { query = \"note\" }
+optional = { hint = \"note\" }
+output = \"note\"
+
+[types.search]
+output = \"note\"
+";
+
+/// One instance, `asker`, designated, declaring its calls to `lookup` twice.
+#[cfg(test)]
+pub(crate) const YIELDING: &str = "\
+name = \"yielding\"
+output = \"asker\"
+
+[instances.asker]
+node_type = \"ask\"
+calls = [\"lookup\", \"lookup\"]
+";
+
+/// The asker's script: sets a global of its own, asks the model `question`, and
+/// outputs a composition of the answer.
+#[cfg(test)]
+fn asking(question: &str) -> String {
+    format!(
+        "local given, host = ...\nleaked = 'the caller'\nlocal answer = host.complete('asking', host.text('note', '{question}'))\nreturn host.compose(host.output, {{answer}}, '')"
+    )
+}
+
+/// lookup's script: what it was asked, and what its state holds under the
+/// caller's global name.
+#[cfg(test)]
+const LOOKUP: &str = "local given, host = ...\nreturn host.text(host.output, 'means ' .. given.query:render() .. ' / ' .. tostring(leaked))";
+
+/// The asker and lookup, performed by their scripts.
+#[cfg(test)]
+fn yielding_behaviours(question: &str, lookup: &str) -> Behaviours {
+    Behaviours::new()
+        .define("ask", "ask.lua", &asking(question))
+        .define("lookup", "lookup.lua", lookup)
+}
+
+/// Room for a few calls.
+#[cfg(test)]
+const CALLING: Limits = Limits {
+    model_calls: 8,
+    ..SMALL
+};
+
+/// A roster sending the role `asking` to `stub`, in `model`'s format.
+#[cfg(test)]
+fn roster_at(stub: &Stub, model: &str) -> Roster {
+    Roster::new(client_for(&stub.base)).map("asking", model)
+}
+
+/// Run `definition` against `stub` with nothing supplied, keeping every record.
+#[cfg(test)]
+fn run_keeping(
+    definition: &WorkflowDefinition,
+    behaviours: &Behaviours,
+    roster: &Roster,
+    limits: Limits,
+) -> (Result<Outcome, ScriptedRefusal>, Vec<String>) {
+    let mut records = Vec::new();
+    let mut source = IdSource::new();
+    let outcome = block(run_scripted(
+        definition,
+        behaviours,
+        roster,
+        Arguments::new(),
+        &mut source,
+        20,
+        limits,
+        |record| records.push(record),
+    ));
+    (outcome, records)
+}
+
+/// A reply calling `lookup` about `query`, under `id`.
+#[cfg(test)]
+fn looking_up(id: &str, query: &str) -> Reply {
+    Reply::text("").call(id, "lookup", &format!("{{\"query\": \"{query}\"}}"))
+}
+
+/// A record's text as TOML.
+#[cfg(test)]
+fn record_toml(record: &str) -> toml_edit::DocumentMut {
+    record.parse().expect("a record is TOML")
+}
+
+/// A record's events, and the kind of each: `exchange`, `call` or `output`.
+#[cfg(test)]
+fn record_events(record: &str) -> Vec<(String, toml_edit::Table)> {
+    let parsed = record_toml(record);
+    let Some(events) = parsed
+        .get("event")
+        .and_then(toml_edit::Item::as_array_of_tables)
+    else {
+        return Vec::new();
+    };
+    events
+        .iter()
+        .map(|event| {
+            let kind = ["exchange", "call", "output"]
+                .into_iter()
+                .find(|kind| event.contains_key(kind))
+                .expect("one kind each");
+            (kind.to_owned(), event.clone())
+        })
+        .collect()
+}
+
+/// The kinds of a record's events, in order.
+#[cfg(test)]
+fn kinds(record: &str) -> Vec<String> {
+    record_events(record)
+        .into_iter()
+        .map(|(kind, _)| kind)
+        .collect()
+}
+
+/// The text a record's text context `id` holds.
+#[cfg(test)]
+fn text_of(record: &str, id: &str) -> String {
+    record_toml(record)["context"][id]["text"]
+        .as_str()
+        .unwrap_or_else(|| panic!("context {id} holds text"))
+        .to_owned()
+}
+
+#[cfg(test)]
+#[test]
+fn model_yields() {
+    let definition = workflow(YIELD_TYPES, YIELDING);
+    for model in ["openai::m", "anthropic::m"] {
+        let stub = Stub::replying(vec![
+            looking_up("call_7", "amber-7"),
+            Reply::text("amber-7: the harbour is closed"),
+        ]);
+        let (outcome, records) = run_keeping(
+            &definition,
+            &yielding_behaviours("What is amber-7?", LOOKUP),
+            &roster_at(&stub, model),
+            CALLING,
+        );
+        assert_eq!(
+            rendered(outcome),
+            "amber-7: the harbour is closed",
+            "{model}"
+        );
+
+        let requests = stub.requests();
+        assert_eq!(requests.len(), 2, "{model}");
+        let continued = sent_messages(&requests[1].1);
+        assert_eq!(
+            continued.last().expect("messages").results,
+            [("call_7".to_owned(), "means amber-7 / nil".to_owned())],
+            "{model}: the model is asked again with the call's output as its result"
+        );
+        assert_eq!(
+            kinds(records.last().expect("records")),
+            ["exchange", "call", "output", "exchange", "output"],
+            "{model}"
+        );
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn offer_is_the_declared_calls() {
+    // lookup asks a model itself, so its own request can be looked at.
+    let asking_lookup = "local given, host = ...\nlocal found = host.complete('asking', given.query)\nreturn host.text(host.output, 'means ' .. found:render())";
+    let stub = Stub::replying(vec![
+        looking_up("call_7", "amber-7"),
+        Reply::text("the harbour"),
+        Reply::text("done"),
+    ]);
+    let (outcome, records) = run_keeping(
+        &workflow(YIELD_TYPES, YIELDING),
+        &yielding_behaviours("What is amber-7?", asking_lookup),
+        &roster_at(&stub, "openai::m"),
+        CALLING,
+    );
+    assert_eq!(rendered(outcome), "done");
+
+    let requests = stub.requests();
+    assert_eq!(requests.len(), 3);
+    let lookup_offered = Some(vec![(
+        "lookup".to_owned(),
+        Some("Looks a codeword up.".to_owned()),
+        vec![
+            ("query".to_owned(), "string".to_owned()),
+            ("hint".to_owned(), "string".to_owned()),
+        ],
+        vec!["query".to_owned()],
+    )]);
+    // Declared twice, offered once; `search` is in the catalogue and not
+    // declared, so not offered.
+    assert_eq!(sent_tools(&requests[0].1), lookup_offered);
+    assert_eq!(
+        sent_tools(&requests[1].1),
+        None,
+        "lookup's own call offers nothing"
+    );
+    assert_eq!(sent_tools(&requests[2].1), lookup_offered);
+
+    // Held by the run as contexts: the exchange's one offered node type is a
+    // composition of its name, description and parameters' names.
+    let last = records.last().expect("records");
+    let (_, first) = &record_events(last)[0];
+    let offer = first["exchange"]["offer"].as_array().expect("an offer");
+    assert_eq!(offer.len(), 1);
+    let offered = offer
+        .get(0)
+        .and_then(|id| id.as_str())
+        .expect("an identifier");
+    let parts: Vec<String> = record_toml(last)["context"][offered]["parts"]
+        .as_array()
+        .expect("a composition")
+        .iter()
+        .map(|part| text_of(last, part.as_str().expect("an identifier")))
+        .collect();
+    assert_eq!(parts, ["lookup", "Looks a codeword up.", "query", "hint"]);
+
+    // A node declaring no calls offers nothing.
+    let plain = Stub::replying(vec![Reply::text("plain")]);
+    let (outcome, _) = run_keeping(
+        &workflow(
+            YIELD_TYPES,
+            "name = \"plain\"\noutput = \"asker\"\n\n[instances.asker]\nnode_type = \"ask\"\n",
+        ),
+        &yielding_behaviours("q", LOOKUP),
+        &roster_at(&plain, "openai::m"),
+        CALLING,
+    );
+    assert_eq!(rendered(outcome), "plain");
+    assert_eq!(sent_tools(&plain.requests()[0].1), None);
+}
+
+#[cfg(test)]
+#[test]
+fn calls_performed_in_order() {
+    let stub = Stub::replying(vec![
+        Reply::text("")
+            .call("c1", "lookup", "{\"query\": \"first\"}")
+            .call("c2", "lookup", "{\"query\": \"second\"}"),
+        Reply::text("done"),
+    ]);
+    let (outcome, _) = run_keeping(
+        &workflow(YIELD_TYPES, YIELDING),
+        &yielding_behaviours("q", LOOKUP),
+        &roster_at(&stub, "anthropic::m"),
+        CALLING,
+    );
+    assert_eq!(rendered(outcome), "done");
+    // Asked again once, after both, with both results in the answer's order;
+    // and each lookup's state held nothing of the asker's global.
+    let requests = stub.requests();
+    assert_eq!(requests.len(), 2);
+    let results: Vec<(String, String)> = sent_messages(&requests[1].1)
+        .into_iter()
+        .flat_map(|message| message.results)
+        .collect();
+    assert_eq!(
+        results,
+        [
+            ("c1".to_owned(), "means first / nil".to_owned()),
+            ("c2".to_owned(), "means second / nil".to_owned()),
+        ]
+    );
+}
+
+#[cfg(test)]
+#[test]
+fn next_window_composes_the_last() {
+    let stub = Stub::replying(vec![looking_up("call_7", "amber-7"), Reply::text("done")]);
+    let (outcome, records) = run_keeping(
+        &workflow(YIELD_TYPES, YIELDING),
+        &yielding_behaviours("What is amber-7?", LOOKUP),
+        &roster_at(&stub, "openai::m"),
+        CALLING,
+    );
+    assert_eq!(rendered(outcome), "done");
+    let last = records.last().expect("records");
+    let events = record_events(last);
+    let id = |item: &toml_edit::Item| item.as_str().expect("an identifier").to_owned();
+    let first = &events[0].1["exchange"];
+    let call = &events[1].1["call"];
+    let output = &events[2].1;
+    let second = &events[3].1["exchange"];
+
+    let window = id(&second["window"]);
+    let written = &record_toml(last)["context"][window.as_str()];
+    let parts: Vec<String> = written["parts"]
+        .as_array()
+        .expect("a composition")
+        .iter()
+        .map(|part| part.as_str().expect("an identifier").to_owned())
+        .collect();
+    assert_eq!(
+        parts,
+        [
+            id(&first["window"]),
+            id(&first["answer"]),
+            id(&call["inputs"]["query"]),
+            id(&output["output"]),
+        ],
+        "the last window, the answer, the call's contexts and its output, by reference"
+    );
+    assert_eq!(written["separator"].as_str(), Some(""));
+    assert_eq!(written["type"].as_str(), Some("note"), "the prompt's type");
+
+    // Its rendering is the text the request carried, in order.
+    let rendering: String = parts.iter().map(|part| text_of(last, part)).collect();
+    let mut carried = String::new();
+    for message in sent_messages(&stub.requests()[1].1) {
+        carried.extend(message.texts);
+        for (_, _, arguments) in message.calls {
+            carried.push_str(arguments["query"].as_str().unwrap_or(""));
+        }
+        carried.extend(message.results.into_iter().map(|(_, text)| text));
+    }
+    assert_eq!(carried, rendering);
+}
+
+#[cfg(test)]
+#[test]
+fn malformed_call_fails() {
+    use crate::host::ModelCallFault;
+    let never = "error('lookup must not run')";
+    let cases = [
+        ("search", "{\"query\": \"x\"}", ModelCallFault::NotOffered),
+        ("lookup", "\"amber-7\"", ModelCallFault::NotAnObject),
+        (
+            "lookup",
+            "{\"query\": \"x\", \"extra\": \"y\"}",
+            ModelCallFault::UndeclaredParameter {
+                parameter: "extra".to_owned(),
+            },
+        ),
+        (
+            "lookup",
+            "{\"hint\": \"x\"}",
+            ModelCallFault::RequiredMissing {
+                parameter: "query".to_owned(),
+            },
+        ),
+        (
+            "lookup",
+            "{\"query\": 7}",
+            ModelCallFault::NotAString {
+                parameter: "query".to_owned(),
+            },
+        ),
+    ];
+    for (name, arguments, fault) in cases {
+        let stub = Stub::replying(vec![
+            looking_up("call_1", "fine").call("call_2", name, arguments),
+            Reply::text("never asked"),
+        ]);
+        let (outcome, records) = run_keeping(
+            &workflow(YIELD_TYPES, YIELDING),
+            &yielding_behaviours("q", never),
+            &roster_at(&stub, "openai::m"),
+            CALLING,
+        );
+        assert_eq!(
+            failed(outcome),
+            (
+                "asker".to_owned(),
+                ScriptFailure::MalformedCall {
+                    node_type: name.to_owned(),
+                    fault: fault.clone(),
+                }
+            ),
+            "{arguments}"
+        );
+        // Nothing reported, performed or spent for the well-formed call before
+        // it - no record was handed over after the one at the start, since
+        // nothing happened to hold - and the model not asked again.
+        assert_eq!(stub.requests().len(), 1, "{arguments}");
+        assert_eq!(records.len(), 1, "{arguments}: {records:?}");
+        assert!(kinds(&records[0]).is_empty());
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn refused_call_fails_with_the_refusal() {
+    // The host checks every call before the run sees it, so a call the run
+    // refuses is made on purpose: the host's offer comes from a workflow that
+    // declares the call, and the run's from one that does not.
+    let declaring = workflow(YIELD_TYPES, YIELDING);
+    let undeclaring = workflow(
+        YIELD_TYPES,
+        "name = \"yielding\"\noutput = \"asker\"\n\n[instances.asker]\nnode_type = \"ask\"\n",
+    );
+    let mut run = Run::<ScriptFailure>::start(&undeclaring, Arguments::new(), 20).expect("starts");
+    let Step::Activate(activation) = run.step() else {
+        panic!("the asker is offered")
+    };
+    let stub = Stub::replying(vec![looking_up("call_1", "amber-7")]);
+    let behaviours = yielding_behaviours("q", LOOKUP);
+    let roster = roster_at(&stub, "openai::m");
+    let mut keep = |_: String| {};
+    let mut env = Env {
+        definition: &declaring,
+        behaviours: &behaviours,
+        roster: &roster,
+        limits: CALLING,
+        source: Rc::new(RefCell::new(IdSource::new())),
+        keep: &mut keep,
+    };
+    match block(perform_activation(&mut run, &activation, &mut env)) {
+        Performed::Stopped(Stop::Failed(ScriptFailure::CallRefused(refusal))) => assert_eq!(
+            refusal,
+            agconflo_core::CallRefusal::Undeclared {
+                instance: "asker".to_owned(),
+                node_type: "lookup".to_owned(),
+            }
+        ),
+        Performed::Output(output) => panic!("expected the call refused, got {output:?}"),
+        Performed::Stopped(_) => panic!("expected the call refused, and it stopped otherwise"),
+    }
+    assert_eq!(stub.requests().len(), 1, "not asked again");
+}
+
+#[cfg(test)]
+#[test]
+fn exchanges_reported_before_calls() {
+    let asking_lookup = "local given, host = ...\nlocal found = host.complete('asking', given.query)\nreturn host.text(host.output, 'means ' .. found:render())";
+    let stub = Stub::replying(vec![
+        looking_up("call_7", "amber-7"),
+        Reply::text("the harbour"),
+        Reply::text("done"),
+    ]);
+    let (outcome, records) = run_keeping(
+        &workflow(YIELD_TYPES, YIELDING),
+        &yielding_behaviours("q", asking_lookup),
+        &roster_at(&stub, "openai::m"),
+        CALLING,
+    );
+    assert_eq!(rendered(outcome), "done");
+    // The record handed over when lookup starts - the one after the answer that
+    // called it - already holds that exchange, with its call.
+    let before = &records[1];
+    assert_eq!(kinds(before), ["exchange"]);
+    let (_, exchange) = &record_events(before)[0];
+    let calls = exchange["exchange"]["calls"].as_array().expect("calls");
+    assert_eq!(calls.len(), 1);
+    assert_eq!(
+        calls
+            .get(0)
+            .and_then(|call| call.as_inline_table())
+            .and_then(|call| call.get("id"))
+            .and_then(|id| id.as_str()),
+        Some("call_7")
+    );
+    // lookup's own answer, which called nothing, and the continuation are held
+    // too - lookup's under the call it performs.
+    let last = records.last().expect("records");
+    assert_eq!(
+        kinds(last),
+        [
+            "exchange", "call", "exchange", "output", "exchange", "output"
+        ]
+    );
+    let (_, own) = &record_events(last)[2];
+    assert_eq!(own["performing"].as_str(), Some("call_7"));
+}
+
+#[cfg(test)]
+#[test]
+fn record_after_each_answer() {
+    let stub = Stub::replying(vec![looking_up("call_7", "amber-7"), Reply::text("done")]);
+    let (outcome, records) = run_keeping(
+        &workflow(YIELD_TYPES, YIELDING),
+        &yielding_behaviours("q", LOOKUP),
+        &roster_at(&stub, "openai::m"),
+        CALLING,
+    );
+    assert_eq!(rendered(outcome), "done");
+    let counts: Vec<Vec<String>> = records.iter().map(|record| kinds(record)).collect();
+    assert_eq!(
+        counts,
+        [
+            vec![],
+            vec!["exchange".to_owned()],
+            vec![
+                "exchange".to_owned(),
+                "call".to_owned(),
+                "output".to_owned()
+            ],
+            vec![
+                "exchange".to_owned(),
+                "call".to_owned(),
+                "output".to_owned(),
+                "exchange".to_owned()
+            ],
+            vec![
+                "exchange".to_owned(),
+                "call".to_owned(),
+                "output".to_owned(),
+                "exchange".to_owned(),
+                "output".to_owned()
+            ],
+        ],
+        "at the start, after each answer and after each output"
+    );
+    // Each record handed over after an answer holds that answer.
+    let answer = |record: &str| {
+        let (_, exchange) = record_events(record)
+            .into_iter()
+            .rev()
+            .find(|(kind, _)| kind == "exchange")
+            .expect("an exchange");
+        let id = exchange["exchange"]["answer"]
+            .as_str()
+            .expect("an identifier")
+            .to_owned();
+        text_of(record, &id)
+    };
+    assert_eq!(answer(&records[1]), "");
+    assert_eq!(answer(&records[3]), "done");
+}
+
+#[cfg(test)]
+proptest::proptest! {
+    #![proptest_config(proptest::prelude::ProptestConfig::with_cases(12))]
+
+    /// For a run whose model yields in `rounds` answers of `calls` calls each,
+    /// resumed from every record it hands over against a provider holding only
+    /// the replies the record had not had, the resumed run ends with the same
+    /// output having asked the provider for exactly those: no window the record
+    /// answered is sent again. When the called node type asks a model of its
+    /// own, some of those records are taken while it is being performed, its
+    /// answer held and the caller's continuation not yet sent. And resumed with
+    /// a model call limit equal to the requests the record answered, the next
+    /// new request fails at the limit - asked of the caller alone, since each
+    /// activation has a limit of its own.
+    #[test]
+    fn resumed_mid_call_asks_nothing_twice(
+        rounds in 1..=2usize,
+        calls in 1..=2usize,
+        anthropic in proptest::prelude::any::<bool>(),
+        callee_asks in proptest::prelude::any::<bool>(),
+    ) {
+        let model = if anthropic { "anthropic::m" } else { "openai::m" };
+        let definition = workflow(YIELD_TYPES, YIELDING);
+        let asking_lookup = "local given, host = ...\nlocal found = host.complete('asking', given.query)\nreturn host.text(host.output, 'means ' .. found:render())";
+        let behaviours = yielding_behaviours("q", if callee_asks { asking_lookup } else { LOOKUP });
+        let mut replies = Vec::new();
+        for round in 0..rounds {
+            let mut reply = Reply::text("");
+            for call in 0..calls {
+                let id = format!("c{round}{call}");
+                reply = reply.call(&id, "lookup", &format!("{{\"query\": \"q{round}{call}\"}}"));
+            }
+            replies.push(reply);
+            if callee_asks {
+                for call in 0..calls {
+                    replies.push(Reply::text(&format!("found {round}{call}")));
+                }
+            }
+        }
+        replies.push(Reply::text("done"));
+
+        let stub = Stub::replying(replies.clone());
+        let (outcome, records) = run_keeping(&definition, &behaviours, &roster_at(&stub, model), CALLING);
+        let result = rendered(outcome);
+
+        let finished = kinds(records.last().expect("records"));
+        for record in &records {
+            let answered = kinds(record).iter().filter(|kind| *kind == "exchange").count();
+            let remaining = Stub::replying(replies[answered..].to_vec());
+            let mut again = vec![record.clone()];
+            let resumed = block(resume_scripted(
+                &definition, &behaviours, &roster_at(&remaining, model), record, CALLING,
+                |record| again.push(record),
+            ))
+            .map(|(outcome, _)| outcome);
+            proptest::prop_assert_eq!(rendered(resumed), result.clone());
+            proptest::prop_assert_eq!(remaining.requests().len(), replies.len() - answered, "{}", record);
+            // No recorded call performed again: the resumed run ends having
+            // held what the uninterrupted one held, and no more.
+            proptest::prop_assert_eq!(&kinds(again.last().expect("records")), &finished);
+
+            if !callee_asks && answered < replies.len() {
+                let limit = Limits { model_calls: u32::try_from(answered).expect("small"), ..CALLING };
+                let unasked = Stub::replying(Vec::new());
+                let limited = block(resume_scripted(
+                    &definition, &behaviours, &roster_at(&unasked, model), record, limit, |_| {},
+                ))
+                .map(|(outcome, _)| outcome);
+                proptest::prop_assert_eq!(failed(limited).1, ScriptFailure::ModelCallLimit);
+                proptest::prop_assert_eq!(unasked.requests().len(), 0);
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn replay_that_diverges_fails() {
+    let definition = workflow(YIELD_TYPES, YIELDING);
+    let stub = Stub::replying(vec![looking_up("call_7", "amber-7"), Reply::text("done")]);
+    let (outcome, records) = run_keeping(
+        &definition,
+        &yielding_behaviours("What is amber-7?", LOOKUP),
+        &roster_at(&stub, "openai::m"),
+        CALLING,
+    );
+    assert_eq!(rendered(outcome), "done");
+    // Taken after the first answer.
+    let record = &records[1];
+    assert_eq!(kinds(record), ["exchange"]);
+    let resumed = |definition: &WorkflowDefinition, question: &str| {
+        let unasked = Stub::replying(vec![Reply::text("done")]);
+        let outcome = block(resume_scripted(
+            definition,
+            &yielding_behaviours(question, LOOKUP),
+            &roster_at(&unasked, "openai::m"),
+            record,
+            CALLING,
+            |_| {},
+        ))
+        .map(|(outcome, _)| outcome);
+        (outcome, unasked.requests().len())
+    };
+
+    // The script edited to ask something else.
+    let (outcome, sent) = resumed(&definition, "What is amber-8?");
+    assert_eq!(
+        failed(outcome).1,
+        ScriptFailure::Diverged {
+            exchange: 0,
+            offer: false
+        }
+    );
+    assert_eq!(sent, 0, "nothing sent");
+
+    // lookup's description edited, which changes the offer.
+    let edited = workflow(
+        &YIELD_TYPES.replace("Looks a codeword up.", "Looks it up."),
+        YIELDING,
+    );
+    let (outcome, sent) = resumed(&edited, "What is amber-7?");
+    assert_eq!(
+        failed(outcome).1,
+        ScriptFailure::Diverged {
+            exchange: 0,
+            offer: true
+        }
+    );
+    assert_eq!(sent, 0);
+
+    // Unchanged, the replayed prompt has new identifiers and the same type and
+    // content, and the run goes on to its one remaining request.
+    let (outcome, sent) = resumed(&definition, "What is amber-7?");
+    assert_eq!(rendered(outcome), "done");
+    assert_eq!(sent, 1);
+}
+
+#[cfg(test)]
+#[test]
+fn continuation_counts_against_the_limit() {
+    let stub = Stub::replying(vec![looking_up("call_7", "amber-7"), Reply::text("done")]);
+    let (outcome, records) = run_keeping(
+        &workflow(YIELD_TYPES, YIELDING),
+        &yielding_behaviours("q", LOOKUP),
+        &roster_at(&stub, "openai::m"),
+        Limits {
+            model_calls: 1,
+            ..SMALL
+        },
+    );
+    assert_eq!(
+        failed(outcome),
+        ("asker".to_owned(), ScriptFailure::ModelCallLimit)
+    );
+    assert_eq!(stub.requests().len(), 1, "the continuation is not sent");
+    // lookup ran and its output is held.
+    assert_eq!(outputs_in(records.last().expect("records")), 1);
+}
+
+#[cfg(test)]
+#[test]
+fn person_as_callee() {
+    let definition = workflow(YIELD_TYPES, YIELDING);
+    let behaviours = Behaviours::new()
+        .define("ask", "ask.lua", &asking("What is amber-7?"))
+        .person("lookup");
+    let before = Stub::replying(vec![looking_up("call_7", "amber-7")]);
+    let (outcome, records) = run_keeping(
+        &definition,
+        &behaviours,
+        &roster_at(&before, "openai::m"),
+        CALLING,
+    );
+    let Ok(Outcome::Awaiting(step)) = outcome else {
+        panic!("the call is handed to a person: {outcome:?}")
+    };
+    assert_eq!(
+        (step.instance(), step.node_type(), step.call()),
+        ("asker", "lookup", Some("call_7"))
+    );
+    let [(parameter, given)] = step.inputs() else {
+        panic!("one input: {:?}", step.inputs())
+    };
+    assert_eq!((parameter.as_str(), &*given.render()), ("query", "amber-7"));
+    assert_eq!(before.requests().len(), 1);
+
+    // Answered from the last record, in a run of its own: the asker's script
+    // runs again, its first request answered from the record, and one more is
+    // sent, carrying the person's text as the call's result.
+    let after = Stub::replying(vec![Reply::text("done")]);
+    let (outcome, _) = block(answer_scripted(
+        &definition,
+        &behaviours,
+        &roster_at(&after, "openai::m"),
+        records.last().expect("a record to answer from"),
+        "asker",
+        "the harbour is closed",
+        CALLING,
+        |_| {},
+    ))
+    .expect("answered");
+    assert_eq!(rendered(Ok(outcome)), "done");
+    let requests = after.requests();
+    assert_eq!(requests.len(), 1);
+    assert_eq!(
+        sent_messages(&requests[0].1)
+            .last()
+            .expect("messages")
+            .results,
+        [("call_7".to_owned(), "the harbour is closed".to_owned())]
+    );
+}
+
+#[cfg(test)]
+#[test]
+fn interrupted_call_resumes() {
+    // The measured shape (EVD_WORK_INSIDE_AN_ACTIVATION_REPEATS) the other way
+    // round: two model calls in one script, the run dropped while the second
+    // waits.
+    let definition = workflow(
+        YIELD_TYPES,
+        "name = \"plain\"\noutput = \"asker\"\n\n[instances.asker]\nnode_type = \"ask\"\n",
+    );
+    let script = "local given, host = ...\nlocal a = host.complete('asking', host.text('note', 'one'))\nlocal b = host.complete('asking', host.text('note', 'two'))\nreturn host.compose(host.output, {a, b}, ' ')";
+    let behaviours = Behaviours::new().define("ask", "ask.lua", script);
+
+    let holding = Stub::holding_after(1, "first");
+    let roster = roster_at(&holding, "openai::m");
+    let mut source = IdSource::new();
+    let mut records = Vec::new();
+    let interrupted = block(async {
+        tokio::select! {
+            ending = run_scripted(
+                &definition, &behaviours, &roster, Arguments::new(), &mut source, 20, CALLING,
+                |record| records.push(record),
+            ) => Some(ending),
+            () = async {
+                while holding.requests().len() < 2 {
+                    tokio::task::yield_now().await;
+                }
+            } => None,
+        }
+    });
+    assert!(interrupted.is_none(), "dropped during the second call");
+    let last = records.last().expect("records");
+    assert_eq!(kinds(last), ["exchange"], "the first answer is recorded");
+
+    let answering = Stub::answering(200, "second");
+    let (outcome, _) = block(resume_scripted(
+        &definition,
+        &behaviours,
+        &roster_at(&answering, "openai::m"),
+        last,
+        CALLING,
+        |_| {},
+    ))
+    .expect("resumes");
+    assert_eq!(rendered(Ok(outcome)), "first second");
+    // Only the second question is asked; the first answer is bought once.
+    let requests = answering.requests();
+    assert_eq!(requests.len(), 1);
+    assert_eq!(sent_messages(&requests[0].1)[0].texts, ["two"]);
 }

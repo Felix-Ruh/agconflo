@@ -13,6 +13,10 @@
 //! caller mapped, and under a limit on the instructions it executes, the memory
 //! it allocates and the model calls it makes.
 //!
+//! A script's model may call the node types its instance declares calls to. Each
+//! call is performed as an activation of the run, by the called node type's own
+//! script or by a person, and the model is asked again with the call's output.
+//!
 //! A node type can instead be named as performed by a person. A scripted run
 //! then stops at each of its activations and hands it to its caller, and goes
 //! on from its record once the caller supplies the person's answer as text.
@@ -27,6 +31,6 @@ mod models;
 mod scripted;
 
 pub use behaviours::{BehaviourFault, Behaviours};
-pub use host::{Limits, ScriptFailure};
+pub use host::{Limits, ModelCallFault, ScriptFailure};
 pub use models::{ModelFailure, Roster};
 pub use scripted::{Outcome, ScriptedRefusal, answer_scripted, resume_scripted, run_scripted};

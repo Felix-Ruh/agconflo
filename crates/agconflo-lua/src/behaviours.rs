@@ -85,7 +85,8 @@ impl Behaviours {
     }
 
     /// Every fault in the scripts for the node types `definition`'s instances
-    /// name, in the order the definition first names each type.
+    /// name - as their own, or as ones they may call - in the order the
+    /// definition first names each type.
     ///
     /// Only instantiated types are asked about. A definition carries every
     /// declaration in its catalogue, and a type nothing instantiates never runs,
@@ -104,8 +105,12 @@ impl Behaviours {
         let mut asked: Vec<&str> = Vec::new();
         let mut faults = Vec::new();
 
-        for instance in &definition.instances {
-            let node_type = instance.node_type.as_str();
+        let named = definition
+            .instances
+            .iter()
+            .flat_map(|instance| std::iter::once(&instance.node_type).chain(&instance.calls));
+        for node_type in named {
+            let node_type = node_type.as_str();
             if asked.contains(&node_type) {
                 continue;
             }
@@ -558,4 +563,37 @@ fn person_and_script_refused() {
         matches!(&outcome, Ok(crate::Outcome::Awaiting(activation)) if activation.instance() == "c"),
         "{outcome:?}"
     );
+}
+
+#[cfg(test)]
+#[test]
+fn callee_without_behaviour_refused() {
+    use crate::scripted::{YIELD_TYPES, YIELDING};
+    // `ask` has a script; `lookup`, which `asker` declares a call to, has
+    // neither a script nor a person - beside another type missing its own.
+    let definition = workflow(
+        YIELD_TYPES,
+        &format!("{YIELDING}\n[instances.other]\nnode_type = \"search\"\n"),
+    );
+    let behaviours = Behaviours::new().define("ask", "ask.lua", MAKES);
+
+    // Refused as a value before anything runs, naming the called type as it
+    // names the instantiated one, in the order the definition first names each.
+    assert_eq!(
+        faults_of(run_with(&definition, &behaviours, None)),
+        vec![
+            BehaviourFault::Missing {
+                node_type: "lookup".to_owned()
+            },
+            BehaviourFault::Missing {
+                node_type: "search".to_owned()
+            },
+        ]
+    );
+
+    // Given a person, the called type needs no script.
+    let behaviours = behaviours
+        .person("lookup")
+        .define("search", "search.lua", MAKES);
+    assert!(run_with(&definition, &behaviours, None).is_ok());
 }

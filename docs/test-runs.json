@@ -3,6 +3,15 @@
   "versions": {
     "": {
       "needs": {
+        "RUN_BEHAVIOURS_CALLEE_WITHOUT_BEHAVIOUR_REFUSED": {
+          "executes": [
+            "TEST_BEHAVIOURS_CALLEE_WITHOUT_BEHAVIOUR_REFUSED"
+          ],
+          "id": "RUN_BEHAVIOURS_CALLEE_WITHOUT_BEHAVIOUR_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-lua behaviours::callee_without_behaviour_refused",
+          "type": "test_run"
+        },
         "RUN_BEHAVIOURS_CHECKING_RUNS_NOTHING": {
           "executes": [
             "TEST_BEHAVIOURS_CHECKING_RUNS_NOTHING"
@@ -525,6 +534,33 @@
           "title": "agconflo-lua models::answer_kept_as_sent",
           "type": "test_run"
         },
+        "RUN_MODELS_CALLS_RETURNED_AS_SENT": {
+          "executes": [
+            "TEST_MODELS_CALLS_RETURNED_AS_SENT"
+          ],
+          "id": "RUN_MODELS_CALLS_RETURNED_AS_SENT",
+          "test_outcome": "passed",
+          "title": "agconflo-lua models::calls_returned_as_sent",
+          "type": "test_run"
+        },
+        "RUN_MODELS_CONTINUATION_SENDS_CONTEXTS_WHOLE": {
+          "executes": [
+            "TEST_MODELS_CONTINUATION_SENDS_CONTEXTS_WHOLE"
+          ],
+          "id": "RUN_MODELS_CONTINUATION_SENDS_CONTEXTS_WHOLE",
+          "test_outcome": "passed",
+          "title": "agconflo-lua models::continuation_sends_contexts_whole",
+          "type": "test_run"
+        },
+        "RUN_MODELS_OFFER_SENT_AS_TOOLS": {
+          "executes": [
+            "TEST_MODELS_OFFER_SENT_AS_TOOLS"
+          ],
+          "id": "RUN_MODELS_OFFER_SENT_AS_TOOLS",
+          "test_outcome": "passed",
+          "title": "agconflo-lua models::offer_sent_as_tools",
+          "type": "test_run"
+        },
         "RUN_MODELS_PROMPT_SENT_EXACTLY": {
           "executes": [
             "TEST_MODELS_PROMPT_SENT_EXACTLY"
@@ -568,6 +604,15 @@
           "id": "RUN_MODELS_UNREACHABLE_PROVIDER_HAS_NO_STATUS",
           "test_outcome": "passed",
           "title": "agconflo-lua models::unreachable_provider_has_no_status",
+          "type": "test_run"
+        },
+        "RUN_MODELS_WINDOW_PARTS_AS_MESSAGES": {
+          "executes": [
+            "TEST_MODELS_WINDOW_PARTS_AS_MESSAGES"
+          ],
+          "id": "RUN_MODELS_WINDOW_PARTS_AS_MESSAGES",
+          "test_outcome": "passed",
+          "title": "agconflo-lua models::window_parts_as_messages",
           "type": "test_run"
         },
         "RUN_READER_ABSENT_OUTPUT_IS_NO_OUTPUT": {
@@ -1353,6 +1398,15 @@
           "title": "agconflo-lua scripted::awaiting_is_not_quiescent",
           "type": "test_run"
         },
+        "RUN_SCRIPTED_CALLS_PERFORMED_IN_ORDER": {
+          "executes": [
+            "TEST_SCRIPTED_CALLS_PERFORMED_IN_ORDER"
+          ],
+          "id": "RUN_SCRIPTED_CALLS_PERFORMED_IN_ORDER",
+          "test_outcome": "passed",
+          "title": "agconflo-lua scripted::calls_performed_in_order",
+          "type": "test_run"
+        },
         "RUN_SCRIPTED_CHANGED_SCRIPT_CHANGES_THE_RESULT": {
           "executes": [
             "TEST_SCRIPTED_CHANGED_SCRIPT_CHANGES_THE_RESULT"
@@ -1360,6 +1414,24 @@
           "id": "RUN_SCRIPTED_CHANGED_SCRIPT_CHANGES_THE_RESULT",
           "test_outcome": "passed",
           "title": "agconflo-lua scripted::changed_script_changes_the_result",
+          "type": "test_run"
+        },
+        "RUN_SCRIPTED_CONTINUATION_COUNTS_AGAINST_THE_LIMIT": {
+          "executes": [
+            "TEST_SCRIPTED_CONTINUATION_COUNTS_AGAINST_THE_LIMIT"
+          ],
+          "id": "RUN_SCRIPTED_CONTINUATION_COUNTS_AGAINST_THE_LIMIT",
+          "test_outcome": "passed",
+          "title": "agconflo-lua scripted::continuation_counts_against_the_limit",
+          "type": "test_run"
+        },
+        "RUN_SCRIPTED_EXCHANGES_REPORTED_BEFORE_CALLS": {
+          "executes": [
+            "TEST_SCRIPTED_EXCHANGES_REPORTED_BEFORE_CALLS"
+          ],
+          "id": "RUN_SCRIPTED_EXCHANGES_REPORTED_BEFORE_CALLS",
+          "test_outcome": "passed",
+          "title": "agconflo-lua scripted::exchanges_reported_before_calls",
           "type": "test_run"
         },
         "RUN_SCRIPTED_EXHAUSTED_SOURCE_FAILS_THE_STEP": {
@@ -1371,6 +1443,15 @@
           "title": "agconflo-lua scripted::exhausted_source_fails_the_step",
           "type": "test_run"
         },
+        "RUN_SCRIPTED_INTERRUPTED_CALL_RESUMES": {
+          "executes": [
+            "TEST_SCRIPTED_INTERRUPTED_CALL_RESUMES"
+          ],
+          "id": "RUN_SCRIPTED_INTERRUPTED_CALL_RESUMES",
+          "test_outcome": "passed",
+          "title": "agconflo-lua scripted::interrupted_call_resumes",
+          "type": "test_run"
+        },
         "RUN_SCRIPTED_INTERRUPTED_RUN_RESUMES": {
           "executes": [
             "TEST_SCRIPTED_INTERRUPTED_RUN_RESUMES"
@@ -1378,6 +1459,51 @@
           "id": "RUN_SCRIPTED_INTERRUPTED_RUN_RESUMES",
           "test_outcome": "passed",
           "title": "agconflo-lua scripted::interrupted_run_resumes",
+          "type": "test_run"
+        },
+        "RUN_SCRIPTED_MALFORMED_CALL_FAILS": {
+          "executes": [
+            "TEST_SCRIPTED_MALFORMED_CALL_FAILS"
+          ],
+          "id": "RUN_SCRIPTED_MALFORMED_CALL_FAILS",
+          "test_outcome": "passed",
+          "title": "agconflo-lua scripted::malformed_call_fails",
+          "type": "test_run"
+        },
+        "RUN_SCRIPTED_MODEL_YIELDS": {
+          "executes": [
+            "TEST_SCRIPTED_MODEL_YIELDS"
+          ],
+          "id": "RUN_SCRIPTED_MODEL_YIELDS",
+          "test_outcome": "passed",
+          "title": "agconflo-lua scripted::model_yields",
+          "type": "test_run"
+        },
+        "RUN_SCRIPTED_NEXT_WINDOW_COMPOSES_THE_LAST": {
+          "executes": [
+            "TEST_SCRIPTED_NEXT_WINDOW_COMPOSES_THE_LAST"
+          ],
+          "id": "RUN_SCRIPTED_NEXT_WINDOW_COMPOSES_THE_LAST",
+          "test_outcome": "passed",
+          "title": "agconflo-lua scripted::next_window_composes_the_last",
+          "type": "test_run"
+        },
+        "RUN_SCRIPTED_OFFER_IS_THE_DECLARED_CALLS": {
+          "executes": [
+            "TEST_SCRIPTED_OFFER_IS_THE_DECLARED_CALLS"
+          ],
+          "id": "RUN_SCRIPTED_OFFER_IS_THE_DECLARED_CALLS",
+          "test_outcome": "passed",
+          "title": "agconflo-lua scripted::offer_is_the_declared_calls",
+          "type": "test_run"
+        },
+        "RUN_SCRIPTED_PERSON_AS_CALLEE": {
+          "executes": [
+            "TEST_SCRIPTED_PERSON_AS_CALLEE"
+          ],
+          "id": "RUN_SCRIPTED_PERSON_AS_CALLEE",
+          "test_outcome": "passed",
+          "title": "agconflo-lua scripted::person_as_callee",
           "type": "test_run"
         },
         "RUN_SCRIPTED_PERSON_BETWEEN_MODEL_CALLS": {
@@ -1414,6 +1540,42 @@
           "id": "RUN_SCRIPTED_RECORDS_HANDED_OVER",
           "test_outcome": "passed",
           "title": "agconflo-lua scripted::records_handed_over",
+          "type": "test_run"
+        },
+        "RUN_SCRIPTED_RECORD_AFTER_EACH_ANSWER": {
+          "executes": [
+            "TEST_SCRIPTED_RECORD_AFTER_EACH_ANSWER"
+          ],
+          "id": "RUN_SCRIPTED_RECORD_AFTER_EACH_ANSWER",
+          "test_outcome": "passed",
+          "title": "agconflo-lua scripted::record_after_each_answer",
+          "type": "test_run"
+        },
+        "RUN_SCRIPTED_REFUSED_CALL_FAILS_WITH_THE_REFUSAL": {
+          "executes": [
+            "TEST_SCRIPTED_REFUSED_CALL_FAILS_WITH_THE_REFUSAL"
+          ],
+          "id": "RUN_SCRIPTED_REFUSED_CALL_FAILS_WITH_THE_REFUSAL",
+          "test_outcome": "passed",
+          "title": "agconflo-lua scripted::refused_call_fails_with_the_refusal",
+          "type": "test_run"
+        },
+        "RUN_SCRIPTED_REPLAY_THAT_DIVERGES_FAILS": {
+          "executes": [
+            "TEST_SCRIPTED_REPLAY_THAT_DIVERGES_FAILS"
+          ],
+          "id": "RUN_SCRIPTED_REPLAY_THAT_DIVERGES_FAILS",
+          "test_outcome": "passed",
+          "title": "agconflo-lua scripted::replay_that_diverges_fails",
+          "type": "test_run"
+        },
+        "RUN_SCRIPTED_RESUMED_MID_CALL_ASKS_NOTHING_TWICE": {
+          "executes": [
+            "TEST_SCRIPTED_RESUMED_MID_CALL_ASKS_NOTHING_TWICE"
+          ],
+          "id": "RUN_SCRIPTED_RESUMED_MID_CALL_ASKS_NOTHING_TWICE",
+          "test_outcome": "passed",
+          "title": "agconflo-lua scripted::resumed_mid_call_asks_nothing_twice",
           "type": "test_run"
         },
         "RUN_SCRIPTED_SAME_WORKFLOW_TWO_PROVIDERS": {

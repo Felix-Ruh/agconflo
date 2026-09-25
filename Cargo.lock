@@ -26,6 +26,7 @@ dependencies = [
  "proptest",
  "serde_json",
  "tokio",
+ "toml_edit",
 ]
 
 [[package]]
