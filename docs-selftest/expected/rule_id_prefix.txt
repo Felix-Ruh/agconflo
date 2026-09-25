@@ -36,6 +36,11 @@ error[needs.schema_definition_violation]
     note: An id whose prefix disagrees with its type makes every id-based reading of the graph unreliable. An implementation's id is typed into a code marker, where nothing else checks it.
 error[needs.schema_definition_violation]
   --> (need)
+      fixtures/rule_id_prefix.rst:71:4
+  WRONG_NOTE:id: "WRONG_NOTE" does not match "^NOTE_" (note-id-must-start-with-note[51]/properties/id/pattern)
+    note: An id whose prefix disagrees with its type makes every id-based reading of the graph unreliable.
+error[needs.schema_definition_violation]
+  --> (need)
       fixtures/rule_id_prefix.rst:66:4
   WRONG_RUN:id: "WRONG_RUN" does not match "^RUN_" (test-run-id-must-start-with-run[46]/properties/id/pattern)
     note: An id whose prefix disagrees with its type makes every id-based reading of the graph unreliable. A run's id is written by the importer from the id of the test case it ran, so this also catches an importer that has stopped naming them that way.
@@ -49,4 +54,9 @@ error[needs.schema_definition_violation]
       fixtures/rule_id_prefix.rst:43:4
   WRONG_TEST:id: "WRONG_TEST" does not match "^TEST_" (test-case-id-must-start-with-test[5]/properties/id/pattern)
     note: An id whose prefix disagrees with its type makes every id-based reading of the graph unreliable.
-Found 10 error(s).
+error[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_id_prefix.rst:74:4
+  WRONG_TRACE:id: "WRONG_TRACE" does not match "^TRACE_" (trace-id-must-start-with-trace[50]/properties/id/pattern)
+    note: An id whose prefix disagrees with its type makes every id-based reading of the graph unreliable. A trace's id is typed into a code marker, where nothing else checks it.
+Found 12 error(s).

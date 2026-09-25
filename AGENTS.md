@@ -195,6 +195,10 @@ Categories that produce hits here:
   `git diff origin/main -- docs | grep '^-   :statement:'` - needs its change record, and the
   record's analysis has to stand on the requirement's own parents. The check sees that a record
   exists; only the review sees whether its argument is the new work in disguise.
+- **A reason in a comment.** Every comment and docstring the diff adds, read
+  against "Comments and docstrings" below: a sentence saying why the code is so,
+  or what it answers to, belongs to a need and a marker. The gate sees an id;
+  only the review sees a reason with no id in it.
 - **Blast radius, not diff.** Which documents, rules, fixtures and gates reach the thing that
   changed. Editing `schemas.json` reaches every golden below the rule you touched, for the reason
   the README gives under "Changing a rule".
@@ -313,6 +317,79 @@ to whatever table precedes it rather than to the document, so it can be both mis
 **Declaring an enum field is already a rule.** A value outside it is `needs.invalid_field_value` at
 warning severity, and every gate here runs `--deny warning`, so it fails the build. Adding or
 changing an enum value is a change that needs its own fixture, not a neutral edit.
+
+## Comments and docstrings
+
+A comment says what the code is; the graph says why it is so and what it
+answers to (`STKH_REASONS_IN_THE_GRAPH`, `DEC_COMMENTS_SAY_WHAT`). There is no
+length limit. The test is what a sentence says, and it is judged sentence by
+sentence, using the table below.
+
+| The text says | It goes |
+| --- | --- |
+| What an item does, what it takes, what it gives back, how it fails | Its docstring, in as many lines as that takes. |
+| What a step inside a body does, or what holds at that point | A comment on it, usually one line, two or three when needed. |
+| Why the code is this way: a choice between alternatives, a measurement behind it | A `dec` (with its `evd`), which the code's marker `follows`. Write the decision first if none says it yet. |
+| Which requirement the code meets | The marker's `implements`. |
+| An explanation this code alone needs, too long for a comment | A `code_note` in `docs/code/<crate>.rst`, which the marker `follows` (`DEC_NOTES_BESIDE_THE_CRATE`). |
+| How this code relates to other code, a requirement, or a decision | The body of the need that owns the relation, not a note. |
+| How an item does what it does | Nowhere in its docstring: that is what the item hides. A non-obvious step gets a comment where it happens. |
+
+The marker is one line, on the line above the item, after its docstring:
+
+    // @<title>,<IMPL id>,impl,[<component requirements>],[<decisions or notes>]
+    // @<title>,<TRACE id>,trace,[],[<decisions or notes>]
+
+`trace` is for code that follows a decision or note and meets no component
+requirement (`DEC_TRACE_MARKERS`). No commas in the title: a comma drops the
+marker without a word from ubc (`EVD_CODELINKS_COMMA_DROPS_MARKER`), which is
+one of the two things `scripts/comment-rules.sh` refuses. The other is a need
+id anywhere in a comment but a marker. An id in prose is a relation no query
+can follow, so name it in the marker instead.
+
+**A reason disguised as a description** is the case to watch for, because no
+machine sees it. The tells: *so that*, *because*, *otherwise*, *rather than*,
+*measured*, *was the alternative*, *without this*. Each usually starts a
+sentence that belongs to a decision.
+
+Before, from `crates/agconflo-lua/src/host.rs`:
+
+    /// Model calls one activation's script may make (`DEC_MODEL_CALLS_COUNTED`).
+    /// Awaiting a model costs no instructions, so without this a loop was
+    /// measured making 2000 calls in one activation (`EVD_MODEL_CALLS_UNLIMITED`).
+    pub model_calls: u32,
+
+After: what the field is, and a link to why. The measurement is already in the
+decision's evidence.
+
+    /// Model calls one activation's script may make.
+    // @Model calls limited per activation,IMPL_HOST_MODEL_CALL_LIMIT_FIELD,impl,[CREQ_HOST_MODEL_CALL_LIMIT],[DEC_MODEL_CALLS_COUNTED]
+    pub model_calls: u32,
+
+A long docstring is fine when it is all interface. This one keeps its length:
+
+    /// Resume the run `record` is a record of, against `definition`.
+    ///
+    /// Returns where the run stopped, with the identifier source it came back
+    /// with, advanced past everything the resumed run issued.
+    ///
+    /// Refused, before any script runs, when the record does not describe a run
+    /// of `definition`, and for the scripts as a start is.
+
+A body comment clarifies the code in front of it: `// The run's settled
+contexts and each activation's in-progress ones, at once.` is a comment. `// It
+takes a list of maps because the output would otherwise be refused` is a
+decision, or a note if it is local to this code.
+
+**Tests.** Why a test exists and what it catches is its `test_case`'s body. A
+comment in a test says what a step sets up or asserts.
+
+**Moving an existing comment.** Nothing is deleted until what it says is found
+in a need, or moved into one in the same commit. A comment that restated a
+decision loses the restatement and gains the marker link; a reason that no
+need holds becomes a decision first. `sh scripts/comment-rules.sh --report`
+lists the long blocks to start from, and `--crate <name>` shows what a crate
+would be refused for before it is added to the script's `HELD`.
 
 ## Commits and branches
 

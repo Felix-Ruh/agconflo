@@ -52,3 +52,7 @@ Fixture: rule_mandatory_fields
 .. test_run:: No outcome
    :id: RUN_NO_FIELDS
    :executes: TEST_NO_FIELDS
+
+.. trace:: No code url
+   :id: TRACE_NO_FIELDS
+   :follows: DEC_NO_FIELDS

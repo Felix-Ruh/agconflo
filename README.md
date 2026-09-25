@@ -116,6 +116,8 @@ sh scripts/import-test-runs.sh --check                         # are the committ
 sh scripts/import-test-runs.sh                                 # rewrite them, then read the diff
 sh scripts/impact.sh <NEED_ID>                                 # what a change to one need reaches
 sh scripts/change-records.sh --staged                          # does every changed requirement have a record?
+sh scripts/comment-rules.sh                                    # no need id in a comment, every code marker well formed
+sh scripts/comment-rules.sh --report                           # long comments and docstrings, for review
 ```
 
 The tests write a JUnit report to `target/nextest/default/junit.xml`, and a test still running after
@@ -132,7 +134,8 @@ execute it directly.
 
 It scans staged changes for credentials — this repository is public, so a leak is permanent — then
 checks and format-checks the requirements project, runs the Cypher gates, runs the metamodel
-self-test, refuses a change to an existing requirement that no change record names, then
+self-test, refuses a change to an existing requirement that no change record names, refuses a need id
+in a Rust comment and a malformed code marker, then
 `cargo fmt --check`, `clippy -D warnings` and the tests under nextest. Both toolchains
 degrade rather than block: a missing `ubc` or a missing `cargo` skips its own gate with a message
 rather than failing the commit, a missing nextest falls back to `cargo test`, and the Rust steps are
@@ -332,6 +335,12 @@ on the item doing the work:
 for them — and fills each one's `code_url` with a permalink to its line at the commit being checked.
 Nothing is written by hand, so the trace cannot drift from the code the way prose would. One
 requirement may be met in several places, and each place carries its own marker.
+
+A marker's second list names the decisions the code follows, so analysing a decision finds the code
+it shaped; code that follows one and meets no requirement gets a `trace` marker instead of an `impl`.
+Why code is as it is lives there, in the graph, and a comment says what the code does - AGENTS.md,
+"Comments and docstrings", has the guidelines, and `scripts/comment-rules.sh` refuses a need id in
+a comment's prose.
 
 A marker naming a requirement that does not exist is a dead link and fails the build. A requirement
 that no marker names is **not** an error — code is written after its requirement — and appears in the

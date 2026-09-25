@@ -94,6 +94,7 @@ Fixture: ok_chain
    :id: IMPL_CHAIN
    :implements: CREQ_CHAIN
    :code_url: https://example.invalid/crates/agconflo-core/src/store.rs#L1
+   :follows: DEC_CHAIN
 
    Written by hand only because this is a fixture. A real implementation comes
    from a marker in the Rust source, which fills in code_url itself.
@@ -106,3 +107,13 @@ Fixture: ok_chain
    Written by hand for the same reason. A real run is imported from the test
    runner's report, and is the latest run of that one case rather than a
    history of it.
+
+.. code_note:: Why the binding walks parameters in declared order
+   :id: NOTE_CHAIN
+
+   An explanation local to one piece of code.
+
+.. trace:: Code following a decision and a note
+   :id: TRACE_CHAIN
+   :follows: DEC_CHAIN, NOTE_CHAIN
+   :code_url: https://example.invalid/src/lib.rs#L2

@@ -94,4 +94,9 @@ error[needs.schema_definition_violation]
       fixtures/rule_mandatory_fields.rst:38:4
   TEST_NO_FIELDS:test-case-must-have-a-kind-and-a-coverage: "coverage" is a required property (test-case-must-have-a-kind-and-a-coverage[11]/required)
     note: The kind carries the testing policy - property-based, positive, or error-path - and coverage says whether this case settles its requirement or only part of it.
-Found 19 error(s).
+error[needs.schema_definition_violation]
+  --> (need)
+      fixtures/rule_mandatory_fields.rst:56:4
+  TRACE_NO_FIELDS:trace-must-have-a-code-url: "code_url" is a required property (trace-must-have-a-code-url[52]/required)
+    note: A trace that does not say where its code is links a decision to nowhere. codelinks fills this from the marker's own location, as it does for an implementation.
+Found 20 error(s).

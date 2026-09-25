@@ -2,8 +2,9 @@
 Agconflo on itself
 ==================
 
-Two goals about Agconflo's relationship with its own development, and they pull
-against each other on purpose: the first is what makes the second worth stating.
+Three goals about Agconflo's relationship with its own development. The first
+two pull against each other on purpose: the first is what makes the second worth
+stating. The third is about where the reasons for its code are kept.
 
 .. stkh_req:: The process that builds Agconflo runs on Agconflo
    :id: STKH_SELF_HOSTING
@@ -42,3 +43,23 @@ against each other on purpose: the first is what makes the second worth stating.
    about, and doing so would quietly turn a general engine into one that runs this
    project's process and approximates everyone else's. Self-hosting creates the
    pressure; this refuses it.
+
+.. stkh_req:: The reasons for the code are kept in the graph
+   :id: STKH_REASONS_IN_THE_GRAPH
+   :stakeholder: maintainer
+   :statement: Agconflo shall keep the reasons for its source code, and the relations between that code and its needs, in its requirements graph rather than in the code's comments.
+
+   A reason written in a comment is invisible to every query this project can
+   ask. Analysing a decision or a requirement should find all the code shaped by
+   it, and a comment naming the decision in prose is found by nobody. The same
+   comment also restates what the decision's own body says, so the two drift
+   apart the first time either changes.
+
+   What a comment or a docstring says is left to it: what the code does, what
+   an item takes and gives back, how it fails. That is the split this goal
+   draws - what the code is, in the code; why it is so and what it answers to,
+   in the graph - and it is judged case by case rather than by a length.
+
+   When it was written, 3,552 of the source's 19,371 lines were comments, and
+   187 of the comments longer than a line named a need in prose
+   (``EVD_SOURCE_COMMENTS_COUNTED``).

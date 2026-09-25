@@ -60,3 +60,14 @@ Fixture: rule_link_target_purity
    :id: IMPL_PURITY
    :implements: CREQ_PURITY, COMP_PURITY
    :code_url: https://example.invalid/src/lib.rs#L1
+
+.. dec:: A decision, followed below beside a requirement
+   :id: DEC_PURITY
+   :dec_status: accepted
+   :decided_on: 2026-09-25
+   :statement: Agconflo shall reject a trace that follows a requirement beside a decision.
+
+.. trace:: Follows a decision and a requirement
+   :id: TRACE_PURITY
+   :follows: DEC_PURITY, CREQ_PURITY
+   :code_url: https://example.invalid/src/lib.rs#L1
