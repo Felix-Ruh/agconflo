@@ -138,3 +138,23 @@ request line, the body's ``model`` field, and whether an ``authorization`` or
    way to tell the run a record was not kept. It can note the failure and
    report it once the run has returned, by which time the run has done
    everything it was going to do.
+
+.. evd:: A request with no key is refused, and an empty key is sent
+   :id: EVD_GENAI_EMPTY_KEY_SENT
+   :evd_kind: measurement
+   :observed_on: 2026-09-25
+   :observation: Through genai against the stub, AuthData::None was refused at the call for both openai:: and anthropic:: with nothing sent, and an empty key was sent as an empty Bearer value and an empty x-api-key.
+
+   Each client's resolver replaced the auth with ``AuthData::None`` or with
+   ``AuthData::from_single("")``, in a process with neither
+   ``ANTHROPIC_API_KEY`` nor ``OPENAI_API_KEY`` set. ``None`` failed with a
+   resolver error for each adapter and the stub received nothing. The empty
+   key reached the stub as ``authorization: Bearer`` with nothing after it
+   for OpenAI and as an ``x-api-key`` of no characters for Anthropic.
+
+   Read in its source (``adapter_shared.rs``), ``genai``'s OpenAI adapter
+   goes without the header only for the OpenAI-compatible adapters that
+   declare they allow it, and the plain
+   ``openai::`` adapter is not one of them: a local server reached as
+   ``openai::`` with an endpoint of its own is sent some key, and an empty one
+   is the one that names nothing.

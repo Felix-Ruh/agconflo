@@ -65,6 +65,7 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    decisions/resume
    decisions/person
    decisions/yield
+   decisions/runner
    decisions/code
    decisions/toolchain
    decisions/requirements
