@@ -175,3 +175,34 @@ request line, the body's ``model`` field, and whether an ``authorization`` or
    ``File::lock`` and ``File::try_lock`` are in the standard library from Rust
    1.89. Only Windows was measured; the tests that rest on this run on Linux
    in continuous integration as well.
+
+.. evd:: A workflow runs from its documents against the local model
+   :id: EVD_RUNNER_LIVE_RUN
+   :evd_kind: measurement
+   :observed_on: 2026-09-26
+   :observation: Against qwen3.8-27b-ridge on LM Studio, agconflo ran a workflow from its documents to a person's step in 3.0 s, took the answer in a new process in 0.07 s, refused a second answer, and resumed a run killed mid-call from its file.
+
+   Taken with the ``agconflo`` binary at ``50bdfca``, built for debugging, in a
+   scratch directory: a manifest, a node type document, a workflow document
+   and three scripts, and a model mapping sending the role ``drafting`` to
+   ``openai::qwen3.8-27b-ridge`` at LM Studio's endpoint with its key in
+   ``LM_API_TOKEN``, the one model LM Studio had loaded. Every other
+   ``*_API_KEY`` variable was removed from the process's environment.
+
+   The workflow: an entry instance taking a subject, a draft asking the model
+   for one sentence about it, a person's review of the draft, and a last
+   instance composing the draft and the verdict. ``check`` first found a
+   script that did not compile and the key variable unset in the shell it ran
+   in, each with its place, and exited 4; with both mended it found nothing and
+   exited 0.
+
+   ``run`` exited 3 after 3.0 s, printing the reviewed instance, the type it
+   produces and the model's sentence as its input. ``answer`` in a new process
+   exited 0 after 0.07 s, printing the sentence and the verdict joined; that is
+   too short for the model to have been asked again. A second ``answer`` to the
+   same file exited 4: the run does not await that step, it has ended.
+
+   A second run was killed 0.8 s in, while the model was answering. Its record
+   file and its lock file were left behind, and ``resume`` took the file at
+   once and exited 3 after 1.9 s with a new sentence: the call the kill
+   interrupted had no answer in the record, so it was asked again.

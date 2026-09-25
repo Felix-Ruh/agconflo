@@ -16,10 +16,11 @@ where did every byte come from?"* has an exact answer.
 ## Status
 
 **Pre-alpha. Nodes run as scripts, call models or wait for a person, a model can call another node
-type, and a run survives an interruption** — no loops, and no tools outside the engine yet. What
-exists is the development process around it and the first slices of code through it: a
-requirements project under `docs/` with a validated metamodel behind it, a commit gate, continuous
-integration, and two crates.
+type, a run survives an interruption, and a person runs a workflow from its documents with the
+`agconflo` command** — no loops, and no tools outside the engine yet. What exists is the
+development process around it and the first slices of code through it: a requirements project
+under `docs/` with a validated metamodel behind it, a commit gate, continuous integration, three
+library crates and a command.
 
 `agconflo-core` implements the `Context` value itself — identity, composition by reference, and
 lineage — the static side of a workflow, and a run over one. The static side is checking its wiring
@@ -44,16 +45,65 @@ scripted run hands its caller a record when it starts, after every output and af
 so a run interrupted mid-call is resumed without asking again for any answer its record holds. A
 node type can instead be performed by a person: the run stops at that step and hands it to
 its caller, who answers later - from the run's record, in another process if need be - with text that
-becomes the step's output. Each crate is traced from its requirements to the code and back from the
-tests that check it.
+becomes the step's output.
+
+`agconflo-runner` is the caller a person does not have to write. It reads a manifest naming a
+workflow's documents and scripts, and a model mapping naming the model each role is played by,
+and starts, resumes, answers or checks a run from them, keeping its record in a file that one run
+at a time holds. `agconflo-cli` is its command line, `agconflo`, described below. Each crate is
+traced from its requirements to the code and back from the tests that check it.
 
 Expect the public API to change without warning. Breaking changes, yes; force-pushes to `main`, no —
 those are blocked outright, along with direct pushes to it.
 
+## Running a workflow
+
+A workflow is its documents: a workflow document, its node type documents and a Lua script for
+each node type a script performs. A **manifest** names them, each by a path relative to the
+manifest itself:
+
+```toml
+workflow = "flow.toml"
+types = ["types.toml"]
+budget = 10                 # the most activations a run may make
+persons = ["review"]        # node types a person performs
+
+[scripts]
+draft = "draft.lua"
+
+[limits]                    # optional, each of the three
+model_calls = 2
+```
+
+Which model plays each role is the machine's, so it is in a **model mapping** of its own. A model
+is always named with its provider, and a key is only ever taken from the variable the mapping
+names; nothing reads `ANTHROPIC_API_KEY` or its like by default:
+
+```toml
+[roles]
+drafting = "anthropic::claude-sonnet-5"
+asking = { model = "openai::qwen3.8-27b-ridge", endpoint = "http://localhost:1234/v1/", key_env = "LM_API_TOKEN" }
+```
+
+```
+agconflo check  manifest.toml --models models.toml
+agconflo run    manifest.toml --record run.toml --models models.toml --arg subject brief "a lighthouse"
+agconflo answer manifest.toml --record run.toml --models models.toml --instance reviewed --text "Approved."
+agconflo resume manifest.toml --record run.toml --models models.toml
+```
+
+`run` refuses a record file that already exists, and `run`, `resume` and `answer` each hold the
+record file for as long as they run, so two people cannot answer one step at once. A completed run's result, or the
+step a run awaits, is all that goes to standard output. The exit status says how the run stopped:
+0 completed, 2 a command line it cannot read, 3 awaiting a person, 4 refused before anything ran,
+5 a node failed, 6 the budget ran out, 7 no node can make further progress, and 8 the record could
+not be kept, whatever else happened.
+
 ## Planned shape
 
 - **Rust**, as a Cargo workspace. `agconflo-core` is a normal Rust crate with a deliberately strict
-  public API; frontends (CLI, viewer, MCP server) are separate crates that depend on it.
+  public API; frontends are separate crates that depend on it. The command line is the first; a
+  viewer and an MCP server are planned.
 - **Provider-agnostic LLM access** via [`genai`](https://github.com/jeremychone/rust-genai), now
   running, and MCP via [`rmcp`](https://github.com/modelcontextprotocol/rust-sdk). The agent loop is
   ours — that is the layer this project exists to own.
