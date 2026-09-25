@@ -132,7 +132,8 @@ decided when it is wanted.
 
    Which documents are read is already the caller's to say
    (``DEC_TYPES_IN_OWN_DOCUMENTS``), and nothing in this project's libraries
-   opens a file. A script is the same: the caller reads it from wherever it
+   opens a file but ``agconflo-runner``, which is such a caller
+   (``DEC_RUNNER_CRATES``). A script is the same: the caller reads it from wherever it
    keeps it, and hands over the text with the name of the document it came from,
    which is what a fault in it is reported against.
 
@@ -146,7 +147,7 @@ decided when it is wanted.
 
    What this leaves unrecorded is the link between a node type and its script,
    which lives in the caller. A command-line caller will want a convention for
-   it, and that is decided when there is one.
+   it, and that is decided when there is one: ``DEC_RUN_FROM_A_MANIFEST``.
 
 .. dec:: A script is the body of its node's behaviour
    :id: DEC_SCRIPT_IS_THE_BODY
