@@ -138,6 +138,87 @@
           "title": "agconflo-core catalogue::repeated_name_names_every_document",
           "type": "test_run"
         },
+        "RUN_COMMAND_ANSWERED_IN_A_NEW_PROCESS": {
+          "executes": [
+            "TEST_COMMAND_ANSWERED_IN_A_NEW_PROCESS"
+          ],
+          "id": "RUN_COMMAND_ANSWERED_IN_A_NEW_PROCESS",
+          "test_outcome": "passed",
+          "title": "agconflo-cli::command answered_in_a_new_process",
+          "type": "test_run"
+        },
+        "RUN_COMMAND_COMMANDS_REACH_THE_RUNNER": {
+          "executes": [
+            "TEST_COMMAND_COMMANDS_REACH_THE_RUNNER"
+          ],
+          "id": "RUN_COMMAND_COMMANDS_REACH_THE_RUNNER",
+          "test_outcome": "passed",
+          "title": "agconflo-cli::command commands_reach_the_runner",
+          "type": "test_run"
+        },
+        "RUN_COMMAND_EXIT_STATUS_PER_ENDING": {
+          "executes": [
+            "TEST_COMMAND_EXIT_STATUS_PER_ENDING"
+          ],
+          "id": "RUN_COMMAND_EXIT_STATUS_PER_ENDING",
+          "test_outcome": "passed",
+          "title": "agconflo-cli::command exit_status_per_ending",
+          "type": "test_run"
+        },
+        "RUN_COMMAND_FAILURE_ON_STANDARD_ERROR": {
+          "executes": [
+            "TEST_COMMAND_FAILURE_ON_STANDARD_ERROR"
+          ],
+          "id": "RUN_COMMAND_FAILURE_ON_STANDARD_ERROR",
+          "test_outcome": "passed",
+          "title": "agconflo-cli::command failure_on_standard_error",
+          "type": "test_run"
+        },
+        "RUN_COMMAND_HELD_RECORD_REFUSED": {
+          "executes": [
+            "TEST_COMMAND_HELD_RECORD_REFUSED"
+          ],
+          "id": "RUN_COMMAND_HELD_RECORD_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-cli::command held_record_refused",
+          "type": "test_run"
+        },
+        "RUN_COMMAND_MISUSE_EXITS_2": {
+          "executes": [
+            "TEST_COMMAND_MISUSE_EXITS_2"
+          ],
+          "id": "RUN_COMMAND_MISUSE_EXITS_2",
+          "test_outcome": "passed",
+          "title": "agconflo-cli::command misuse_exits_2",
+          "type": "test_run"
+        },
+        "RUN_COMMAND_RESULT_ON_STANDARD_OUTPUT": {
+          "executes": [
+            "TEST_COMMAND_RESULT_ON_STANDARD_OUTPUT"
+          ],
+          "id": "RUN_COMMAND_RESULT_ON_STANDARD_OUTPUT",
+          "test_outcome": "passed",
+          "title": "agconflo-cli::command result_on_standard_output",
+          "type": "test_run"
+        },
+        "RUN_COMMAND_RESUMED_AFTER_A_KILL": {
+          "executes": [
+            "TEST_COMMAND_RESUMED_AFTER_A_KILL"
+          ],
+          "id": "RUN_COMMAND_RESUMED_AFTER_A_KILL",
+          "test_outcome": "passed",
+          "title": "agconflo-cli::command resumed_after_a_kill",
+          "type": "test_run"
+        },
+        "RUN_COMMAND_UNKEPT_RECORD_TOLD": {
+          "executes": [
+            "TEST_COMMAND_UNKEPT_RECORD_TOLD"
+          ],
+          "id": "RUN_COMMAND_UNKEPT_RECORD_TOLD",
+          "test_outcome": "passed",
+          "title": "agconflo-cli::command unkept_record_told",
+          "type": "test_run"
+        },
         "RUN_CONTEXT_DEEP_NESTING_DROPS": {
           "executes": [
             "TEST_CONTEXT_DEEP_NESTING_DROPS"

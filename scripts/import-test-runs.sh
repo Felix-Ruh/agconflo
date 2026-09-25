@@ -46,7 +46,7 @@ esac
 # run naming a test case that does not exist is a dead link that would fail the
 # documentation build. A case id carries no crate name, so the traced crates'
 # module names must not repeat one another.
-CRATES="agconflo-core agconflo-lua agconflo-runner"
+CRATES="agconflo-core agconflo-lua agconflo-runner agconflo-cli"
 
 report="$root/target/nextest/default/junit.xml"
 committed="$root/docs/test-runs.json"

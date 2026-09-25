@@ -2,6 +2,7 @@
 resolver = "3"
 members = [
     "crates/agconflo-core",
+    "crates/agconflo-cli",
     "crates/agconflo-lua",
     "crates/agconflo-runner",
     "crates/junit-to-needs",
@@ -36,6 +37,10 @@ mlua = { version = "=0.12.1", features = ["lua55", "vendored", "async"] }
 # a stub on the loopback interface rather than a provider.
 genai = "=0.7.0-beta.24"
 tokio = { version = "=1.53.1", features = ["rt", "macros", "net", "io-util", "time"] }
+
+# agconflo-cli reads its command line with clap (DEC_COMMAND_LINE_THROUGH_CLAP),
+# pinned exactly at the newest release.
+clap = { version = "=4.6.7", features = ["derive"] }
 
 # Testing policy: property-based tests wherever a property can be stated,
 # alongside positive tests and error-path ("negative") tests.

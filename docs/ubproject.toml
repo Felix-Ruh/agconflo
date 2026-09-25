@@ -703,3 +703,30 @@ needs_fields = [
     { name = "implements", type = "list[str]", default = [] },
     { name = "follows", type = "list[str]", default = [] },
 ]
+
+# The same shape for agconflo-cli.
+[codelinks.projects.agconflo-cli]
+remote_url_pattern = "https://github.com/Felix-Ruh/agconflo/blob/{commit}/{path}#L{line}"
+
+[codelinks.projects.agconflo-cli.source_discover]
+src_dir = "../crates"
+include = ["**/agconflo-cli/src/**/*.rs"]
+comment_type = "rust"
+
+[codelinks.projects.agconflo-cli.analyse]
+get_oneline_needs = true
+get_need_id_refs = false
+
+[codelinks.projects.agconflo-cli.analyse.oneline_comment_style]
+start_sequence = "@"
+end_sequence = "\n"
+field_split_char = ","
+# `implements` in the place of the default `links`: see [needs.links.implements].
+# `follows` after it: see [needs.links.follows].
+needs_fields = [
+    { name = "title", type = "str" },
+    { name = "id", type = "str" },
+    { name = "type", type = "str", default = "impl" },
+    { name = "implements", type = "list[str]", default = [] },
+    { name = "follows", type = "list[str]", default = [] },
+]
