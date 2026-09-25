@@ -161,5 +161,17 @@ error, since code comes after its requirement; the review report
    A call holds whatever a model sent, or what the run refuses of a call could
    not be put to it.
 
+.. code_note:: The order a record's refusals are asked in
+   :id: NOTE_RECORD_REFUSAL_ORDER
+
+   A record is refused in the order a caller fixes what is wrong: first text
+   that is not a record of this version, then a workflow a run of which would
+   not start with the recorded arguments, then a record the workflow would not
+   have produced - an output it disagrees with, or a call it refuses - and last
+   a count of spent activations no run with those events could have spent. The
+   version is read before anything else in the text, since a record of another
+   version may hold anything, and every other fault in it would be beside the
+   point.
+
 .. src-trace::
    :project: agconflo-core

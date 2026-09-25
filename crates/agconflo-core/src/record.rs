@@ -1,24 +1,13 @@
 //! The run record: a run written down as text while it is under way, and a run
-//! taken up again from the text in another process (`ARCH_RESUME`).
+//! taken up again from the text in another process.
 //!
-//! A record is a TOML document (`DEC_RECORD_IN_TOML`). It holds the run's budget,
-//! the activations it spent, the position of the identifier source its
-//! contexts came from, its arguments, every event the run accepted in the order
-//! it accepted them - each exchange, each call and each output with the inputs
-//! its activation was given (`DEC_RECORD_HOLDS_EXCHANGES`) - and every context
-//! those hold, once each, in a table keyed by identifier, a composition naming
-//! its parts rather than holding them. Written nested, a deep composition was measured
-//! unreadable (`EVD_NESTED_RECORD_REFUSED`). Every number is a decimal string,
-//! because a TOML integer stops short of an identifier's range
-//! (`EVD_TOML_RECORD_KEYS`).
-//!
-//! A run is resumed by starting it from its recorded arguments and reporting
-//! each recorded event to it in turn (`DEC_RESUME_REPLAYS_CALLS`), so every
-//! check a run makes applies to a resumed one unchanged, and what this module
-//! adds is only what a record alone can get wrong.
-//!
-//! Nothing here opens a file (`DEC_RECORD_IN_CORE`): a record is text handed to
-//! the run's caller, and text handed back.
+//! A record is a TOML document holding the run's budget, the activations it
+//! spent, the position of the identifier source its contexts came from, its
+//! arguments, every event the run accepted in the order it accepted them, and
+//! every context those hold, once each, in a table keyed by identifier - a
+//! composition naming its parts. Every number is a decimal string. A run is
+//! resumed by reporting each recorded event to it in turn, and nothing here
+//! opens a file.
 
 use std::collections::HashMap;
 use std::fmt;
@@ -35,10 +24,7 @@ use crate::run::{
 use crate::workflow::WorkflowDefinition;
 
 /// The version of the record this module writes, and the only one it reads.
-///
-/// Version 1 held outputs and nothing between them. A record of it is refused
-/// rather than read as a run that made no model call, since resuming it as one
-/// would pay again for every answer it had (`DEC_RECORD_HOLDS_EXCHANGES`).
+// @Records at version 2,TRACE_RECORD_VERSION,trace,[],[DEC_RECORD_HOLDS_EXCHANGES, DEC_RECORD_IN_TOML, DEC_RECORD_IN_CORE]
 const VERSION: &str = "2";
 
 /// What a record says of a source that has issued every identifier it has.
@@ -49,27 +35,18 @@ const TOP: [&str; 7] = [
     "version", "budget", "spent", "source", "argument", "event", "context",
 ];
 
-/// Why a record was not resumed.
-///
-/// Four classes, and the order they are asked in is the order a caller fixes
-/// them in: text that is not a record, a workflow a run of which would not
-/// start, a record the workflow would not have produced, and a count of
-/// activations no run could have spent.
-///
-/// `#[non_exhaustive]` because what a record can get wrong is not finished,
-/// as for [`StartRefusal`].
+/// Why a record was not resumed, asked in the order a caller fixes them.
+// @Refusals asked in the order they are fixed,TRACE_RECORD_REFUSAL,trace,[],[NOTE_RECORD_REFUSAL_ORDER, DEC_FAILURES_NON_EXHAUSTIVE]
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ResumeRefusal {
-    /// The text is not a record this version writes
-    /// (`CREQ_RECORD_REFUSES_UNREADABLE`).
+    /// The text is not a record this version writes.
     Unreadable(RecordFault),
     /// A run of the workflow with the recorded arguments would not start, and
-    /// this is the refusal its start gives
-    /// (`CREQ_RECORD_REFUSES_WHAT_START_REFUSES`).
+    /// this is the refusal its start gives.
     Start(StartRefusal),
     /// The workflow would not have produced this record: the first recorded
-    /// output it disagrees with (`CREQ_RECORD_REFUSES_DIVERGENCE`).
+    /// output it disagrees with.
     Diverged {
         /// Where that output stands among the recorded ones, the first being 0.
         output: usize,
@@ -79,8 +56,7 @@ pub enum ResumeRefusal {
         divergence: Divergence,
     },
     /// A recorded call the workflow would not accept from the activation that
-    /// made it, and the run's refusal of it
-    /// (`CREQ_RECORD_REFUSES_UNDECLARED_CALL`).
+    /// made it, and the run's refusal of it.
     CallRefused {
         /// The instance whose activation the record says made it.
         instance: String,
@@ -114,8 +90,8 @@ pub enum Divergence {
     /// The run offered nothing at that point, having ended.
     NothingOffered,
     /// The run offered the instance with other inputs: a workflow bound
-    /// differently (`EVD_REPLAY_BY_NAME_ACCEPTS_REWIRING`). Each list is a
-    /// parameter and the identifier of its context, ordered by parameter.
+    /// differently. Each list is a parameter and the identifier of its context,
+    /// ordered by parameter.
     InputsDiffer {
         /// What the record says the activation was given.
         recorded: Vec<(String, ContextId)>,
@@ -126,12 +102,9 @@ pub enum Divergence {
     Refused(OutputRefusal),
 }
 
-/// Text that cannot be resumed as a run's record, and where in it.
-///
-/// A line and a column counted from one, the column in characters, as the
-/// topology reader counts them (`CREQ_READER_FAULT_LOCATED`): every value in a
-/// parsed record carries its place, so every fault has one, not only a text
-/// that is not TOML.
+/// Text that cannot be resumed as a run's record, and where in it: a line and
+/// a column counted from one, the column in characters, as the topology reader
+/// counts them.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RecordFault {
     line: usize,
@@ -178,9 +151,7 @@ pub enum RecordFaultKind {
         /// The absent key.
         key: Vec<String>,
     },
-    /// A key no record holds. Refused rather than passed over, unlike in a
-    /// workflow document: nobody annotates a record, so a key this version does
-    /// not write says the text was written by something else.
+    /// A key no record holds, refused rather than passed over.
     UnexpectedKey {
         /// The key.
         key: Vec<String>,
@@ -196,16 +167,14 @@ pub enum RecordFaultKind {
     },
     /// A number not written as the decimal a record writes: digits alone,
     /// without a leading zero, within `u64`. Identifiers, the budget, the count
-    /// and the source's position are all numbers. `07` is refused rather than
-    /// read as `7`, since as a key it would be a second context under one
-    /// identifier (`EVD_TOML_RECORD_KEYS`).
+    /// and the source's position are all numbers.
     NotANumber {
         /// The key holding it, or naming it when the number is the key itself.
         key: Vec<String>,
         /// What is written there.
         found: String,
     },
-    /// A context type name the model refuses (`CREQ_VALUE_DECLARED_TYPE`).
+    /// A context type name the model refuses.
     InvalidContextType {
         /// The key holding the name.
         key: Vec<String>,
@@ -226,7 +195,7 @@ pub enum RecordFaultKind {
         key: Vec<String>,
     },
     /// An identifier at or past the recorded source's position, which that
-    /// source could not have issued (`DEC_RECORD_CARRIES_THE_SOURCE`).
+    /// source could not have issued.
     NotIssued {
         /// The context table carrying it.
         key: Vec<String>,
@@ -340,15 +309,10 @@ impl fmt::Display for RecordFaultKind {
 impl std::error::Error for RecordFault {}
 
 impl<'a, F> Run<'a, F> {
-    /// This run written down as text, with the position of `source`, which must
-    /// be the source its contexts are being made from.
-    ///
-    /// Whole every time (`DEC_RECORD_WRITTEN_WHOLE`): the text is one run, and a
-    /// caller replacing its last record with it has stored everything.
-    ///
-    /// Contexts are written in the order of their identifiers, so two records
-    /// of one run differ only where the run does.
-    // @A run written down whole,IMPL_RECORD_WRITE,impl,[CREQ_RECORD_HOLDS_THE_RUN]
+    /// This run written down as text, whole, with the position of `source`, which
+    /// must be the source its contexts are being made from. Contexts are written
+    /// in the order of their identifiers.
+    // @A run written down whole,IMPL_RECORD_WRITE,impl,[CREQ_RECORD_HOLDS_THE_RUN],[DEC_RECORD_WRITTEN_WHOLE]
     pub fn record(&self, source: &IdSource) -> String {
         let state = self.recorded();
         let mut record = DocumentMut::new();
@@ -415,22 +379,12 @@ impl<'a, F> Run<'a, F> {
     ///
     /// The run is started from the recorded arguments and budget and handed
     /// each recorded event in turn, in the activation the record says it
-    /// happened in (`DEC_RESUME_REPLAYS_CALLS`): an output, which the run must
-    /// offer the recorded activation with the recorded inputs for and accept; a
-    /// call, which it must accept from that activation, or the record is refused
-    /// naming the call (`CREQ_RECORD_REFUSES_UNDECLARED_CALL`); and an exchange,
-    /// which it holds with the activation as it held it before
-    /// (`CREQ_RECORD_KEEPS_EXCHANGES`). Then whatever was outstanding when the
-    /// record was taken - the activation performing, and the call it waited on -
-    /// is offered again, counted once, as it was before
-    /// (`CREQ_RECORD_CONTINUES_THE_RUN`). Nothing is performed: the recorded
-    /// outputs are the ones the run holds, so the caller's next step is the
-    /// work the recorded run had not done.
-    ///
-    /// The source is the only way to go on making contexts for the run: a fresh
-    /// one would issue identifiers the run holds, and every output made from it
-    /// would be refused.
-    // @A record replayed through the run,IMPL_RECORD_RESUME,impl,[CREQ_RECORD_CONTINUES_THE_RUN, CREQ_RECORD_REFUSES_DIVERGENCE, CREQ_RECORD_REFUSES_WHAT_START_REFUSES, CREQ_RECORD_KEEPS_EXCHANGES, CREQ_RECORD_REFUSES_UNDECLARED_CALL]
+    /// happened in: an output, which the run must offer the recorded activation
+    /// with the recorded inputs for and accept; a call, which it must accept
+    /// from that activation; and an exchange, which it holds with the
+    /// activation. Then whatever was outstanding when the record was taken is
+    /// offered again, counted once. Nothing is performed.
+    // @A record replayed through the run,IMPL_RECORD_RESUME,impl,[CREQ_RECORD_CONTINUES_THE_RUN, CREQ_RECORD_REFUSES_DIVERGENCE, CREQ_RECORD_REFUSES_WHAT_START_REFUSES, CREQ_RECORD_KEEPS_EXCHANGES, CREQ_RECORD_REFUSES_UNDECLARED_CALL],[DEC_RESUME_REPLAYS_CALLS, DEC_RECORD_CARRIES_THE_SOURCE]
     pub fn resume(
         definition: &'a WorkflowDefinition,
         record: &str,
@@ -520,8 +474,7 @@ impl<'a, F> Run<'a, F> {
             return Err(disagrees);
         }
 
-        // Asked last because only the run knows what it holds, once every
-        // argument and event has been brought in.
+        // Asked last, once every argument and event has been brought in.
         let held = run.recorded().held;
         let holds = |id: &ContextId| held.iter().any(|contexts| contexts.contains_key(id));
         if let Some(stray) = read.order.iter().find(|id| !holds(id)) {
@@ -539,10 +492,6 @@ impl<'a, F> Run<'a, F> {
 impl<F> Run<'_, F> {
     /// The activation for `instance` performing `performing` - outstanding
     /// already, or offered by the next step - or how the run disagrees.
-    ///
-    /// What a recorded event is replayed into: it happened in that activation,
-    /// so the run has to be in it, and a run that offers another, or nothing,
-    /// is not the run the record is of.
     fn reached(
         &mut self,
         instance: &str,
@@ -572,13 +521,10 @@ impl<F> Run<'_, F> {
 
 /// One event as a record writes it: the instance its activation is for, the call
 /// that activation performs when it is a call's, and what happened - an output
-/// with its activation's inputs, an exchange, or a call.
-///
-/// Every context by identifier, and a call's identifier as the provider issued
-/// it (`CREQ_RECORD_HOLDS_EXCHANGES`). A window is written by identifier too, so
-/// its parts - which of them was an answer, which a call's output - are in the
-/// context table rather than flattened into its rendering.
-// @Exchanges and calls and outputs written in the order accepted,IMPL_RECORD_EVENTS,impl,[CREQ_RECORD_HOLDS_EXCHANGES, CREQ_RECORD_HOLDS_THE_RUN]
+/// with its activation's inputs, an exchange, or a call - every context by
+/// identifier, a window included, and a call's identifier as the provider issued
+/// it.
+// @Exchanges and calls and outputs written in the order accepted,IMPL_RECORD_EVENTS,impl,[CREQ_RECORD_HOLDS_EXCHANGES, CREQ_RECORD_HOLDS_THE_RUN],[NOTE_RUN_ONE_EVENT_LIST]
 fn written_event(event: &Event) -> Table {
     let id = |context: &Context| context.id().value().to_string();
     let inputs = |given: &[(String, Context)]| {
@@ -742,9 +688,7 @@ impl<'t> Reading<'t> {
         })?;
         let top = parsed.as_table();
 
-        // The version first, since a record of another version may hold
-        // anything at all, and every other fault in it would be beside the
-        // point.
+        // The version first.
         let version = self.needed(top, None, &["version"])?;
         let written = self.string(version, &["version"])?;
         if written != VERSION {
@@ -965,15 +909,11 @@ impl<'t> Reading<'t> {
     }
 
     /// Every context the record holds, made - each once, however many hold it -
-    /// with the order they are written in and where.
-    ///
-    /// Made with a stack of the module's own rather than by recursion, since a
-    /// composition's depth has no bound and a recursive walk was measured
-    /// aborting at 100,000 levels (`CREQ_VALUE_PARTS_BY_REFERENCE`). A part is
-    /// made before what holds it; a part still being made when it is reached
-    /// again is a composition holding itself.
+    /// with the order they are written in and where. A part is made before what
+    /// holds it, with a stack of the module's own; a part still being made when
+    /// it is reached again is a composition holding itself.
     #[allow(clippy::type_complexity)]
-    // @Each context made once and without recursion,IMPL_RECORD_CONTEXTS,impl,[CREQ_RECORD_KEEPS_CONTEXTS, CREQ_RECORD_REFUSES_UNREADABLE]
+    // @Each context made once and without recursion,IMPL_RECORD_CONTEXTS,impl,[CREQ_RECORD_KEEPS_CONTEXTS, CREQ_RECORD_REFUSES_UNREADABLE],[NOTE_CONTEXT_NO_RECURSION]
     fn contexts(
         &self,
         table: Option<&Item>,
@@ -1252,7 +1192,7 @@ fn owned(key: &[&str]) -> Vec<String> {
 }
 
 // --- tests -------------------------------------------------------------------
-// Bare functions named after their test cases, for the reason given in id.rs.
+// Bare functions named after their test cases.
 
 #[cfg(test)]
 use crate::wiring::well_formed_definition;
@@ -1612,10 +1552,7 @@ proptest! {
 fn deep_composition_kept() {
     const DEPTH: u64 = 100_000;
     // Each level from a source of its own standing below its part's, so that
-    // identifiers fall outward: the outermost is written first, and making it
-    // goes down every level. Numbered the usual way, each part would already
-    // have been made when its holder was reached, and a recursive maker would
-    // never go deeper than one - measured, it passed this test that way.
+    // identifiers fall outward and making the outermost goes down every level.
     let mut deep = note(&mut IdSource::resumed_at(Some(DEPTH)), "x");
     for level in (0..DEPTH).rev() {
         let mut source = IdSource::resumed_at(Some(level));
