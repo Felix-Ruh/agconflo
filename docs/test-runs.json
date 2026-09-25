@@ -1038,6 +1038,87 @@
           "title": "agconflo-core record::version_one_refused",
           "type": "test_run"
         },
+        "RUN_RUNNER_ANSWERS_THE_AWAITED_STEP": {
+          "executes": [
+            "TEST_RUNNER_ANSWERS_THE_AWAITED_STEP"
+          ],
+          "id": "RUN_RUNNER_ANSWERS_THE_AWAITED_STEP",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::answers_the_awaited_step",
+          "type": "test_run"
+        },
+        "RUN_RUNNER_ANSWER_ELSEWHERE_LEAVES_THE_FILE": {
+          "executes": [
+            "TEST_RUNNER_ANSWER_ELSEWHERE_LEAVES_THE_FILE"
+          ],
+          "id": "RUN_RUNNER_ANSWER_ELSEWHERE_LEAVES_THE_FILE",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::answer_elsewhere_leaves_the_file",
+          "type": "test_run"
+        },
+        "RUN_RUNNER_ARGUMENTS_KEPT_EXACTLY": {
+          "executes": [
+            "TEST_RUNNER_ARGUMENTS_KEPT_EXACTLY"
+          ],
+          "id": "RUN_RUNNER_ARGUMENTS_KEPT_EXACTLY",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::arguments_kept_exactly",
+          "type": "test_run"
+        },
+        "RUN_RUNNER_CHECK_RUNS_NOTHING": {
+          "executes": [
+            "TEST_RUNNER_CHECK_RUNS_NOTHING"
+          ],
+          "id": "RUN_RUNNER_CHECK_RUNS_NOTHING",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::check_runs_nothing",
+          "type": "test_run"
+        },
+        "RUN_RUNNER_ENDINGS_HANDED_BACK": {
+          "executes": [
+            "TEST_RUNNER_ENDINGS_HANDED_BACK"
+          ],
+          "id": "RUN_RUNNER_ENDINGS_HANDED_BACK",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::endings_handed_back",
+          "type": "test_run"
+        },
+        "RUN_RUNNER_REFUSED_START_TAKES_NOTHING": {
+          "executes": [
+            "TEST_RUNNER_REFUSED_START_TAKES_NOTHING"
+          ],
+          "id": "RUN_RUNNER_REFUSED_START_TAKES_NOTHING",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::refused_start_takes_nothing",
+          "type": "test_run"
+        },
+        "RUN_RUNNER_RESUMES_AN_INTERRUPTED_RUN": {
+          "executes": [
+            "TEST_RUNNER_RESUMES_AN_INTERRUPTED_RUN"
+          ],
+          "id": "RUN_RUNNER_RESUMES_AN_INTERRUPTED_RUN",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::resumes_an_interrupted_run",
+          "type": "test_run"
+        },
+        "RUN_RUNNER_RUNS_TO_COMPLETION": {
+          "executes": [
+            "TEST_RUNNER_RUNS_TO_COMPLETION"
+          ],
+          "id": "RUN_RUNNER_RUNS_TO_COMPLETION",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::runs_to_completion",
+          "type": "test_run"
+        },
+        "RUN_RUNNER_UNKNOWN_ARGUMENT_REFUSED": {
+          "executes": [
+            "TEST_RUNNER_UNKNOWN_ARGUMENT_REFUSED"
+          ],
+          "id": "RUN_RUNNER_UNKNOWN_ARGUMENT_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::unknown_argument_refused",
+          "type": "test_run"
+        },
         "RUN_RUN_ACCEPTED_OUTPUTS_ARE_ALL_NEW": {
           "executes": [
             "TEST_RUN_ACCEPTED_OUTPUTS_ARE_ALL_NEW"

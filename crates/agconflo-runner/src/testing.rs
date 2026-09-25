@@ -86,6 +86,12 @@ impl Stub {
         Self::serving(Some(answer.to_owned()))
     }
 
+    /// A stub holding every request open without a word: a provider a run can
+    /// be interrupted while waiting on.
+    pub(crate) fn holding() -> Self {
+        Self::serving(None)
+    }
+
     fn serving(answer: Option<String>) -> Self {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("a loopback port");
         let base = format!("http://{}/v1/", listener.local_addr().expect("an address"));

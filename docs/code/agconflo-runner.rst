@@ -27,5 +27,15 @@ written by anyone. A requirement that no marker names is not an error, since
 code comes after its requirement; the review report
 ``scripts/reports/unimplemented.cypher`` lists them.
 
+.. code_note:: The runner's property test runs 32 cases
+   :id: NOTE_RUNNER_PROPERTY_CASES
+
+   Each case starts a run, and each run builds a model client, which took
+   about 36 ms on Linux where that was measured
+   (``NOTE_SCRIPTED_ONE_TEST_CLIENT``). At that rate proptest's default of 256
+   cases spends some 9 s of the 20 s a test is given on clients alone, and 32
+   spend about 1.2 s. The property is text kept exactly, which a few dozen
+   texts of every line ending exercise as well as a few hundred.
+
 .. src-trace::
    :project: agconflo-runner
