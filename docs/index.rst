@@ -85,4 +85,5 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    evidence/resume
    evidence/person
    evidence/runner
+   evidence/tools
    evidence/yield
