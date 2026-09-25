@@ -5,10 +5,7 @@ use std::collections::BTreeMap;
 use serde_json::{Map, Value, json};
 
 /// Whether a test passed.
-///
-/// There is no third value, and that was measured rather than chosen: nextest
-/// writes no test case at all for an ignored test (EVD_NEXTEST_IGNORED_ABSENT),
-/// so nothing a report says was run can have been skipped.
+// @Passed or failed and nothing else,TRACE_NEEDS_TWO_OUTCOMES,trace,[],[DEC_LATEST_RUN_ONLY]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Outcome {
     Passed,
@@ -43,8 +40,7 @@ impl Run {
         }
     }
 
-    /// `RUN_` and the rest of the test case's id, so a case's run is found from
-    /// the case's id alone.
+    /// `RUN_` and the rest of the test case's id.
     pub fn id(&self) -> String {
         format!("RUN{}", &self.test_case["TEST".len()..])
     }
@@ -90,18 +86,14 @@ impl Runs {
         self.runs.values()
     }
 
-    /// The needs file ubc imports as external needs.
+    /// The needs file ubc imports as external needs, with an empty version.
     ///
-    /// Its version is left empty: ubc imports the needs whatever it says but
-    /// refuses a file with none (EVD_EXTERNAL_VERSION_FREE), and a version
-    /// following the project's would change the file on every release.
-    ///
-    /// The same runs always give the same bytes. Keys are in sorted order at
-    /// every level, inserted in that order too, so the output stays the same if
-    /// another crate in the build ever switches on serde_json's `preserve_order`.
-    /// Lines end in `\n` alone, and the file ends with one.
+    /// The same runs always give the same bytes: keys in sorted order at every
+    /// level, and every line ending in `\n`, the last one included.
+    // @Outcomes alone under an empty version,TRACE_NEEDS_FILE,trace,[],[DEC_LATEST_RUN_ONLY, DEC_RUNS_FILE_VERSION_EMPTY]
     pub fn to_json(&self) -> String {
         let mut needs = Map::new();
+        // In id order, which serde_json keeps whether or not `preserve_order` is on.
         for run in self.runs.values() {
             let id = run.id();
             let need = json!({

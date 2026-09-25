@@ -286,3 +286,48 @@ body, and every rule needs a fixture because the tool ignores a malformed one.
    block holds a reason is a question whose honest answer is sometimes no. Each
    crate is held once its comments have been brought to the decisions above,
    so the gate is green on every commit of the way there.
+
+.. dec:: The test results file carries an empty version
+   :id: DEC_RUNS_FILE_VERSION_EMPTY
+   :dec_status: accepted
+   :decided_on: 2026-09-25
+   :supported_by: EVD_EXTERNAL_VERSION_FREE
+   :statement: Agconflo's test result importer shall write its needs file with an empty version.
+
+   ``DEC_RUNS_COMMITTED`` commits the file and ``DEC_LATEST_RUN_ONLY`` keeps it
+   changing only when an outcome does. A version following the project's would
+   change it on every release whatever the tests did. ubc imports the needs
+   under any version, the empty one included, and refuses a file with none
+   (``EVD_EXTERNAL_VERSION_FREE``), so the version is written, and empty.
+
+.. dec:: A report is imported whole or refused
+   :id: DEC_IMPORT_WHOLE_OR_REFUSED
+   :dec_status: accepted
+   :decided_on: 2026-09-25
+   :supported_by: EVD_NEXTEST_TEST_PATHS, EVD_NEXTEST_IGNORED_ABSENT
+   :statement: Agconflo's test result importer shall import every run of the crates it is given from a report, or import none and say why.
+
+   A file holding some of a report's runs reads exactly like one holding all of
+   them, so an importer that skipped what it could not read would commit a
+   file that looks complete and is not. Each way a report falls short is
+   therefore a refusal of the whole of it, naming the test:
+
+   - A test with no classname has no crate.
+   - A test whose path is not ASCII letters, digits and underscores makes no
+     id, such as a binary target's ``bin/<name>`` (``EVD_NEXTEST_IGNORED_ABSENT``)
+     or a hyphenated file. An id built from it would fail the graph's id
+     pattern naming only the id, where the refusal names the test.
+   - Two tests making one id, a skipped test, and a retried one each leave
+     which run counts undecided.
+   - A crate named with no test in the report is refused, so a misspelt name
+     cannot import an empty file that looks clean.
+
+   Only the named crates' tests are read. nextest writes one report for the
+   whole workspace, and a crate whose tests trace to no test case, the importer
+   among them, would contribute runs of cases that do not exist. A crate name
+   is matched whole, so ``agconflo-core-extra`` is not ``agconflo-core``, and a
+   name holding ``::`` is a test binary's id rather than a crate
+   (``EVD_NEXTEST_TEST_PATHS``). Taken for a crate, it would match that binary
+   and drop the file from every id made from it: ``TEST_REACHES_EACH_ONCE`` for
+   a test whose case is ``TEST_LINEAGE_REACHES_EACH_ONCE``, wrong and looking
+   right. Matched as nothing, it is refused as a crate with no tests.

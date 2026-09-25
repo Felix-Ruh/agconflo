@@ -55,6 +55,7 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    tests/yield
    code/agconflo-core
    code/agconflo-lua
+   code/junit-to-needs
    decisions/context
    decisions/workflow
    decisions/topology
