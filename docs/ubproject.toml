@@ -193,6 +193,22 @@ title = "Implementation"
 prefix = "IMPL_"
 
 [[needs.types]]
+# Code that follows a decision or a note and implements no component requirement,
+# produced from a one-line marker like an implementation (DEC_TRACE_MARKERS). Not
+# `code`, which is a built-in directive (EVD_CODELINKS_SECOND_TYPE).
+directive = "trace"
+title = "Trace"
+prefix = "TRACE_"
+
+[[needs.types]]
+# An explanation local to one piece of code, written in docs/code/<crate>.rst and
+# named by that code's marker (DEC_NOTES_BESIDE_THE_CRATE). Not `note`, which is
+# reStructuredText's own admonition.
+directive = "code_note"
+title = "Note"
+prefix = "NOTE_"
+
+[[needs.types]]
 # The latest run of one test case: how it went the last time it ran.
 #
 # NOT A HISTORY, deliberately. One run per test case, rewritten in place, so the
@@ -270,6 +286,13 @@ description = "The requirement this test case checks."
 outgoing = "implements"
 incoming = "implemented by"
 description = "The component requirement this code answers for."
+
+# A marker's second list: the decisions and notes the code follows
+# (DEC_CODE_FOLLOWS_BY_MARKER, EVD_CODELINKS_SECOND_LIST).
+[needs.links.follows]
+outgoing = "follows"
+incoming = "followed by"
+description = "A decision or note this code follows."
 
 # Its own link rather than `verifies`, which a test case carries to the
 # requirement it checks. A run checks nothing: it says how one case fared the
@@ -543,7 +566,8 @@ base_url = "https://github.com/Felix-Ruh/agconflo/blob/main/docs/test-runs.json"
 # `impl` need, which docs/code/<crate>.rst brings into the graph with a
 # `src-trace` directive. A marker is an ordinary comment:
 #
-#     // @<title>,<IMPL id>,impl,[<component requirement ids>]
+#     // @<title>,<IMPL id>,impl,[<component requirement ids>],[<decision or note ids>]
+#     // @<title>,<TRACE id>,trace,[],[<decision or note ids>]
 #
 # ONE-LINE MARKERS ONLY. `@need-ids:` references are switched off: two call
 # sites referencing one need keep only the first, with no diagnostic, where two
@@ -589,11 +613,13 @@ start_sequence = "@"
 end_sequence = "\n"
 field_split_char = ","
 # `implements` in the place of the default `links`: see [needs.links.implements].
+# `follows` after it: see [needs.links.follows].
 needs_fields = [
     { name = "title", type = "str" },
     { name = "id", type = "str" },
     { name = "type", type = "str", default = "impl" },
     { name = "implements", type = "list[str]", default = [] },
+    { name = "follows", type = "list[str]", default = [] },
 ]
 
 # The same shape for agconflo-lua: one project per crate, so each crate's
@@ -615,9 +641,11 @@ start_sequence = "@"
 end_sequence = "\n"
 field_split_char = ","
 # `implements` in the place of the default `links`: see [needs.links.implements].
+# `follows` after it: see [needs.links.follows].
 needs_fields = [
     { name = "title", type = "str" },
     { name = "id", type = "str" },
     { name = "type", type = "str", default = "impl" },
     { name = "implements", type = "list[str]", default = [] },
+    { name = "follows", type = "list[str]", default = [] },
 ]

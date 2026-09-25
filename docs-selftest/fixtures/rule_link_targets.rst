@@ -88,3 +88,14 @@ Fixture: rule_link_targets
    :id: RUN_WRONG_TARGET
    :executes: CREQ_WRONG_PARENT
    :test_outcome: passed
+
+.. trace:: Follows a requirement rather than a decision or a note
+   :id: TRACE_WRONG_TARGET
+   :follows: CREQ_WRONG_PARENT
+   :code_url: https://example.invalid/src/lib.rs#L1
+
+.. impl:: Follows a requirement, which belongs in implements
+   :id: IMPL_WRONG_FOLLOWS
+   :implements: CREQ_WRONG_ALLOC
+   :follows: CREQ_WRONG_PARENT
+   :code_url: https://example.invalid/src/lib.rs#L1

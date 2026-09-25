@@ -3,13 +3,13 @@ Fixture: rule_id_prefix
 =======================
 
 .. One need of every type whose id prefix disagrees with its type, so this
-   fixture covers all nine id-prefix rules at once. Each need is otherwise fully
+   fixture covers every id-prefix rule at once. Each need is otherwise fully
    conformant - every mandatory field present, every link pointing at a need of
    the right type - so the only thing wrong with any of them is the prefix.
 
    The needs link to each other rather than to a separate valid spine: a link
    rule cares about the TYPE of its target, and these are all of the right types
-   despite their ids. That keeps the fixture to nine needs.
+   despite their ids. That keeps the fixture to one need per type.
 
 .. stkh_req:: A stakeholder requirement not called STKH
    :id: WRONG_STKH
@@ -67,3 +67,11 @@ Fixture: rule_id_prefix
    :id: WRONG_RUN
    :executes: WRONG_TEST
    :test_outcome: passed
+
+.. code_note:: A note not called NOTE
+   :id: WRONG_NOTE
+
+.. trace:: A trace not called TRACE
+   :id: WRONG_TRACE
+   :follows: WRONG_NOTE
+   :code_url: https://example.invalid/src/lib.rs#L1

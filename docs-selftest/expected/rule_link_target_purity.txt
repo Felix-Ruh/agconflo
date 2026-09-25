@@ -23,4 +23,8 @@ error[needs.schema_network_violation]
   --> (need)
       fixtures/rule_link_target_purity.rst:53:4
   TEST_PURITY:verifies/COMP_PURITY: "comp" is not one of "feat_req" or "comp_req" (test-case-must-verify-a-requirement[18]/local_fail)
-Found 6 error(s).
+error[needs.schema_network_violation]
+  --> (need)
+      fixtures/rule_link_target_purity.rst:70:4
+  TRACE_PURITY:follows/CREQ_PURITY: "comp_req" is not one of "dec" or "code_note" (trace-must-follow-a-decision-or-note[53]/local_fail)
+Found 7 error(s).

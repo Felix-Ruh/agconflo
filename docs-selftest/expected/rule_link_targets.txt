@@ -49,6 +49,10 @@ error[needs.schema_network_violation]
   FEAT_WRONG_PARENT:derived_from: Too few valid links of type 'derived_from' (0 < 1) / nok: COMP_TARGETS (feat-req-must-derive-from-a-stkh-req[12]/contains_too_few)
 error[needs.schema_network_violation]
   --> (need)
+      fixtures/rule_link_targets.rst:97:4
+  IMPL_WRONG_FOLLOWS:follows/CREQ_WRONG_PARENT: "comp_req" is not one of "dec" or "code_note" (impl-follows-only-decisions-or-notes[54]/local_fail)
+error[needs.schema_network_violation]
+  --> (need)
       fixtures/rule_link_targets.rst:82:4
   IMPL_WRONG_TARGET:implements/FEAT_WRONG_PARENT: "comp_req" was expected (impl-must-implement-a-comp-req[45]/local_fail)
 error[needs.schema_network_violation]
@@ -71,4 +75,12 @@ error[needs.schema_network_violation]
   --> (need)
       fixtures/rule_link_targets.rst:56:4
   TEST_WRONG_TARGET:verifies: Too few valid links of type 'verifies' (0 < 1) / nok: COMP_TARGETS (test-case-must-verify-a-requirement[18]/contains_too_few)
-Found 18 error(s).
+error[needs.schema_network_violation]
+  --> (need)
+      fixtures/rule_link_targets.rst:92:4
+  TRACE_WRONG_TARGET:follows/CREQ_WRONG_PARENT: "comp_req" is not one of "dec" or "code_note" (trace-must-follow-a-decision-or-note[53]/local_fail)
+error[needs.schema_network_violation]
+  --> (need)
+      fixtures/rule_link_targets.rst:92:4
+  TRACE_WRONG_TARGET:follows: Too few valid links of type 'follows' (0 < 1) / nok: CREQ_WRONG_PARENT (trace-must-follow-a-decision-or-note[53]/contains_too_few)
+Found 21 error(s).

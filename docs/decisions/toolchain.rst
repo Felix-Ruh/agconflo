@@ -242,7 +242,9 @@ body, and every rule needs a fixture because the tool ignores a malformed one.
    ``docs/code/<crate>.rst``, the document that already brings the crate's code
    into the graph, and the code names it in the ``follows`` list of its marker.
    The note, its links and its body would move into the source unchanged once
-   ubc reads needs there.
+   ubc reads needs there. Its directive is ``code_note``: ``note`` is
+   reStructuredText's own admonition, and a need type registered under it lost
+   its title in the metamodel's self-test.
 
    An explanation of how code relates to something else is not a note: it
    belongs to the need that owns the relation, a decision's or a requirement's

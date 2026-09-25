@@ -10,7 +10,10 @@
     "type-dec": { "properties": { "type": { "const": "dec" } } },
     "type-evd": { "properties": { "type": { "const": "evd" } } },
     "type-impl": { "properties": { "type": { "const": "impl" } } },
-    "type-test-run": { "properties": { "type": { "const": "test_run" } } }
+    "type-test-run": { "properties": { "type": { "const": "test_run" } } },
+    "type-trace": { "properties": { "type": { "const": "trace" } } },
+    "type-note": { "properties": { "type": { "const": "code_note" } } },
+    "type-followed": { "properties": { "type": { "enum": ["dec", "code_note"] } } }
   },
   "schemas": [
     {
@@ -588,6 +591,55 @@
       "message": "A run is the latest run of ONE test case, which is what lets the imported file be rewritten in place rather than grown. A run covering two cases makes latest-wins meaningless, since either case could have moved it. Written as maxItems for the reason given on the allocation rule above: minItems does not fire when the link is absent, and the lower bound comes from the network rule before this one.",
       "select": { "$ref": "#/$defs/type-test-run" },
       "validate": { "local": { "properties": { "executes": { "maxItems": 1 } } } }
+    },
+    {
+      "id": "trace-id-must-start-with-trace",
+      "severity": "violation",
+      "message": "An id whose prefix disagrees with its type makes every id-based reading of the graph unreliable. A trace's id is typed into a code marker, where nothing else checks it.",
+      "select": { "$ref": "#/$defs/type-trace" },
+      "validate": { "local": { "properties": { "id": { "pattern": "^TRACE_" } } } }
+    },
+    {
+      "id": "note-id-must-start-with-note",
+      "severity": "violation",
+      "message": "An id whose prefix disagrees with its type makes every id-based reading of the graph unreliable.",
+      "select": { "$ref": "#/$defs/type-note" },
+      "validate": { "local": { "properties": { "id": { "pattern": "^NOTE_" } } } }
+    },
+    {
+      "id": "trace-must-have-a-code-url",
+      "severity": "violation",
+      "message": "A trace that does not say where its code is links a decision to nowhere. codelinks fills this from the marker's own location, as it does for an implementation.",
+      "select": { "$ref": "#/$defs/type-trace" },
+      "validate": { "local": { "required": ["code_url"] } }
+    },
+    {
+      "id": "trace-must-follow-a-decision-or-note",
+      "severity": "violation",
+      "message": "A trace exists to link code to the decision or note it follows (DEC_TRACE_MARKERS). One following nothing, or following a requirement, is an implementation under the wrong type. Presence and purity, as in the network rules above.",
+      "select": { "$ref": "#/$defs/type-trace" },
+      "validate": {
+        "network": {
+          "follows": {
+            "contains": { "local": { "$ref": "#/$defs/type-followed" } },
+            "minContains": 1,
+            "items": { "local": { "$ref": "#/$defs/type-followed" } }
+          }
+        }
+      }
+    },
+    {
+      "id": "impl-follows-only-decisions-or-notes",
+      "severity": "violation",
+      "message": "What code follows is a decision or a note (DEC_CODE_FOLLOWS_BY_MARKER); a requirement it answers for goes in implements. Written with items and no contains, since an implementation need follow nothing.",
+      "select": { "$ref": "#/$defs/type-impl" },
+      "validate": {
+        "network": {
+          "follows": {
+            "items": { "local": { "$ref": "#/$defs/type-followed" } }
+          }
+        }
+      }
     }
   ]
 }
