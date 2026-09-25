@@ -75,8 +75,9 @@ impl Behaviours {
     ///
     /// A type no instance names is not asked about, and a script for a type the
     /// definition lacks is ignored. A type a person performs must have no script.
+    /// Scripts are compiled and none of them runs.
     // @Every instantiated type has one script that compiles or a person,IMPL_BEHAVIOURS_CHECK,impl,[CREQ_BEHAVIOURS_REFUSE_MISSING, CREQ_BEHAVIOURS_REFUSE_TWICE, CREQ_BEHAVIOURS_EVERY_FAULT, CREQ_BEHAVIOURS_PERSON_OR_SCRIPT]
-    pub(crate) fn faults(&self, definition: &WorkflowDefinition) -> Vec<BehaviourFault> {
+    pub fn faults(&self, definition: &WorkflowDefinition) -> Vec<BehaviourFault> {
         let mut asked: Vec<&str> = Vec::new();
         let mut faults = Vec::new();
 
