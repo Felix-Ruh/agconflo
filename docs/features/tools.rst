@@ -19,10 +19,11 @@ that already cover one, and is not said again here. A tool step counts against
 the budget (``FEAT_RUN_BUDGET_STOPS``); a model calls one as it calls any node
 type its instance declares (``FEAT_YIELD_CALL_PERFORMED``); a resumed run
 performs no step again whose output its record holds
-(``FEAT_RESUME_REPEATS_NO_OUTPUT``); the text a step is answered with becomes
-its output (``FEAT_PERSON_TEXT_IS_THE_OUTPUT``); and a person is told how a
-run stopped (``FEAT_RUNNER_TELLS_HOW_IT_STOPPED``). Each gains test cases in
-``tests/tools`` and nothing else.
+(``FEAT_RESUME_REPEATS_NO_OUTPUT``); and the text a step is answered with
+becomes its output (``FEAT_PERSON_TEXT_IS_THE_OUTPUT``). Each gains test cases
+in ``tests/tools`` and nothing else. A person is told how a run stopped
+(``FEAT_RUNNER_TELLS_HOW_IT_STOPPED``) with no new way of stopping: a step the
+engine could not perform is awaited, as a person's is.
 
 Each requirement was checked by hand against the two questions every body here
 answers: could it be false while its parents hold, and could they hold while it
