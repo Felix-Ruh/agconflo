@@ -6,27 +6,14 @@ use crate::Context;
 
 impl Context {
     /// Every context reachable through this one's parts, each reported once and
-    /// in no particular order. The context itself is not among them, and a text
-    /// context has none.
-    ///
-    /// A set rather than a list of paths. Parts are shared, so one ancestor is
-    /// often reachable along several paths, and there can be exponentially many
-    /// of them; each context is visited once, so a walk costs time in
+    /// in no particular order, told apart by identifier. The context itself is
+    /// not among them, and a text context has none. A walk costs time in
     /// proportion to the contexts and parts in the ancestry, whatever its shape.
-    /// It always ends, since a context can only be composed from contexts that
-    /// already exist.
-    ///
-    /// Contexts are told apart by identifier alone, as
-    /// `DEC_NO_CONTENT_ADDRESSING` has it. Two sources in one run would issue
-    /// the same identifiers and a walk across both would take different
-    /// contexts for one; keeping a run to one source belongs to whatever owns
-    /// the run.
-    // @Each ancestor walked once,IMPL_LINEAGE_WALK,impl,[CREQ_WALKER_EACH_ONCE]
+    // @Each ancestor walked once,IMPL_LINEAGE_WALK,impl,[CREQ_WALKER_EACH_ONCE],[DEC_NO_CONTENT_ADDRESSING, NOTE_CONTEXT_NO_RECURSION]
     pub fn lineage(&self) -> Vec<&Context> {
         let mut seen = HashSet::new();
         let mut ancestry = Vec::new();
-        // A stack of its own rather than recursion, for the reason rendering
-        // has one: a recursive walk overflowed an 8 MiB stack at 100,000 levels.
+        // A stack of its own rather than the call stack.
         let mut pending: Vec<&Context> = self.parts().iter().collect();
         while let Some(context) = pending.pop() {
             if seen.insert(context.id()) {
@@ -39,7 +26,7 @@ impl Context {
 }
 
 // --- tests -------------------------------------------------------------------
-// Bare functions named after their test cases, for the reason given in id.rs.
+// Bare functions named after their test cases.
 
 #[cfg(test)]
 use crate::{ContextId, ContextType, IdSource};

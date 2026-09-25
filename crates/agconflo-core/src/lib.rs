@@ -3,15 +3,10 @@
 //! from TOML documents and written back into them, and a run over one - driven
 //! by its caller, which performs each activation and reports what came of it.
 //!
-//! Everything public is re-exported here from private modules. The modules are
-//! named to fit the test case ids in `docs/tests/`, which is a reason to keep
-//! them out of the paths callers write.
+//! Everything public is re-exported here from private modules.
 //!
-//! A comment of the form `// @<title>,<IMPL id>,impl,[<requirement ids>]` is a
-//! trace marker: ubc reads it into the requirements graph as the place where
-//! those component requirements are met (`docs/code/agconflo-core.rst`). It is
-//! checked with the rest of the graph, so a marker naming a requirement that
-//! does not exist fails the documentation check, in the commit hook and in CI.
+//! A comment starting with `// @` is a code marker, read into the requirements
+//! graph by `docs/code/agconflo-core.rst`, which gives its shapes.
 
 mod catalogue;
 mod context;

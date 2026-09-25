@@ -1,31 +1,17 @@
 //! Compiling a snippet against this crate, for the test cases whose property is
 //! that some code does not compile.
 //!
-//! Not a `compile_fail` doctest: the test runner does not run doctests
-//! (EVD_NEXTEST_NO_DOCTESTS), so such a case would never produce a result. And
-//! not trybuild, which compares the compiler's whole output against a stored
-//! copy - wording, layout, line numbers - while the toolchain here follows
-//! stable, so a new compiler could fail those cases with no code having
-//! changed. It also rebuilds every dev-dependency for its scratch project,
-//! measured at 9 s from cold. What a case needs asserted is narrower: the error
-//! code, and the phrase that names why the code was refused.
-//!
-//! Each snippet becomes the body of `main` in its own small project under
-//! `<target>/compile-fail/<case>/`, depending on this crate by path, and is
-//! checked with `cargo check`. The projects share one target directory of their
-//! own, so this crate is compiled for them once and cargo's lock serialises
-//! concurrent cases. The crate is compiled there without `cfg(test)`, which is
-//! the point: a snippet sees exactly what a dependent crate would.
-//!
-//! Every failure to run is a test failure, never a pass. A snippet that
-//! compiles, a refusal with another error code, and cargo not starting at all
-//! each fail the assertion.
+//! Each snippet becomes the body of `main` in its own project under
+//! `<target>/compile-fail/<case>/`, depending on this crate by path, checked
+//! with `cargo check`. A snippet that compiles, a refusal with another error
+//! code, and cargo not starting at all each fail the assertion.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 /// Asserts that `body` does not compile, refused with error `code` and a
 /// message containing `phrase`.
+// @Snippets checked in projects of their own,TRACE_COMPILE_FAIL_HARNESS,trace,[],[NOTE_COMPILE_FAIL_HARNESS]
 pub(crate) fn assert_refused(case: &str, body: &str, code: &str, phrase: &str) {
     let stderr = match check(case, body) {
         Ok(()) => panic!("`{case}` compiled, and was expected to be refused with {code}"),
@@ -41,8 +27,7 @@ pub(crate) fn assert_refused(case: &str, body: &str, code: &str, phrase: &str) {
     );
 }
 
-/// Asserts that `body` compiles. A refusal is only evidence when its nearest
-/// compiling neighbour is seen to compile.
+/// Asserts that `body` compiles.
 pub(crate) fn assert_compiles(case: &str, body: &str) {
     if let Err(stderr) = check(case, body) {
         panic!("`{case}` was expected to compile:\n{stderr}");
