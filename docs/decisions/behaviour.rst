@@ -209,3 +209,37 @@ decided when it is wanted.
    Contexts reach a script as values it can call methods on and nothing else,
    which was measured rather than assumed: a script could not read or replace
    their metatable, nor add a field to one (``EVD_LUA_USERDATA_PROTECTED``).
+
+.. dec:: The coroutine library is taken back out once the host functions exist
+   :id: DEC_COROUTINES_CLOSED_AFTER_HOST
+   :dec_status: accepted
+   :decided_on: 2026-09-25
+   :supported_by: EVD_MLUA_ASYNC_LOADS_COROUTINE
+   :statement: Agconflo shall remove the coroutine library from a script's environment after the host functions for its activation are made.
+
+   ``DEC_ENVIRONMENT_BY_NAME`` never loads ``coroutine``, since resuming a
+   coroutine hands back its error as a value, which is catching a limit under
+   another name (``CREQ_HOST_NO_CATCHING``). Measured, ``mlua`` loads the library
+   anyway when the first asynchronous function is made, and reads
+   ``coroutine.yield`` into its own poller at that moment
+   (``EVD_MLUA_ASYNC_LOADS_COROUTINE``). Removing the global afterwards takes it
+   from the script and leaves the poller what it took.
+
+   Removing it before the host functions are made was the alternative, and
+   ``mlua`` would load it again on the first asynchronous function. Giving up
+   asynchronous host functions was the other, and ``DEC_BEHAVIOUR_ASYNC`` needs
+   them.
+
+.. dec:: A script is given neither print nor collectgarbage
+   :id: DEC_NO_PRINT_OR_COLLECTOR
+   :dec_status: accepted
+   :decided_on: 2026-09-25
+   :supported_by: EVD_LUA_DEFAULT_STATE_EXPOSES
+   :statement: Agconflo shall leave print and collectgarbage out of a script's environment.
+
+   Two functions of the base library that ``DEC_ENVIRONMENT_BY_NAME``'s two kinds
+   do not cover, since neither reads outside the activation nor catches an
+   error. ``print`` writes to the host process's output, where no wire carries
+   it and no record holds it: a script's one way out is its output context.
+   ``collectgarbage`` controls the state's collector, which is the host's to run
+   under the memory limit rather than the script's.

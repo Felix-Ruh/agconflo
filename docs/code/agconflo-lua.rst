@@ -30,5 +30,63 @@ fails the check like any other. A requirement that no marker names is not an
 error, since code comes after its requirement; the review report
 ``scripts/reports/unimplemented.cypher`` lists them.
 
+.. code_note:: The script host's default limits
+   :id: NOTE_HOST_DEFAULT_LIMITS
+
+   Ten million instructions, 64 MiB and one model call: a few tens of
+   milliseconds of work, several thousand times what an empty state holds, and
+   a run whose model calls are bounded by its step budget. None of the numbers
+   is a requirement; each is room for a script that assembles text and asks one
+   question. The model call default is ``DEC_EVERY_TURN_COUNTED``'s.
+
+.. code_note:: How the script host tells a failure's kind
+   :id: NOTE_HOST_FAILURE_ORDER
+
+   Every limit, and a failed model call, reaches a script as an ordinary Lua
+   error, and its message is not what says which it was. So what a call to the
+   host could not complete is kept outside the script, and flags are asked
+   before the error is: the instruction limit first, since a script over it may
+   have been anywhere, a model call's aftermath included; then the model call
+   limit; then a failure a host function recorded. Only then is the error read,
+   and a memory error is the memory limit whatever raised it. Anything else is
+   the script's own error, kept whole, since its document, line and traceback
+   are what its author reads. A limit is never reported as a script error, nor
+   the other way round.
+
+.. code_note:: Why the host's functions own what they use
+   :id: NOTE_HOST_OWNED_HANDLES
+
+   A model call is awaited, and a function scoped to a borrow cannot be. So each
+   host function owns what it needs - the identifier source, the roster, the
+   call counts - rather than borrowing it for the activation. The run cannot be
+   owned that way, since it borrows its workflow: the host leaves what it asks
+   of the run in a mailbox and waits, and whatever polls the script answers
+   from the run it holds (``DEC_RUN_IS_DRIVEN``). The yield is to the driver, as
+   the call is a step of the run.
+
+   A scripted run lends its caller's identifier source to the scripts the same
+   way, and puts it back advanced past every identifier the run issued however
+   the run ends, an early return included.
+
+.. code_note:: The order a scripted run asks its refusals in
+   :id: NOTE_SCRIPTED_REFUSAL_ORDER
+
+   Whatever the run itself refuses comes first - a workflow and its arguments,
+   or a record - then the scripts, and last, when a person's answer was
+   supplied, whether the run awaits it. The scripts are asked about only once
+   the run would start: a workflow with a wiring defect may name a node type
+   that does not exist, and whether it has a script is not a question worth
+   answering first.
+
+.. code_note:: The tests share one model client per thread
+   :id: NOTE_SCRIPTED_ONE_TEST_CLIENT
+
+   Building a client reaches no network, and is still not free: on Linux it
+   took about 36 ms, measured in a container with four CPUs, where Windows was
+   far cheaper. Built afresh for every case, the property tests that run a
+   workflow hundreds of times took 19 s and 10 s there, against 0.6 s and 0.5 s
+   with one client, and the first was killed at the 20 s limit in CI. So a
+   roster mapping no role is built once per thread and cloned.
+
 .. src-trace::
    :project: agconflo-lua

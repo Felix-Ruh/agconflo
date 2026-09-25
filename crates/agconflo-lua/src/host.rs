@@ -17,12 +17,9 @@ use mlua::prelude::*;
 use crate::behaviours::Script;
 use crate::models::{Asked, ModelFailure, Offered, Part, Roster};
 
-/// What one activation's script may spend.
-///
-/// Counted in instructions executed, bytes allocated and model calls made rather
-/// than in time (`DEC_LIMITS_NOT_TIME`): the same script stops at the same point
-/// on every machine, and a slow machine is not a runaway script. Each activation
-/// has its own, since nothing else is shared between activations either.
+/// What one activation's script may spend: instructions executed, bytes
+/// allocated and model calls made. Each activation has its own.
+// @Limits counted in work and not in time,IMPL_HOST_LIMITS_TYPE,impl,[CREQ_HOST_INSTRUCTION_LIMIT, CREQ_HOST_MEMORY_LIMIT],[DEC_LIMITS_NOT_TIME]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
     /// Instructions one activation's script may execute. Counted in steps of a
@@ -30,18 +27,14 @@ pub struct Limits {
     pub instructions: u64,
     /// Bytes one activation's Lua state may hold, the state's own included.
     pub memory: usize,
-    /// Model calls one activation's script may make (`DEC_MODEL_CALLS_COUNTED`).
-    /// Awaiting a model costs no instructions, so without this a loop was
-    /// measured making 2000 calls in one activation (`EVD_MODEL_CALLS_UNLIMITED`).
+    /// Model calls one activation's script may make.
+    // @Model calls limited per activation,IMPL_HOST_MODEL_CALL_LIMIT_FIELD,impl,[CREQ_HOST_MODEL_CALL_LIMIT],[DEC_MODEL_CALLS_COUNTED]
     pub model_calls: u32,
 }
 
 impl Default for Limits {
-    /// Ten million instructions, 64 MiB and one model call: a few tens of
-    /// milliseconds of work, several thousand times what an empty state holds,
-    /// and a run whose calls are bounded by its step budget. None of the
-    /// numbers is a requirement; each is room for a script that assembles text
-    /// and asks one question.
+    /// Ten million instructions, 64 MiB and one model call.
+    // @The default limits,TRACE_HOST_DEFAULT_LIMITS,trace,[],[NOTE_HOST_DEFAULT_LIMITS, DEC_EVERY_TURN_COUNTED]
     fn default() -> Self {
         Self {
             instructions: 10_000_000,
@@ -51,68 +44,57 @@ impl Default for Limits {
     }
 }
 
-/// How an activation's script failed.
-///
-/// Carried as the run's failure, so a caller learns which of these it was as a
-/// value (`STKH_TYPED_FAILURE`). A limit is never reported as a script error nor
-/// the other way round: every limit reaches a script as a Lua error, and telling
-/// them apart is this type's reason to exist.
-///
-/// `#[non_exhaustive]`: what a script can do wrong grows with what it can do.
+/// How an activation's script failed, carried as the run's failure. A limit is
+/// never reported as a script error, nor the other way round.
+// @A script's failure as values,TRACE_HOST_SCRIPT_FAILURE,trace,[],[DEC_FAILURES_NON_EXHAUSTIVE, NOTE_HOST_FAILURE_ORDER]
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ScriptFailure {
-    /// The script raised an error, or one was raised in something it called
-    /// (`CREQ_HOST_ERROR_CARRIED`).
+    /// The script raised an error, or one was raised in something it called.
     Raised {
         /// The error as Lua reports it, with the document, the line and the
         /// traceback. An error raised with something other than a string has no
         /// message worth the name: a table renders as its address.
         message: String,
     },
-    /// The script returned something other than exactly one context
-    /// (`CREQ_HOST_ONE_CONTEXT`).
+    /// The script returned something other than exactly one context.
     NotOneContext {
         /// What it returned: `nothing`, a Lua type's name, or how many values.
         found: String,
     },
-    /// The script executed more instructions than its limit
-    /// (`CREQ_HOST_INSTRUCTION_LIMIT`).
+    /// The script executed more instructions than its limit.
     InstructionLimit,
-    /// The script allocated more memory than its limit
-    /// (`CREQ_HOST_MEMORY_LIMIT`).
+    /// The script allocated more memory than its limit.
     MemoryLimit,
-    /// The script asked for more model calls than its limit
-    /// (`CREQ_HOST_MODEL_CALL_LIMIT`). The call over the limit was not made.
+    /// The script asked for more model calls than its limit, and the call over
+    /// it was not made.
     ModelCallLimit,
-    /// A model call failed (`CREQ_HOST_MODEL_FAILURE`), and this is how.
+    /// A model call failed, and this is how.
     ModelFailed(ModelFailure),
-    /// The script returned a context the run refused
-    /// (`CREQ_HOST_OUTPUT_REFUSAL_CARRIED`), and this is the run's refusal.
+    /// The script returned a context the run refused, and this is the run's
+    /// refusal.
     OutputRefused(OutputRefusal),
     /// A person answered a step and the identifier source had nothing left to
-    /// issue the answer's context under (`CREQ_HOST_TAKES_PERSON_TEXT`). A
+    /// issue the answer's context under. A
     /// script meeting the same source raises an error from the function it
     /// called, which is carried as [`ScriptFailure::Raised`].
     SourceExhausted(SourceExhausted),
     /// A model's answer made a call Agconflo refuses, and none of that answer's
-    /// calls was performed (`CREQ_HOST_REFUSES_MALFORMED_CALL`).
+    /// calls was performed.
     MalformedCall {
         /// The name the model called.
         node_type: String,
         /// Which fault it was.
         fault: ModelCallFault,
     },
-    /// The run refused a call the model made (`CREQ_HOST_CALL_REFUSAL_CARRIED`),
-    /// and this is the run's refusal.
+    /// The run refused a call the model made, and this is the run's refusal.
     CallRefused(CallRefusal),
     /// The run refused an exchange the model made, and this is the run's
     /// refusal. Every context of an exchange is issued by the run's own source
     /// or read from its record, so nothing here is expected to produce one.
     ExchangeRefused(ExchangeRefusal),
     /// An activation resumed from its record sent a window or an offer other
-    /// than the one its record holds at that point, and nothing was sent
-    /// (`CREQ_HOST_REPLAY_DIVERGED`).
+    /// than the one its record holds at that point, and nothing was sent.
     Diverged {
         /// Which of the activation's recorded exchanges it differs from, the
         /// first being 0.
@@ -122,7 +104,8 @@ pub enum ScriptFailure {
     },
 }
 
-/// What is wrong with a call a model made (`DEC_MALFORMED_CALL_FAILS`).
+/// What is wrong with a call a model made.
+// @The five faults of a call,TRACE_HOST_CALL_FAULT,trace,[],[DEC_MALFORMED_CALL_FAILS, DEC_FAILURES_NON_EXHAUSTIVE]
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ModelCallFault {
@@ -195,12 +178,8 @@ impl fmt::Display for ScriptFailure {
 impl std::error::Error for ScriptFailure {}
 
 /// The globals every state has that a script is not given: those that read a
-/// file or compile text (`EVD_LUA_DEFAULT_STATE_EXPOSES`), those that catch an
-/// error (`EVD_LUA_PCALL_SWALLOWS_LIMITS`), `collectgarbage`, which controls the
-/// state's collector, and `print`, which writes to the host process's output.
-/// `load` is the one that matters most - it builds a function
-/// from text a script assembled, and anything removed would come back through
-/// it.
+/// file or compile text, those that catch an error, `collectgarbage` and `print`.
+// @The globals left out of every state,TRACE_HOST_LEFT_OUT,trace,[],[DEC_ENVIRONMENT_BY_NAME, DEC_NO_PRINT_OR_COLLECTOR]
 const LEFT_OUT: [&str; 8] = [
     "dofile",
     "loadfile",
@@ -212,17 +191,10 @@ const LEFT_OUT: [&str; 8] = [
     "print",
 ];
 
-/// A Lua state holding the environment a script runs in, and nothing else.
-///
-/// Built from the libraries named here rather than by taking something out of
-/// a default (`DEC_ENVIRONMENT_BY_NAME`): `io`, `os`, `debug` and `package` are
-/// never loaded, so what nobody thought of is out by construction. `coroutine`
-/// is not loaded here either, and `mlua` loads it anyway once an asynchronous
-/// function exists, so it is taken out again after the host functions are made
-/// (`EVD_MLUA_ASYNC_LOADS_COROUTINE`). From what is loaded, the base library's file readers, compiler
-/// and error catchers go, and so does `math`'s random source, which differed
-/// between processes (`EVD_LUA_RANDOM_PER_PROCESS`).
-// @An environment built from named parts,IMPL_HOST_SANDBOX,impl,[CREQ_HOST_NOTHING_OUTSIDE, CREQ_HOST_NO_CATCHING]
+/// A Lua state holding the environment a script runs in, and nothing else:
+/// `string`, `table`, `math` and `utf8`, without the globals in `LEFT_OUT` and
+/// without `math`'s random source.
+// @An environment built from named parts,IMPL_HOST_SANDBOX,impl,[CREQ_HOST_NOTHING_OUTSIDE, CREQ_HOST_NO_CATCHING],[DEC_ENVIRONMENT_BY_NAME]
 pub(crate) fn sandbox() -> LuaResult<Lua> {
     let lua = Lua::new_with(
         LuaStdLib::STRING | LuaStdLib::TABLE | LuaStdLib::MATH | LuaStdLib::UTF8,
@@ -245,8 +217,8 @@ pub(crate) fn chunk_name(document: &str) -> String {
 }
 
 /// A context as a script holds it: something to call methods on and nothing
-/// else. Its metatable is closed to the script (`EVD_LUA_USERDATA_PROTECTED`), so
-/// what it says cannot be changed from inside.
+/// else, whose metatable the script cannot reach.
+// @A context held as closed userdata,TRACE_HOST_HANDED,trace,[],[DEC_HOST_FUNCTIONS_CONTEXT_API]
 struct Handed(Context);
 
 impl LuaUserData for Handed {
@@ -267,9 +239,8 @@ impl LuaUserData for Handed {
     }
 }
 
-/// What one activation's model calls came to, kept outside the script so that
-/// a call it could not complete is reported as what it was, not as the Lua
-/// error that stopped the script.
+/// What one activation's model calls came to, kept outside the script.
+// @Calls kept outside the script,TRACE_HOST_CALLS_KEPT,trace,[],[NOTE_HOST_FAILURE_ORDER]
 #[derive(Default)]
 struct Calls {
     /// Requests counted against the limit, answered from the record included.
@@ -280,8 +251,8 @@ struct Calls {
     failed: RefCell<Option<ScriptFailure>>,
 }
 
-/// What the script host asks of the run while it performs an activation - the
-/// one way a model's call reaches the run (`DEC_CALL_IS_AN_ACTIVATION`).
+/// What the script host asks of the run while it performs an activation.
+// @A model's call asked of the run,TRACE_HOST_ASKING,trace,[],[DEC_CALL_IS_AN_ACTIVATION]
 pub(crate) enum Asking {
     /// Hold this exchange with the activation, and hand the caller a record.
     Exchange(Exchange),
@@ -300,13 +271,9 @@ pub(crate) enum Given {
     Stop,
 }
 
-/// Where the script host leaves what it asks and finds what it was given.
-///
-/// A script's host functions own what they hold, since a model call is awaited
-/// and a scoped function cannot be, and the run borrows its workflow, so it
-/// cannot be held by them. So the host asks and waits, and whatever polls the
-/// script answers from the run it has (`DEC_RUN_IS_DRIVEN`): the yield is to
-/// the driver, as the call is a step of the run.
+/// Where the script host leaves what it asks of the run, and finds what the run
+/// gave.
+// @The host asks the run through a mailbox,TRACE_HOST_MAILBOX,trace,[],[NOTE_HOST_OWNED_HANDLES, DEC_RUN_IS_DRIVEN]
 #[derive(Default)]
 pub(crate) struct Mailbox {
     pub(crate) asking: RefCell<Option<Asking>>,
@@ -328,7 +295,8 @@ async fn ask(mailbox: &Rc<Mailbox>, asking: Asking) -> Given {
 
 /// What an activation resumed from its record is answered from: the exchanges
 /// the record holds for it, in order, and the output of each of their calls the
-/// record holds, by the provider's identifier (`DEC_SCRIPT_REPLAYED_FROM_ITS_RECORD`).
+/// record holds, by the provider's identifier.
+// @A replay answered from the record,TRACE_HOST_REPLAY,trace,[],[DEC_SCRIPT_REPLAYED_FROM_ITS_RECORD]
 #[derive(Clone, Debug, Default)]
 pub(crate) struct Replay {
     pub(crate) exchanges: Vec<Exchange>,
@@ -344,29 +312,19 @@ pub(crate) struct Performing {
     pub(crate) mailbox: Rc<Mailbox>,
 }
 
-/// Perform `activation` by running `script`, or say how it failed.
+/// Perform `activation` by running `script` in a new state and a thread of its
+/// own, or say how it failed.
 ///
-/// A new state for every call (`DEC_STATE_PER_ACTIVATION`): one shared across a
-/// run was measured carrying a global and a write to the string library from
-/// one node's script into the next's (`EVD_LUA_SHARED_STATE_LEAKS`).
-///
-/// The script is the body of the behaviour (`DEC_SCRIPT_IS_THE_BODY`) and is
-/// given two arguments, read as `local given, host = ...`: the activation's
-/// inputs under their parameters' names, with an unbound optional parameter
-/// absent rather than empty; and the host functions, which are the context API
-/// and nothing else (`DEC_HOST_FUNCTIONS_CONTEXT_API`) - `host.text(type, text)`,
-/// `host.compose(type, parts, separator)`, `host.complete(role, prompt, type)`
-/// and `host.output`, the type the output is declared as.
-///
-/// Asynchronous, because a model call is awaited rather than blocked on
-/// (`DEC_BEHAVIOUR_ASYNC`). The script runs in a Lua thread made for it, and its
-/// instruction limit is set on that thread: a limit set on the state never ran
-/// in the coroutine an asynchronous call uses (`EVD_LUA_HOOK_PER_THREAD`).
+/// The script is given two arguments, read as `local given, host = ...`: the
+/// activation's inputs under their parameters' names, with an unbound optional
+/// parameter absent rather than empty; and the host functions -
+/// `host.text(type, text)`, `host.compose(type, parts, separator)`,
+/// `host.complete(role, prompt, type)` and `host.output`, the type the output is
+/// declared as.
 ///
 /// Contexts the script makes are issued identifiers from `source`, which must be
-/// the source the run's arguments came from: a second source repeats the first
-/// one's identifiers, and the run refuses the collision.
-// @A script run in a state and thread of its own,IMPL_HOST_PERFORM,impl,[CREQ_HOST_RUNS_THE_SCRIPT, CREQ_HOST_FRESH_STATE, CREQ_HOST_INSTRUCTION_LIMIT]
+/// the source the run's arguments came from; the run refuses another's.
+// @A script run in a state and thread of its own,IMPL_HOST_PERFORM,impl,[CREQ_HOST_RUNS_THE_SCRIPT, CREQ_HOST_FRESH_STATE, CREQ_HOST_INSTRUCTION_LIMIT],[DEC_STATE_PER_ACTIVATION, DEC_SCRIPT_IS_THE_BODY, DEC_HOST_FUNCTIONS_CONTEXT_API, DEC_BEHAVIOUR_ASYNC, DEC_HOOK_ON_THE_THREAD]
 pub(crate) async fn perform(
     script: &Script,
     activation: &Activation,
@@ -406,14 +364,11 @@ pub(crate) async fn perform(
 
 /// The host table: the context API, the one model call, and the output type.
 ///
-/// Every function owns what it needs rather than borrowing it for a scope,
-/// because a model call is awaited and a scoped function cannot be.
-/// `host.complete` checks the call limit before calling (`CREQ_HOST_MODEL_CALL_LIMIT`),
-/// takes its prompt as a context and nothing else (`CREQ_HOST_PROMPT_IS_A_CONTEXT`),
-/// and gives the answer back as a new context of the type the script names, or
-/// of its output's declared type when it names none (`CREQ_HOST_MODEL_ANSWER`).
+/// `host.complete` checks the call limit before calling, takes its prompt as a
+/// context and nothing else, and gives the answer back as a new context of the
+/// type the script names, or of its output's declared type when it names none.
 /// Between the two, its model may yield: see [`complete`].
-// @A model call through the host,IMPL_HOST_COMPLETE,impl,[CREQ_HOST_MODEL_ANSWER, CREQ_HOST_PROMPT_IS_A_CONTEXT, CREQ_HOST_MODEL_CALL_LIMIT]
+// @A model call through the host,IMPL_HOST_COMPLETE,impl,[CREQ_HOST_MODEL_ANSWER, CREQ_HOST_PROMPT_IS_A_CONTEXT, CREQ_HOST_MODEL_CALL_LIMIT],[NOTE_HOST_OWNED_HANDLES]
 fn host_functions(
     lua: &Lua,
     activation: &Activation,
@@ -471,8 +426,7 @@ fn host_functions(
         "complete",
         lua.create_async_function(
             move |_, (role, prompt, declared): (String, LuaAnyUserData, Option<String>)| {
-                // Taken before anything is awaited: a borrow of the userdata
-                // cannot be held across the call, and a prompt that is not a
+                // Read before anything is awaited: a prompt that is not a
                 // context is refused before any call is made.
                 let prompt = prompt.borrow::<Handed>().map(|handed| handed.0.clone());
                 let completing = completing.clone();
@@ -516,27 +470,22 @@ impl Completing {
 /// context of `declared`, yielding to each call it makes.
 ///
 /// The model is offered the node types the activation's instance declares calls
-/// to, as contexts of the prompt's type made from their declarations
-/// (`CREQ_HOST_OFFERS_DECLARED`). Every request counts against the model call
-/// limit, checked before it is sent (`DEC_EVERY_TURN_COUNTED`). An answer is
-/// reported to the run - window, offer, answer and every call - before any of its
-/// calls is performed, and the run hands its caller a record holding it
-/// (`CREQ_HOST_REPORTS_EXCHANGES`, `CREQ_HOST_RECORD_AFTER_ANSWER`); but first
-/// every call of it is checked, and one that is malformed fails the activation
-/// with none reported (`CREQ_HOST_REFUSES_MALFORMED_CALL`). The calls are then
-/// performed by the run in the order the answer gives them
-/// (`CREQ_HOST_PERFORMS_CALLS`), and the model is sent a window composing the
-/// last one, the answer, each call's contexts and each call's output
-/// (`CREQ_HOST_NEXT_WINDOW`), until it answers without calling.
+/// to, as contexts of the prompt's type made from their declarations. Every
+/// request counts against the model call limit, checked before it is sent. Every
+/// call of an answer is checked, and one that is malformed fails the activation
+/// with none reported; otherwise the answer is reported to the run - window,
+/// offer, answer and every call - and the run hands its caller a record holding
+/// it. The calls are then performed by the run in the order the answer gives
+/// them, and the model is sent a window composing the last one, the answer, each
+/// call's contexts and each call's output, until it answers without calling.
 ///
 /// An activation resumed from its record answers each request its record holds
 /// from the record instead, counted all the same, and each call the record holds
-/// an output for from that output (`CREQ_HOST_ANSWERS_FROM_RECORD`) - once the
-/// window and the offer are seen to be the ones recorded, by type and content,
-/// since the identifiers a replay makes are new. A difference fails the
-/// activation before anything is sent (`CREQ_HOST_REPLAY_DIVERGED`). When they
-/// agree the activation goes on with the recorded contexts.
-// @A model's calls performed and the next window composed,IMPL_HOST_YIELD,impl,[CREQ_HOST_OFFERS_DECLARED, CREQ_HOST_PERFORMS_CALLS, CREQ_HOST_NEXT_WINDOW, CREQ_HOST_REFUSES_MALFORMED_CALL, CREQ_HOST_REPORTS_EXCHANGES, CREQ_HOST_ANSWERS_FROM_RECORD, CREQ_HOST_REPLAY_DIVERGED, CREQ_HOST_MODEL_CALL_LIMIT]
+/// an output for from that output - once the window and the offer are seen to be
+/// the ones recorded, by type and content. A difference fails the activation
+/// before anything is sent. When they agree the activation goes on with the
+/// recorded contexts.
+// @A model's calls performed and the next window composed,IMPL_HOST_YIELD,impl,[CREQ_HOST_OFFERS_DECLARED, CREQ_HOST_PERFORMS_CALLS, CREQ_HOST_NEXT_WINDOW, CREQ_HOST_REFUSES_MALFORMED_CALL, CREQ_HOST_REPORTS_EXCHANGES, CREQ_HOST_ANSWERS_FROM_RECORD, CREQ_HOST_REPLAY_DIVERGED, CREQ_HOST_MODEL_CALL_LIMIT],[DEC_EVERY_TURN_COUNTED, DEC_CALL_IS_AN_ACTIVATION, DEC_WINDOW_IS_A_CONTEXT, DEC_MALFORMED_CALL_FAILS, DEC_CALLS_IN_ORDER, DEC_RECORD_AFTER_EACH_ANSWER, DEC_SCRIPT_REPLAYED_FROM_ITS_RECORD]
 async fn complete(
     completing: &Completing,
     role: &str,
@@ -653,7 +602,8 @@ fn same(a: &Context, b: &Context) -> bool {
 /// The offer: for each node type the instance declares a call to, once, a
 /// composition of text contexts of `kind` - its name, its description, and each
 /// parameter's name, required ones first - and the same contexts as the roster
-/// sends them (`DEC_TOOLS_OFFERED_AS_CONTEXTS`).
+/// sends them.
+// @The offer made from the declarations,IMPL_HOST_OFFER,impl,[CREQ_HOST_OFFERS_DECLARED],[DEC_TOOLS_OFFERED_AS_CONTEXTS]
 fn offer_for(
     issuing: &Rc<RefCell<IdSource>>,
     kind: &ContextType,
@@ -691,9 +641,9 @@ fn offer_for(
 
 /// Every call of an answer checked against what was offered, and only then made
 /// into calls: each argument a text context of the type its parameter is
-/// declared for, in the order the model gave them
-/// (`DEC_CALL_CARRIES_STRING_VALUES`). The first fault found is the one
-/// reported, and no call is made when there is one.
+/// declared for, in the order the model gave them. The first fault found is the
+/// one reported, and no call is made when there is one.
+// @Every call checked before any is made,IMPL_HOST_CHECK_CALLS,impl,[CREQ_HOST_REFUSES_MALFORMED_CALL],[DEC_CALL_CARRIES_STRING_VALUES, DEC_MALFORMED_CALL_FAILS]
 #[allow(clippy::type_complexity)]
 fn checked(
     asked: &[Asked],
@@ -755,30 +705,16 @@ fn checked(
         .collect())
 }
 
-/// Take the coroutine library back out of the script's reach.
-///
-/// `mlua` loads it into the globals when the first asynchronous function is
-/// created, whatever the state was built with, and reads `coroutine.yield` from
-/// them there and then into its own poller (`EVD_MLUA_ASYNC_LOADS_COROUTINE`).
-/// Left in, a script could resume a coroutine and have any error - a limit's
-/// included - handed back as a value, which is catching it under another name
-/// (`CREQ_HOST_NO_CATCHING`). Removed after the host functions are made, so
-/// the poller keeps what it took.
-// @Coroutines closed after the host is built,IMPL_HOST_CLOSE_COROUTINES,impl,[CREQ_HOST_NO_CATCHING]
+/// Take the coroutine library, which `mlua` loads with the first asynchronous
+/// function, back out of the script's reach.
+// @Coroutines closed after the host is built,IMPL_HOST_CLOSE_COROUTINES,impl,[CREQ_HOST_NO_CATCHING],[DEC_COROUTINES_CLOSED_AFTER_HOST]
 fn close_coroutines(lua: &Lua) -> LuaResult<()> {
     lua.globals().raw_set("coroutine", LuaNil)
 }
 
-/// Hold `thread` to its instruction limit, returning the flag the count sets
-/// once it passes the limit.
-///
-/// A hook every thousand instructions, measured stopping an endless loop
-/// (`EVD_LUA_LIMITS_STOP`), and set on the thread the script runs in rather than
-/// on the state (`DEC_HOOK_ON_THE_THREAD`). The memory limit is the state's, and
-/// held under an asynchronous call. Both reach the script as errors it cannot
-/// catch, because nothing that catches one is in its environment
-/// (`CREQ_HOST_NO_CATCHING`).
-// @Both limits set on every activation,IMPL_HOST_LIMITS,impl,[CREQ_HOST_INSTRUCTION_LIMIT, CREQ_HOST_MEMORY_LIMIT]
+/// Hold `thread` to its instruction limit with a hook every thousand
+/// instructions, returning the flag the count sets once it passes the limit.
+// @Both limits set on every activation,IMPL_HOST_LIMITS,impl,[CREQ_HOST_INSTRUCTION_LIMIT, CREQ_HOST_MEMORY_LIMIT],[DEC_LIMITS_NOT_TIME, DEC_HOOK_ON_THE_THREAD]
 fn limit(thread: &LuaThread, limits: Limits) -> LuaResult<Rc<Cell<bool>>> {
     const EVERY: u32 = 1000;
     let over = Rc::new(Cell::new(false));
@@ -799,13 +735,9 @@ fn limit(thread: &LuaThread, limits: Limits) -> LuaResult<Rc<Cell<bool>>> {
     Ok(over)
 }
 
-/// What the script's run comes to.
-///
-/// The flags are asked before the error is: every limit, and a failed model
-/// call, reach the script as ordinary errors, and their messages are not what
-/// says which it was. The instruction limit is asked first, since a script over
-/// it may have been anywhere, a model call's aftermath included.
-// @A limit is a limit and a failed call is a failed call,IMPL_HOST_OUTCOME,impl,[CREQ_HOST_MODEL_FAILURE, CREQ_HOST_MODEL_CALL_LIMIT, CREQ_HOST_INSTRUCTION_LIMIT]
+/// What the script's run comes to: the instruction limit, the model call limit
+/// and a host function's failure first, then the error or the values returned.
+// @A limit is a limit and a failed call is a failed call,IMPL_HOST_OUTCOME,impl,[CREQ_HOST_MODEL_FAILURE, CREQ_HOST_MODEL_CALL_LIMIT, CREQ_HOST_INSTRUCTION_LIMIT],[NOTE_HOST_FAILURE_ORDER]
 fn outcome(
     returned: LuaResult<LuaMultiValue>,
     over_instructions: &Cell<bool>,
@@ -823,11 +755,8 @@ fn outcome(
     returned.map_err(failure).and_then(one_context)
 }
 
-/// The one context `values` holds, or what they held instead.
-///
-/// Anything else fails, and says what it was: `nil`, a table and two contexts
-/// are three different mistakes. A string is not turned into a context, since
-/// the type it would be given is a decision the script did not make.
+/// The one context `values` holds, or a failure saying what they held instead:
+/// nothing, a Lua type's name, or how many values. A string is not a context.
 // @Exactly one context or a failure naming what came back,IMPL_HOST_ONE_CONTEXT,impl,[CREQ_HOST_ONE_CONTEXT]
 fn one_context(values: LuaMultiValue) -> Result<Context, ScriptFailure> {
     let not_one = |found: String| Err(ScriptFailure::NotOneContext { found });
@@ -843,12 +772,10 @@ fn one_context(values: LuaMultiValue) -> Result<Context, ScriptFailure> {
     }
 }
 
-/// The failure a Lua error stands for, once the flags have been asked.
-///
-/// A memory error is the memory limit, whatever raised it. Anything else is the
-/// script's own error, kept whole: the document, the line and the traceback are
-/// what its author reads.
-// @A limit is a limit and an error is an error,IMPL_HOST_FAILURE,impl,[CREQ_HOST_ERROR_CARRIED, CREQ_HOST_MEMORY_LIMIT]
+/// The failure a Lua error stands for, once the flags have been asked: a memory
+/// error is the memory limit, whatever raised it, and anything else is the
+/// script's own error, kept whole.
+// @A limit is a limit and an error is an error,IMPL_HOST_FAILURE,impl,[CREQ_HOST_ERROR_CARRIED, CREQ_HOST_MEMORY_LIMIT],[NOTE_HOST_FAILURE_ORDER]
 fn failure(error: LuaError) -> ScriptFailure {
     match error {
         LuaError::MemoryError(_) => ScriptFailure::MemoryLimit,
@@ -897,10 +824,8 @@ node_type = "first"
 node_type = "second"
 "#;
 
-/// Run the pair with `script` as `a`'s behaviour, and return how `a` failed.
-///
-/// That the failure is `a`'s is the evidence nothing after it was performed:
-/// `b` was ready the whole time, and a run that went on would have ended on it.
+/// Run the pair with `script` as `a`'s behaviour, and return how `a` failed;
+/// `b` is ready the whole time.
 #[cfg(test)]
 fn first_fails_with(script: &str) -> ScriptFailure {
     let behaviours = Behaviours::new()
@@ -1144,8 +1069,7 @@ fn refused_output_fails_with_the_refusal() {
 #[cfg(test)]
 #[test]
 fn nothing_survives_an_activation() {
-    // `second` and `third` are two instances of one type, `step`, so a state kept
-    // per type is caught as well as one kept per run.
+    // `second` and `third` are two instances of one type, `step`.
     let leaky = r#"
 local given, host = ...
 local seen = tostring(secret) .. '/' .. tostring(string.secret)
@@ -1272,9 +1196,7 @@ fn spending(iterations: u64) -> String {
 #[cfg(test)]
 #[test]
 fn instruction_limit_is_per_activation() {
-    // Calibrated rather than assumed: `spend` iterations fit one activation's
-    // limit and twice as many do not, so the three activations of the second
-    // run spend more than any limit counted across the run could allow.
+    // `spend` iterations fit one activation's limit, and twice as many do not.
     let spend = SMALL.instructions * 2 / 3;
     let chained = |seed: &str| {
         let behaviours = Behaviours::new().define("seed", "seed.lua", seed).define(
@@ -1317,8 +1239,7 @@ fn holding(bytes: usize) -> String {
 #[cfg(test)]
 #[test]
 fn memory_limit_is_per_activation() {
-    // Calibrated as the instruction case is: `hold` fits one activation and
-    // twice as much does not, so three activations exceed any shared limit.
+    // `hold` fits one activation's limit, and twice as much does not.
     let hold = SMALL.memory * 2 / 3;
     let chained = |seed: &str| {
         let behaviours = Behaviours::new().define("seed", "seed.lua", seed).define(

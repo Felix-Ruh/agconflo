@@ -1,10 +1,5 @@
 //! The model roster: the caller's mapping from role to model, and the client
-//! that reaches them.
-//!
-//! A script names a role - what the call is for - and the caller starting the
-//! run says which model plays it (`DEC_MODELS_BY_ROLE`), so the same workflow
-//! reaches another provider by changing one mapping (`STKH_PROVIDER_CHOICE`).
-//! Nothing here knows about scripts or activations.
+//! that reaches them. Nothing here knows about scripts or activations.
 
 use std::collections::HashMap;
 use std::fmt;
@@ -19,10 +14,10 @@ use genai::chat::{
 /// Which model plays each role, and the client that reaches them.
 ///
 /// The client is the caller's own: where each model's requests go and what
-/// credentials they carry are decided when it is built, from the caller's
-/// environment and never from this repository. Models are named as `genai`
-/// names them - `openai::gpt-...`, `claude-...` - and reached through it
-/// (`DEC_MODELS_THROUGH_GENAI`).
+/// credentials they carry are decided when it is built, and the roster reads no
+/// credentials itself. Models are named as `genai` names them - `openai::gpt-...`,
+/// `claude-...`.
+// @A mapping from role to model,IMPL_MODELS_ROSTER,impl,[CREQ_ROSTER_ROLE_TO_MODEL],[DEC_MODELS_BY_ROLE, DEC_MODELS_THROUGH_GENAI]
 #[derive(Clone, Debug)]
 pub struct Roster {
     client: Client,
@@ -39,8 +34,7 @@ impl Roster {
     }
 
     /// The same roster, with `role` played by `model`. Mapping a role again
-    /// replaces its model: the roster is the caller's choice for this run, and
-    /// the last word is the choice.
+    /// replaces its model.
     pub fn map(mut self, role: &str, model: &str) -> Self {
         self.roles.insert(role.to_owned(), model.to_owned());
         self
@@ -58,22 +52,19 @@ impl Roster {
     /// Send the model `role` is mapped to `window`, offering it `offer`, and
     /// return what it answered: its text, and every call it made.
     ///
-    /// Each part goes as the message it is (`DEC_WINDOW_IS_A_CONTEXT`), and no
-    /// text goes that is not the rendering of one of the window's or the offer's
-    /// contexts, whole and byte for byte (`CREQ_ROSTER_CONTEXTS_WHOLE`): no
-    /// system prompt, no instructions, nothing trimmed. Measured, `genai` adds
-    /// parameters and the format's own words and no text
-    /// (`EVD_GENAI_TWO_FORMATS_EXACT`). A window of one user part is one user
-    /// message holding its rendering. With nothing offered, no tools are sent.
+    /// Each part goes as the message it is, and no text goes that is not the
+    /// rendering of one of the window's or the offer's contexts, whole and byte
+    /// for byte: no system prompt, no instructions, nothing trimmed. A window of
+    /// one user part is one user message holding its rendering. With nothing
+    /// offered, no tools are sent.
     ///
-    /// The answer's text is the text the provider sent (`DEC_ANSWER_AS_SENT`),
-    /// which excludes any reasoning the model reports separately, and is empty
-    /// when the response holds none - as it does beside a call in OpenAI's
-    /// format. Its calls come back in the order it made them, judged by nothing.
+    /// The answer's text is the text the provider sent, which excludes any
+    /// reasoning the model reports separately, and is empty when the response
+    /// holds none - as it does beside a call in OpenAI's format. Its calls come
+    /// back in the order it made them, unjudged.
     ///
-    /// A role mapped to nothing fails before anything is sent: sending the role
-    /// as a model name would reach whatever provider the name resembles.
-    // @One role one model and every part as it is,IMPL_MODELS_CALL,impl,[CREQ_ROSTER_ROLE_TO_MODEL, CREQ_ROSTER_CONTEXTS_WHOLE, CREQ_ROSTER_UNMAPPED_ROLE, CREQ_ROSTER_PROVIDER_FAILURE, CREQ_ROSTER_ANSWER_AS_SENT]
+    /// A role mapped to nothing fails before anything is sent.
+    // @One role one model and every part as it is,IMPL_MODELS_CALL,impl,[CREQ_ROSTER_ROLE_TO_MODEL, CREQ_ROSTER_CONTEXTS_WHOLE, CREQ_ROSTER_UNMAPPED_ROLE, CREQ_ROSTER_PROVIDER_FAILURE, CREQ_ROSTER_ANSWER_AS_SENT],[DEC_WINDOW_IS_A_CONTEXT, DEC_ANSWER_AS_SENT, DEC_MODELS_BY_ROLE]
     pub(crate) async fn send(
         &self,
         role: &str,
@@ -113,7 +104,8 @@ impl Roster {
 }
 
 /// One part of a model call's window, as the script host knows it from what the
-/// run holds (`DEC_WINDOW_IS_A_CONTEXT`).
+/// run holds.
+// @A window's part by its provenance,TRACE_MODELS_PART,trace,[],[DEC_WINDOW_IS_A_CONTEXT]
 #[derive(Clone, Debug)]
 pub(crate) enum Part {
     /// A part no answer or call produced - a script's prompt among them - sent
@@ -127,9 +119,9 @@ pub(crate) enum Part {
     Result { call: String, output: Context },
 }
 
-/// One node type offered to a model, as the contexts its offer is made of
-/// (`DEC_TOOLS_OFFERED_AS_CONTEXTS`): its name, its description, and each
-/// parameter's name with whether it is required.
+/// One node type offered to a model, as the contexts its offer is made of: its
+/// name, its description, and each parameter's name with whether it is required.
+// @An offer made of contexts,TRACE_MODELS_OFFERED,trace,[],[DEC_TOOLS_OFFERED_AS_CONTEXTS]
 #[derive(Clone, Debug)]
 pub(crate) struct Offered {
     pub(crate) name: Context,
@@ -146,7 +138,7 @@ pub(crate) struct Answered {
 
 /// One call a model's answer made, as the provider sent it: its identifier, the
 /// name it called, and its arguments as `genai` parsed them. Nothing about it
-/// has been checked (`CREQ_ROSTER_CALLS_RETURNED`).
+/// has been checked.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Asked {
     pub(crate) id: String,
@@ -159,9 +151,9 @@ pub(crate) struct Asked {
 /// A model's turn holds its text beside its calls when it has any, and no text
 /// part when its answer is empty, which sends the whole of an empty rendering.
 /// A call's arguments are an object of its contexts' renderings under their
-/// parameters' names, in the order the call gave them; the JSON around them is
-/// `genai`'s to write (`DEC_CALL_CARRIES_STRING_VALUES`).
-// @Each part of a window sent as the message it is,IMPL_MODELS_MESSAGES,impl,[CREQ_ROSTER_PARTS_AS_MESSAGES, CREQ_ROSTER_CONTEXTS_WHOLE]
+/// parameters' names, in the order the call gave them; `genai` writes the JSON
+/// around them.
+// @Each part of a window sent as the message it is,IMPL_MODELS_MESSAGES,impl,[CREQ_ROSTER_PARTS_AS_MESSAGES, CREQ_ROSTER_CONTEXTS_WHOLE],[DEC_WINDOW_IS_A_CONTEXT, DEC_CALL_CARRIES_STRING_VALUES]
 fn messages(window: &[Part]) -> Vec<ChatMessage> {
     window
         .iter()
@@ -200,8 +192,8 @@ fn messages(window: &[Part]) -> Vec<ChatMessage> {
 
 /// One offered node type as a tool: named and described by its contexts'
 /// renderings, taking one string for each parameter, the required ones marked
-/// required - which are the format's words, not the node type's.
-// @An offered node type sent as a tool,IMPL_MODELS_TOOLS,impl,[CREQ_ROSTER_OFFER_AS_TOOLS]
+/// required.
+// @An offered node type sent as a tool,IMPL_MODELS_TOOLS,impl,[CREQ_ROSTER_OFFER_AS_TOOLS],[DEC_TOOLS_OFFERED_AS_CONTEXTS]
 fn tool(offered: &Offered) -> Tool {
     let mut properties = serde_json::Map::new();
     let mut required = Vec::new();
@@ -234,17 +226,10 @@ fn returned_calls(calls: &[&ToolCall]) -> Vec<Asked> {
         .collect()
 }
 
-/// The answer's text as the provider sent it, read from the response body, for
-/// the two formats measured; `None` for any other.
-///
-/// Read here rather than taken from `genai`, because `genai`'s OpenAI adapter
-/// trims the answer and its Anthropic adapter does not
-/// (`EVD_GENAI_OPENAI_TRIMS`): the same workflow would get different bytes from
-/// two providers saying the same thing. OpenAI's format holds the answer as one
-/// string; Anthropic's as blocks, whose text ones are joined in order. A
-/// response in any other format falls back to `genai`'s reading of it, which is
-/// the limit of what was measured.
-// @The answer as the provider sent it,IMPL_MODELS_ANSWER_AS_SENT,impl,[CREQ_ROSTER_ANSWER_AS_SENT]
+/// The answer's text as the provider sent it, read from the response body: in
+/// OpenAI's format one string, in Anthropic's the text blocks joined in order.
+/// `None` for any other format.
+// @The answer as the provider sent it,IMPL_MODELS_ANSWER_AS_SENT,impl,[CREQ_ROSTER_ANSWER_AS_SENT],[DEC_ANSWER_AS_SENT]
 fn answer_as_sent(raw: &serde_json::Value) -> Option<String> {
     if let Some(content) = raw["choices"][0]["message"]["content"].as_str() {
         return Some(content.to_owned());
@@ -259,18 +244,11 @@ fn answer_as_sent(raw: &serde_json::Value) -> Option<String> {
 }
 
 /// Why a model call failed.
-///
-/// Values rather than a message, because a caller acts differently on each: an
-/// unmapped role is its own mapping to fix, a 401 is a key, a 503 is a provider
-/// to wait for (`CREQ_ROSTER_PROVIDER_FAILURE`). `genai` holds the status as a
-/// value already (`EVD_GENAI_ERROR_STATUS`).
-///
-/// `#[non_exhaustive]`: the ways a call can fail grow with what a call can be.
+// @A model call's failure as values,IMPL_MODELS_FAILURE,impl,[CREQ_ROSTER_PROVIDER_FAILURE, CREQ_ROSTER_UNMAPPED_ROLE],[DEC_FAILURES_NON_EXHAUSTIVE]
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ModelFailure {
-    /// The role is mapped to no model, and nothing was sent
-    /// (`CREQ_ROSTER_UNMAPPED_ROLE`).
+    /// The role is mapped to no model, and nothing was sent.
     Unmapped {
         /// The role the script called.
         role: String,
@@ -308,8 +286,7 @@ impl fmt::Display for ModelFailure {
 impl std::error::Error for ModelFailure {}
 
 // --- test builders -----------------------------------------------------------
-// A stub provider, and a client pointed at it. Used by every module's model
-// tests, so they live beside the roster they exercise.
+// A stub provider, and a client pointed at it, for every module's model tests.
 
 #[cfg(test)]
 use std::io::{Read, Write};
@@ -328,10 +305,8 @@ pub(crate) struct Stub {
 #[cfg(test)]
 impl Stub {
     /// A stub answering every request with `status`, and with `answer` as the
-    /// model's text when that is 200.
-    ///
-    /// Blocking sockets on a thread of its own, so that it serves whichever
-    /// runtime a test happens to make.
+    /// model's text when that is 200. It serves from a thread of its own, under
+    /// whatever runtime a test makes.
     pub(crate) fn answering(status: u16, answer: &str) -> Self {
         Self::serving(status, vec![Reply::text(answer)], true, usize::MAX)
     }
@@ -712,8 +687,7 @@ fn unreachable_provider_has_no_status() {
 #[cfg(test)]
 #[test]
 fn answer_kept_as_sent() {
-    // Whitespace at both ends: `genai`'s OpenAI adapter trims it and its
-    // Anthropic adapter keeps it (EVD_GENAI_OPENAI_TRIMS).
+    // Whitespace at both ends, which `genai`'s OpenAI adapter trims.
     let answer = "\n  an answer, spaced \n\n";
     let stub = Stub::answering(200, answer);
     let roster = Roster::new(client_for(&stub.base))
