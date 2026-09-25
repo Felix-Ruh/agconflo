@@ -305,6 +305,18 @@ if git diff --cached --name-only | grep -qx 'scripts/change-records\.sh'; then
         fail "the change-record check did not refuse what it must"
 fi
 
+# --- comment rules -----------------------------------------------------------
+# DEC_COMMENT_CHECKS: no need id in a Rust comment that is not a code marker,
+# and no marker of the wrong shape, in every crate scripts/comment-rules.sh
+# holds. Git and awk alone. Its self-test takes under two seconds, so it runs
+# on every commit.
+
+echo "pre-commit: comment rules"
+sh scripts/comment-rules.sh --selftest > /dev/null ||
+    fail "the comment check did not refuse what it must - run 'sh scripts/comment-rules.sh --selftest'"
+sh scripts/comment-rules.sh --staged ||
+    fail "a comment names a need or a marker is malformed - see AGENTS.md, 'Comments and docstrings'"
+
 # --- rust --------------------------------------------------------------------
 # Written before the first crate existed and skipped until it did, so that it
 # never had to be remembered and retrofitted; each step was tripped once when

@@ -130,6 +130,13 @@ jobs:
           sh scripts/change-records.sh --selftest
           sh scripts/change-records.sh "$(git merge-base HEAD origin/main)"
 
+      # DEC_COMMENT_CHECKS, over every crate the script holds. The self-test
+      # first, so a check that has stopped refusing fails here. Git and awk.
+      - name: Comment rules
+        run: |
+          sh scripts/comment-rules.sh --selftest
+          sh scripts/comment-rules.sh
+
       # Deliberately NOT cached. Measured: the download takes under 4 s and
       # hashing it 0.2 s, so a cache would save nothing worth having - while
       # a cache hit would skip the script's SHA-256 verification entirely.

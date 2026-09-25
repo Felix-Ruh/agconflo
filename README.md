@@ -116,6 +116,8 @@ sh scripts/import-test-runs.sh --check                         # are the committ
 sh scripts/import-test-runs.sh                                 # rewrite them, then read the diff
 sh scripts/impact.sh <NEED_ID>                                 # what a change to one need reaches
 sh scripts/change-records.sh --staged                          # does every changed requirement have a record?
+sh scripts/comment-rules.sh                                    # no need id in a comment, every code marker well formed
+sh scripts/comment-rules.sh --report                           # long comments and docstrings, for review
 ```
 
 The tests write a JUnit report to `target/nextest/default/junit.xml`, and a test still running after
@@ -132,7 +134,8 @@ execute it directly.
 
 It scans staged changes for credentials — this repository is public, so a leak is permanent — then
 checks and format-checks the requirements project, runs the Cypher gates, runs the metamodel
-self-test, refuses a change to an existing requirement that no change record names, then
+self-test, refuses a change to an existing requirement that no change record names, refuses a need id
+in a Rust comment and a malformed code marker, then
 `cargo fmt --check`, `clippy -D warnings` and the tests under nextest. Both toolchains
 degrade rather than block: a missing `ubc` or a missing `cargo` skips its own gate with a message
 rather than failing the commit, a missing nextest falls back to `cargo test`, and the Rust steps are
