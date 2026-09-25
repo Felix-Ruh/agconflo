@@ -336,6 +336,12 @@ for them — and fills each one's `code_url` with a permalink to its line at the
 Nothing is written by hand, so the trace cannot drift from the code the way prose would. One
 requirement may be met in several places, and each place carries its own marker.
 
+A marker's second list names the decisions the code follows, so analysing a decision finds the code
+it shaped; code that follows one and meets no requirement gets a `trace` marker instead of an `impl`.
+Why code is as it is lives there, in the graph, and a comment says what the code does - AGENTS.md,
+"Comments and docstrings", has the guidelines, and `scripts/comment-rules.sh` refuses a need id in
+a comment's prose.
+
 A marker naming a requirement that does not exist is a dead link and fails the build. A requirement
 that no marker names is **not** an error — code is written after its requirement — and appears in the
 `unimplemented` review report instead. `untested` and `unrun` ask the same question of test cases and
