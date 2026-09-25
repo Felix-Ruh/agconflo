@@ -91,6 +91,12 @@ that the record amended.
    resumed on a thread with a small stack. It resumes, and the argument renders
    as it did.
 
+   Each level comes from a source of its own standing below its part's, so that
+   identifiers fall outward: the outermost is written first, and making it goes
+   down every level. Numbered the usual way, each part would already have been
+   made when its holder was reached, and a recursive maker would never go deeper
+   than one - measured, it passed this case that way.
+
    Catches: a deep composition built by recursion.
 
 .. test_case:: A resumed run's source issues nothing the recorded one had

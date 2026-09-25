@@ -1,14 +1,8 @@
 //! The topology reader: one document's text turned into what it describes, and a
 //! fault in that text refused with its place.
 //!
-//! Read with toml_edit alone, walking the parsed document by hand rather than
-//! deserializing it. Every table and value in a parsed document carries the span
-//! a fault is located by (`EVD_TOML_EDIT_SPANS`), and its tables hand their keys
-//! on in the order they were written (`EVD_TOML_EDIT_KEEPS_ORDER`) - which is
-//! the order a node assembles its inputs in, so it is data here.
-//!
-//! Keys the model does not name are passed over rather than refused. A document
-//! an editor has annotated is the ordinary case, not a fault in it.
+//! Read with toml_edit alone, walking the parsed document by hand; keys the
+//! model does not name are passed over.
 
 use std::fmt;
 use std::ops::Range;
@@ -21,10 +15,6 @@ use crate::workflow::{Binding, NodeInstance, NodeType, Parameter, WorkflowDefini
 
 /// The node types one document declares, under the name its caller gave the
 /// document.
-///
-/// The name travels with the declarations because a type declared twice is
-/// found only once several documents are gathered, and the fault then has to
-/// say which documents it was (`CREQ_CATALOGUE_DECLARED_ONCE`).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NodeTypeDocument {
     pub(crate) document: String,
@@ -43,17 +33,9 @@ impl NodeTypeDocument {
     }
 }
 
-/// A document that cannot be read, and where.
-///
-/// The place is three values rather than a sentence, for the reason a wiring
-/// defect carries its place as fields (`CREQ_DEFECT_NAMES_PLACE`): the caller
-/// this is written for is an agent correcting its own document, and it reads
-/// fields. The line and column are counted from one, and the column in
-/// characters, exactly as the parser's own message counts them - a place one off
-/// from the message beside it sends an author to the wrong character.
-///
-/// The document is named by whatever its caller called it, since which documents
-/// are read is the caller's to say (`DEC_TYPES_IN_OWN_DOCUMENTS`).
+/// A document that cannot be read, and where: the document as its caller named
+/// it, and the line and the column in characters, each counted from one as the
+/// parser's own message counts them.
 #[derive(Clone, Debug, PartialEq, Eq)]
 // @A fault in the text located as values,IMPL_READER_PLACE,impl,[CREQ_READER_FAULT_LOCATED]
 pub struct ReadFault {
@@ -85,18 +67,13 @@ impl ReadFault {
     }
 }
 
-/// What makes a document unreadable.
-///
-/// Every one of these is a fault in the text rather than in the workflow it
-/// describes. A name that resolves to nothing is not among them: it is a wiring
-/// defect, and reading lets it through for the validator to report with
-/// everything else (`CREQ_READER_NAMES_UNRESOLVED`).
+/// What makes a document unreadable: a fault in the text, never a name that
+/// resolves to nothing.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum FaultKind {
-    /// The text is not TOML. A name written twice within one table is among
-    /// these, since every name is a table key (`DEC_NAMES_AS_KEYS`) and TOML
-    /// forbids a key written twice.
+    /// The text is not TOML, a name written twice within one table among it.
+    // @A repeated name refused as TOML refuses it,TRACE_READER_SYNTAX,trace,[],[DEC_NAMES_AS_KEYS]
     Syntax {
         /// The parser's own account of the fault, without its place.
         message: String,
@@ -115,8 +92,8 @@ pub enum FaultKind {
         /// The absent key, from the top of the document down.
         key: Vec<String>,
     },
-    /// A context type name that the model refuses (`CREQ_VALUE_DECLARED_TYPE`),
-    /// though the text holds it as a well-formed string.
+    /// A context type name that the model refuses, though the text holds it as a
+    /// well-formed string.
     InvalidContextType {
         /// The key holding the name, from the top of the document down.
         key: Vec<String>,
@@ -177,15 +154,10 @@ impl std::error::Error for ReadFault {}
 /// tables and an array - `required` and `optional`, each keying a parameter's
 /// context type by the parameter's name, and `globals`, the context types read
 /// by declaration - and `output`, the one context type it produces, and may hold
-/// a `description` of what it does, shown to a model it is offered to. Only
-/// `output` is needed; an absent list is an empty one, an absent description is
-/// empty, and a document without `types` declares none.
-///
-/// Parameters come back in the order they are written, whether a list is
-/// written as a header table, an inline table or dotted keys. Nothing here
-/// sorts them, collects them into a sorted map, or reads the three lists by
-/// position rather than by key.
-// @A node type document read in the order it is written,IMPL_READER_TYPES,impl,[CREQ_READER_TYPES]
+/// a `description`. Only `output` is needed; an absent list is an empty one, an
+/// absent description is empty, and a document without `types` declares none.
+/// Parameters come back in the order they are written, in whichever TOML form.
+// @A node type document read in the order it is written,IMPL_READER_TYPES,impl,[CREQ_READER_TYPES],[DEC_NAMES_AS_KEYS, DEC_TYPES_IN_OWN_DOCUMENTS]
 pub fn read_node_types(document: &str, text: &str) -> Result<NodeTypeDocument, ReadFault> {
     let reading = Reading { document, text };
     let parsed = reading.parse()?;
@@ -204,18 +176,14 @@ pub fn read_node_types(document: &str, text: &str) -> Result<NodeTypeDocument, R
     })
 }
 
-/// A workflow document as it was read, handed on with the definition.
-///
-/// Handed on so that writing a definition back can edit this document rather
-/// than write a new one, and everything a definition does not carry - comments,
-/// keys the model does not name, the author's layout - can stay where it was
-/// (`CREQ_WRITER_KEEPS_UNREAD`). Its text is what [`fmt::Display`] writes.
+/// A workflow document as it was read, handed on with the definition so that
+/// writing it back edits this document. Its text is what [`fmt::Display`]
+/// writes.
 #[derive(Clone, Debug)]
 pub struct WorkflowDocument {
     pub(crate) document: String,
     pub(crate) toml: DocumentMut,
-    /// Whether the text read ended its lines in CRLF, which toml_edit does not
-    /// keep (`EVD_TOML_EDIT_WRITES_LF`).
+    /// Whether the text read ended its lines in CRLF.
     pub(crate) crlf: bool,
 }
 
@@ -234,20 +202,11 @@ impl WorkflowDocument {
 /// with `output`. Each instance is a table under `instances`, keyed by its name,
 /// holding the `node_type` it names, whether it is an `entry` node, and its
 /// `bindings`, each keying the instance a parameter is wired to by the
-/// parameter's name. Only `name` and each `node_type` are needed.
-///
-/// Three absences are read as nothing rather than as something, and each of the
-/// other readings is a defect somebody would reach for. An absent `output`
-/// designates no output, not the only instance or the last: the validator
-/// refuses that with everything else wrong (`DEC_ONE_OUTPUT_KEY`). An absent
-/// `entry` is not an entry node, since an entry node's parameters are exempt from
-/// being bound and defaulting the other way passes a workflow that is not wired
-/// at all. And absent `instances` or `bindings` are none.
-///
-/// The definition carries every declaration in the catalogue, whether or not an
-/// instance names it, since the catalogue is what its instances are checked
-/// against.
-// @A workflow document read into a definition,IMPL_READER_WORKFLOW,impl,[CREQ_READER_WORKFLOW]
+/// parameter's name. Only `name` and each `node_type` are needed: an absent
+/// `output` designates none, an absent `entry` is not an entry node, and absent
+/// `instances` or `bindings` are none. The definition carries every declaration
+/// in the catalogue.
+// @A workflow document read into a definition,IMPL_READER_WORKFLOW,impl,[CREQ_READER_WORKFLOW],[DEC_ONE_OUTPUT_KEY, DEC_TOPOLOGY_IN_TOML]
 pub fn read_workflow(
     document: &str,
     text: &str,
@@ -348,14 +307,8 @@ impl<'t> Reading<'t> {
             .ok_or_else(|| self.wrong_type(item.span(), key, "string", item.type_name()))
     }
 
-    /// One instance, written under `instances.<name>`.
-    ///
-    /// Every name in it is copied as it is written and looked up nowhere: not the
-    /// type it names, not the instance each binding is wired to, not the
-    /// parameter each binding fills. A name that resolves to nothing is a wiring
-    /// defect, and the validator reports it with every other one; a reader that
-    /// looked it up could only refuse the first it met, and the author would learn
-    /// of the second after fixing it.
+    /// One instance, written under `instances.<name>`, every name in it copied as
+    /// written and looked up nowhere.
     // @Names read as written and looked up nowhere,IMPL_READER_NAMES_AS_WRITTEN,impl,[CREQ_READER_NAMES_UNRESOLVED]
     fn instance(&self, name: &str, item: &Item) -> Result<NodeInstance, ReadFault> {
         let key = ["instances", name];
@@ -401,14 +354,9 @@ impl<'t> Reading<'t> {
     }
 
     /// The node types an instance declares calls to, in the order its `calls`
-    /// array lists them, or none when it has no such key.
-    ///
-    /// Each name is copied as written and looked up nowhere, as every other name
-    /// of an instance is: a call to a node type nobody supplied is a wiring
-    /// defect (`CREQ_VALIDATOR_CALL_RESOLVES`). A name listed twice is read
-    /// twice. A key that is not an array of strings is refused where it is
-    /// written rather than read as no calls, since that would declare nothing
-    /// without a word.
+    /// array lists them, a name listed twice read twice, or none when it has no
+    /// such key. A key that is not an array of strings is refused where it is
+    /// written.
     // @An instance's calls read in the order written,IMPL_READER_CALLS,impl,[CREQ_READER_CALLS]
     fn calls(&self, table: &dyn TableLike, key: &[&str]) -> Result<Vec<String>, ReadFault> {
         let Some(item) = table.get("calls") else {
@@ -501,19 +449,10 @@ impl<'t> Reading<'t> {
         })
     }
 
-    /// Nothing, or a fault for a parameter `declaration` lists as both
-    /// required and optional.
-    ///
-    /// The parser refuses a name written twice within one list, since it is a
-    /// repeated key, and cannot see one written once in each: the two lists are
-    /// two tables. Read as it stands, the validator would judge every wire into
-    /// that parameter by one declaration and ignore the other.
-    ///
-    /// The fault is placed where the name repeats, as the parser places a
-    /// repeated key: at whichever of the two declarations is written later. With
-    /// several such names, the one that repeats first in the text is reported.
-    /// Names are compared exactly, as they are everywhere else - `input` and
-    /// `Input` are two parameters.
+    /// Nothing, or a fault for a parameter `declaration` lists as both required
+    /// and optional, placed at whichever declaration is written later; with
+    /// several, the one that repeats first in the text. Names are compared
+    /// exactly.
     // @A parameter declared in both lists refused where it repeats,IMPL_READER_DECLARED_ONCE,impl,[CREQ_READER_FAULT_LOCATED]
     fn declared_once(
         &self,
@@ -522,10 +461,8 @@ impl<'t> Reading<'t> {
         required: &[Parameter],
         optional: &[Parameter],
     ) -> Result<(), ReadFault> {
-        // A key read from a parsed document has a span - the test places an
-        // inline and a header spelling exactly. A missing one would still
-        // refuse the document, at its start at worst, rather than let the
-        // repetition through.
+        // A key read from a parsed document has a span; a missing one refuses the
+        // document at its start.
         let written_at = |list: &str, name: &str| {
             declaration
                 .get(list)
@@ -614,14 +551,9 @@ fn path(key: &[&str]) -> Vec<String> {
 }
 
 /// The line and column of byte `offset` in `text`, counted from one, the column
-/// in characters.
-///
-/// Counted exactly as toml_edit counts them when it writes a refusal's message,
-/// since the two reach a caller side by side, and that count lives in a private
-/// function of the library (`EVD_TOML_EDIT_SPANS`). So this is a port of it,
-/// down to its two edges: an offset at or past the end of the text is placed
-/// just after the last character, on its line, and an offset inside a character
-/// wider than one byte falls back to counting bytes.
+/// in characters, as toml_edit counts them in its own messages: an offset at or
+/// past the end is placed just after the last character, and one inside a
+/// character wider than a byte falls back to counting bytes.
 pub(crate) fn line_and_column(text: &str, offset: usize) -> (usize, usize) {
     let bytes = text.as_bytes();
     if bytes.is_empty() {
@@ -645,7 +577,7 @@ pub(crate) fn line_and_column(text: &str, offset: usize) -> (usize, usize) {
 }
 
 // --- tests -------------------------------------------------------------------
-// Bare functions named after their test cases, for the reason given in id.rs.
+// Bare functions named after their test cases.
 
 #[cfg(test)]
 use crate::catalogue::node_type_document;
@@ -661,9 +593,7 @@ use proptest::collection::vec;
 use proptest::prelude::*;
 
 // --- documents the tests write -----------------------------------------------
-// Written with a few lines of formatting of their own rather than with the
-// writer, so that a reader and a writer wrong in matching ways cannot pass
-// together. The writer's tests use them too, for the same reason.
+// Written without the writer, and used by the writer's tests too.
 
 /// A workflow document as a test writes it: a definition's worth of names, and
 /// the choices about how each is written that a definition has no place for.
@@ -822,11 +752,8 @@ fn quoted(value: &str) -> String {
 }
 
 /// `names` as a TOML array written the way a person might: padded inside its
-/// brackets, and its first name as a literal string where TOML allows one.
-///
-/// Not the writer's own way of writing an array, on purpose. An array the writer
-/// rewrote while its names stayed the same would then come back as different
-/// text, so leaving an unchanged list alone is something a test can see.
+/// brackets, and its first name as a literal string where TOML allows one - not
+/// the writer's own way of writing one.
 #[cfg(test)]
 fn array(names: &[String]) -> String {
     let items: Vec<String> = names
@@ -969,12 +896,8 @@ const RESOLVABLE: Pools = Pools {
 proptest! {
     /// Any list of distinct names, written as a node type's required parameters,
     /// reads back in the order written - in an inline table, in dotted keys and
-    /// under a header of their own, and each of those in the order generated and
-    /// reverse-sorted too, since that is the order in which every name moves.
-    ///
-    /// The whole declaration is compared, not the names alone, so a reader that
-    /// kept the order and lost a type, or filed a parameter in another list,
-    /// fails here too.
+    /// under a header of their own, each in the order generated and
+    /// reverse-sorted - and the whole declaration is compared.
     #[test]
     fn parameter_order_is_kept(names in vec("[a-z]{1,6}", 1..=8)) {
         let mut given: Vec<String> = Vec::new();
@@ -1018,13 +941,9 @@ proptest! {
 
 #[test]
 fn three_lists_kept_apart() {
-    // Written globals, optional, required - an order other than the one the
-    // model holds them in - so a reader taking the lists by position puts each
-    // in the wrong one. Each list declares its own context types, so a list read
-    // as another cannot come out equal by accident.
-    //
-    // It carries keys the model does not name as well, at the top and on a
-    // type, which an editor's document always will: a strict reader refuses it.
+    // Written globals, optional, required - an order other than the model's -
+    // each list declaring its own context types, with keys the model does not
+    // name at the top and on a type.
     let text = "\
 [editor]
 zoom = 2
@@ -1062,9 +981,7 @@ output = \"note\"
 #[test]
 fn empty_context_type_is_a_fault() {
     // A parameter, an output and a global each declared with the context type
-    // "", which is a well-formed TOML string and a name the model refuses. Each
-    // is a fault at that value - the document it is in, its line, and the
-    // column of its opening quote.
+    // "", each a fault at that value.
     let cases = [
         (
             "parameter.toml",
@@ -1108,13 +1025,8 @@ proptest! {
     /// For any document written in any of the forms TOML allows, reading gives
     /// exactly what was written - the name, every instance with its type, entry
     /// flag and bindings, and the output or none - and the catalogue's
-    /// declarations as its node types.
-    ///
-    /// The generator writes the entry key absent, present and true, and present
-    /// and false. A reader defaulting an absent key to true reads every instance
-    /// as an entry node, and nothing else here would see it: the validator
-    /// exempts an entry node's parameters, so the definition it makes passes
-    /// validation.
+    /// declarations as its node types. The entry key is written absent, true and
+    /// false.
     #[test]
     fn reads_what_is_written(written in any_written(RESOLVABLE)) {
         let catalogue = catalogue();
@@ -1128,9 +1040,7 @@ proptest! {
 
 #[test]
 fn absent_output_is_no_output() {
-    // One instance, which is the shape where a reader filling the gap has an
-    // obvious candidate - and designating it would give the workflow an output
-    // its author never named.
+    // One instance, and no output designated.
     let text = "name = \"lonely\"\n\n[instances.only]\nnode_type = \"source\"\n";
     let (definition, _) = read_workflow("lonely.toml", text, &catalogue()).expect("it reads");
 
@@ -1234,8 +1144,7 @@ bindings = {}
 #[test]
 fn faults_carry_their_place() {
     // The four ways a workflow document cannot be read, each under a name of its
-    // own. The places are the fault's, counted from one, and read from the
-    // fault's fields - never from its message.
+    // own, the places read from the fault's fields.
     let key = |parts: &[&str]| parts.iter().map(|&part| part.to_owned()).collect();
     let cases = [
         (
@@ -1297,13 +1206,8 @@ fn place_in_message(message: &str) -> Option<(usize, usize)> {
 
 /// A valid document - a workflow or a node type document - with characters
 /// deleted, inserted or swapped, or one value replaced by a value of another
-/// kind. Arbitrary text almost never parses far enough to reach a value the
-/// reader interprets, which is where an `unwrap` would sit; a valid document
-/// nearly broken is what gets there.
-///
-/// The replaced value is there because the other three changes almost never
-/// make one: measured over 512 documents, they gave faults in the syntax and
-/// missing keys, and not one value of the wrong kind.
+/// kind.
+// @Nearly valid text for the reader,TRACE_READER_NEAR_VALID,trace,[],[NOTE_READER_NEAR_VALID_TEXT]
 #[cfg(test)]
 fn nearly_valid() -> impl Strategy<Value = String> {
     const TYPES: &str = "\
@@ -1501,9 +1405,8 @@ fn parameter_declared_twice_is_a_fault() {
             (4, 29),
             key(&["types", "review", "optional", "input"]),
         ),
-        // The optional list first, as header tables: now the repetition is in
-        // the required one, so a reader always pointing at one list is wrong in
-        // one of these two.
+        // The optional list first, as header tables: the repetition is in the
+        // required one.
         (
             "optional-first.toml",
             "[types.review]\noutput = \"note\"\n\n[types.review.optional]\ninput = \"diff\"\n\n[types.review.required]\ninput = \"note\"\n",
@@ -1552,11 +1455,6 @@ proptest! {
     /// Documents naming types only some of which the catalogue declares,
     /// binding parameters and sources only some of which exist, and designating
     /// an output that may be no instance at all, read as written.
-    ///
-    /// The pools hold a binding to a parameter its type does not declare and an
-    /// output naming no instance, since those are names too, and a reader
-    /// resolving them would refuse a document for a defect the validator
-    /// reports beside every other.
     #[test]
     fn reading_resolves_nothing(written in any_written(Pools {
         types: &["source", "sink", "not-declared"],
@@ -1575,9 +1473,8 @@ proptest! {
 #[test]
 fn calls_read_in_order() {
     // Three calls, one listed twice, on one instance; none on another; and a
-    // calls key on a node type document, where it is a key the reader does not
-    // name. The workflow's calls name a type the catalogue lacks as well, since
-    // resolving is the validator's.
+    // calls key on a node type document. The workflow's calls name a type the
+    // catalogue lacks as well.
     let types = read_node_types(
         "types.toml",
         "[types.lookup]\noutput = \"note\"\ncalls = [\"sink\"]\ndescription = \" Looks a term up. \"\n\n[types.bare]\noutput = \"note\"\n",

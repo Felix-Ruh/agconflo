@@ -5,24 +5,14 @@ use std::fmt;
 /// The identifier of one context, shared with no other context in the same run.
 ///
 /// Only an [`IdSource`] makes one, or a run's record naming one a source issued
-/// before the run was interrupted, and handing it back beside a source past it.
-/// The field is private and nothing converts into this type, so an identifier
-/// cannot be written down, defaulted or parsed into existence. Copying one is harmless: a copy names the same context, and
-/// a context is created from a source rather than from an identifier, so a
-/// copy can never label a second one.
-///
-/// Deliberately without an ordering. Nothing promises that a later context
-/// carries a larger identifier, and an `Ord` would invite code to assume it.
+/// before the run was interrupted. It cannot be written down, defaulted or
+/// parsed into existence, and it has no ordering.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-// @Identifiers only a source can make,IMPL_ID_CONTEXT_ID,impl,[CREQ_SOURCE_SOLE_ISSUER]
+// @Identifiers only a source can make,IMPL_ID_CONTEXT_ID,impl,[CREQ_SOURCE_SOLE_ISSUER],[NOTE_ID_TRAITS]
 pub struct ContextId(u64);
 
-/// Issues context identifiers, never the same one twice.
-///
-/// One source stands for one run. It is neither `Clone` nor `Copy`, because two
-/// copies would issue the same sequence, each correct on its own and repeating
-/// jointly. Two sources created separately would do the same, and preventing
-/// that belongs to whatever owns a run once the engine has one.
+/// Issues context identifiers, never the same one twice. One source stands for
+/// one run, and it can be neither cloned nor copied.
 #[derive(Debug)]
 // @A source that cannot be copied,IMPL_ID_SOURCE,impl,[CREQ_SOURCE_NO_REPEAT]
 pub struct IdSource {
@@ -36,18 +26,15 @@ impl IdSource {
         Self { next: Some(0) }
     }
 
-    /// A source whose next identifier is `first`, so that a test can reach the
-    /// end of the space without counting to it. Being private to this module is
-    /// what keeps every other caller from restarting the sequence; it is
-    /// compiled into test builds only because the tests below are its one use.
+    /// A source whose next identifier is `first`, for a test reaching the end of
+    /// the space without counting to it. Private to this module, and test-only.
     #[cfg(test)]
     fn starting_at(first: u64) -> Self {
         Self { next: Some(first) }
     }
 
     /// Issues the next identifier, or refuses once every identifier has been
-    /// issued. The refusal is permanent: wrapping round would reissue the first
-    /// identifier without a word, which is the defect this exists to rule out.
+    /// issued. The refusal is permanent.
     // @Issuing each identifier once,IMPL_ID_ISSUE,impl,[CREQ_SOURCE_NO_REPEAT]
     pub(crate) fn issue(&mut self) -> Result<ContextId, SourceExhausted> {
         let id = self.next.ok_or(SourceExhausted)?;
@@ -56,30 +43,24 @@ impl IdSource {
     }
 
     /// The identifier this source would issue next, or `None` once it has
-    /// issued them all - which is what a run's record keeps of it
-    /// (`DEC_RECORD_CARRIES_THE_SOURCE`).
+    /// issued them all.
+    // @A source's position for its record,TRACE_ID_POSITION,trace,[],[DEC_RECORD_CARRIES_THE_SOURCE]
     pub(crate) fn position(&self) -> Option<u64> {
         self.next
     }
 
-    /// A source standing where a recorded one stood.
-    ///
-    /// The one way besides [`IdSource::new`] to make a source, and crate-private
-    /// for the reason the identifier's constructor is: a source placed anywhere
-    /// else would reissue what one before it issued. The run record calls it
-    /// only after refusing a record holding an identifier at or past `position`.
+    /// A source standing where a recorded one stood. The run record calls it only
+    /// after refusing a record holding an identifier at or past `position`.
     pub(crate) fn resumed_at(position: Option<u64>) -> Self {
         Self { next: position }
     }
 }
 
 impl ContextId {
-    /// An identifier read back from a run's record.
-    ///
-    /// Crate-private, and called only by the run record, which hands every
-    /// identifier it makes this way back beside a source positioned past it
-    /// (`CREQ_RECORD_SOURCE_CONTINUES`): the identifier was issued once, before the
-    /// run was interrupted, and is being named again rather than issued.
+    /// An identifier read back from a run's record, named again rather than
+    /// issued. Called only by the run record, which hands it back beside a source
+    /// positioned past it.
+    // @An identifier named again from a record,TRACE_ID_RESUMED,trace,[],[DEC_RECORD_CARRIES_THE_SOURCE]
     pub(crate) fn resumed(value: u64) -> Self {
         Self(value)
     }
@@ -90,9 +71,8 @@ impl ContextId {
     }
 }
 
-/// Written out rather than derived. A derived `Default` sets `next` to `None`,
-/// which is a source that has already run out - measured, and exactly the
-/// derive that clippy's `new_without_default` invites.
+/// A source that has issued nothing yet, as [`IdSource::new`] is.
+// @A default source written out,TRACE_ID_DEFAULT,trace,[],[NOTE_ID_TRAITS]
 impl Default for IdSource {
     fn default() -> Self {
         Self::new()
@@ -113,12 +93,7 @@ impl fmt::Display for SourceExhausted {
 impl std::error::Error for SourceExhausted {}
 
 // --- tests -------------------------------------------------------------------
-// Bare functions rather than a `tests` module, because each name is the id of
-// the test case it implements: the runner reports a unit test by its full
-// module path, so `id::never_repeats` is TEST_ID_NEVER_REPEATS in
-// docs/tests/context.rst, and a `tests` module would add a segment to every one
-// (EVD_NEXTEST_TEST_PATHS). A test without a case would have nothing to report
-// its result against, so there are exactly as many tests here as cases.
+// Bare functions, each named after the test case it implements.
 
 #[cfg(test)]
 use crate::compile_fail::{assert_compiles, assert_refused};
@@ -156,9 +131,8 @@ fn exhaustion_is_permanent() {
         assert_eq!(source.issue(), Err(SourceExhausted));
     }
 
-    // Creating a context is a request for an identifier too, whether from text
-    // or by composing, and is refused the same way rather than creating
-    // something with no identity.
+    // Creating a context from text or by composing is refused the same way, and
+    // creates nothing.
     let note = ContextType::new("note").unwrap();
     let text = Context::text(&mut source, note.clone(), "text");
     assert_eq!(text.map(|context| context.id()), Err(SourceExhausted));

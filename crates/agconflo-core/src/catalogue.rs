@@ -8,11 +8,9 @@ use crate::reader::NodeTypeDocument;
 use crate::workflow::NodeType;
 
 /// Every node type the documents it was gathered from declare, each under a
-/// name no other declares.
-///
-/// Which documents those are is its caller's to say
-/// (`DEC_TYPES_IN_OWN_DOCUMENTS`); a catalogue neither searches for them nor
+/// name no other declares. A catalogue neither searches for documents nor
 /// watches them.
+// @Documents given by the caller,TRACE_CATALOGUE_DOCUMENTS,trace,[],[DEC_TYPES_IN_OWN_DOCUMENTS]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TypeCatalogue {
     node_types: Vec<NodeType>,
@@ -22,19 +20,8 @@ impl TypeCatalogue {
     /// The declarations of every one of `documents`, or a refusal naming every
     /// type name more than one of them declares.
     ///
-    /// The one question no single document can answer. Within a document a name
-    /// written twice is a repeated key, and the parser refuses it before a
-    /// declaration exists; across two, each document is valid on its own and the
-    /// conflict exists only in the set.
-    ///
-    /// Nothing is kept when a name repeats - not the first declaration, not the
-    /// last, and not one of two that happen to be identical. Keeping either is
-    /// choosing on the author's behalf which document is wrong, and identical
-    /// copies are harmless on the day and drift apart afterwards, which is why a
-    /// type is declared once in the first place. And every repeated name is
-    /// named, each with every document declaring it, since any of those documents
-    /// may be the wrong one and fixing one name to learn of the next is a round
-    /// trip.
+    /// Nothing is kept when a name repeats, identical declarations included, and
+    /// every repeated name is named with every document declaring it.
     ///
     /// The declarations are held in the order they were given: document by
     /// document, and within one in the order it declares them.
@@ -178,10 +165,7 @@ fn repeated(type_name: &str, documents: &[&str]) -> RepeatedType {
 
 #[test]
 fn repeated_name_names_every_document() {
-    // Declared differently in each, so a catalogue keeping the first or the last
-    // declaration would hold something - and three documents rather than two,
-    // because two is the number at which "the first and the last" and "every
-    // one" are the same answer.
+    // Three documents, each declaring the type differently.
     let documents = vec![
         node_type_document(
             "a.toml",

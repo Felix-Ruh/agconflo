@@ -6,20 +6,15 @@ use std::sync::Arc;
 
 use crate::id::{ContextId, IdSource, SourceExhausted};
 
-/// The type a context was declared with.
-///
-/// Nominal: two types are the same exactly when their names are, and nothing
-/// infers one from content. Checked when the name is made rather than when a
-/// context is, so a context cannot be declared with an invalid type at all.
-/// Cheap to clone, since every context of a type carries it.
+/// The type a context was declared with: two types are the same exactly when
+/// their names are, and a name is checked when it is made, before any context
+/// can be declared with it.
+// @A nominal type checked when named,TRACE_CONTEXT_TYPE,trace,[],[DEC_CONTEXT_TYPING]
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct ContextType(Arc<str>);
 
 impl ContextType {
     /// A type named `name`, refusing only an empty name.
-    ///
-    /// Which characters a name may hold is left to the workflow format, which
-    /// is why the error is open to further kinds.
     // @A declared type that refuses an empty name,IMPL_CONTEXT_TYPE,impl,[CREQ_VALUE_DECLARED_TYPE]
     pub fn new(name: &str) -> Result<Self, InvalidTypeName> {
         if name.is_empty() {
@@ -38,8 +33,7 @@ impl ContextType {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[non_exhaustive]
 pub enum InvalidTypeName {
-    /// The name was empty. A type keys global contexts and validates wiring,
-    /// and an empty key does neither.
+    /// The name was empty.
     Empty,
 }
 
@@ -58,17 +52,9 @@ impl std::error::Error for InvalidTypeName {}
 /// [`Context::parts`].
 ///
 /// A handle: cloning one shares the same value, identifier included, rather
-/// than copying it. That is how a composition holds its parts by reference, and
-/// how one context reaches every consumer wired to it.
-///
-/// Nothing here can change once the value exists. There is no public field, no
-/// method taking `&mut self`, and no interior mutability, so every read of a
-/// context sees the value it was created as.
-///
-/// There is deliberately no metadata. `DEC_METADATA_TRANSFORMED` has no
-/// requirement to answer to until Transform nodes exist, and because content is
-/// reached through methods, metadata can be added later without breaking any
-/// caller. Its absence is a decision, not an omission to fill in.
+/// than copying it. Nothing here can change once the value exists, and a
+/// context carries no metadata.
+// @An immutable shared value without metadata,TRACE_CONTEXT_VALUE,trace,[],[DEC_COMPOSITION_BY_REFERENCE, NOTE_CONTEXT_NO_METADATA]
 #[derive(Clone)]
 pub struct Context(Arc<Node>);
 
@@ -93,8 +79,6 @@ impl Context {
     /// A context holding `text` exactly as given, with an identifier issued by
     /// `source`.
     ///
-    /// Takes the source rather than an identifier: identifiers can be copied,
-    /// so accepting one would let a single identifier label two contexts.
     /// Refused only when the source has run out, and then nothing is created.
     // @Text held byte for byte,IMPL_CONTEXT_TEXT,impl,[CREQ_VALUE_TEXT_EXACT]
     pub fn text(
@@ -132,11 +116,7 @@ impl Context {
     }
 
     /// A text context read back from a run's record, under the identifier it
-    /// was recorded with.
-    ///
-    /// Crate-private: taking an identifier rather than a source is exactly what
-    /// the public constructors refuse to do, and the run record is the one
-    /// caller, holding each identifier once (`CREQ_RECORD_KEEPS_CONTEXTS`).
+    /// was recorded with. The run record is the one caller.
     pub(crate) fn resumed_text(id: ContextId, declared_type: ContextType, text: String) -> Self {
         Self::new(id, declared_type, Content::Text(text.into_boxed_str()))
     }
@@ -176,11 +156,7 @@ impl Context {
 
     /// Whether `other` is this very context - the same value reached through
     /// another handle - rather than one that merely carries the same identifier.
-    ///
-    /// Crate-private, and not an equality: nothing outside may treat two contexts
-    /// as one on any ground but identity (`DEC_NO_CONTENT_ADDRESSING`), and this
-    /// exists so that the run can tell a context it holds from a second one under
-    /// the same identifier (`DEC_IDENTIFIER_NAMES_ONE_CONTEXT`).
+    // @The same context told from one sharing its identifier,TRACE_CONTEXT_IS,trace,[],[DEC_NO_CONTENT_ADDRESSING, DEC_IDENTIFIER_NAMES_ONE_CONTEXT]
     pub(crate) fn is(&self, other: &Context) -> bool {
         Arc::ptr_eq(&self.0, &other.0)
     }
@@ -210,8 +186,7 @@ impl Context {
     /// Text comes back byte for byte - no line endings converted, nothing
     /// trimmed, no Unicode normalisation - and borrowed rather than copied. A
     /// composition comes back as its parts' content in order, joined by its
-    /// separator, computed on each read; that is why this is a `Cow` rather than
-    /// a `&str`, which would need a stored copy to point into.
+    /// separator, computed on each read, which is why this is a `Cow`.
     // @Text rendered exactly and parts joined,IMPL_CONTEXT_RENDER,impl,[CREQ_VALUE_TEXT_EXACT, CREQ_VALUE_RENDER_JOINED]
     pub fn render(&self) -> Cow<'_, str> {
         match &self.0.content {
@@ -220,10 +195,8 @@ impl Context {
         }
     }
 
-    /// Walks the composition with a stack of its own rather than the call
-    /// stack. Nesting has no fixed depth, and a recursive render overflowed
-    /// even a 32 MiB stack at 100,000 levels - measured - which is an abort,
-    /// not a failure anyone can assert on.
+    /// Walks the composition with a stack of its own rather than the call stack.
+    // @A render that spends no frame per level,TRACE_CONTEXT_RENDER_FLAT,trace,[],[NOTE_CONTEXT_NO_RECURSION]
     fn render_composed(&self) -> String {
         enum Step<'a> {
             Part(&'a Context),
@@ -253,9 +226,8 @@ impl Context {
     }
 }
 
-/// Written out, because a derived one would recurse into every part: an abort
-/// on a deep context, and a whole tree printed on a shallow one. Parts are
-/// shown by identifier instead.
+/// A context with its parts shown by identifier.
+// @Debug without recursion,TRACE_CONTEXT_DEBUG,trace,[],[NOTE_CONTEXT_NO_RECURSION]
 impl fmt::Debug for Context {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut debug = f.debug_struct("Context");
@@ -273,14 +245,9 @@ impl fmt::Debug for Context {
     }
 }
 
-/// Releases a composition's parts from a worklist rather than by recursion.
-/// The derived drop spends stack frames on every level, and overflowed even a
-/// 32 MiB stack at 100,000 levels - measured.
-///
-/// A part is taken apart here only when this was its last holder, which is
-/// exactly when `Arc::into_inner` hands it over. A part still held anywhere
-/// else is left whole.
-// @A deep chain released without recursion,IMPL_CONTEXT_RELEASE,impl,[CREQ_VALUE_PARTS_BY_REFERENCE]
+/// Releases a composition's parts from a worklist rather than by recursion,
+/// taking a part apart only when this was its last holder.
+// @A deep chain released without recursion,IMPL_CONTEXT_RELEASE,impl,[CREQ_VALUE_PARTS_BY_REFERENCE],[NOTE_CONTEXT_NO_RECURSION]
 impl Drop for Node {
     fn drop(&mut self) {
         let Content::Composed { parts, .. } = &mut self.content else {
@@ -300,7 +267,7 @@ impl Drop for Node {
 }
 
 // --- tests -------------------------------------------------------------------
-// Bare functions named after their test cases, for the reason given in id.rs.
+// Bare functions named after their test cases.
 
 #[cfg(test)]
 use proptest::collection::vec;
@@ -314,9 +281,8 @@ use proptest::sample::Index;
 #[cfg(test)]
 const DEPTH: usize = 100_000;
 
-/// Any text at all. Not `any::<String>()`: its pattern is `\PC*`, which never
-/// generates a control character, so CR, LF and NUL - the bytes a normalising
-/// defect changes - would never be tried.
+/// Any text at all, CR, LF and NUL included, which `any::<String>()` never
+/// generates.
 #[cfg(test)]
 fn any_text() -> impl Strategy<Value = String> {
     vec(any::<char>(), 0..64).prop_map(String::from_iter)
@@ -412,9 +378,7 @@ proptest! {
     #[test]
     fn parts_are_originals(
         // Each entry is text, or - when it picks earlier entries - a
-        // composition of them. Compositions have to be among the parts: the
-        // defect this exists for flattens a composed part into a copy of its
-        // text, and a pool of text alone would never show it.
+        // composition of them.
         pool in vec((any_type_name(), any_text(), vec(any::<Index>(), 0..3)), 1..6),
         picks in vec(any::<Index>(), 0..12),
     ) {
@@ -441,10 +405,8 @@ proptest! {
     #[test]
     fn type_is_declared(
         declared in any_type_name(),
-        // `true` declares a part with the composition's own name. The first
-        // branch never does, which is the case an inferred type gets wrong; the
-        // second mixes both, since composing summaries into a summary is
-        // ordinary.
+        // `true` declares a part with the composition's own name: never in the
+        // first branch, mixed in the second.
         shares_name in prop_oneof![vec(Just(false), 1..6), vec(any::<bool>(), 0..6)],
     ) {
         let mut source = IdSource::new();
@@ -509,9 +471,8 @@ fn deep_nesting_renders() {
     }
     assert_eq!(context.render(), vec!["x"; DEPTH + 1].join(","));
 
-    // Leaked on purpose. Releasing the chain is `deep_nesting_drops`'s case,
-    // and a defect there would otherwise abort this one too, reporting the
-    // renderer as broken when it is not.
+    // Leaked, so that this case is about rendering alone; releasing the chain
+    // is `deep_nesting_drops`'s.
     std::mem::forget(context);
 }
 
