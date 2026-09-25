@@ -158,3 +158,20 @@ request line, the body's ``model`` field, and whether an ``authorization`` or
    ``openai::`` adapter is not one of them: a local server reached as
    ``openai::`` with an endpoint of its own is sent some key, and an empty one
    is the one that names nothing.
+
+.. evd:: A file lock is exclusive across processes and dies with its holder
+   :id: EVD_FILE_LOCK_DIES_WITH_ITS_PROCESS
+   :evd_kind: measurement
+   :observed_on: 2026-09-25
+   :observation: On Windows, a file locked with std::fs::File::lock refused try_lock from another process and from another handle in the same process, and was locked by another process 3 ms after the holder was killed, in each of 3 runs.
+
+   One process opened a lock file, took ``lock`` on it, printed that it held
+   it and slept; a second process and a second handle in the driving process
+   each took ``try_lock``, and both got ``WouldBlock``. The holder was then
+   killed, and a new process's ``try_lock`` succeeded at once. The lock file
+   itself stayed on disk: what a killed process leaves is a file nobody
+   holds.
+
+   ``File::lock`` and ``File::try_lock`` are in the standard library from Rust
+   1.89. Only Windows was measured; the tests that rest on this run on Linux
+   in continuous integration as well.

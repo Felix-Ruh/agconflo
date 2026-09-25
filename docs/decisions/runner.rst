@@ -178,8 +178,8 @@ arguments other than text are given.
    :id: DEC_RECORD_FILE_LOCKED
    :dec_status: accepted
    :decided_on: 2026-09-25
-   :supported_by: EVD_CREATE_NEW_ONE_WINNER
-   :statement: Agconflo shall hold a record file for a run by creating a lock file beside it that must not already exist, and remove the lock when the run stops.
+   :supported_by: EVD_FILE_LOCK_DIES_WITH_ITS_PROCESS, EVD_CREATE_NEW_ONE_WINNER
+   :statement: Agconflo shall hold a record file for a run by taking an exclusive lock on a lock file beside it, which the operating system releases when the process holding it ends.
 
    ``DEC_ANSWER_ONCE_BY_THE_KEEPER`` leaves answering a record once to
    whoever keeps it, and the runner keeps it. Replacing the record after an
@@ -187,17 +187,27 @@ arguments other than text are given.
    both read the record before either replaces it, and give the two runs
    sharing identifiers that decision's evidence measured.
 
-   Exclusive creation lets exactly one of many racers win
-   (``EVD_CREATE_NEW_ONE_WINNER``), so whichever run creates the lock holds
-   the record, and every other is refused. A process that dies holding it
-   leaves the lock behind; the refusal names the lock file, and removing it is
-   the person's, who knows whether the other run is still going.
+   The lock is refused to another process and to another handle in the same
+   one, and is free again as soon as the process holding it is killed
+   (``EVD_FILE_LOCK_DIES_WITH_ITS_PROCESS``). A run interrupted by its process
+   ending - the interruption a record is kept for - therefore leaves nothing
+   that stops it being resumed. The lock file stays on disk, held by nobody.
 
-   A lock on the record file itself was the alternative. The record is
+   Creating the lock file exclusively and removing it when the run stops was
+   the first form of this decision, and exclusive creation does let exactly
+   one of many racers win (``EVD_CREATE_NEW_ONE_WINNER``). It lost before any
+   code was written: a process killed mid-run leaves the file behind, and every
+   resume after a crash would be refused until a person deleted it by hand.
+
+   A lock on the record file itself was the other alternative. The record is
    replaced by renaming over it (``DEC_RECORD_REPLACED_BY_RENAME``), and a
    rename over a file held open without delete sharing fails
    (``EVD_RENAME_REPLACES_RECORD``), so the lock would stop the very write it
    exists to protect.
+
+   The standard library's file lock is from Rust 1.89, so ``agconflo-runner``
+   declares that as its own ``rust-version``, as ``agconflo-lua`` declares
+   what ``mlua`` needs.
 
 .. dec:: A record not kept is told once the run has stopped
    :id: DEC_RECORD_NOT_KEPT_TOLD
