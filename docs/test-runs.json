@@ -615,6 +615,87 @@
           "title": "agconflo-lua models::window_parts_as_messages",
           "type": "test_run"
         },
+        "RUN_PROJECT_FAULTS_CARRY_THEIR_PLACE": {
+          "executes": [
+            "TEST_PROJECT_FAULTS_CARRY_THEIR_PLACE"
+          ],
+          "id": "RUN_PROJECT_FAULTS_CARRY_THEIR_PLACE",
+          "test_outcome": "passed",
+          "title": "agconflo-runner project::faults_carry_their_place",
+          "type": "test_run"
+        },
+        "RUN_PROJECT_LIMITS_DEFAULT_WHEN_ABSENT": {
+          "executes": [
+            "TEST_PROJECT_LIMITS_DEFAULT_WHEN_ABSENT"
+          ],
+          "id": "RUN_PROJECT_LIMITS_DEFAULT_WHEN_ABSENT",
+          "test_outcome": "passed",
+          "title": "agconflo-runner project::limits_default_when_absent",
+          "type": "test_run"
+        },
+        "RUN_PROJECT_MISSING_FILE_NAMED": {
+          "executes": [
+            "TEST_PROJECT_MISSING_FILE_NAMED"
+          ],
+          "id": "RUN_PROJECT_MISSING_FILE_NAMED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner project::missing_file_named",
+          "type": "test_run"
+        },
+        "RUN_PROJECT_MISSING_OR_MISTYPED_KEY_REFUSED": {
+          "executes": [
+            "TEST_PROJECT_MISSING_OR_MISTYPED_KEY_REFUSED"
+          ],
+          "id": "RUN_PROJECT_MISSING_OR_MISTYPED_KEY_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner project::missing_or_mistyped_key_refused",
+          "type": "test_run"
+        },
+        "RUN_PROJECT_PATHS_FROM_THE_MANIFEST": {
+          "executes": [
+            "TEST_PROJECT_PATHS_FROM_THE_MANIFEST"
+          ],
+          "id": "RUN_PROJECT_PATHS_FROM_THE_MANIFEST",
+          "test_outcome": "passed",
+          "title": "agconflo-runner project::paths_from_the_manifest",
+          "type": "test_run"
+        },
+        "RUN_PROJECT_READS_WHAT_IT_NAMES": {
+          "executes": [
+            "TEST_PROJECT_READS_WHAT_IT_NAMES"
+          ],
+          "id": "RUN_PROJECT_READS_WHAT_IT_NAMES",
+          "test_outcome": "passed",
+          "title": "agconflo-runner project::reads_what_it_names",
+          "type": "test_run"
+        },
+        "RUN_PROJECT_SCRIPTS_KEPT_EXACTLY": {
+          "executes": [
+            "TEST_PROJECT_SCRIPTS_KEPT_EXACTLY"
+          ],
+          "id": "RUN_PROJECT_SCRIPTS_KEPT_EXACTLY",
+          "test_outcome": "passed",
+          "title": "agconflo-runner project::scripts_kept_exactly",
+          "type": "test_run"
+        },
+        "RUN_PROJECT_UNDECODABLE_FILE_REFUSED": {
+          "executes": [
+            "TEST_PROJECT_UNDECODABLE_FILE_REFUSED"
+          ],
+          "id": "RUN_PROJECT_UNDECODABLE_FILE_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner project::undecodable_file_refused",
+          "type": "test_run"
+        },
+        "RUN_PROJECT_UNKNOWN_KEY_REFUSED": {
+          "executes": [
+            "TEST_PROJECT_UNKNOWN_KEY_REFUSED"
+          ],
+          "id": "RUN_PROJECT_UNKNOWN_KEY_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner project::unknown_key_refused",
+          "type": "test_run"
+        },
         "RUN_READER_ABSENT_OUTPUT_IS_NO_OUTPUT": {
           "executes": [
             "TEST_READER_ABSENT_OUTPUT_IS_NO_OUTPUT"
