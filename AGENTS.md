@@ -456,4 +456,9 @@ would be refused for before it is added to the script's `HELD`.
 - Never add a coverage rule. It fires on everything not yet built and blocks the first step of
   authoring; coverage is a query here.
 - Never commit a secret. This repository is public from its first commit, so a leak is permanent.
+- Never let a test, a probe or a live run use a provider key found in the environment -
+  `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` or any other - unless the maintainer allows it for that run.
+  `genai` reads each adapter's own variable without being asked (`EVD_GENAI_KEY_CHECKED_AT_CALL`),
+  so remove those variables from anything that could reach one. Tests answer with a loopback stub,
+  and a live run uses a model already loaded in LM Studio.
 - Never commit generated output except where a plan explicitly says to.
