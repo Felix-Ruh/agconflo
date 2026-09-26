@@ -1014,7 +1014,7 @@ fn check_runs_nothing() {
 
     scratch.write(
         "flow.toml",
-        "name = \"broken\"\noutput = \"third\"\n\n[instances.first]\nnode_type = \"begin\"\nentry = true\n\n[instances.second]\nnode_type = \"add\"\nbindings = { before = \"nobody\" }\n\n[instances.third]\nnode_type = \"add\"\n",
+        "name = \"broken\"\noutput = \"third\"\n\n[instances.first]\nnode_type = \"begin\"\nentry = true\n\n[instances.second]\nnode_type = \"add\"\nbindings = { before = \"nobody\" }\n\n[instances.third]\nnode_type = \"add\"\nbindings = { before = \"gone\" }\n",
     );
     scratch.write("add.lua", "local given, host = ...\nreturn (\n");
     let findings = check(sources);

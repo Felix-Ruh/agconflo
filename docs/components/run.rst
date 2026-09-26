@@ -159,7 +159,7 @@ component requirement whose subject is anything else.
      defective workflow is indistinguishable from a green run on a sound one.
    - **A refusal reported as an ending.** A caller handling the four endings
      would treat a workflow it must fix as a run that happened
-     (``DEC_RUN_REFUSED_BEFORE_IT_STARTS``).
+     (``DEC_RUN_REFUSED_UNLESS_EVERY_INPUT_GIVEN``).
 
 .. comp_req:: A refusal carries every defect there is
    :id: CREQ_RUN_REFUSAL_NAMES_EVERY_DEFECT
@@ -185,39 +185,43 @@ component requirement whose subject is anything else.
    - **Defects rendered into one message.** A caller then parses prose to learn
      what to fix, which is what carrying them as values exists to avoid.
 
-.. comp_req:: A run whose signature is not filled does not start
+.. comp_req:: A run whose inputs are not each given does not start
    :id: CREQ_RUN_REFUSES_UNFILLED_SIGNATURE
    :derived_from: FEAT_RUN_ENTRY_SOURCE_EXACT
    :allocated_to: COMP_WORKFLOW_RUN
    :ears_pattern: unwanted
-   :statement: If an entry parameter of a workflow is not filled by exactly one context of its declared type, then Workflow run shall refuse to start a run of that workflow.
+   :statement: If a parameter of a workflow that nothing binds is not given exactly one context of its declared type, then Workflow run shall refuse to start a run of that workflow.
 
-   Arguments are addressed by the entry instance and parameter each fills
-   (``DEC_ARGUMENTS_PER_ENTRY``), so this is a question about pairs rather than
-   about names, and two entry instances declaring one parameter name are two
-   parameters to fill.
+   Changed by ``DEC_CHANGE_RUN_ENTRY_SOURCE_EXACT``. The parameters nothing
+   binds are the workflow's signature (``DEC_SIGNATURE_IS_WHAT_NOTHING_BINDS``),
+   read from the wiring on every instance. Arguments are addressed by the
+   instance and parameter each fills (``DEC_ARGUMENTS_PER_PARAMETER``), so this
+   is a question about pairs rather than about names, and two instances
+   declaring one parameter name are two parameters to fill.
 
    Failure modes:
 
-   - **A required entry parameter with no argument.** Measured reading as a stuck
-     run (``EVD_RUN_MISSING_ARGUMENT_QUIESCES``), which names every waiting
-     instance instead of the one argument to supply.
+   - **A parameter nothing binds with no argument.** Measured reading as a
+     stuck run (``EVD_RUN_MISSING_ARGUMENT_QUIESCES``), which names every
+     waiting instance instead of the one argument to supply - and it is how a
+     forgotten binding shows.
+   - **Inputs read from a mark on the instance rather than from the wiring.**
+     An instance with no mark, holding a parameter nothing binds, is then never
+     asked for, and waits for ever.
    - **An argument of a context type the declaration does not name.** The wiring
      validator refuses this between two instances and cannot see it here, because
      there is no binding to look at.
-   - **An entry parameter both supplied and bound.** Sound wiring, recorded among
-     the open shapes in ``components/wiring``, and what a loop closing back onto
-     an entry node draws. Taking the argument and ignoring the wire is what the
-     prototype did, silently.
+   - **An argument for a parameter a binding fills.** Two sources with nothing
+     to order them (``DEC_RUN_REFUSED_UNLESS_EVERY_INPUT_GIVEN``). Taking the
+     argument and ignoring the wire is what the prototype did, silently.
    - **An argument naming an instance or parameter the workflow does not have.**
      A typo in a parameter name then leaves the real parameter unfilled while the
      caller believes it supplied it.
-   - **An entry parameter left unsupplied and the run started.** Every
-     parameter is required (``DEC_EVERY_INPUT_REQUIRED``), so the entry node
-     would be given an activation missing it.
 
-   Must pass unreported: one argument per entry parameter of the declared type, and two entry instances of the same node type, whose parameters
-   share names and are two parameters all the same.
+   Must pass unreported: one argument per parameter nothing binds, of the
+   declared type, on whichever instances hold them; and two instances of the
+   same node type, whose parameters share names and are two parameters all the
+   same.
 
 .. comp_req:: A run stops at its budget rather than past it
    :id: CREQ_RUN_STOPS_AT_BUDGET

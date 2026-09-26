@@ -107,7 +107,7 @@ to leave every one of them open.
 
 .. dec:: A run's arguments are held per entry parameter
    :id: DEC_ARGUMENTS_PER_ENTRY
-   :dec_status: accepted
+   :dec_status: superseded
    :decided_on: 2026-09-22
    :supported_by: EVD_RUN_ENTRY_NAME_SHARED
    :statement: Agconflo shall hold a run's arguments under the entry instance and parameter each one fills rather than under a parameter name alone.
@@ -146,7 +146,7 @@ to leave every one of them open.
 
 .. dec:: A run that cannot start is refused rather than stuck
    :id: DEC_RUN_REFUSED_BEFORE_IT_STARTS
-   :dec_status: accepted
+   :dec_status: superseded
    :decided_on: 2026-09-22
    :supported_by: EVD_RUN_MISSING_ARGUMENT_QUIESCES
    :statement: Agconflo shall refuse to start a run whose workflow is invalid or whose entry parameters do not each have exactly one source of their declared type rather than reporting either as a run unable to proceed.
@@ -174,6 +174,47 @@ to leave every one of them open.
    engine refuses, and refuses before anything has happened. A run is the first
    thing in this project that can be said to have started, so it is the first
    place that half can be met.
+
+.. dec:: A run's arguments are held per parameter
+   :id: DEC_ARGUMENTS_PER_PARAMETER
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :supersedes: DEC_ARGUMENTS_PER_ENTRY
+   :supported_by: EVD_RUN_ENTRY_NAME_SHARED
+   :statement: Agconflo shall hold a run's arguments under the instance and parameter each one fills rather than under a parameter name alone.
+
+   What ``DEC_ARGUMENTS_PER_ENTRY`` decided stands for every instance rather
+   than for entry instances, which there are none of any more
+   (``STKH_RUN_FROM_ANY_PARAMETER``). An argument is a context given to one
+   parameter of one instance, and two instances of one node type declare the
+   same parameter names, so addressing by name alone hands one context to two
+   parameters (``EVD_RUN_ENTRY_NAME_SHARED``).
+
+   It follows that a workflow's signature is a list of instance-and-parameter
+   pairs rather than of names (``DEC_SIGNATURE_IS_WHAT_NOTHING_BINDS``).
+
+.. dec:: A run is refused unless every input is given
+   :id: DEC_RUN_REFUSED_UNLESS_EVERY_INPUT_GIVEN
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :supersedes: DEC_RUN_REFUSED_BEFORE_IT_STARTS
+   :supported_by: EVD_RUN_MISSING_ARGUMENT_QUIESCES
+   :statement: Agconflo shall refuse to start a run whose workflow is invalid or whose parameters nothing binds are not each given exactly one context of their declared type, rather than report either as a run unable to proceed.
+
+   What ``DEC_RUN_REFUSED_BEFORE_IT_STARTS`` decided stands, asked of the
+   parameters nothing binds rather than of entry instances'. A refusal is about
+   what the caller supplied and names the one thing to fix; an ending is about
+   what happened. Measured, a missing argument read as quiescence names every
+   waiting instance and buries the one context to give
+   (``EVD_RUN_MISSING_ARGUMENT_QUIESCES``).
+
+   It matters more now than it did. A parameter nothing binds is an input
+   rather than a wiring defect (``STKH_RUN_FROM_ANY_PARAMETER``), so a
+   forgotten binding reaches no validator, and this refusal is the first thing
+   to name it - before any node runs, as ``STKH_WIRING_CHECKED`` asks.
+
+   A context given to a parameter a binding fills is refused too, as it was:
+   the argument and the wire are two sources with nothing to order them.
 
 .. dec:: A started run ends in exactly one way
    :id: DEC_RUN_ENDS_ONE_WAY

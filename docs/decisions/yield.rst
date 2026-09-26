@@ -10,7 +10,7 @@ handed over. Each replaced decision is kept where it was, marked superseded.
 
 Two things are left out on purpose. A workflow cannot be called yet: nothing
 invokes a workflow, and its signature is not settled
-(``DEC_ARGUMENTS_PER_ENTRY``), so the node types a model may call are node types
+(``DEC_ARGUMENTS_PER_PARAMETER``), so the node types a model may call are node types
 until ``STKH_WORKFLOW_AS_NODE`` has its invocation. And nothing here reaches a
 tool outside the engine: a Lua script cannot, by design, so a node type wrapping
 an MCP server needs a behaviour written in Rust, which is the next slice.

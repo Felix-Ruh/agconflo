@@ -12,13 +12,6 @@ use crate::ContextType;
 #[non_exhaustive]
 // @A place carried as a value,IMPL_DEFECT_PLACE,impl,[CREQ_DEFECT_NAMES_PLACE],[DEC_FAILURES_NON_EXHAUSTIVE]
 pub enum WiringDefect {
-    /// A required parameter of an instance carries no binding.
-    RequiredParameterUnbound {
-        /// The instance whose parameter is unwired.
-        instance: String,
-        /// The required parameter carrying no binding.
-        parameter: String,
-    },
     /// A binding names an instance the definition does not carry.
     UnresolvedInstance {
         /// The instance consuming the binding.
@@ -108,8 +101,7 @@ impl WiringDefect {
     /// the definition itself.
     pub fn instance(&self) -> Option<&str> {
         match self {
-            Self::RequiredParameterUnbound { instance, .. }
-            | Self::UnresolvedInstance { instance, .. }
+            Self::UnresolvedInstance { instance, .. }
             | Self::UnresolvedNodeType { instance, .. }
             | Self::UndeclaredParameter { instance, .. }
             | Self::RepeatedInstance { instance }
@@ -125,8 +117,7 @@ impl WiringDefect {
     /// single parameter.
     pub fn parameter(&self) -> Option<&str> {
         match self {
-            Self::RequiredParameterUnbound { parameter, .. }
-            | Self::UnresolvedInstance { parameter, .. }
+            Self::UnresolvedInstance { parameter, .. }
             | Self::UndeclaredParameter { parameter, .. }
             | Self::RepeatedBinding { parameter, .. }
             | Self::ContextTypeDisagreement { parameter, .. } => Some(parameter),
@@ -156,13 +147,6 @@ impl WiringDefect {
 impl fmt::Display for WiringDefect {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::RequiredParameterUnbound {
-                instance,
-                parameter,
-            } => write!(
-                f,
-                "the node '{instance}' requires '{parameter}', and nothing is bound to it"
-            ),
             Self::UnresolvedInstance {
                 instance,
                 parameter,
@@ -258,8 +242,7 @@ proptest! {
             // Exhaustive, so that a class added later is filed as concerning a wire
             // or not.
             match defect {
-                WiringDefect::RequiredParameterUnbound { .. }
-                | WiringDefect::UnresolvedInstance { .. }
+                WiringDefect::UnresolvedInstance { .. }
                 | WiringDefect::UndeclaredParameter { .. }
                 | WiringDefect::RepeatedBinding { .. }
                 | WiringDefect::ContextTypeDisagreement { .. } => {}

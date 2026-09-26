@@ -76,9 +76,9 @@ pub(crate) fn next_activation(
 
 /// The activation `instance` may have now, or `None` when it may not activate:
 /// when it has not already produced and every parameter its node type declares
-/// has a context. A parameter left unbound blocks for ever. An entry instance's
-/// parameters are taken from the arguments alone.
-// @Readiness and the activation it carries,IMPL_SCHEDULER_READY,impl,[CREQ_SCHEDULER_READY_WHEN_BOUND, CREQ_SCHEDULER_ACTIVATION_CARRIES],[DEC_EVERY_INPUT_REQUIRED]
+/// has a context. A bound parameter takes its source's output, and one nothing
+/// binds takes its argument; one with neither blocks for ever.
+// @Readiness and the activation it carries,IMPL_SCHEDULER_READY,impl,[CREQ_SCHEDULER_READY_WHEN_BOUND, CREQ_SCHEDULER_ACTIVATION_CARRIES],[DEC_EVERY_INPUT_REQUIRED, DEC_SIGNATURE_IS_WHAT_NOTHING_BINDS]
 pub(crate) fn activation_for(
     definition: &WorkflowDefinition,
     arguments: &Arguments,
@@ -117,8 +117,8 @@ enum Filling<'c> {
     Ready(&'c Context),
     /// Something will fill it and has not yet.
     Waiting,
-    /// Nothing ever will: the definition binds nothing to it and supplies
-    /// nothing for it.
+    /// Nothing ever will: the definition binds nothing to it and the run was
+    /// given nothing for it.
     Unwired,
 }
 
@@ -130,15 +130,11 @@ fn filling<'c>(
     instance: &NodeInstance,
     parameter: &str,
 ) -> Filling<'c> {
-    if instance.entry {
+    let Some(binding) = instance.bindings.iter().find(|b| b.parameter == parameter) else {
         return match arguments.context_for(&instance.name, parameter) {
             Some(context) => Filling::Ready(context),
             None => Filling::Unwired,
         };
-    }
-
-    let Some(binding) = instance.bindings.iter().find(|b| b.parameter == parameter) else {
-        return Filling::Unwired;
     };
 
     match produced.get(&binding.source) {

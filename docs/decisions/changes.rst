@@ -667,3 +667,120 @@ that changed them show through, and are revised here.
      the line of ``decisions/tools`` in the trust decision: rewritten for the
      mount. The other line of ``components/environment`` and the one of
      ``decisions/changes``: unaffected, neither being about mounts.
+
+.. dec:: Removed: a parameter nothing binds is an input, not a wiring defect
+   :id: DEC_CHANGE_WIRING_REQUIRED_BOUND
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :supported_by: EVD_IMPACT_WIRING_REQUIRED_BOUND
+   :statement: Agconflo's requirements project shall remove FEAT_WIRING_REQUIRED_BOUND and CREQ_VALIDATOR_REQUIRED_BOUND because the stakeholder decided a parameter nothing binds is one of a workflow's inputs.
+
+   Removes ``FEAT_WIRING_REQUIRED_BOUND`` and ``CREQ_VALIDATOR_REQUIRED_BOUND``,
+   and takes the first from what ``ARCH_WIRING`` realises.
+
+   Before, the feature: "If a workflow leaves a required parameter of a node
+   unbound, then Agconflo shall reject that workflow before running any node
+   of it." And the component: "If a node instance leaves a required parameter
+   unbound, then Wiring validator shall report a defect naming that
+   parameter." After: neither exists.
+
+   Raised by the maintainer, while the repetition feature was being planned:
+   a loop's first pass needs a context from outside the loop, and every
+   context a node is given should be a context, whichever node is given it,
+   with no node marked as where a run begins.
+
+   Justification: its parent changed, at the stakeholder's word. Both rested
+   on ``STKH_WIRING_CHECKED``, and on reading its "invalid workflow" as
+   including one that leaves a parameter unbound - which was right while only
+   an instance marked as an entry could be given its parameters from outside.
+   ``STKH_RUN_FROM_ANY_PARAMETER`` settles the meeting of the two goals:
+   a parameter nothing binds is an input, and a workflow is not invalid for
+   having one. ``STKH_WIRING_CHECKED`` itself is unchanged, and still holds:
+   a run whose inputs are not each given is refused before any node runs
+   (``FEAT_RUN_ENTRY_SOURCE_EXACT``, changed beside this). Keeping the defect
+   and exempting parameters an invocation would give was the other option, and
+   is not one: the validator reads a definition, and cannot know what a run
+   will be given. What is lost is recorded in the stakeholder requirement: a
+   forgotten binding is found when a run starts rather than by the validator.
+
+   Verdicts on the impact analysis (``EVD_IMPACT_WIRING_REQUIRED_BOUND``):
+
+   - Up, ``STKH_WIRING_CHECKED``: unchanged, as above.
+   - Down, ``ARCH_WIRING``: no longer realises the feature; its body counts
+     seven defect classes where it counted eight. ``IMPL_WIRING_REQUIRED_BOUND``:
+     removed with the check it marked, and ``WiringDefect`` loses the variant.
+     ``TEST_WIRING_EVERY_UNBOUND_REQUIRED_IS_REPORTED`` and
+     ``TEST_WIRING_UNWIRED_INSTANCE_IS_REPORTED``: removed with their tests.
+     ``TEST_WIRING_DEGENERATE_DECLARATIONS_PASS``: kept, verifying
+     ``CREQ_VALIDATOR_ACCEPTS_WELL_FORMED`` now, with instances holding
+     parameters nothing binds in place of the entry node. Their runs follow
+     their cases.
+   - Sideways, the twelve other requirements of ``COMP_WIRING_VALIDATOR`` and
+     the ten features beside it in ``ARCH_WIRING``: unaffected in what they
+     oblige, none being about a parameter with no binding. Six cases that used
+     an unbound parameter only to show the walk goes on use another defect
+     now - ``TEST_WIRING_ALL_FOUR_CLASSES_REPORTED``,
+     ``TEST_WIRING_INSTANCE_OF_MISSING_TYPE_IS_REPORTED``,
+     ``TEST_WIRING_UNDECLARED_PARAMETER_IS_REPORTED``,
+     ``TEST_WIRING_SHARED_INSTANCE_NAME_IS_REPORTED``,
+     ``TEST_WIRING_NAME_DEFECTS_REPORTED_TOGETHER`` and
+     ``TEST_RUN_REFUSAL_CARRIES_EVERY_DEFECT`` - each keeping what it asserts.
+   - Text, the line of ``features/run`` naming the feature, and the marker in
+     ``wiring.rs``: the first reworded, the second removed.
+
+.. dec:: Revised: every input of a run is given exactly once, wherever it is
+   :id: DEC_CHANGE_RUN_ENTRY_SOURCE_EXACT
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :supported_by: EVD_IMPACT_RUN_ENTRY_SOURCE_EXACT
+   :statement: Agconflo's requirements project shall state FEAT_RUN_ENTRY_SOURCE_EXACT and CREQ_RUN_REFUSES_UNFILLED_SIGNATURE of the parameters nothing binds because the stakeholder decided those are a workflow's inputs.
+
+   Amends ``FEAT_RUN_ENTRY_SOURCE_EXACT``, adding
+   ``STKH_RUN_FROM_ANY_PARAMETER`` to what it derives from, and
+   ``CREQ_RUN_REFUSES_UNFILLED_SIGNATURE``.
+
+   Before, the feature: "If an entry parameter of a run is not filled by
+   exactly one context of its declared type, then Agconflo shall refuse to
+   start that run." After: "If a parameter of a run's workflow that nothing
+   binds is not given exactly one context of its declared type, then Agconflo
+   shall refuse to start that run." Before, the component: "If an entry
+   parameter of a workflow is not filled by exactly one context of its
+   declared type, then Workflow run shall refuse to start a run of that
+   workflow." After: "If a parameter of a workflow that nothing binds is not
+   given exactly one context of its declared type, then Workflow run shall
+   refuse to start a run of that workflow."
+
+   Raised with ``DEC_CHANGE_WIRING_REQUIRED_BOUND``, by the same decision.
+
+   Justification: a parent was added, at the stakeholder's word.
+   ``STKH_EXPLICIT_CONTEXT`` is unchanged, and the feature still answers it at
+   the boundary where a node's context comes from outside the graph. What
+   that boundary is was the entry mark; ``STKH_RUN_FROM_ANY_PARAMETER`` makes
+   it every parameter nothing binds, and the feature now derives from both.
+   The new statement names no mechanism: it is the old one asked of the
+   inputs as the stakeholder defines them. It would read the same had the
+   repetition feature never been planned. The id keeps its old word; renaming
+   it was the alternative, a removal and an addition for one change of
+   meaning.
+
+   Verdicts on the impact analysis (``EVD_IMPACT_RUN_ENTRY_SOURCE_EXACT``):
+
+   - Up, ``STKH_EXPLICIT_CONTEXT``: unchanged; ``STKH_RUN_FROM_ANY_PARAMETER``
+     added.
+   - Down, ``ARCH_RUN``: unchanged, still realising the feature.
+     ``IMPL_RUN_SIGNATURE``: changing, walking every instance's parameters in
+     place of entry instances'. ``TEST_RUN_MISSING_ARGUMENT_IS_REFUSED``,
+     ``TEST_RUN_ARGUMENT_OF_WRONG_TYPE_IS_REFUSED``,
+     ``TEST_RUN_ARGUMENT_FOR_NO_PARAMETER_IS_REFUSED`` and
+     ``TEST_RUN_SIGNATURE_FILLED_EXACTLY_STARTS``: unchanged in what they
+     assert, reworded. ``TEST_RUN_ENTRY_PARAMETER_ALSO_BOUND_IS_REFUSED``:
+     replaced by ``TEST_RUN_BOUND_PARAMETER_GIVEN_AN_ARGUMENT_IS_REFUSED``,
+     since a bound parameter with no argument is no longer refused and is
+     that case's control. ``TEST_RUN_INPUTS_GIVEN_WHERE_NOTHING_BINDS`` is
+     added for the shape the change exists for. Their runs follow their cases.
+   - Sideways, the twenty other requirements of ``COMP_WORKFLOW_RUN`` and the
+     nine features beside it in ``ARCH_RUN``: unaffected, none being about
+     what a run is started with but
+     ``CREQ_RUN_REFUSES_SHARED_ARGUMENT_IDENTIFIER``, which is about the
+     arguments' identifiers whatever they fill.
+   - Text, the marker in ``run.rs``: retitled.

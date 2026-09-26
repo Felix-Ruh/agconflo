@@ -239,7 +239,7 @@ single requirement to verify.
 
    The refusal is a value of its own kind rather than one of the four endings,
    so a caller can tell a workflow it must fix from a run that happened
-   (``DEC_RUN_REFUSED_BEFORE_IT_STARTS``).
+   (``DEC_RUN_REFUSED_UNLESS_EVERY_INPUT_GIVEN``).
 
 .. test_case:: A refusal carries every defect the validator found
    :id: TEST_RUN_REFUSAL_CARRIES_EVERY_DEFECT
@@ -247,7 +247,7 @@ single requirement to verify.
    :test_kind: error_path
    :coverage: full
 
-   A definition carrying five defects of four classes, two of them on one
+   A definition carrying five defects of five classes, two of them on one
    instance. The refusal carries all five, and they equal what
    ``validate_wiring`` reports for the same definition - compared as a whole
    rather than counted, so a run that forwards the right number of the wrong
@@ -263,7 +263,7 @@ single requirement to verify.
    :test_kind: error_path
    :coverage: partial
 
-   A run started without an argument for a required entry parameter is refused,
+   A run started without an argument for a parameter nothing binds is refused,
    naming that instance and parameter.
 
    The assertion that matters is which answer came back, not that one did:
@@ -277,26 +277,42 @@ single requirement to verify.
    :test_kind: error_path
    :coverage: partial
 
-   An argument whose context type is not the one the entry parameter is declared
-   for is refused, naming the parameter and both types.
+   An argument whose context type is not the one the parameter is declared for
+   is refused, naming the parameter and both types.
 
    No binding exists to compare, so the wiring validator cannot see this and the
    run is the only thing that can.
 
-.. test_case:: An entry parameter that is also bound is refused
-   :id: TEST_RUN_ENTRY_PARAMETER_ALSO_BOUND_IS_REFUSED
+.. test_case:: An argument for a bound parameter is refused
+   :id: TEST_RUN_BOUND_PARAMETER_GIVEN_AN_ARGUMENT_IS_REFUSED
    :verifies: CREQ_RUN_REFUSES_UNFILLED_SIGNATURE
    :test_kind: error_path
    :coverage: partial
 
-   An entry instance carrying a binding for a parameter the run also supplies is
-   refused, naming the parameter with two sources. The definition's wiring is
-   sound and the validator reports nothing, which is what makes this the run's
-   question.
+   An argument for a parameter a binding fills is refused, naming the parameter
+   with two sources. The definition's wiring is sound and the validator reports
+   nothing, which is what makes this the run's question. The control: the same
+   workflow started without that argument starts, the wire being the
+   parameter's one source.
 
-   Asserted in both arrangements, with and without an argument for that
-   parameter, because a reader that silently prefers the argument passes the
-   first and a reader that silently prefers the wire passes the second.
+   Catches: the argument silently preferred over the wire, which is what the
+   prototype did; a bound parameter demanded as an input as well.
+
+.. test_case:: Inputs are given wherever nothing binds a parameter
+   :id: TEST_RUN_INPUTS_GIVEN_WHERE_NOTHING_BINDS
+   :verifies: CREQ_RUN_REFUSES_UNFILLED_SIGNATURE
+   :test_kind: error_path
+   :coverage: partial
+
+   Two instances past the first, each with one parameter wired and one that
+   nothing binds, neither marked in any way. Started with nothing, the run is
+   refused naming both parameters, in the definition's order. Started with a
+   context for each, each instance is given its own beside the output wired to
+   it, and the run completes.
+
+   Catches: inputs read from a mark on the instance rather than from the
+   wiring, which starts this run with nothing and leaves both instances
+   waiting; one missing input named where there are two.
 
 .. test_case:: An argument for a parameter the workflow does not have is refused
    :id: TEST_RUN_ARGUMENT_FOR_NO_PARAMETER_IS_REFUSED
@@ -317,9 +333,9 @@ single requirement to verify.
    :test_kind: positive
    :coverage: partial
 
-   The requirement's must-pass list. One argument per entry parameter, each of
-   the declared type, starts a run - including the shape measured wrong
-   (``EVD_RUN_ENTRY_NAME_SHARED``): two entry instances of node types that each
+   The requirement's must-pass list. One argument per parameter nothing binds,
+   each of the declared type, starts a run - including the shape measured wrong
+   (``EVD_RUN_ENTRY_NAME_SHARED``): two instances of node types that each
    declare a parameter called the same thing, for two different context types,
    are two parameters and receive their own arguments.
 

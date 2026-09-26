@@ -12,9 +12,9 @@ two lists pull in opposite directions on purpose - one is the validator failing
 to report a defect, the other is the validator reporting one that is not there -
 and a set of cases derived from only one of them would leave the other free.
 
-That matters more here than in the feature before this one. Eight of the eleven
+That matters more here than in the feature before this one. Most of the
 requirements say what must be refused and none of those says what must not be, so
-a validator refusing everything satisfies all eight and no case built from them
+a validator refusing everything satisfies all of them and no case built from them
 would notice. The positive cases and ``TEST_WIRING_WELL_FORMED_DEFINITIONS_PASS``
 are the half that does.
 
@@ -59,54 +59,24 @@ defect it earns is unsettled, and a case asserting one would be inventing a
 requirement rather than checking one. What is settled is that it may not stop
 the walk, and that is what the case asserts. The three
 shapes it held before them are classified now, each by cases of its own below.
-The third shape still open, a binding into an entry node, is legal today and
-checked like any other binding, so no case singles it out.
-
-.. test_case:: Every unbound required parameter is reported
-   :id: TEST_WIRING_EVERY_UNBOUND_REQUIRED_IS_REPORTED
-   :verifies: CREQ_VALIDATOR_REQUIRED_BOUND
-   :test_kind: property
-   :coverage: partial
-
-   For any definition whose node types declare parameters and requested global
-   types, with an arbitrary subset of the parameters bound, the unbound-parameter
-   defects are exactly the parameters carrying no binding, computed independently
-   by the test.
-
-   The generator must reach an instance with no bindings at all, since that is
-   the case a walk over the bindings never visits, and it must declare globals on
-   the same instances as parameters, since a walk that reports those is
-   over-blocking and no case built only from parameters would see it.
-
-.. test_case:: An instance with no bindings is reported once per parameter
-   :id: TEST_WIRING_UNWIRED_INSTANCE_IS_REPORTED
-   :verifies: CREQ_VALIDATOR_REQUIRED_BOUND
-   :test_kind: error_path
-   :coverage: partial
-
-   An instance carrying no bindings at all, of a node type requiring two
-   parameters, is reported as two defects rather than one: each names that
-   instance and one of the parameters, and the two differ. What holds afterwards
-   is that the walk continues - a second instance's own unbound parameter is in
-   the same report.
-
-   The granularity is the assertion. One defect saying the instance is unwired
-   would satisfy "a defect is reported" and leave the author to work out which
-   parameters it meant.
+The third, a binding into an entry node, is closed: there are no entry nodes
+(``STKH_RUN_FROM_ANY_PARAMETER``).
 
 .. test_case:: Globals and empty declarations pass
    :id: TEST_WIRING_DEGENERATE_DECLARATIONS_PASS
-   :verifies: CREQ_VALIDATOR_REQUIRED_BOUND
+   :verifies: CREQ_VALIDATOR_ACCEPTS_WELL_FORMED
    :test_kind: positive
    :coverage: partial
 
-   Nothing is reported for each shape the requirement names as legal: a node
-   type declaring no parameters at all; a node requesting a global context type that no binding carries; an
-   entry node, whose parameters are the workflow's own rather than wires.
+   Nothing is reported for a node type declaring no parameters at all; a node
+   requesting a global context type that no binding carries; and parameters
+   nothing binds, on an instance with no bindings and on one with some, which
+   are the workflow's inputs rather than broken wires
+   (``STKH_RUN_FROM_ANY_PARAMETER``).
 
-   A generator reaches a node type with an empty parameter list rarely, and never
-   reaches the entry node at all, since what makes one is its position in the
-   definition rather than anything about its declaration.
+   A generator reaches a node type with an empty parameter list rarely, and the
+   well-formed generator never leaves a parameter unbound, so none of these
+   shapes is reached by ``TEST_WIRING_WELL_FORMED_DEFINITIONS_PASS``.
 
 .. test_case:: A binding to an instance that is not there is reported
    :id: TEST_WIRING_BINDING_TO_MISSING_INSTANCE_IS_REPORTED
@@ -118,10 +88,9 @@ checked like any other binding, so no case singles it out.
    unresolved defect, naming the consuming instance and parameter and echoing the
    name that resolved to nothing.
 
-   What must not also appear is the point of the case: that parameter is bound,
-   so no unbound-parameter defect is reported for it. The two checks answer
-   different questions about the same parameter, and a report carrying both would
-   send the author to add a wire that is already there.
+   What must not also appear is the point of the case: one wire to nowhere is one
+   defect, and nothing more is said about the parameter it fills, which is
+   bound.
 
 .. test_case:: Each wire to a missing name is reported
    :id: TEST_WIRING_EVERY_BROKEN_WIRE_IS_REPORTED
@@ -147,9 +116,9 @@ checked like any other binding, so no case singles it out.
    defect, naming that instance and echoing the type name.
 
    Nothing else about that instance is reported, and that is the half of the case
-   that can regress quietly: its parameters are unknowable, so no
-   unbound-parameter defect is invented for them, and no type-agreement defect is
-   invented for the wires it feeds. The rest of the definition is still walked,
+   that can regress quietly: its parameters are unknowable, so no defect is
+   invented about its own bindings, and no type-agreement defect is invented for
+   the wires it feeds. The rest of the definition is still walked,
    so another instance's defect appears in the same report.
 
 .. test_case:: A self-binding and shared node types pass
@@ -229,7 +198,8 @@ checked like any other binding, so no case singles it out.
    :test_kind: positive
    :coverage: partial
 
-   Nothing is reported for a workflow with no entry parameters, which is legal,
+   Nothing is reported for a workflow whose every parameter is bound, which is
+   legal,
    nor for a designated output whose node also feeds other nodes, which does not
    make it less terminal.
 
@@ -248,13 +218,12 @@ checked like any other binding, so no case singles it out.
    type, each of these bindings is reported as one defect naming its instance
    and the parameter as it was written: a name no parameter has; a binding
    spelled like the requested global; a typo of
-   the required parameter, reported beside the required parameter it leaves
-   unbound; and an undeclared parameter bound to an instance that is not there,
-   reported beside that unresolved source.
+   the required parameter; and an undeclared parameter bound to an instance
+   that is not there, reported beside that unresolved source.
 
    The first is the case the requirement exists for: nothing else about the
-   instance is wrong. The last two are what a walk moving on after one
-   defect gets wrong, each hiding a second fix behind the first. And no context
+   instance is wrong. The last is what a walk moving on after one defect gets
+   wrong, hiding a second fix behind the first. And no context
    type disagreement is reported for any of them, although the instance they are
    wired from produces a type no declared parameter has: an undeclared parameter
    has no type to compare, and comparing against a stand-in for one invents a
@@ -312,7 +281,8 @@ checked like any other binding, so no case singles it out.
    :test_kind: positive
    :coverage: partial
 
-   Nothing is reported for an output naming an entry node, nor for one naming an
+   Nothing is reported for an output naming an instance with a parameter nothing
+   binds, nor for one naming an
    instance whose name is not its node type's.
 
    The second is what an output resolved against the node types rather than the
@@ -326,21 +296,20 @@ checked like any other binding, so no case singles it out.
    :coverage: partial
 
    Four instances sharing one name - of two node types producing different
-   context types, of a type with a required parameter left unbound, and of a type
-   that was not supplied - are reported as exactly one defect naming that name. A
-   binding from the name into a parameter declared for one of the two context
-   types adds nothing, and nor does the designated output naming it; the rest of
-   the definition is still walked, so another instance's unbound parameter is in
-   the same report. The definition is checked twice, with the two instances
+   context types, of a type with a parameter, and of a type that was not
+   supplied - are reported as exactly one defect naming that name. A binding from
+   the name into a parameter declared for one of the two context types adds
+   nothing, and nor does the designated output naming it; the rest of the
+   definition is still walked, so another instance's wire to nowhere is in the
+   same report. The definition is checked twice, with the two instances
    producing different types in either order and a different instance first each
-   time - the second time, the one with its parameter unbound - and the report is
-   the same both times.
+   time - the second time, the one of the type that was not supplied - and the
+   report is the same both times.
 
    Two orders, because a validator resolving the name to the first instance
    carrying it passes exactly one of them, and one walking only that first
-   instance reports its unbound parameter in the second. What is not reported is
-   the rest of the case: the unbound parameter, the missing type, the
-   disagreement and an unresolved output are each what checking one instance as
+   instance reports its missing type in the second. What is not reported is the
+   rest of the case: the missing type, the disagreement and an unresolved output are each what checking one instance as
    if the name were its own produces, and each would name a node the author
    cannot find.
 
@@ -389,19 +358,19 @@ checked like any other binding, so no case singles it out.
    one counting sources within an instance refuses the second - and each is a
    graph drawn every day.
 
-.. test_case:: A definition with the first four defect classes reports all of them
+.. test_case:: A definition with four defect classes reports all of them
    :id: TEST_WIRING_ALL_FOUR_CLASSES_REPORTED
    :verifies: CREQ_VALIDATOR_EVERY_DEFECT
    :test_kind: error_path
    :coverage: partial
 
-   A definition carrying one defect of each of the four classes the validator was
-   first written for - an unbound required parameter, a binding to a name that is
-   not there, a wire across two context types, and no designated output - reports
-   exactly four defects, one of each class, each once.
+   A definition carrying one defect of each of four classes - a binding to a
+   parameter its type does not declare, a binding to a name that is not there, a
+   wire across two context types, and no designated output - reports exactly four
+   defects, one of each class, each once.
 
-   Where the four sit is as much of the case as the count. The unbound parameter
-   and the mismatched wire are on the same instance, so a walk that moves on once
+   Where the four sit is as much of the case as the count. The undeclared
+   parameter and the mismatched wire are on the same instance, so a walk that moves on once
    an instance has a defect reports three; and the signature is malformed, so a
    validator that refuses the definition for that before examining any wiring
    reports one. Both are failure modes their own requirements enumerate, and
@@ -417,14 +386,13 @@ checked like any other binding, so no case singles it out.
    :coverage: partial
 
    A definition carrying a name two instances share, an undeclared parameter
-   bound twice on an instance whose required parameter is unbound, and an output
-   naming no instance reports exactly five defects, each once: the shared name,
-   the unbound parameter, the undeclared parameter, the parameter bound twice,
-   and the output.
+   bound twice on one instance, and an output naming no instance reports exactly
+   four defects, each once: the shared name, the undeclared parameter, the
+   parameter bound twice, and the output.
 
    The rules for a name that picks out two things each stop part of the walk on
-   purpose, and this is the case for a stop placed one step too wide. Three of the
-   five sit on one instance, so a walk leaving an instance once a binding repeats
+   purpose, and this is the case for a stop placed one step too wide. Two of the
+   four sit on one instance, so a walk leaving an instance once a binding repeats
    reports fewer, and the shared name comes first, so one leaving the definition
    once a name is shared reports one.
 
@@ -482,7 +450,7 @@ checked like any other binding, so no case singles it out.
    type, exactly one designated output - the report is empty.
 
    The generator carries this case, and it must reach the shapes a validator
-   written to be strict refuses by accident: a cycle, a node no entry node
+   written to be strict refuses by accident: a cycle, a node nothing
    reaches, a declared global that no binding carries, and an output bound by several parameters. A generator producing only
    trees would pass against a validator that refuses every one of them, which
    would make this the weakest case in the document rather than the control every

@@ -146,7 +146,7 @@ and what it turned down.
 
 .. dec:: A workflow has a signature
    :id: DEC_WORKFLOW_SIGNATURE
-   :dec_status: accepted
+   :dec_status: superseded
    :decided_on: 2026-08-14
    :statement: Agconflo shall give a workflow a signature of typed entry parameters and exactly one designated output.
 
@@ -163,6 +163,32 @@ and what it turned down.
    A workflow with no designated output, or with more than one, is therefore
    invalid rather than merely unusual, and that is a check on the definition
    rather than on a run.
+
+.. dec:: A workflow's signature is what nothing in it binds
+   :id: DEC_SIGNATURE_IS_WHAT_NOTHING_BINDS
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :supersedes: DEC_WORKFLOW_SIGNATURE
+   :statement: Agconflo shall take a workflow's signature to be the typed parameters of its nodes that nothing binds and exactly one designated output.
+
+   A caller can only wire to something whose shape is known, and a workflow's
+   shape is still a node type's: typed parameters and one output
+   (``DEC_WORKFLOW_SIGNATURE``). What changes is where the parameters come
+   from. They were the parameters of instances marked as entries; they are
+   now every parameter the graph leaves unbound, read from the wiring rather
+   than declared beside it (``STKH_RUN_FROM_ANY_PARAMETER``). Each is a pair
+   of an instance and a parameter (``DEC_ARGUMENTS_PER_PARAMETER``).
+
+   Marking inputs, on the instance or on the parameter, was the alternative.
+   It catches a forgotten binding as a defect of the graph, where reading the
+   signature from the wiring catches it only when a run starts
+   (``DEC_RUN_REFUSED_UNLESS_EVERY_INPUT_GIVEN``). The maintainer chose the
+   reading for being the more general: a workflow can then be entered at
+   whichever of its nodes the wiring leaves open, and a flag has to be kept in
+   step with every change to the wiring.
+
+   The designated output is unchanged, and so is its check: a workflow with no
+   designated output, or with more than one, is invalid.
 
 .. dec:: A workflow repeats part of itself by walking its edges again
    :id: DEC_REPETITION_BY_EDGES

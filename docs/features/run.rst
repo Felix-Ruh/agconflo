@@ -67,9 +67,8 @@ and names the components they are divided between, which are defined in
    node in it runs - is satisfied by a validator that is never asked, because no
    node ever runs either.
 
-   ``FEAT_WIRING_REQUIRED_BOUND`` already carries the phrase "before running any
-   node of it", and it is about one defect class rather than about who does the
-   refusing. This requirement is about the run: it is the first thing in this
+   Each of the defect classes is about what makes a workflow invalid rather
+   than about who does the refusing. This requirement is about the run: it is the first thing in this
    project that can be said to have started, which is what makes it the first
    place a refusal can come before anything.
 
@@ -78,31 +77,32 @@ and names the components they are divided between, which are defined in
    component allocated the work, where the same obligation on the validator
    already lives.
 
-.. feat_req:: Every entry parameter is filled exactly once
+.. feat_req:: Every input of a run is given exactly once
    :id: FEAT_RUN_ENTRY_SOURCE_EXACT
-   :derived_from: STKH_EXPLICIT_CONTEXT
+   :derived_from: STKH_EXPLICIT_CONTEXT, STKH_RUN_FROM_ANY_PARAMETER
    :ears_pattern: unwanted
    :verification_method: test
-   :statement: If an entry parameter of a run is not filled by exactly one context of its declared type, then Agconflo shall refuse to start that run.
+   :statement: If a parameter of a run's workflow that nothing binds is not given exactly one context of its declared type, then Agconflo shall refuse to start that run.
 
-   An entry instance's parameters are the workflow's own rather than wires
-   (``DEC_WORKFLOW_SIGNATURE``), so they are the one place a node's inputs come
-   from outside the graph. The parent says a node is given exactly the contexts
-   wired to it, and this is the boundary where "wired" stops meaning anything.
+   Changed by ``DEC_CHANGE_RUN_ENTRY_SOURCE_EXACT``, which kept its id. A
+   parameter nothing binds is one of the workflow's inputs
+   (``STKH_RUN_FROM_ANY_PARAMETER``), and so the one place a node's inputs come
+   from outside the graph. ``STKH_EXPLICIT_CONTEXT`` says a node is given
+   exactly the contexts wired to it, and this is the boundary where "wired"
+   stops meaning anything.
 
-   It can be false while the parent holds, in three ways, and one of them was
+   It can be false while both parents hold, in three ways, and one of them was
    measured. An argument may be missing, and the run then has nothing to give a
-   parameter the declaration says is required. It may be of a context type the
-   declaration does not name, which the wiring validator would refuse between
-   two instances and cannot see here, because there is no binding to look at. Or
-   the parameter may be both supplied and bound - sound wiring, recorded among
-   the open shapes in ``components/wiring``, and exactly what a loop closing back
-   onto an entry node draws - which gives it two sources and no ground to prefer
-   either.
+   parameter the declaration says is required; it is the one place a forgotten
+   binding is caught, since the graph cannot tell it from an input. It may be
+   of a context type the declaration does not name, which the wiring validator
+   would refuse between two instances and cannot see here, because there is no
+   binding to look at. Or two may be given for one parameter, with no ground to
+   prefer either.
 
-   ``DEC_ARGUMENTS_PER_ENTRY`` is what makes the first of those a real question
-   rather than a bookkeeping one. Arguments are addressed by instance and
-   parameter, so two entry instances declaring one parameter name are two
+   ``DEC_ARGUMENTS_PER_PARAMETER`` is what makes the first of those a real
+   question rather than a bookkeeping one. Arguments are addressed by instance
+   and parameter, so two instances declaring one parameter name are two
    parameters to fill, where the obvious reading of a workflow's parameter list
    made them one and was measured feeding both from a single context.
 
@@ -364,12 +364,13 @@ and names the components they are divided between, which are defined in
      which is what keeps a provider, a script and a runtime out of this feature.
    - ``DEC_EVERY_INPUT_REQUIRED``, superseding ``DEC_BINDING_IS_AWAITED``:
      every parameter a type declares is required, bound and waited for.
-   - ``DEC_ARGUMENTS_PER_ENTRY``: an argument is addressed by the entry instance
-     and parameter it fills, so two entry instances declaring one name are two
-     parameters.
-   - ``DEC_RUN_REFUSED_BEFORE_IT_STARTS``: a workflow with a defect, and a
-     signature whose parameters do not each have exactly one source, are refusals
-     rather than endings.
+   - ``DEC_ARGUMENTS_PER_PARAMETER``, superseding ``DEC_ARGUMENTS_PER_ENTRY``:
+     an argument is addressed by the instance and parameter it fills, so two
+     instances declaring one name are two parameters.
+   - ``DEC_RUN_REFUSED_UNLESS_EVERY_INPUT_GIVEN``, superseding
+     ``DEC_RUN_REFUSED_BEFORE_IT_STARTS``: a workflow with a defect, and
+     parameters nothing binds that are not each given exactly one context, are
+     refusals rather than endings.
    - ``DEC_RUN_ENDS_ONE_WAY``: the four endings are closed, so the run has one
      answer to what became of it.
    - ``DEC_BUDGET_COUNTS_ACTIVATIONS``: the budget is a count the run keeps,
