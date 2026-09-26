@@ -2,10 +2,11 @@
 Running a workflow
 ==================
 
-What happens when a workflow actually runs: what it can be made of, what it may
-integrate with, the ways a run is allowed to end, and what a person needs to
-run one. Several of these constrain each other, or a goal in
-``stakeholder/context``, and the bodies say where.
+What happens when a workflow actually runs: what it can be made of, which way
+it goes and how often it goes round, what it may integrate with, the ways a run
+is allowed to end, and what a person needs to run one. Several of these
+constrain each other, or a goal in ``stakeholder/context``, and the bodies say
+where.
 
 .. stkh_req:: The provider is not baked in
    :id: STKH_PROVIDER_CHOICE
@@ -71,6 +72,65 @@ run one. Several of these constrain each other, or a goal in
    checks is perfectly possible, which is what this requirement rules out. The
    value is that a wiring mistake costs a rejection rather than half of an
    expensive run.
+
+.. stkh_req:: A node chooses the branch a run takes
+   :id: STKH_ROUTING
+   :stakeholder: user
+   :statement: Agconflo shall let a node decide which of the branches after it a run takes.
+
+   A pipeline often goes one of several ways depending on what has happened
+   in it: a review that accepts a change goes on to describing it, one that
+   rejects it goes back to the draft. Wiring says what can happen, not which
+   of it does in a given run. Without this every such choice is made outside
+   the workflow - a script doing both branches' work, or a person starting a
+   second run - where nothing the run keeps records which way it went.
+
+   The node decides because the choice is made from contexts, and a node is
+   what is given contexts (``STKH_EXPLICIT_CONTEXT``). Deciding is a step of
+   its own, apart from producing content: ``STKH_ONE_OUTPUT`` keeps the two
+   apart as what makes a router a router and a transform a transform, so the
+   deciding node's one output is its decision.
+
+   It names no mechanism. Explicit control edges gated by the decision are
+   what ``DEC_IMPLIED_CONTROL_EDGES`` reserves for "a router gating one branch
+   over another", and none can be represented yet
+   (``DEC_ACTIVATION_ONCE_PER_RUN``). Nor does it say what makes the decision:
+   a script, a model or a person each performs a node. And a router is not a
+   type Agconflo ships, but a node type any workflow declares
+   (``STKH_NO_PRIVILEGED_TYPES``).
+
+   A run already completes whatever instances have not run
+   (``DEC_COMPLETION_IS_DESIGNATED_OUTPUT``), so a branch not taken leaves
+   nothing unfinished. The stuck-run report below still has to tell the
+   instances of a branch not taken from instances that cannot proceed, and
+   the two requirements have to agree about that.
+
+.. stkh_req:: A workflow repeats part of itself
+   :id: STKH_REPETITION
+   :stakeholder: user
+   :statement: Agconflo shall let a workflow repeat part of itself until a node decides it is done.
+
+   Retrying a step until a test passes is an ordinary pipeline
+   (``DEC_BACK_EDGES_ALLOWED``), and so are drafting, reviewing and drafting
+   again, or fixing and building until the build passes. Without this the
+   repetition happens inside one node - a model's own calls within one
+   activation - or outside the run, and the workflow no longer shows the
+   step that was repeated or how often.
+
+   The end of a repetition is a decision like any other: go round again or go
+   on. So it leans on ``STKH_ROUTING``, and a repetition ended by a count is a
+   node deciding on a count. It is separate from that goal because routing
+   holds without it: branches that never return are useful on their own.
+
+   It names no mechanism. A back edge is legal to write today
+   (``DEC_BACK_EDGES_ALLOWED``), and the loop scope that decision records as
+   a fallback remains one. Nor does it say how one pass's contexts are kept
+   apart from the next's: each activation's contexts are already new
+   (``DEC_IDENTITY_PER_ACTIVATION``), and tagging them by pass is what
+   ``DEC_ACTIVATION_ONCE_PER_RUN`` defers until an instance can run twice.
+
+   It does not bound itself. A repetition whose node never decides it is done
+   is what the step budget below stops.
 
 .. stkh_req:: A runaway run is stopped
    :id: STKH_STEP_BUDGET
