@@ -65,6 +65,10 @@ enum Command {
         instance: String,
         #[command(flatten)]
         text: Text,
+        /// For a router's step, an instance its run goes on to; once for each,
+        /// and `--route ""` for none.
+        #[arg(long = "route", value_name = "INSTANCE")]
+        route: Vec<String>,
     },
 }
 
@@ -164,7 +168,9 @@ async fn perform(command: Command) -> u8 {
             files,
             instance,
             text,
+            route,
         } => {
+            let route = named(&route);
             let text = match (text.text, text.text_file) {
                 (Some(text), _) => text,
                 (None, file) => match read(&file.unwrap_or_default()) {
@@ -172,7 +178,14 @@ async fn perform(command: Command) -> u8 {
                     Err(message) => return refused(&message),
                 },
             };
-            agconflo_runner::answer(files.sources(), &files.record, &instance, &text).await
+            agconflo_runner::answer(
+                files.sources(),
+                &files.record,
+                &instance,
+                &text,
+                route.as_deref(),
+            )
+            .await
         }
     };
     match stopped {
@@ -180,6 +193,20 @@ async fn perform(command: Command) -> u8 {
         Err(refusal @ Refusal::NoGrants) => refused(&format!("{refusal}; name it with --grants")),
         Err(refusal) => refused(&refusal.to_string()),
     }
+}
+
+/// The route `--route` gave: none when it was not given, and the names given
+/// otherwise, an empty one naming nothing so that `--route ""` is a route to
+/// nowhere.
+// @A person's route read from the command,IMPL_MAIN_ROUTE,impl,[CREQ_COMMAND_READS_ROUTE],[DEC_PERSON_ROUTE_IN_THE_ANSWER]
+fn named(route: &[String]) -> Option<Vec<String>> {
+    (!route.is_empty()).then(|| {
+        route
+            .iter()
+            .filter(|name| !name.is_empty())
+            .cloned()
+            .collect()
+    })
 }
 
 /// The arguments given as text and in files, in that order, or why a file
@@ -239,7 +266,7 @@ fn report(stopped: &Stopped) -> u8 {
     match &stopped.outcome {
         Outcome::Ended(RunEnding::Completed(result)) => print(&result.render()),
         Outcome::Awaiting(activation) => {
-            print(&awaited(activation));
+            print(&awaited(activation, stopped.routes.as_deref()));
             match &stopped.engine {
                 Some(failure) => eprintln!(
                     "agconflo: the tool step for {} was not performed - {failure}; `agconflo resume` performs it again once the engine is back, or answer it with `agconflo answer`",
@@ -286,13 +313,18 @@ fn status(stopped: &Stopped) -> u8 {
 }
 
 /// The step a run awaits, as a person is shown it: the instance, the type of
-/// context it produces, and each input by parameter with its rendering.
-fn awaited(activation: &Activation) -> String {
+/// context it produces, for a router's step the instances it may name, and
+/// each input by parameter with its rendering.
+// @A router's choices printed with its awaited step,IMPL_MAIN_ROUTES_SHOWN,impl,[CREQ_COMMAND_READS_ROUTE],[DEC_PERSON_ROUTE_IN_THE_ANSWER]
+fn awaited(activation: &Activation, routes: Option<&[String]>) -> String {
     let mut shown = format!(
         "instance: {}\nproduces: {}\n",
         activation.instance(),
         activation.output().as_str()
     );
+    if let Some(routes) = routes {
+        shown.push_str(&format!("routes to: {}\n", routes.join(" ")));
+    }
     for (parameter, context) in activation.inputs() {
         shown.push_str(&format!(
             "input {parameter} ({}):\n{}\n",
