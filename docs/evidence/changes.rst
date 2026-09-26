@@ -201,3 +201,18 @@ or keeps, on the commit named. Re-running one later shows what has moved since.
    ``TEST_RUN_SIGNATURE_FILLED_EXACTLY_STARTS`` with their runs. Beside them:
    every other requirement of ``COMP_WORKFLOW_RUN``, and every other feature
    ``ARCH_RUN`` realises. In prose: the marker in ``run.rs``.
+
+.. evd:: The impact of giving text for any instance's parameter
+   :id: EVD_IMPACT_RUNNER_ARGUMENTS
+   :evd_kind: measurement
+   :observed_on: 2026-09-26
+   :observation: CREQ_RUNNER_ARGUMENTS_AS_TEXT and CREQ_RUNNER_REFUSES_UNKNOWN_ARGUMENT each answer to 2 needs, have 3 below them by link and 15 requirements sharing their component, and are named on 1 line of prose.
+
+   Run as ``sh scripts/impact.sh CREQ_RUNNER_ARGUMENTS_AS_TEXT`` and
+   ``sh scripts/impact.sh CREQ_RUNNER_REFUSES_UNKNOWN_ARGUMENT`` on
+   ``42acfdc``. Above them: ``FEAT_RUNNER_STARTS_FROM_DOCUMENTS`` and
+   ``STKH_RUN_FROM_DOCUMENTS``. Below: ``IMPL_RUNNER_ARGUMENTS``, and
+   ``TEST_RUNNER_ARGUMENTS_KEPT_EXACTLY`` and
+   ``TEST_RUNNER_UNKNOWN_ARGUMENT_REFUSED`` with their runs. Beside them:
+   every other requirement of ``COMP_RUNNER``, each the other among them. In
+   prose: the marker in ``runner.rs``.

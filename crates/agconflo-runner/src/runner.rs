@@ -31,10 +31,10 @@ pub struct Sources<'a> {
     pub grants: Option<&'a Path>,
 }
 
-/// One argument of a run: the text for one entry instance's parameter.
+/// One argument of a run: the text for one instance's parameter.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Argument {
-    /// The entry instance.
+    /// The instance.
     pub instance: String,
     /// The parameter it fills.
     pub parameter: String,
@@ -64,8 +64,7 @@ pub enum Refusal {
     Project(ProjectFault),
     /// The model mapping cannot be read.
     Models(ModelsFault),
-    /// Text was given for a parameter no entry instance of the workflow
-    /// declares.
+    /// Text was given for a parameter no instance of the workflow declares.
     Argument {
         /// The instance, as given.
         instance: String,
@@ -94,7 +93,7 @@ impl fmt::Display for Refusal {
                 parameter,
             } => write!(
                 f,
-                "no entry instance {instance} of the workflow declares a parameter {parameter}"
+                "no instance {instance} of the workflow declares a parameter {parameter}"
             ),
             Self::Record(refusal) => refusal.fmt(f),
             Self::Run(refusal) => refusal.fmt(f),
@@ -403,8 +402,8 @@ fn environment(name: &str) -> Option<String> {
 }
 
 /// Each argument as a context of the type its parameter declares, issued by
-/// `source`, or a refusal for the first naming no entry instance's parameter.
-// @Each argument made a context of the type its parameter declares,IMPL_RUNNER_ARGUMENTS,impl,[CREQ_RUNNER_ARGUMENTS_AS_TEXT, CREQ_RUNNER_REFUSES_UNKNOWN_ARGUMENT],[DEC_ARGUMENTS_AS_TEXT]
+/// `source`, or a refusal for the first naming no instance's parameter.
+// @Each argument made a context of the type its parameter declares,IMPL_RUNNER_ARGUMENTS,impl,[CREQ_RUNNER_ARGUMENTS_AS_TEXT, CREQ_RUNNER_REFUSES_UNKNOWN_ARGUMENT],[DEC_ARGUMENTS_AS_TEXT_PER_PARAMETER]
 fn supplied(
     definition: &WorkflowDefinition,
     arguments: &[Argument],
@@ -416,7 +415,7 @@ fn supplied(
             let declared = definition
                 .instances
                 .iter()
-                .find(|instance| instance.entry && instance.name == argument.instance)
+                .find(|instance| instance.name == argument.instance)
                 .and_then(|instance| {
                     definition
                         .node_types
@@ -657,7 +656,7 @@ fn stopped(
 #[cfg(test)]
 use crate::testing::{Scratch, Stub};
 #[cfg(test)]
-use agconflo_core::RunEnding;
+use agconflo_core::{RunEnding, SignatureFault, StartRefusal};
 #[cfg(test)]
 use agconflo_lua::ScriptFailure;
 #[cfg(test)]
@@ -722,7 +721,7 @@ fn models(scratch: &Scratch, file: &str, stub: &Stub) -> std::path::PathBuf {
     )
 }
 
-/// The brief `text` for the entry instance.
+/// The brief `text` for the first instance.
 #[cfg(test)]
 fn brief(text: &str) -> Vec<Argument> {
     vec![Argument {
@@ -857,7 +856,7 @@ fn unknown_argument_refused() {
     };
     let record = scratch.path("run.toml");
 
-    for (instance, parameter) in [("ghost", "brief"), ("first", "brif"), ("second", "before")] {
+    for (instance, parameter) in [("ghost", "brief"), ("first", "brif")] {
         let arguments = [Argument {
             instance: instance.to_owned(),
             parameter: parameter.to_owned(),
@@ -873,6 +872,57 @@ fn unknown_argument_refused() {
         assert!(!record.exists());
         assert!(!scratch.path("run.toml.lock").exists());
     }
+
+    // A parameter a binding fills is declared, so the runner makes the
+    // context, and the run refuses it as a second source.
+    let arguments = [
+        brief("x").remove(0),
+        Argument {
+            instance: "second".to_owned(),
+            parameter: "before".to_owned(),
+            text: "x".to_owned(),
+        },
+    ];
+    match runtime().block_on(start(sources, &record, &arguments)) {
+        Err(Refusal::Run(ScriptedRefusal::Start(StartRefusal::Signature(faults)))) => {
+            assert_eq!(
+                faults,
+                [SignatureFault::ParameterAlsoBound {
+                    instance: "second".to_owned(),
+                    parameter: "before".to_owned(),
+                }]
+            );
+        }
+        other => panic!("expected second.before refused as bound, got {other:?}"),
+    }
+    assert!(!record.exists());
+}
+
+#[cfg(test)]
+#[test]
+fn argument_for_any_instance_taken() {
+    let scratch = Scratch::new("argument_for_any_instance_taken");
+    let manifest = project(&scratch, "add", 5);
+    // The middle instance leaves its parameter to the run, as the first does.
+    scratch.write(
+        "flow.toml",
+        "name = \"open\"\noutput = \"third\"\n\n[instances.first]\nnode_type = \"begin\"\n\n[instances.second]\nnode_type = \"add\"\n\n[instances.third]\nnode_type = \"add\"\nbindings = { before = \"second\" }\n",
+    );
+    let mut arguments = brief("unused");
+    arguments.push(Argument {
+        instance: "second".to_owned(),
+        parameter: "before".to_owned(),
+        text: "middle".to_owned(),
+    });
+    let sources = Sources {
+        manifest: &manifest,
+        models: None,
+        grants: None,
+    };
+
+    let stopped = runtime().block_on(start(sources, &scratch.path("run.toml"), &arguments));
+
+    assert_eq!(completed(stopped), "middle+c+c");
 }
 
 #[cfg(test)]

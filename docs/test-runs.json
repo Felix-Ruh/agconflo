@@ -1452,6 +1452,15 @@
           "title": "agconflo-runner runner::arguments_kept_exactly",
           "type": "test_run"
         },
+        "RUN_RUNNER_ARGUMENT_FOR_ANY_INSTANCE_TAKEN": {
+          "executes": [
+            "TEST_RUNNER_ARGUMENT_FOR_ANY_INSTANCE_TAKEN"
+          ],
+          "id": "RUN_RUNNER_ARGUMENT_FOR_ANY_INSTANCE_TAKEN",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::argument_for_any_instance_taken",
+          "type": "test_run"
+        },
         "RUN_RUNNER_CHECK_REPORTS_TOOLS": {
           "executes": [
             "TEST_RUNNER_CHECK_REPORTS_TOOLS"

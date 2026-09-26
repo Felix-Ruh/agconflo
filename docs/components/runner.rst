@@ -331,10 +331,14 @@ component requirement whose subject is anything else.
    :derived_from: FEAT_RUNNER_STARTS_FROM_DOCUMENTS
    :allocated_to: COMP_RUNNER
    :ears_pattern: event
-   :statement: When text is given for an entry instance's parameter, Runner shall supply the run a context of the type that parameter declares holding that text exactly.
+   :statement: When text is given for an instance's parameter, Runner shall supply the run a context of the type that parameter declares holding that text exactly.
 
-   ``DEC_ARGUMENTS_AS_TEXT``. The type is the one the instance's node type
-   declares for the parameter.
+   ``DEC_ARGUMENTS_AS_TEXT_PER_PARAMETER``, changed by
+   ``DEC_CHANGE_RUNNER_ARGUMENTS``. The type is the one the instance's node
+   type declares for the parameter, whichever instance it is: a run's inputs
+   are the parameters nothing binds, on any instance
+   (``STKH_RUN_FROM_ANY_PARAMETER``). Whether the parameter is one the run
+   takes is the run's to say (``CREQ_RUN_REFUSES_UNFILLED_SIGNATURE``).
 
    Failure modes:
 
@@ -342,15 +346,16 @@ component requirement whose subject is anything else.
    - **Every argument given one type**, and the run refused for a parameter
      that declares another.
 
-.. comp_req:: An argument for no entry parameter is refused before the run
+.. comp_req:: An argument for no declared parameter is refused before the run
    :id: CREQ_RUNNER_REFUSES_UNKNOWN_ARGUMENT
    :derived_from: FEAT_RUNNER_STARTS_FROM_DOCUMENTS
    :allocated_to: COMP_RUNNER
    :ears_pattern: unwanted
-   :statement: If text is given for a parameter no entry instance of the workflow declares, then Runner shall refuse the run before any node runs and name that instance and parameter.
+   :statement: If text is given for a parameter no instance of the workflow declares, then Runner shall refuse the run before any node runs and name that instance and parameter.
 
-   The runner makes the context, and a parameter nobody declares has no type
-   to make it of, so it refuses before the run would.
+   Changed by ``DEC_CHANGE_RUNNER_ARGUMENTS``. The runner makes the context,
+   and a parameter nobody declares has no type to make it of, so it refuses
+   before the run would.
 
    Failure modes:
 

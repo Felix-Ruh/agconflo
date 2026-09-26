@@ -44,10 +44,10 @@ enum Command {
     Run {
         #[command(flatten)]
         files: Files,
-        /// Text for an entry instance's parameter.
+        /// Text for an instance's parameter that nothing binds.
         #[arg(long = "arg", num_args = 3, value_names = ["INSTANCE", "PARAMETER", "TEXT"])]
         arguments: Vec<String>,
-        /// A file whose text is for an entry instance's parameter.
+        /// A file whose text is for an instance's parameter that nothing binds.
         #[arg(long = "arg-file", num_args = 3, value_names = ["INSTANCE", "PARAMETER", "FILE"])]
         argument_files: Vec<String>,
     },

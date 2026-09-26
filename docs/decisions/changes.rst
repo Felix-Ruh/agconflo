@@ -784,3 +784,56 @@ that changed them show through, and are revised here.
      ``CREQ_RUN_REFUSES_SHARED_ARGUMENT_IDENTIFIER``, which is about the
      arguments' identifiers whatever they fill.
    - Text, the marker in ``run.rs``: retitled.
+
+.. dec:: Revised: text is given for any instance's parameter, not an entry's
+   :id: DEC_CHANGE_RUNNER_ARGUMENTS
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :supported_by: EVD_IMPACT_RUNNER_ARGUMENTS
+   :statement: Agconflo's requirements project shall state CREQ_RUNNER_ARGUMENTS_AS_TEXT and CREQ_RUNNER_REFUSES_UNKNOWN_ARGUMENT of any instance's parameter because there are no entry instances.
+
+   Amends ``CREQ_RUNNER_ARGUMENTS_AS_TEXT`` and
+   ``CREQ_RUNNER_REFUSES_UNKNOWN_ARGUMENT``.
+
+   Before: "When text is given for an entry instance's parameter, Runner shall
+   supply the run a context of the type that parameter declares holding that
+   text exactly." After: "When text is given for an instance's parameter,
+   Runner shall supply the run a context of the type that parameter declares
+   holding that text exactly." Before: "If text is given for a parameter no
+   entry instance of the workflow declares, then Runner shall refuse the run
+   before any node runs and name that instance and parameter." After: "If
+   text is given for a parameter no instance of the workflow declares, then
+   Runner shall refuse the run before any node runs and name that instance
+   and parameter."
+
+   Raised with ``DEC_CHANGE_WIRING_REQUIRED_BOUND``, by the same decision of
+   the maintainer's (``STKH_RUN_FROM_ANY_PARAMETER``).
+
+   Justification: each is wrong against its own parent now.
+   ``FEAT_RUNNER_STARTS_FROM_DOCUMENTS`` performs a run "with the arguments
+   that person gave", and ``STKH_RUN_FROM_DOCUMENTS`` above it asks nothing
+   about entries; the statements named the one kind of instance that could be
+   given its parameters when they were written, the shape
+   ``EVD_AMENDMENTS_CAME_SIDEWAYS`` found behind most changes. With no entry
+   instances, the old first statement obliges nothing and the second refuses
+   every argument. The new statements drop the word and name no mechanism;
+   which declared parameters a run takes stays the run's to say.
+
+   Verdicts on the impact analysis (``EVD_IMPACT_RUNNER_ARGUMENTS``):
+
+   - Up, ``FEAT_RUNNER_STARTS_FROM_DOCUMENTS`` and ``STKH_RUN_FROM_DOCUMENTS``:
+     unchanged.
+   - Down, ``IMPL_RUNNER_ARGUMENTS``: changing, looking for the declaration on
+     any instance. ``TEST_RUNNER_ARGUMENTS_KEPT_EXACTLY``: unchanged in what it
+     asserts. ``TEST_RUNNER_UNKNOWN_ARGUMENT_REFUSED``: its third shape, a
+     parameter of an instance that is not an entry, is refused by the run now
+     rather than the runner, and is kept as the case's control.
+     ``TEST_RUNNER_ARGUMENT_FOR_ANY_INSTANCE_TAKEN`` is added. Their runs
+     follow their cases.
+   - Sideways, the other fourteen requirements of ``COMP_RUNNER``: unaffected,
+     none being about what text is given for.
+   - Outside the analysis, since it shares no component:
+     ``CREQ_COMMAND_READS_THE_COMMAND`` passes the arguments through
+     unchanged, and the command line's help text drops the word.
+   - Text, the marker in ``runner.rs``: now following
+     ``DEC_ARGUMENTS_AS_TEXT_PER_PARAMETER``.
