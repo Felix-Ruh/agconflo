@@ -2865,6 +2865,15 @@
           "title": "agconflo-core wiring::resolving_outputs_pass",
           "type": "test_run"
         },
+        "RUN_WIRING_ROUTED_INPUT_CHECKED": {
+          "executes": [
+            "TEST_WIRING_ROUTED_INPUT_CHECKED"
+          ],
+          "id": "RUN_WIRING_ROUTED_INPUT_CHECKED",
+          "test_outcome": "passed",
+          "title": "agconflo-core wiring::routed_input_checked",
+          "type": "test_run"
+        },
         "RUN_WIRING_SELF_BINDING_AND_SHARED_TYPES_PASS": {
           "executes": [
             "TEST_WIRING_SELF_BINDING_AND_SHARED_TYPES_PASS"

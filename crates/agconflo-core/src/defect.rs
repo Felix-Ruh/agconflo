@@ -94,6 +94,18 @@ pub enum WiringDefect {
         /// The name as it was written.
         name: String,
     },
+    /// A binding takes an input of an instance whose node type does not route,
+    /// or does not declare that input.
+    UnroutedInput {
+        /// The instance consuming the binding.
+        instance: String,
+        /// The parameter it fills.
+        parameter: String,
+        /// The instance whose input it takes.
+        source: String,
+        /// The input it takes, as it was written.
+        input: String,
+    },
 }
 
 impl WiringDefect {
@@ -108,7 +120,8 @@ impl WiringDefect {
             | Self::RepeatedBinding { instance, .. }
             | Self::ContextTypeDisagreement { instance, .. }
             | Self::UnresolvedCall { instance, .. }
-            | Self::UnportableCallName { instance, .. } => Some(instance),
+            | Self::UnportableCallName { instance, .. }
+            | Self::UnroutedInput { instance, .. } => Some(instance),
             Self::SignatureOutputs { .. } | Self::UnresolvedOutput { .. } => None,
         }
     }
@@ -120,7 +133,8 @@ impl WiringDefect {
             Self::UnresolvedInstance { parameter, .. }
             | Self::UndeclaredParameter { parameter, .. }
             | Self::RepeatedBinding { parameter, .. }
-            | Self::ContextTypeDisagreement { parameter, .. } => Some(parameter),
+            | Self::ContextTypeDisagreement { parameter, .. }
+            | Self::UnroutedInput { parameter, .. } => Some(parameter),
             Self::UnresolvedNodeType { .. }
             | Self::RepeatedInstance { .. }
             | Self::SignatureOutputs { .. }
@@ -215,6 +229,15 @@ impl fmt::Display for WiringDefect {
                 f,
                 "the node '{instance}' may call '{name}', which is not a tool name every provider accepts: 1 to 64 ASCII letters, digits, underscores or hyphens"
             ),
+            Self::UnroutedInput {
+                instance,
+                parameter,
+                source,
+                input,
+            } => write!(
+                f,
+                "'{parameter}' of the node '{instance}' takes the input '{input}' of '{source}', which is not a router declaring that input"
+            ),
         }
     }
 }
@@ -245,7 +268,8 @@ proptest! {
                 WiringDefect::UnresolvedInstance { .. }
                 | WiringDefect::UndeclaredParameter { .. }
                 | WiringDefect::RepeatedBinding { .. }
-                | WiringDefect::ContextTypeDisagreement { .. } => {}
+                | WiringDefect::ContextTypeDisagreement { .. }
+                | WiringDefect::UnroutedInput { .. } => {}
                 WiringDefect::UnresolvedNodeType { .. }
                 | WiringDefect::RepeatedInstance { .. }
                 | WiringDefect::SignatureOutputs { .. }

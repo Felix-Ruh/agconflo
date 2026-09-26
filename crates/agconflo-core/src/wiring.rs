@@ -143,7 +143,22 @@ fn check_bindings(
             continue;
         }
         if let Some(parameter) = parameter {
-            check_binding_type(instance, parameter, binding, source, declarations, defects);
+            match &binding.input {
+                None => {
+                    check_binding_type(instance, parameter, binding, source, declarations, defects);
+                }
+                Some(input) => {
+                    check_routed_input(
+                        instance,
+                        parameter,
+                        binding,
+                        input,
+                        source,
+                        declarations,
+                        defects,
+                    );
+                }
+            }
         }
     }
 }
@@ -214,6 +229,46 @@ fn check_binding_type(
             parameter: binding.parameter.clone(),
             expected: parameter.context_type.clone(),
             produced: producer.output.clone(),
+        });
+    }
+}
+
+/// A binding taking `input` of `source` takes one a router declares, and the
+/// parameter it fills is declared for that input's type. A source of a node
+/// type the definition does not carry is never compared.
+// @A routed input taken from a router declaring it,IMPL_WIRING_ROUTED_INPUT,impl,[CREQ_VALIDATOR_ROUTED_INPUT, CREQ_VALIDATOR_TYPES_AGREE],[DEC_ROUTER_OUTPUT_IS_ITS_DECISION]
+fn check_routed_input(
+    instance: &NodeInstance,
+    parameter: &Parameter,
+    binding: &Binding,
+    input: &str,
+    source: &NodeInstance,
+    declarations: &HashMap<&str, &NodeType>,
+    defects: &mut Vec<WiringDefect>,
+) {
+    let Some(router) = declarations.get(source.node_type.as_str()) else {
+        return;
+    };
+    let declared = router
+        .required
+        .iter()
+        .find(|declared| declared.name == input)
+        .filter(|_| router.routes);
+    let Some(declared) = declared else {
+        defects.push(WiringDefect::UnroutedInput {
+            instance: instance.name.clone(),
+            parameter: binding.parameter.clone(),
+            source: source.name.clone(),
+            input: input.to_owned(),
+        });
+        return;
+    };
+    if declared.context_type != parameter.context_type {
+        defects.push(WiringDefect::ContextTypeDisagreement {
+            instance: instance.name.clone(),
+            parameter: binding.parameter.clone(),
+            expected: parameter.context_type.clone(),
+            produced: declared.context_type.clone(),
         });
     }
 }
@@ -1181,6 +1236,50 @@ fn name_defects_reported_together() {
             undeclared("b", "hnit"),
             bound_twice("b", "hnit"),
             unresolved_output("nowhere"),
+        ]
+    );
+}
+
+/// A binding taking `input` of `source`, reported as not a router's.
+#[cfg(test)]
+fn unrouted(instance: &str, parameter: &str, source: &str, input: &str) -> WiringDefect {
+    WiringDefect::UnroutedInput {
+        instance: instance.to_owned(),
+        parameter: parameter.to_owned(),
+        source: source.to_owned(),
+        input: input.to_owned(),
+    }
+}
+
+#[test]
+fn routed_input_checked() {
+    let types = vec![
+        node_type("route", &[("draft", "note"), ("change", "diff")], "note").routing(),
+        node_type("pass", &[("draft", "note")], "note"),
+        node_type("take", &[("input", "note")], "note"),
+        node_type("patch", &[("input", "diff")], "diff"),
+    ];
+    let instances = vec![
+        instance("r", "route", &[]),
+        instance("p", "pass", &[]),
+        // The router's declared input, into a parameter of its type: sound.
+        instance("sound", "take", &[]).taking("input", "r", "draft"),
+        // An input of a node that does not route, though it declares it.
+        instance("not_router", "take", &[]).taking("input", "p", "draft"),
+        // An input the router does not declare.
+        instance("undeclared", "take", &[]).taking("input", "r", "brief"),
+        // The router's `diff` input into a `note` parameter.
+        instance("crossed", "take", &[]).taking("input", "r", "change"),
+        // The router's `diff` input into a `diff` parameter: sound.
+        instance("patched", "patch", &[]).taking("input", "r", "change"),
+    ];
+
+    assert_eq!(
+        validate_wiring(&definition(types, instances, &["sound"])),
+        vec![
+            unrouted("not_router", "input", "p", "draft"),
+            unrouted("undeclared", "input", "r", "brief"),
+            disagreement("crossed", "input", "note", "diff"),
         ]
     );
 }
