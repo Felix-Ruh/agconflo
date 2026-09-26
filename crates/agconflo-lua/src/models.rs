@@ -24,7 +24,8 @@ use genai::chat::{
 pub struct Roster {
     client: Client,
     roles: HashMap<String, String>,
-    http: reqwest::Client,
+    /// The client decisions are sent through, made at the first decision.
+    http: std::sync::OnceLock<reqwest::Client>,
     decisions: HashMap<String, Decider>,
 }
 
@@ -52,7 +53,7 @@ impl Roster {
         Self {
             client,
             roles: HashMap::new(),
-            http: reqwest::Client::new(),
+            http: std::sync::OnceLock::new(),
             decisions: HashMap::new(),
         }
     }
@@ -203,6 +204,7 @@ impl Roster {
         };
         let response = self
             .http
+            .get_or_init(reqwest::Client::new)
             .post(format!("{}decisions", decider.endpoint))
             .bearer_auth(&decider.key)
             .header(reqwest::header::CONTENT_TYPE, "application/json")
