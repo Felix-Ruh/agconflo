@@ -331,3 +331,49 @@ body, and every rule needs a fixture because the tool ignores a malformed one.
    and drop the file from every id made from it: ``TEST_REACHES_EACH_ONCE`` for
    a test whose case is ``TEST_LINEAGE_REACHES_EACH_ONCE``, wrong and looking
    right. Matched as nothing, it is refused as a crate with no tests.
+
+.. dec:: An agent asks the graph through ubc's Cypher, strictly and counting rows, before searching the files
+   :id: DEC_GRAPH_ASKED_THROUGH_UBC
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :supported_by: EVD_GRAPH_TELLS_LINK_FROM_MENTION, EVD_CYPHER_EMPTY_UNLESS_STRICT, EVD_CONTENT_IS_THE_BODY, EVD_REGEX_STOPS_AT_A_LINE_BREAK
+   :statement: Agconflo's agents shall ask a question the requirements graph can answer as a ubc Cypher query run with --strict, and count its rows, before searching the files the graph is built from.
+
+   How ``STKH_GRAPH_QUERIED_FIRST`` is met today. ``ubc query cypher`` is how
+   the toolchain's gates and reports already ask the graph, ubc being the
+   whole toolchain (``DEC_NO_PYTHON``), and of ubc's three query commands the
+   one that follows links from need to need. A query follows links, which the
+   files show only as text: of six lines naming one decision, one was a link,
+   and which cases verify a component's requirements, and how each last ran,
+   was one query where the files needed a script
+   (``EVD_GRAPH_TELLS_LINK_FROM_MENTION``).
+
+   Reading a need and finding needs are questions too. A need's body is its
+   ``content``, exactly as written (``EVD_CONTENT_IS_THE_BODY``), so a need is
+   read by a query returning its statement and content, and found by one
+   searching its text fields. A search is ``CONTAINS``, or a regular
+   expression opened with ``(?s)``: every body spans lines, and a pattern
+   crossing a line break without it matches nothing and still succeeds
+   (``EVD_REGEX_STOPS_AT_A_LINE_BREAK``).
+
+   ``--strict`` and a count of the rows, because an empty answer is what both
+   a question nothing matches and a query that could never match look like,
+   and only ``--strict`` refuses the second (``EVD_CYPHER_EMPTY_UNLESS_STRICT``).
+   An empty answer is believed once a control that should return rows has
+   returned them. ``AGENTS.md`` gives the command, the graph's labels and
+   links, and the traps a query falls into.
+
+   Searching the files stays right for what the graph does not hold: the body
+   of a function, the text of a file that is not a need. When ubc cannot run,
+   as when its licence grant cannot be reached, the agent says so and searches
+   the files.
+
+   Searching the documents first was the alternative: it finds a mention and
+   a link alike, and a relation across three levels is joined by hand. ubc's
+   other two query commands were others. ``query filter`` evaluates an
+   expression over one need's own fields, its outgoing links among them: it
+   reads a need and finds needs by their content, but a question two links
+   deep takes one filter per link, joined by hand. ``query search`` searches
+   what a document can reference, and says it does not search what a need
+   says. A script wrapping the command was the last; the command is one line,
+   and a wrapper is one more thing whose output would have to be trusted.

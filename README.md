@@ -235,7 +235,7 @@ sh .githooks/pre-commit                                        # everything the 
 sh scripts/docs-selftest.sh                                    # prove the metamodel's rules still fire
 sh scripts/cypher-gates.sh                                     # run each Cypher gate, proved first
 sh scripts/cypher-gates.sh --report                            # print the review reports
-tools/ubc query cypher --project docs 'MATCH (n) RETURN n.id'  # query the needs graph
+tools/ubc query cypher --project docs --strict 'MATCH (n) RETURN n.id'  # query the graph (AGENTS.md)
 tools/cargo-nextest nextest run --workspace --all-targets      # the tests, as the gates run them
 sh scripts/import-test-runs.sh --check                         # are the committed test results current?
 sh scripts/import-test-runs.sh                                 # rewrite them, then read the diff
