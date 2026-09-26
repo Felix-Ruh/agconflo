@@ -37,6 +37,13 @@ step hooks git config core.hooksPath .githooks
 start_docker() {
     docker info >/dev/null 2>&1 && return 0
     command -v dockerd >/dev/null 2>&1 || { echo 'session-start: dockerd not found' >&2; return 1; }
+    # A resumed session keeps the pid file of a containerd that is gone. When
+    # its number now belongs to another process, dockerd waits for that one and
+    # gives up, so a file naming anything but a containerd is removed.
+    pidfile=/var/run/docker/containerd/containerd.pid
+    if [ -f "$pidfile" ] && [ "$(cat "/proc/$(cat "$pidfile")/comm" 2>/dev/null)" != containerd ]; then
+        rm -f "$pidfile"
+    fi
     nohup setsid dockerd >/tmp/dockerd.log 2>&1 &
     i=0
     while [ "$i" -lt 30 ]; do
