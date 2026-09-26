@@ -228,6 +228,15 @@
           "title": "agconflo-cli::command misuse_exits_2",
           "type": "test_run"
         },
+        "RUN_COMMAND_PERSON_ROUTES": {
+          "executes": [
+            "TEST_COMMAND_PERSON_ROUTES"
+          ],
+          "id": "RUN_COMMAND_PERSON_ROUTES",
+          "test_outcome": "passed",
+          "title": "agconflo-cli::command person_routes",
+          "type": "test_run"
+        },
         "RUN_COMMAND_RESULT_ON_STANDARD_OUTPUT": {
           "executes": [
             "TEST_COMMAND_RESULT_ON_STANDARD_OUTPUT"
@@ -1612,6 +1621,15 @@
           "id": "RUN_RUNNER_PERFORMS_TOOL_STEPS",
           "test_outcome": "passed",
           "title": "agconflo-runner runner::performs_tool_steps",
+          "type": "test_run"
+        },
+        "RUN_RUNNER_PERSON_ROUTES": {
+          "executes": [
+            "TEST_RUNNER_PERSON_ROUTES"
+          ],
+          "id": "RUN_RUNNER_PERSON_ROUTES",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::person_routes",
           "type": "test_run"
         },
         "RUN_RUNNER_RECORDED_TOOL_STEP_NOT_REPEATED": {
