@@ -38,8 +38,9 @@ host's in the module ``host``, the roster's in ``models``, a resumed script's in
    :coverage: full
 
    Scripts asking with no question, with a question lacking instructions, with
-   one option, and with a number where an option's meaning goes. Each fails as
-   a script error and the stub receives nothing.
+   one option, with a number where an option's meaning goes, and with a key
+   that is neither instructions nor options. Each fails as a script error
+   naming its fault, and the stub receives nothing.
 
    Catches: the request sent and refused by the provider; a question with one
    option answered; a number taken as text.

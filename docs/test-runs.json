@@ -489,6 +489,42 @@
           "title": "agconflo-runner grants::unreadable_refused",
           "type": "test_run"
         },
+        "RUN_HOST_BAD_QUESTIONS_REFUSED": {
+          "executes": [
+            "TEST_HOST_BAD_QUESTIONS_REFUSED"
+          ],
+          "id": "RUN_HOST_BAD_QUESTIONS_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-lua host::bad_questions_refused",
+          "type": "test_run"
+        },
+        "RUN_HOST_DECISIONS_COUNTED": {
+          "executes": [
+            "TEST_HOST_DECISIONS_COUNTED"
+          ],
+          "id": "RUN_HOST_DECISIONS_COUNTED",
+          "test_outcome": "passed",
+          "title": "agconflo-lua host::decisions_counted",
+          "type": "test_run"
+        },
+        "RUN_HOST_DECISION_CHOSEN": {
+          "executes": [
+            "TEST_HOST_DECISION_CHOSEN"
+          ],
+          "id": "RUN_HOST_DECISION_CHOSEN",
+          "test_outcome": "passed",
+          "title": "agconflo-lua host::decision_chosen",
+          "type": "test_run"
+        },
+        "RUN_HOST_DECISION_WITH_CALLS_REFUSED": {
+          "executes": [
+            "TEST_HOST_DECISION_WITH_CALLS_REFUSED"
+          ],
+          "id": "RUN_HOST_DECISION_WITH_CALLS_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-lua host::decision_with_calls_refused",
+          "type": "test_run"
+        },
         "RUN_HOST_EACH_TYPE_RUNS_ITS_OWN_SCRIPT": {
           "executes": [
             "TEST_HOST_EACH_TYPE_RUNS_ITS_OWN_SCRIPT"
@@ -804,6 +840,15 @@
           "title": "agconflo-lua models::answer_kept_as_sent",
           "type": "test_run"
         },
+        "RUN_MODELS_BAD_DECISION_ANSWER_FAILS": {
+          "executes": [
+            "TEST_MODELS_BAD_DECISION_ANSWER_FAILS"
+          ],
+          "id": "RUN_MODELS_BAD_DECISION_ANSWER_FAILS",
+          "test_outcome": "passed",
+          "title": "agconflo-lua models::bad_decision_answer_fails",
+          "type": "test_run"
+        },
         "RUN_MODELS_CALLS_RETURNED_AS_SENT": {
           "executes": [
             "TEST_MODELS_CALLS_RETURNED_AS_SENT"
@@ -820,6 +865,33 @@
           "id": "RUN_MODELS_CONTINUATION_SENDS_CONTEXTS_WHOLE",
           "test_outcome": "passed",
           "title": "agconflo-lua models::continuation_sends_contexts_whole",
+          "type": "test_run"
+        },
+        "RUN_MODELS_DECISION_REFUSAL_CARRIED": {
+          "executes": [
+            "TEST_MODELS_DECISION_REFUSAL_CARRIED"
+          ],
+          "id": "RUN_MODELS_DECISION_REFUSAL_CARRIED",
+          "test_outcome": "passed",
+          "title": "agconflo-lua models::decision_refusal_carried",
+          "type": "test_run"
+        },
+        "RUN_MODELS_DECISION_SENT_TO_ITS_ENDPOINT": {
+          "executes": [
+            "TEST_MODELS_DECISION_SENT_TO_ITS_ENDPOINT"
+          ],
+          "id": "RUN_MODELS_DECISION_SENT_TO_ITS_ENDPOINT",
+          "test_outcome": "passed",
+          "title": "agconflo-lua models::decision_sent_to_its_endpoint",
+          "type": "test_run"
+        },
+        "RUN_MODELS_KIND_MISMATCH_FAILS": {
+          "executes": [
+            "TEST_MODELS_KIND_MISMATCH_FAILS"
+          ],
+          "id": "RUN_MODELS_KIND_MISMATCH_FAILS",
+          "test_outcome": "passed",
+          "title": "agconflo-lua models::kind_mismatch_fails",
           "type": "test_run"
         },
         "RUN_MODELS_OFFER_SENT_AS_TOOLS": {
@@ -883,6 +955,24 @@
           "id": "RUN_MODELS_WINDOW_PARTS_AS_MESSAGES",
           "test_outcome": "passed",
           "title": "agconflo-lua models::window_parts_as_messages",
+          "type": "test_run"
+        },
+        "RUN_MODEL_MAP_BAD_DECISIONS_ENTRY_REFUSED": {
+          "executes": [
+            "TEST_MODEL_MAP_BAD_DECISIONS_ENTRY_REFUSED"
+          ],
+          "id": "RUN_MODEL_MAP_BAD_DECISIONS_ENTRY_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner model_map::bad_decisions_entry_refused",
+          "type": "test_run"
+        },
+        "RUN_MODEL_MAP_DECISIONS_REACH_THEIR_MODEL": {
+          "executes": [
+            "TEST_MODEL_MAP_DECISIONS_REACH_THEIR_MODEL"
+          ],
+          "id": "RUN_MODEL_MAP_DECISIONS_REACH_THEIR_MODEL",
+          "test_outcome": "passed",
+          "title": "agconflo-runner model_map::decisions_reach_their_model",
           "type": "test_run"
         },
         "RUN_MODEL_MAP_DEFAULT_KEY_NEVER_SENT": {
@@ -2305,6 +2395,15 @@
           "id": "RUN_SCRIPTED_CONTINUATION_COUNTS_AGAINST_THE_LIMIT",
           "test_outcome": "passed",
           "title": "agconflo-lua scripted::continuation_counts_against_the_limit",
+          "type": "test_run"
+        },
+        "RUN_SCRIPTED_DECISION_REPLAYED": {
+          "executes": [
+            "TEST_SCRIPTED_DECISION_REPLAYED"
+          ],
+          "id": "RUN_SCRIPTED_DECISION_REPLAYED",
+          "test_outcome": "passed",
+          "title": "agconflo-lua scripted::decision_replayed",
           "type": "test_run"
         },
         "RUN_SCRIPTED_EXCHANGES_REPORTED_BEFORE_CALLS": {

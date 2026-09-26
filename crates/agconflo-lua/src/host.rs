@@ -15,7 +15,7 @@ use agconflo_core::{
 use mlua::prelude::*;
 
 use crate::behaviours::Script;
-use crate::models::{Asked, ModelFailure, Offered, Part, Roster};
+use crate::models::{Asked, Chosen, ModelFailure, Offered, Part, Question, Roster, chosen};
 
 /// What one activation's script may spend: instructions executed, bytes
 /// allocated and model calls made. Each activation has its own.
@@ -319,8 +319,8 @@ pub(crate) struct Performing {
 /// activation's inputs under their parameters' names, with an unbound optional
 /// parameter absent rather than empty; and the host functions -
 /// `host.text(type, text)`, `host.compose(type, parts, separator)`,
-/// `host.complete(role, prompt, type)` and `host.output`, the type the output is
-/// declared as.
+/// `host.complete(role, prompt, type)`, `host.decide(role, state, questions,
+/// type)` and `host.output`, the type the output is declared as.
 ///
 /// Contexts the script makes are issued identifiers from `source`, which must be
 /// the source the run's arguments came from; the run refuses another's.
@@ -422,6 +422,7 @@ fn host_functions(
         replay: performing.replay,
         mailbox: performing.mailbox,
     });
+    let deciding = completing.clone();
     host.raw_set(
         "complete",
         lua.create_async_function(
@@ -437,6 +438,40 @@ fn host_functions(
                     complete(&completing, &role, prompt, declared)
                         .await
                         .map(Handed)
+                }
+            },
+        )?,
+    )?;
+
+    host.raw_set(
+        "decide",
+        lua.create_async_function(
+            move |lua,
+                  (role, state, questions, declared): (
+                String,
+                LuaAnyUserData,
+                LuaTable,
+                String,
+            )| {
+                // Read before anything is awaited: a state that is not a
+                // context, and malformed questions, are refused before any
+                // request is made.
+                let state = state.borrow::<Handed>().map(|handed| handed.0.clone());
+                let asked = asked_questions(&questions);
+                let deciding = deciding.clone();
+                async move {
+                    let state = state?;
+                    let asked = asked?;
+                    let declared = ContextType::new(&declared).map_err(LuaError::external)?;
+                    let (answer, chosen) = decide(&deciding, &role, state, asked, declared).await?;
+                    let table = lua.create_table()?;
+                    for chosen in chosen {
+                        let one = lua.create_table()?;
+                        one.raw_set("choice", chosen.choice)?;
+                        one.raw_set("confidence", chosen.confidence)?;
+                        table.raw_set(chosen.question, one)?;
+                    }
+                    Ok((Handed(answer), table))
                 }
             },
         )?,
@@ -586,6 +621,196 @@ async fn complete(
         }
         window = next;
     }
+}
+
+/// A question a script asks, as it wrote it: its name, its instructions, and
+/// each option with what it means.
+type Written = (String, String, Vec<(String, String)>);
+
+/// The questions `table` asks, each a choice between options, in the order of
+/// their names, each question's options in the order of theirs - or the script
+/// error naming the first fault: no question, a name or a text that is not a
+/// string, a key other than `instructions` and `options`, instructions missing,
+/// or fewer than two options.
+// @Each question a choice between two or more options written as strings,IMPL_HOST_QUESTIONS,impl,[CREQ_HOST_REFUSES_BAD_QUESTIONS],[DEC_CHOICE_QUESTIONS_ONLY]
+fn asked_questions(table: &LuaTable) -> LuaResult<Vec<Written>> {
+    let text = |value: LuaValue, what: &str| -> LuaResult<String> {
+        match value {
+            LuaValue::String(text) => Ok(text.to_str()?.to_owned()),
+            other => Err(LuaError::runtime(format!(
+                "{what} is {}, not a string",
+                other.type_name()
+            ))),
+        }
+    };
+    let mut asked = Vec::new();
+    for pair in table.pairs::<LuaValue, LuaValue>() {
+        let (name, question) = pair?;
+        let name = text(name, "a question's name")?;
+        let LuaValue::Table(question) = question else {
+            return Err(LuaError::runtime(format!(
+                "the question {name} is not a table"
+            )));
+        };
+        let mut instructions = None;
+        let mut options = Vec::new();
+        for pair in question.pairs::<LuaValue, LuaValue>() {
+            let (key, value) = pair?;
+            match text(key, &format!("a key of the question {name}"))?.as_str() {
+                "instructions" => {
+                    instructions =
+                        Some(text(value, &format!("the question {name}'s instructions"))?);
+                }
+                "options" => {
+                    let LuaValue::Table(given) = value else {
+                        return Err(LuaError::runtime(format!(
+                            "the question {name}'s options are not a table"
+                        )));
+                    };
+                    for pair in given.pairs::<LuaValue, LuaValue>() {
+                        let (option, meaning) = pair?;
+                        let option = text(option, &format!("an option of the question {name}"))?;
+                        let meaning =
+                            text(meaning, &format!("the question {name}'s option {option}"))?;
+                        options.push((option, meaning));
+                    }
+                }
+                other => {
+                    return Err(LuaError::runtime(format!(
+                        "the question {name} has {other}, which is neither instructions nor options"
+                    )));
+                }
+            }
+        }
+        let Some(instructions) = instructions else {
+            return Err(LuaError::runtime(format!(
+                "the question {name} has no instructions"
+            )));
+        };
+        if options.len() < 2 {
+            return Err(LuaError::runtime(format!(
+                "the question {name} has {} option(s), and a choice needs two",
+                options.len()
+            )));
+        }
+        options.sort();
+        asked.push((name, instructions, options));
+    }
+    if asked.is_empty() {
+        return Err(LuaError::runtime("a decision needs a question"));
+    }
+    asked.sort_by(|a, b| a.0.cmp(&b.0));
+    Ok(asked)
+}
+
+/// One `host.decide`: the decisions model `role` is mapped to asked `asked`
+/// about `state`, and its answer given back as a context of `declared` beside
+/// each question's choice.
+///
+/// Refused as a script error before anything is counted or sent when the
+/// activation's instance declares calls. Each question's name and the question
+/// itself become contexts of the state's type, and the window is the state and
+/// each question's two, composed in the order of the questions' names. The
+/// request counts against the model call limit, checked before it is sent. An
+/// answer is reported to the run as an exchange of that window, no offer and
+/// the answer, and the run hands its caller a record holding it.
+///
+/// An activation resumed from its record answers from the record instead,
+/// counted all the same, once the window is seen to be the one recorded and the
+/// recorded offer empty; a difference fails the activation before anything is
+/// sent.
+// @A decision asked as a model call and recorded as an exchange,IMPL_HOST_DECIDE,impl,[CREQ_HOST_GIVES_CHOICE, CREQ_HOST_REFUSES_CHOICE_WITH_CALLS, CREQ_HOST_MODEL_CALL_LIMIT, CREQ_HOST_REPORTS_EXCHANGES, CREQ_HOST_ANSWERS_FROM_RECORD, CREQ_HOST_REPLAY_DIVERGED, CREQ_HOST_MODEL_FAILURE],[DEC_DECISION_IS_A_MODEL_CALL, DEC_QUESTIONS_ARE_CONTEXTS, DEC_DECIDING_WITHOUT_CALLS, DEC_DECIDE_GIVES_ANSWER_AND_CHOICES]
+async fn decide(
+    completing: &Completing,
+    role: &str,
+    state: Context,
+    asked: Vec<Written>,
+    declared: ContextType,
+) -> LuaResult<(Context, Vec<Chosen>)> {
+    if !completing.callees.is_empty() {
+        return Err(LuaError::runtime(
+            "a decision cannot be asked for where the instance declares calls",
+        ));
+    }
+    let issuing = &completing.source;
+    let calls = &completing.calls;
+    let kind = state.declared_type().clone();
+    let mut questions = Vec::new();
+    for (name, instructions, options) in asked {
+        let criteria: serde_json::Map<String, serde_json::Value> = options
+            .iter()
+            .map(|(option, meaning)| (option.clone(), meaning.clone().into()))
+            .collect();
+        let question = serde_json::json!({
+            "type": "choice",
+            "instructions": instructions,
+            "criteria": criteria,
+        })
+        .to_string();
+        let mut source = issuing.borrow_mut();
+        questions.push(Question {
+            name: Context::text(&mut source, kind.clone(), name).map_err(LuaError::external)?,
+            options: options.into_iter().map(|(option, _)| option).collect(),
+            context: Context::text(&mut source, kind.clone(), question)
+                .map_err(LuaError::external)?,
+        });
+    }
+    let mut parts = vec![&state];
+    for question in &questions {
+        parts.push(&question.name);
+        parts.push(&question.context);
+    }
+    let window =
+        Context::compose(&mut issuing.borrow_mut(), kind, parts, "").map_err(LuaError::external)?;
+
+    if calls.made.get() >= completing.limits.model_calls {
+        calls.over_limit.set(true);
+        return Err(LuaError::runtime("model call limit exceeded"));
+    }
+    calls.made.set(calls.made.get() + 1);
+
+    let cursor = calls.replayed.get();
+    if let Some(recorded) = completing.replay.exchanges.get(cursor) {
+        calls.replayed.set(cursor + 1);
+        if !same(recorded.window(), &window) {
+            return Err(completing.fail(ScriptFailure::Diverged {
+                exchange: cursor,
+                offer: false,
+            }));
+        }
+        if !recorded.offer().is_empty() {
+            return Err(completing.fail(ScriptFailure::Diverged {
+                exchange: cursor,
+                offer: true,
+            }));
+        }
+        let answer = recorded.answer().clone();
+        let chosen = chosen(&answer.render(), &questions).map_err(|question| {
+            completing.fail(ScriptFailure::ModelFailed(ModelFailure::BadAnswer {
+                role: role.to_owned(),
+                question,
+            }))
+        })?;
+        return Ok((answer, chosen));
+    }
+
+    let decided = match completing.roster.decide(role, &state, &questions).await {
+        Ok(decided) => decided,
+        Err(failure) => return Err(completing.fail(ScriptFailure::ModelFailed(failure))),
+    };
+    let answer = Context::text(&mut issuing.borrow_mut(), declared, decided.text)
+        .map_err(LuaError::external)?;
+    if !matches!(
+        ask(
+            &completing.mailbox,
+            Asking::Exchange(Exchange::new(window, answer.clone()))
+        )
+        .await,
+        Given::Held
+    ) {
+        return Err(stopped());
+    }
+    Ok((answer, decided.chosen))
 }
 
 /// The error a script ends with when the run stopped the activation; what
@@ -1419,4 +1644,131 @@ fn memory_limit_holds_across_a_model_call() {
     );
     assert_eq!(failure, ScriptFailure::MemoryLimit);
     assert_eq!(stub.requests().len(), 1);
+}
+
+// --- decisions -----------------------------------------------------------------
+
+#[cfg(test)]
+use crate::models::Reply;
+#[cfg(test)]
+use crate::scripted::{DECIDED, ROUTE_TYPES, ROUTING, YIELD_TYPES, YIELDING, decider_at, deciding};
+
+#[cfg(test)]
+#[test]
+fn decision_chosen() {
+    let stub = crate::models::Stub::replying(vec![Reply::decision(DECIDED)]);
+    let behaviours = Behaviours::new().define("route", "route.lua", &deciding("Revise?"));
+    let result = rendered(crate::scripted::run_with_roster(
+        &workflow(ROUTE_TYPES, ROUTING),
+        &behaviours,
+        &decider_at(&stub),
+        None,
+    ));
+    // Each choice under its own question's name, though answered in the
+    // reverse order; the answer a context of the type named, as sent.
+    assert_eq!(result, format!("revise 0.75 low 0.5 decision {DECIDED}"));
+    assert_eq!(stub.requests().len(), 1);
+}
+
+#[cfg(test)]
+#[test]
+fn bad_questions_refused() {
+    let asking = |questions: &str| {
+        format!(
+            "local given, host = ...\nlocal answer = host.decide('routing', host.text('note', 's'), {questions}, 'decision')\nreturn answer"
+        )
+    };
+    for (questions, said) in [
+        ("{}", "needs a question"),
+        (
+            "{ q = { options = { a = 'x', b = 'y' } } }",
+            "has no instructions",
+        ),
+        (
+            "{ q = { instructions = 'i', options = { a = 'x' } } }",
+            "a choice needs two",
+        ),
+        (
+            "{ q = { instructions = 'i', options = { a = 5, b = 'y' } } }",
+            "is integer, not a string",
+        ),
+        (
+            "{ q = { instructions = 'i', options = { a = 'x', b = 'y' }, type = 'score' } }",
+            "neither instructions nor options",
+        ),
+    ] {
+        let stub = crate::models::Stub::replying(vec![Reply::decision(DECIDED)]);
+        let behaviours = Behaviours::new().define("route", "route.lua", &asking(questions));
+        let (_, failure) = failed(crate::scripted::run_with_roster(
+            &workflow(ROUTE_TYPES, ROUTING),
+            &behaviours,
+            &decider_at(&stub),
+            None,
+        ));
+        match failure {
+            ScriptFailure::Raised { message } => {
+                assert!(message.contains(said), "{questions}: {message}")
+            }
+            other => panic!("expected {questions} refused as a script error, got {other:?}"),
+        }
+        assert!(stub.requests().is_empty(), "{questions}: nothing sent");
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn decision_with_calls_refused() {
+    let stub = crate::models::Stub::replying(vec![Reply::decision(DECIDED)]);
+    let behaviours = Behaviours::new()
+        .define("ask", "ask.lua", &deciding("Revise?"))
+        .define(
+            "lookup",
+            "lookup.lua",
+            "local given, host = ...\nreturn host.text(host.output, 'x')",
+        );
+    let (instance, failure) = failed(crate::scripted::run_with_roster(
+        &workflow(YIELD_TYPES, YIELDING),
+        &behaviours,
+        &decider_at(&stub),
+        None,
+    ));
+    assert_eq!(instance, "asker");
+    match failure {
+        ScriptFailure::Raised { message } => {
+            assert!(message.contains("declares calls"), "{message}")
+        }
+        other => panic!("expected a script error, got {other:?}"),
+    }
+    assert!(stub.requests().is_empty(), "nothing sent");
+
+    // The same script where the instance declares none: the control.
+    let behaviours = Behaviours::new().define("route", "route.lua", &deciding("Revise?"));
+    rendered(crate::scripted::run_with_roster(
+        &workflow(ROUTE_TYPES, ROUTING),
+        &behaviours,
+        &decider_at(&stub),
+        None,
+    ));
+    assert_eq!(stub.requests().len(), 1);
+}
+
+#[cfg(test)]
+#[test]
+fn decisions_counted() {
+    // A chat call and a decision spend the limit of two; the second decision
+    // is refused before it is sent, as the limit.
+    let stub = crate::models::Stub::replying(vec![Reply::text("ok"), Reply::decision(DECIDED)]);
+    let decide = "host.decide('routing', host.text('note', 's'), { verdict = { instructions = 'i', options = { accept = 'x', revise = 'y' } }, risk = { instructions = 'r', options = { high = 'h', low = 'l' } } }, 'decision')";
+    let script = format!(
+        "local given, host = ...\nlocal first = host.complete('drafting', host.text('note', 'q'))\n{decide}\nlocal answer = {decide}\nreturn answer"
+    );
+    let behaviours = Behaviours::new().define("route", "route.lua", &script);
+    let (_, failure) = failed(crate::scripted::run_with_roster(
+        &workflow(ROUTE_TYPES, ROUTING),
+        &behaviours,
+        &decider_at(&stub),
+        None,
+    ));
+    assert_eq!(failure, ScriptFailure::ModelCallLimit);
+    assert_eq!(stub.requests().len(), 2);
 }

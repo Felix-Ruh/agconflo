@@ -36,6 +36,7 @@ dependencies = [
  "genai",
  "mlua",
  "proptest",
+ "reqwest",
  "serde_json",
  "tokio",
  "toml_edit",

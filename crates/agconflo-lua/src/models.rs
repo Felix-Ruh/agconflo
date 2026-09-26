@@ -11,32 +11,75 @@ use genai::chat::{
     ToolResponse,
 };
 
-/// Which model plays each role, and the client that reaches them.
+/// Which model plays each role, and the clients that reach them.
 ///
-/// The client is the caller's own: where each model's requests go and what
-/// credentials they carry are decided when it is built, and the roster reads no
-/// credentials itself. Models are named as `genai` names them - `openai::gpt-...`,
-/// `claude-...`.
+/// A role is played by a chat model or by a decisions model. A chat model is
+/// reached through the `genai` client, which is the caller's own: where each
+/// model's requests go and what credentials they carry are decided when it is
+/// built, and the roster reads no credentials itself. Chat models are named as
+/// `genai` names them - `openai::gpt-...`, `claude-...`. A decisions model is
+/// reached at the endpoint and with the key it is mapped with.
 // @A mapping from role to model,IMPL_MODELS_ROSTER,impl,[CREQ_ROSTER_ROLE_TO_MODEL],[DEC_MODELS_BY_ROLE, DEC_DECISIONS_THROUGH_THEIR_ENDPOINT]
 #[derive(Clone, Debug)]
 pub struct Roster {
     client: Client,
     roles: HashMap<String, String>,
+    http: reqwest::Client,
+    decisions: HashMap<String, Decider>,
+}
+
+/// Where a role's decisions go: the model, the endpoint the decisions path is
+/// joined to, and the key.
+#[derive(Clone)]
+struct Decider {
+    model: String,
+    endpoint: String,
+    key: String,
+}
+
+impl fmt::Debug for Decider {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Decider")
+            .field("model", &self.model)
+            .field("endpoint", &self.endpoint)
+            .finish_non_exhaustive()
+    }
 }
 
 impl Roster {
-    /// A roster reaching models through `client`, with no role mapped yet.
+    /// A roster reaching chat models through `client`, with no role mapped yet.
     pub fn new(client: Client) -> Self {
         Self {
             client,
             roles: HashMap::new(),
+            http: reqwest::Client::new(),
+            decisions: HashMap::new(),
         }
     }
 
-    /// The same roster, with `role` played by `model`. Mapping a role again
-    /// replaces its model.
+    /// The same roster, with `role` played by the chat model `model`. Mapping a
+    /// role again replaces what it was mapped to.
     pub fn map(mut self, role: &str, model: &str) -> Self {
+        self.decisions.remove(role);
         self.roles.insert(role.to_owned(), model.to_owned());
+        self
+    }
+
+    /// The same roster, with `role` played by the decisions model `model`,
+    /// reached at `endpoint` - to which the path `decisions` is joined - with
+    /// `key` as its bearer token. Mapping a role again replaces what it was
+    /// mapped to.
+    // @A role mapped to a decisions model at its endpoint with its key,IMPL_MODELS_MAP_DECISIONS,impl,[CREQ_MODEL_MAP_READS_DECISIONS],[DEC_DECISIONS_ROLE_IN_THE_MAP]
+    pub fn map_decisions(mut self, role: &str, model: &str, endpoint: &str, key: &str) -> Self {
+        self.roles.remove(role);
+        self.decisions.insert(
+            role.to_owned(),
+            Decider {
+                model: model.to_owned(),
+                endpoint: endpoint.to_owned(),
+                key: key.to_owned(),
+            },
+        );
         self
     }
 
@@ -71,6 +114,12 @@ impl Roster {
         window: &[Part],
         offer: &[Offered],
     ) -> Result<Answered, ModelFailure> {
+        if self.decisions.contains_key(role) {
+            return Err(ModelFailure::KindMismatch {
+                role: role.to_owned(),
+                decisions: true,
+            });
+        }
         let Some(model) = self.roles.get(role) else {
             return Err(ModelFailure::Unmapped {
                 role: role.to_owned(),
@@ -101,6 +150,148 @@ impl Roster {
             }),
         }
     }
+}
+
+impl Roster {
+    /// Ask the decisions model `role` is mapped to each of `questions` about
+    /// `state`, and return what it answered: the answers as the provider sent
+    /// them, and each question's choice.
+    ///
+    /// The request goes to the decisions path of the role's endpoint and holds
+    /// the model's name, the state's rendering, and each question's rendering
+    /// whole under its name - nothing else. A role mapped to a chat model, or to
+    /// nothing, fails before anything is sent; so does an answer that lacks a
+    /// question asked or chooses an option that was not.
+    // @A decision sent to its endpoint as its contexts,IMPL_MODELS_DECIDE,impl,[CREQ_ROSTER_SENDS_DECISION, CREQ_ROSTER_REFUSES_KIND_MISMATCH, CREQ_ROSTER_UNMAPPED_ROLE, CREQ_ROSTER_PROVIDER_FAILURE],[DEC_DECISIONS_THROUGH_THEIR_ENDPOINT, DEC_QUESTIONS_ARE_CONTEXTS]
+    pub(crate) async fn decide(
+        &self,
+        role: &str,
+        state: &Context,
+        questions: &[Question],
+    ) -> Result<Decided, ModelFailure> {
+        if self.roles.contains_key(role) {
+            return Err(ModelFailure::KindMismatch {
+                role: role.to_owned(),
+                decisions: false,
+            });
+        }
+        let Some(decider) = self.decisions.get(role) else {
+            return Err(ModelFailure::Unmapped {
+                role: role.to_owned(),
+            });
+        };
+        let string = |text: &str| serde_json::Value::String(text.to_owned()).to_string();
+        let mut body = format!(
+            "{{\"model\":{},\"state\":{},\"questions\":{{",
+            string(&decider.model),
+            string(&state.render())
+        );
+        for (index, question) in questions.iter().enumerate() {
+            if index > 0 {
+                body.push(',');
+            }
+            body.push_str(&string(&question.name.render()));
+            body.push(':');
+            body.push_str(&question.context.render());
+        }
+        body.push_str("}}");
+
+        let failed = |status: Option<u16>, message: String| ModelFailure::Provider {
+            role: role.to_owned(),
+            status,
+            message,
+        };
+        let response = self
+            .http
+            .post(format!("{}decisions", decider.endpoint))
+            .bearer_auth(&decider.key)
+            .header(reqwest::header::CONTENT_TYPE, "application/json")
+            .body(body)
+            .send()
+            .await
+            .map_err(|error| failed(None, error.to_string()))?;
+        let status = response.status();
+        let text = response
+            .text()
+            .await
+            .map_err(|error| failed(Some(status.as_u16()), error.to_string()))?;
+        if !status.is_success() {
+            return Err(failed(Some(status.as_u16()), text));
+        }
+        let answers = answers_as_sent(&text).ok_or_else(|| {
+            failed(
+                Some(status.as_u16()),
+                format!("the response holds no answers: {text}"),
+            )
+        })?;
+        let chosen = chosen(&answers, questions).map_err(|question| ModelFailure::BadAnswer {
+            role: role.to_owned(),
+            question,
+        })?;
+        Ok(Decided {
+            text: answers,
+            chosen,
+        })
+    }
+}
+
+/// One choice question a decision asks: the context whose rendering is its
+/// name, the options it offers, and the context whose rendering is the question
+/// as the endpoint reads it.
+#[derive(Clone, Debug)]
+pub(crate) struct Question {
+    pub(crate) name: Context,
+    pub(crate) options: Vec<String>,
+    pub(crate) context: Context,
+}
+
+/// What a decisions model answered: the answers as the provider sent them, and
+/// each question's choice, in the order the questions were asked.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct Decided {
+    pub(crate) text: String,
+    pub(crate) chosen: Vec<Chosen>,
+}
+
+/// The option chosen for one question, and the model's confidence in it.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct Chosen {
+    pub(crate) question: String,
+    pub(crate) choice: String,
+    pub(crate) confidence: f64,
+}
+
+/// The `answers` of a decisions response, as the text the provider sent, or
+/// `None` when the response is not JSON or holds none.
+fn answers_as_sent(response: &str) -> Option<String> {
+    let read: HashMap<String, Box<serde_json::value::RawValue>> =
+        serde_json::from_str(response).ok()?;
+    read.get("answers").map(|raw| raw.get().to_owned())
+}
+
+/// Each question's choice read from `answers`, in the order the questions were
+/// asked, or the name of the first question the answers do not answer with
+/// one of its options.
+// @Every question answered with an option it offered,IMPL_MODELS_CHOSEN,impl,[CREQ_ROSTER_REFUSES_BAD_ANSWER],[DEC_DECISION_ANSWER_CHECKED]
+pub(crate) fn chosen(answers: &str, questions: &[Question]) -> Result<Vec<Chosen>, String> {
+    let read: serde_json::Value = serde_json::from_str(answers).unwrap_or_default();
+    questions
+        .iter()
+        .map(|question| {
+            let name = question.name.render().into_owned();
+            let answer = &read[&name];
+            match answer["choice"].as_str() {
+                Some(choice) if question.options.iter().any(|option| option == choice) => {
+                    Ok(Chosen {
+                        question: name,
+                        choice: choice.to_owned(),
+                        confidence: answer["confidence"].as_f64().unwrap_or(0.0),
+                    })
+                }
+                _ => Err(name),
+            }
+        })
+        .collect()
 }
 
 /// One part of a model call's window, as the script host knows it from what the
@@ -253,6 +444,24 @@ pub enum ModelFailure {
         /// The role the script called.
         role: String,
     },
+    /// The role is mapped to the other kind of model than the call needs, and
+    /// nothing was sent.
+    KindMismatch {
+        /// The role the script called.
+        role: String,
+        /// Whether the role is mapped to a decisions model, which a chat call
+        /// cannot use; otherwise it is mapped to a chat model, which a decision
+        /// cannot use.
+        decisions: bool,
+    },
+    /// A decisions model's answer lacks a question that was asked, or chose an
+    /// option the question did not offer.
+    BadAnswer {
+        /// The role the script called.
+        role: String,
+        /// The question.
+        question: String,
+    },
     /// The provider failed the call, or could not be reached.
     Provider {
         /// The role the script called.
@@ -260,7 +469,8 @@ pub enum ModelFailure {
         /// The HTTP status the provider answered with; none when there was no
         /// answer at all.
         status: Option<u16>,
-        /// The failure as `genai` reports it.
+        /// The failure as `genai` reports it, or as the decisions endpoint
+        /// answered it.
         message: String,
     },
 }
@@ -269,6 +479,24 @@ impl fmt::Display for ModelFailure {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Unmapped { role } => write!(f, "the role {role} is mapped to no model"),
+            Self::KindMismatch {
+                role,
+                decisions: true,
+            } => write!(
+                f,
+                "the role {role} is mapped to a decisions model, which answers no chat call"
+            ),
+            Self::KindMismatch {
+                role,
+                decisions: false,
+            } => write!(
+                f,
+                "the role {role} is mapped to a chat model, which answers no decision"
+            ),
+            Self::BadAnswer { role, question } => write!(
+                f,
+                "the decisions model for {role} did not answer {question} with one of its options"
+            ),
             Self::Provider {
                 role,
                 status: Some(status),
@@ -294,12 +522,14 @@ use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
 
 /// A stub provider on the loopback interface, answering OpenAI's
-/// chat-completions format at `/v1/chat/completions` and Anthropic's messages
-/// format at `/v1/messages`, and recording every request it was sent.
+/// chat-completions format at `/v1/chat/completions`, Anthropic's messages
+/// format at `/v1/messages` and the decisions endpoint's at `/v1/decisions`,
+/// and recording every request it was sent.
 #[cfg(test)]
 pub(crate) struct Stub {
     pub(crate) base: String,
     seen: Arc<Mutex<Vec<(String, serde_json::Value)>>>,
+    raw: Arc<Mutex<Vec<String>>>,
 }
 
 #[cfg(test)]
@@ -308,34 +538,54 @@ impl Stub {
     /// model's text when that is 200. It serves from a thread of its own, under
     /// whatever runtime a test makes.
     pub(crate) fn answering(status: u16, answer: &str) -> Self {
-        Self::serving(status, vec![Reply::text(answer)], true, usize::MAX)
+        Self::serving(status, vec![Reply::text(answer)], true, usize::MAX, None)
+    }
+
+    /// A stub refusing every request with `status` and `body`, as it is.
+    pub(crate) fn refusing(status: u16, body: &str) -> Self {
+        Self::serving(
+            status,
+            vec![Reply::text("")],
+            true,
+            usize::MAX,
+            Some(body.to_owned()),
+        )
     }
 
     /// A stub answering the first `answered` requests with `answer`, and
     /// holding every later one open without a word - a provider a run can be
     /// interrupted while waiting on.
     pub(crate) fn holding_after(answered: usize, answer: &str) -> Self {
-        Self::serving(200, vec![Reply::text(answer)], true, answered)
+        Self::serving(200, vec![Reply::text(answer)], true, answered, None)
     }
 
     /// A stub answering its n-th request with the n-th of `replies`, and
     /// holding every request past the last open without a word.
     pub(crate) fn replying(replies: Vec<Reply>) -> Self {
         let answered = replies.len();
-        Self::serving(200, replies, false, answered)
+        Self::serving(200, replies, false, answered, None)
     }
 
-    fn serving(status: u16, replies: Vec<Reply>, repeat: bool, answered: usize) -> Self {
+    fn serving(
+        status: u16,
+        replies: Vec<Reply>,
+        repeat: bool,
+        answered: usize,
+        refusal: Option<String>,
+    ) -> Self {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("a loopback port");
         let base = format!("http://{}/v1/", listener.local_addr().expect("an address"));
         let seen = Arc::new(Mutex::new(Vec::new()));
+        let raw = Arc::new(Mutex::new(Vec::new()));
         let recorded = seen.clone();
+        let bodies = raw.clone();
         std::thread::spawn(move || {
             let mut held = Vec::new();
             for mut connection in listener.incoming().flatten() {
                 let Some((path, body)) = read_request(&mut connection) else {
                     continue;
                 };
+                bodies.lock().expect("the bodies").push(body.clone());
                 let request = serde_json::from_str(&body).unwrap_or(serde_json::Value::Null);
                 let mut log = recorded.lock().expect("the log");
                 log.push((path.clone(), request));
@@ -347,13 +597,17 @@ impl Stub {
                 drop(log);
                 let reply = if repeat { &replies[0] } else { &replies[index] };
                 let reply = if status != 200 {
-                    serde_json::json!({"error": {"message": "the stub refused", "type": "stub"}})
+                    refusal.clone().unwrap_or_else(|| {
+                        serde_json::json!({"error": {"message": "the stub refused", "type": "stub"}})
+                            .to_string()
+                    })
+                } else if path.ends_with("/decisions") {
+                    reply.decisions()
                 } else if path.ends_with("/messages") {
-                    reply.anthropic()
+                    reply.anthropic().to_string()
                 } else {
-                    reply.openai()
+                    reply.openai().to_string()
                 };
-                let reply = reply.to_string();
                 let _ = write!(
                     connection,
                     "HTTP/1.1 {status} Stub\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{reply}",
@@ -361,7 +615,12 @@ impl Stub {
                 );
             }
         });
-        Self { base, seen }
+        Self { base, seen, raw }
+    }
+
+    /// The body of every request received so far, as it was sent.
+    pub(crate) fn raw_bodies(&self) -> Vec<String> {
+        self.raw.lock().expect("the bodies").clone()
     }
 
     /// Every request received so far: its path and its body.
@@ -378,6 +637,7 @@ impl Stub {
 pub(crate) struct Reply {
     text: String,
     calls: Vec<(String, String, String)>,
+    answers: String,
 }
 
 #[cfg(test)]
@@ -387,7 +647,26 @@ impl Reply {
         Self {
             text: text.to_owned(),
             calls: Vec::new(),
+            answers: "{}".to_owned(),
         }
+    }
+
+    /// A decisions reply whose `answers` are `answers`, JSON text as the
+    /// endpoint writes it.
+    pub(crate) fn decision(answers: &str) -> Self {
+        Self {
+            answers: answers.to_owned(),
+            ..Self::text("")
+        }
+    }
+
+    /// The reply in the decisions endpoint's format, with its answers as
+    /// written.
+    fn decisions(&self) -> String {
+        format!(
+            "{{\"model\":\"stub\",\"answers\":{},\"usage\":{{\"cost\":0}},\"provider\":\"Stub\"}}",
+            self.answers
+        )
     }
 
     /// The same reply, also calling `name` under `id` with `arguments`, JSON
@@ -1062,5 +1341,145 @@ proptest::proptest! {
         for rendering in renderings.iter().filter(|rendering| !rendering.is_empty()) {
             proptest::prop_assert!(carried.iter().any(|text| text == rendering), "{:?} was not carried: {}", rendering, body);
         }
+    }
+}
+
+// --- decisions -----------------------------------------------------------------
+
+/// A roster mapping `drafting` to a chat model and `routing` to a decisions
+/// model, both at `stub`.
+#[cfg(test)]
+fn deciding_at(stub: &Stub) -> Roster {
+    Roster::new(client_for(&stub.base))
+        .map("drafting", "openai::m")
+        .map_decisions("routing", "~stub/decider", &stub.base, "the-key")
+}
+
+/// The question `name`, choosing among `options`, written as `text`.
+#[cfg(test)]
+fn question(source: &mut IdSource, name: &str, text: &str, options: &[&str]) -> Question {
+    Question {
+        name: note(source, "note", name),
+        options: options.iter().map(|option| (*option).to_owned()).collect(),
+        context: note(source, "note", text),
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn decision_sent_to_its_endpoint() {
+    let stub = Stub::replying(vec![Reply::decision(
+        r#"{"verdict":{"type":"choice","choice":"revise","probabilities":{"accept":0,"revise":1},"confidence":1}}"#,
+    )]);
+    let mut source = IdSource::new();
+    let state = note(
+        &mut source,
+        "note",
+        "  A review, \"quoted\",\nwith findings. ",
+    );
+    // Spaced as no serializer spaces it, so a question rebuilt from its parts
+    // would not match.
+    let written = r#"{ "type" : "choice",  "instructions": "Revise?", "criteria": {"accept": "no", "revise": "yes"} }"#;
+    let verdict = question(&mut source, "verdict", written, &["accept", "revise"]);
+
+    let decided = block(deciding_at(&stub).decide("routing", &state, &[verdict])).expect("decided");
+    assert_eq!(decided.chosen[0].choice, "revise");
+
+    let requests = stub.requests();
+    assert_eq!(requests.len(), 1);
+    let (path, body) = &requests[0];
+    assert_eq!(path, "/v1/decisions");
+    assert_eq!(body["model"], "~stub/decider");
+    assert_eq!(body["state"], state.render().as_ref());
+    let raw = &stub.raw_bodies()[0];
+    assert!(
+        raw.contains(&format!("\"verdict\":{written}")),
+        "the question byte for byte under its name: {raw}"
+    );
+    let mut keys: Vec<&String> = body.as_object().expect("an object").keys().collect();
+    keys.sort();
+    assert_eq!(keys, ["model", "questions", "state"], "nothing else: {raw}");
+}
+
+#[cfg(test)]
+#[test]
+fn kind_mismatch_fails() {
+    let stub = Stub::answering(200, "unused");
+    let roster = deciding_at(&stub);
+    let mut source = IdSource::new();
+    let state = note(&mut source, "note", "state");
+    let verdict = question(&mut source, "verdict", "{}", &["accept", "revise"]);
+
+    assert_eq!(
+        block(roster.decide("drafting", &state, &[verdict])),
+        Err(ModelFailure::KindMismatch {
+            role: "drafting".to_owned(),
+            decisions: false
+        })
+    );
+    assert_eq!(
+        block(roster.call("routing", &state)),
+        Err(ModelFailure::KindMismatch {
+            role: "routing".to_owned(),
+            decisions: true
+        })
+    );
+    assert!(stub.requests().is_empty(), "nothing was sent");
+}
+
+#[cfg(test)]
+#[test]
+fn bad_decision_answer_fails() {
+    let mut source = IdSource::new();
+    let state = note(&mut source, "note", "state");
+    let questions = [
+        question(&mut source, "risk", "{}", &["high", "low"]),
+        question(&mut source, "verdict", "{}", &["accept", "revise"]),
+    ];
+    for (answers, missing) in [
+        (r#"{"verdict":{"choice":"accept","confidence":1}}"#, "risk"),
+        (
+            r#"{"risk":{"choice":"low","confidence":1},"verdict":{"choice":"reject","confidence":1}}"#,
+            "verdict",
+        ),
+    ] {
+        let stub = Stub::replying(vec![Reply::decision(answers)]);
+        assert_eq!(
+            block(deciding_at(&stub).decide("routing", &state, &questions)),
+            Err(ModelFailure::BadAnswer {
+                role: "routing".to_owned(),
+                question: missing.to_owned()
+            }),
+            "{answers}"
+        );
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn decision_refusal_carried() {
+    let mut source = IdSource::new();
+    let state = note(&mut source, "note", "state");
+    let verdict = question(&mut source, "verdict", "{}", &["accept", "revise"]);
+    for (status, body) in [
+        (
+            400,
+            r#"{"error":{"code":400,"message":"[{\"code\":\"invalid_type\",\"path\":[\"questions\",\"q\",\"criteria\"]}]"}}"#,
+        ),
+        (401, r#"{"error":{"code":401,"message":"User not found."}}"#),
+        (
+            404,
+            r#"{"error":{"code":404,"message":"0 endpoints out of 1 requested are available matching your guardrail restrictions","metadata":{"reason":"provider-not-allowed-by-guardrail"}}}"#,
+        ),
+    ] {
+        let stub = Stub::refusing(status, body);
+        assert_eq!(
+            block(deciding_at(&stub).decide("routing", &state, std::slice::from_ref(&verdict))),
+            Err(ModelFailure::Provider {
+                role: "routing".to_owned(),
+                status: Some(status),
+                message: body.to_owned(),
+            })
+        );
     }
 }

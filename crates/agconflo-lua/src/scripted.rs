@@ -1502,6 +1502,47 @@ fn yielding_behaviours(question: &str, lookup: &str) -> Behaviours {
         .define("lookup", "lookup.lua", lookup)
 }
 
+/// One instance, `router`, designated, declaring no calls.
+#[cfg(test)]
+pub(crate) const ROUTE_TYPES: &str = "\
+[types.route]
+output = \"note\"
+";
+
+/// The router alone.
+#[cfg(test)]
+pub(crate) const ROUTING: &str = "\
+name = \"routing\"
+output = \"router\"
+
+[instances.router]
+node_type = \"route\"
+";
+
+/// A script asking the role `routing` whether to revise, with `instructions`,
+/// and how risky, answering as a `decision` and outputting each choice and
+/// confidence before the answer.
+#[cfg(test)]
+pub(crate) fn deciding(instructions: &str) -> String {
+    format!(
+        "local given, host = ...\nlocal answer, chosen = host.decide('routing', host.text('note', 'a review'), {{ verdict = {{ instructions = '{instructions}', options = {{ accept = 'no finding', revise = 'a finding' }} }}, risk = {{ instructions = 'Risky?', options = {{ high = 'h', low = 'l' }} }} }}, 'decision')\nreturn host.compose(host.output, {{ host.text(host.output, chosen.verdict.choice .. ' ' .. chosen.verdict.confidence .. ' ' .. chosen.risk.choice .. ' ' .. chosen.risk.confidence .. ' ' .. answer:type() .. ' '), answer }}, '')"
+    )
+}
+
+/// The answers a decisions model gives the deciding script: revise and low,
+/// in the reverse of the order they were asked in.
+#[cfg(test)]
+pub(crate) const DECIDED: &str = r#"{"verdict":{"type":"choice","choice":"revise","confidence":0.75},"risk":{"type":"choice","choice":"low","confidence":0.5}}"#;
+
+/// A roster mapping `drafting` to a chat model and `routing` to a decisions
+/// model, both at `stub`.
+#[cfg(test)]
+pub(crate) fn decider_at(stub: &Stub) -> Roster {
+    Roster::new(client_for(&stub.base))
+        .map("drafting", "openai::m")
+        .map_decisions("routing", "~stub/decider", &stub.base, "k")
+}
+
 /// Room for a few calls.
 #[cfg(test)]
 const CALLING: Limits = Limits {
@@ -2243,4 +2284,54 @@ fn interrupted_call_resumes() {
     let requests = answering.requests();
     assert_eq!(requests.len(), 1);
     assert_eq!(sent_messages(&requests[0].1)[0].texts, ["two"]);
+}
+
+#[cfg(test)]
+#[test]
+fn decision_replayed() {
+    let definition = workflow(ROUTE_TYPES, ROUTING);
+    let stub = Stub::replying(vec![Reply::decision(DECIDED)]);
+    let behaviours = |instructions: &str| {
+        Behaviours::new().define("route", "route.lua", &deciding(instructions))
+    };
+    let (outcome, records) = run_keeping(
+        &definition,
+        &behaviours("Revise?"),
+        &decider_at(&stub),
+        CALLING,
+    );
+    let result = rendered(outcome);
+    let record = records
+        .iter()
+        .find(|record| kinds(record) == ["exchange"])
+        .expect("a record holding the decision");
+    let resumed = |instructions: &str| {
+        let unasked = Stub::replying(Vec::new());
+        let outcome = block(resume_scripted(
+            &definition,
+            &behaviours(instructions),
+            &decider_at(&unasked),
+            record,
+            CALLING,
+            |_| {},
+        ))
+        .map(|(outcome, _)| outcome);
+        (outcome, unasked.requests().len())
+    };
+
+    // Answered from the record, and nothing sent.
+    let (outcome, sent) = resumed("Revise?");
+    assert_eq!(rendered(outcome), result);
+    assert_eq!(sent, 0);
+
+    // One word of a question's instructions changed: diverged, nothing sent.
+    let (outcome, sent) = resumed("Revise it?");
+    assert_eq!(
+        failed(outcome).1,
+        ScriptFailure::Diverged {
+            exchange: 0,
+            offer: false
+        }
+    );
+    assert_eq!(sent, 0);
 }

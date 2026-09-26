@@ -85,7 +85,18 @@ names; nothing reads `ANTHROPIC_API_KEY` or its like by default:
 [roles]
 drafting = "anthropic::claude-sonnet-5"
 asking = { model = "openai::qwen3.8-27b-ridge", endpoint = "http://localhost:1234/v1/", key_env = "LM_API_TOKEN" }
+routing = { decisions = "~typesafe/jev-latest", endpoint = "https://openrouter.ai/api/alpha/", key_env = "OPEN_ROUTER_API_KEY" }
 ```
+
+A role may instead be played by a **decisions model**, which chooses among named options rather
+than writing text: its entry names it under `decisions`, with an endpoint ending in `/`, to which
+`decisions` is joined, and a key variable, both required. A script asks it with
+`host.decide(role, state, questions, type)`, where each question is
+`{ instructions = "...", options = { accept = "...", revise = "..." } }` with two options or more.
+It returns the answer as a context of the type named, and a table giving each question's `choice`
+and `confidence` by its name, so a router's script branches on `chosen.verdict.choice`. A decision
+is a model call: it counts against the limit, is recorded and replayed, and fails as a call does. It
+may be asked only by an instance that declares no calls.
 
 ```
 agconflo check  manifest.toml --models models.toml

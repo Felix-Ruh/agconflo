@@ -31,11 +31,14 @@ toml_edit = "=0.25.15"
 # release - moving it means measuring again first.
 mlua = { version = "=0.12.1", features = ["lua55", "vendored", "async"] }
 
-# agconflo-lua reaches language models through genai (DEC_MODELS_THROUGH_GENAI),
-# pinned exactly at the newest release, a pre-release, on which every finding in
-# evidence/models was measured. tokio drives it in the tests, which answer with
-# a stub on the loopback interface rather than a provider.
+# agconflo-lua reaches chat models through genai and decisions models through
+# reqwest (DEC_DECISIONS_THROUGH_THEIR_ENDPOINT). genai is pinned exactly at the
+# newest release, a pre-release, on which every finding in evidence/models was
+# measured; reqwest at the release genai builds, with features genai already
+# turns on, so it adds no crate. tokio drives both in the tests, which answer
+# with a stub on the loopback interface rather than a provider.
 genai = "=0.7.0-beta.24"
+reqwest = { version = "=0.13.5", default-features = false, features = ["json", "rustls", "http2", "system-proxy"] }
 tokio = { version = "=1.53.1", features = ["rt", "macros", "net", "io-util", "time"] }
 
 # agconflo-cli reads its command line with clap (DEC_COMMAND_LINE_THROUGH_CLAP),
@@ -50,7 +53,7 @@ proptest = "1.11"
 # writes the needs file. chrono and uuid are what quick-junit's setters take,
 # needed only by tests that vary a report's timestamps and run id.
 quick-junit = "0.8.0"
-serde_json = "1.0.151"
+serde_json = { version = "1.0.151", features = ["raw_value"] }
 thiserror = "2.0.20"
 chrono = { version = "0.4.45", default-features = false, features = ["std"] }
 uuid = "1.17.0"
