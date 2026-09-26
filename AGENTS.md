@@ -37,7 +37,10 @@ holds every need with its fields and its body, every link, each code marker with
 line, and each test's latest outcome. A query follows a link where a search of the files finds a
 link and a mention in prose alike (`EVD_GRAPH_TELLS_LINK_FROM_MENTION`).
 
-    tools/ubc query cypher --project docs --strict -f json '<query>'
+    tools/ubc query cypher --project docs --strict '<query>'
+
+It answers as a table and ends with the count, `5 rows returned.` or `0 rows returned.`; a body in
+a column of its own prints with its line breaks. Add `-f json` only when a script reads the answer.
 
 - **Need types are labels, links are relationships, fields are properties.** The labels:
   `stkh_req`, `feat_req`, `feat_arch`, `comp`, `comp_req`, `test_case`, `test_run`, `dec`, `evd`,
@@ -45,10 +48,10 @@ link and a mention in prose alike (`EVD_GRAPH_TELLS_LINK_FROM_MENTION`).
   `verifies`, `executes`, `implements`, `follows`, `supported_by`, `supersedes`.
 - **A need's body is `n.content`**, exactly as written, markup and all
   (`EVD_CONTENT_IS_THE_BODY`). Implementations, traces and test runs have none.
-- **Always `--strict`, and count the rows.** Without it, a label or property the graph lacks
-  answers `[]` with exit 0. With it, that exits 1, but a well-formed query matching nothing still
-  answers `[]` with exit 0 (`EVD_CYPHER_EMPTY_UNLESS_STRICT`). Believe an empty answer only once a
-  control that should return rows has returned them.
+- **Always `--strict`, and read the count.** Without it, a label or property the graph lacks
+  answers no rows with exit 0. With it, that exits 1, but a well-formed query matching nothing
+  still answers no rows with exit 0 (`EVD_CYPHER_EMPTY_UNLESS_STRICT`). Believe an empty answer
+  only once a control that should return rows has returned them.
 - **Search text with `CONTAINS`, or a regex opened with `(?s)`.** Every body spans lines, and `.`
   does not cross a line break: `n.content =~ ".*nobody.*"` matched nothing where
   `"(?s).*nobody.*"` matched 45 needs (`EVD_REGEX_STOPS_AT_A_LINE_BREAK`). `CONTAINS` keeps case;
