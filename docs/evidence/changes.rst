@@ -149,3 +149,20 @@ or keeps, on the commit named. Re-running one later shows what has moved since.
    ``IMPL_RUNNER_PREPARED``, and ``TEST_RUNNER_REFUSES_UNGRANTED`` with its
    run. Beside it: every other requirement of ``COMP_RUNNER``. In prose: the
    marker, in ``runner.rs``.
+
+.. evd:: The impact of stating what a tool container mounts by what the grants name
+   :id: EVD_IMPACT_SANDBOX_LOCKED_DOWN
+   :evd_kind: measurement
+   :observed_on: 2026-09-26
+   :observation: CREQ_SANDBOX_LOCKED_DOWN answers to 2 needs, has 7 below it by link and 15 requirements sharing its component, and is named on 5 lines of prose.
+
+   Run as ``sh scripts/impact.sh CREQ_SANDBOX_LOCKED_DOWN`` on ``db9227d``.
+   Above it: ``FEAT_TOOL_KEPT_TO_ITS_GRANT`` and ``STKH_TOOLS_CONFINED``. Below
+   it: ``IMPL_SANDBOX_MAKE``, and ``TEST_SANDBOX_CONFINED_TO_GRANTS``,
+   ``TEST_SANDBOX_OWN_PROCESS_SURVIVES`` and
+   ``TEST_SANDBOX_ROOT_STEP_CLEANED_UP`` with their runs. Beside it: every
+   other requirement of ``COMP_SANDBOX``, ``CREQ_SANDBOX_TRUSTS_GRANTED``
+   among them. In prose: the marker in ``sandbox.rs``, two lines of
+   ``components/environment``, one of ``decisions/changes`` and one of
+   ``decisions/tools``. No architecture uses a component it is allocated to
+   beyond its own.

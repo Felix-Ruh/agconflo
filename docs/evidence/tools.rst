@@ -19,7 +19,7 @@ scratch directory mounted as ``/work``.
 
 What was not measured is named here: a build that needs a package registry
 with no network, and a Docker engine installed on Linux itself and used
-without root - rootless Docker or Podman among them. The last six below
+without root - rootless Docker or Podman among them. The last seven below
 were taken on an engine installed on Linux and used by root, in a cloud
 development container whose outgoing TLS is intercepted, and each says so. A
 local model calling a node a tool performs was left to the live run of the
@@ -473,3 +473,31 @@ feature, which ``EVD_TOOLS_LIVE_RUN`` records; its project needed no package.
    changed nothing; why ubc still found no licence was not investigated.
    The README advises granting a worktree, so a tool that runs ubc has to be
    granted a clone instead.
+
+.. evd:: A single file bind-mounted read-only into a locked-down container stays unchanged and is trusted by ubc
+   :id: EVD_TRUST_FILE_MOUNTS_READ_ONLY
+   :evd_kind: measurement
+   :observed_on: 2026-09-26
+   :observation: A CA bundle bind-mounted read-only at /etc/agconflo/trust.pem into a read-only-root container could be neither removed nor written by a root or a 1000 step, and ubc trusted it through SSL_CERT_FILE.
+
+   The engine of ``EVD_UBC_IN_A_CONTAINER``, and a container made as the
+   sandbox makes one: ``--init``, the bridge network, a read-only root, a
+   ``/tmp`` in memory, no capabilities, no new privileges and its own process
+   as 65534, with a full clone mounted writable at ``/work/repo``. The host's
+   bundle, copied to a path holding a comma and a space, was mounted with
+   ``readonly`` at a target outside ``/work`` that the image does not hold;
+   the engine made the mount point on the read-only root itself.
+
+   As root and as 1000, ``rm`` answered "Read-only file system"; appending
+   answered the same for root and "Permission denied" for 1000; the host file
+   compared equal afterwards. ``docker inspect`` listed the two mounts, the
+   file's as not writable.
+
+   With the licence cache in the clone's ``docs/.ub_cache`` removed first,
+   ``ubc check --deny warning`` without ``SSL_CERT_FILE`` exited with "Not
+   determined to be an open source project", and then with it set found no
+   errors, and ``query cypher`` counted 27 stakeholder requirements. Two
+   confounds were met on the way and removed: a clone whose ``origin`` named
+   the local path rather than the GitHub repository was refused whatever was
+   trusted, and a run after a passing one passed without the file, answered
+   from that cache.
