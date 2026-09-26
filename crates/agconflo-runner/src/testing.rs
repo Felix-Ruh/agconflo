@@ -6,6 +6,10 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{Arc, Mutex};
 
+/// The image the tests' containers are made from, by its digest.
+pub(crate) const IMAGE: &str =
+    "alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6";
+
 /// A directory for one test's files, emptied when it is made and removed when
 /// it is dropped.
 pub(crate) struct Scratch {

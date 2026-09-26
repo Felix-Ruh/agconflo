@@ -190,6 +190,12 @@ impl<'t> Toml<'t> {
             .ok_or_else(|| self.wrong_kind(item, key, "a string"))
     }
 
+    /// `item`, under `key`, read as true or false.
+    pub(crate) fn boolean(&self, item: &Item, key: &[String]) -> Result<bool, (Place, KeyFault)> {
+        item.as_bool()
+            .ok_or_else(|| self.wrong_kind(item, key, "true or false"))
+    }
+
     /// `item`, under `key`, read as an array of strings.
     pub(crate) fn strings(
         &self,

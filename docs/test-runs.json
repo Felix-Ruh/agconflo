@@ -345,6 +345,60 @@
           "title": "agconflo-core defect::signature_names_the_definition",
           "type": "test_run"
         },
+        "RUN_GRANTS_BAD_FOLDER_REFUSED": {
+          "executes": [
+            "TEST_GRANTS_BAD_FOLDER_REFUSED"
+          ],
+          "id": "RUN_GRANTS_BAD_FOLDER_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner grants::bad_folder_refused",
+          "type": "test_run"
+        },
+        "RUN_GRANTS_NARROW_BY_DEFAULT": {
+          "executes": [
+            "TEST_GRANTS_NARROW_BY_DEFAULT"
+          ],
+          "id": "RUN_GRANTS_NARROW_BY_DEFAULT",
+          "test_outcome": "passed",
+          "title": "agconflo-runner grants::narrow_by_default",
+          "type": "test_run"
+        },
+        "RUN_GRANTS_PATHS_FROM_THE_FILE": {
+          "executes": [
+            "TEST_GRANTS_PATHS_FROM_THE_FILE"
+          ],
+          "id": "RUN_GRANTS_PATHS_FROM_THE_FILE",
+          "test_outcome": "passed",
+          "title": "agconflo-runner grants::paths_from_the_file",
+          "type": "test_run"
+        },
+        "RUN_GRANTS_READS_WHAT_IT_NAMES": {
+          "executes": [
+            "TEST_GRANTS_READS_WHAT_IT_NAMES"
+          ],
+          "id": "RUN_GRANTS_READS_WHAT_IT_NAMES",
+          "test_outcome": "passed",
+          "title": "agconflo-runner grants::reads_what_it_names",
+          "type": "test_run"
+        },
+        "RUN_GRANTS_TAGGED_IMAGE_REFUSED": {
+          "executes": [
+            "TEST_GRANTS_TAGGED_IMAGE_REFUSED"
+          ],
+          "id": "RUN_GRANTS_TAGGED_IMAGE_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner grants::tagged_image_refused",
+          "type": "test_run"
+        },
+        "RUN_GRANTS_UNREADABLE_REFUSED": {
+          "executes": [
+            "TEST_GRANTS_UNREADABLE_REFUSED"
+          ],
+          "id": "RUN_GRANTS_UNREADABLE_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner grants::unreadable_refused",
+          "type": "test_run"
+        },
         "RUN_HOST_EACH_TYPE_RUNS_ITS_OWN_SCRIPT": {
           "executes": [
             "TEST_HOST_EACH_TYPE_RUNS_ITS_OWN_SCRIPT"
