@@ -1143,19 +1143,32 @@ impl<'a, F> Run<'a, F> {
 
     /// The output accepted for the call `id` the outstanding activation made, or
     /// `None` when it made no such call or its output has not been accepted.
+    /// A call an earlier activation of the same instance made is not this
+    /// one's, whatever it was named.
+    // @A called output asked of its own activation alone,IMPL_RUN_CALLED,impl,[CREQ_RUN_CALL_OUTPUT_TO_CALLER]
     pub fn called(&self, id: &str) -> Option<&Context> {
         let caller = self.outstanding()?;
         if caller.call().is_some() {
             return None;
         }
-        self.log.iter().rev().find_map(|event| match event {
-            Event::Output { activation, output }
-                if activation.instance() == caller.instance() && activation.call() == Some(id) =>
-            {
-                Some(output)
-            }
-            _ => None,
-        })
+        // Back through the log as far as the instance's previous output of its
+        // own, which ended its previous activation.
+        self.log
+            .iter()
+            .rev()
+            .take_while(|event| {
+                !matches!(event, Event::Output { activation, .. }
+                    if activation.instance() == caller.instance() && activation.call().is_none())
+            })
+            .find_map(|event| match event {
+                Event::Output { activation, output }
+                    if activation.instance() == caller.instance()
+                        && activation.call() == Some(id) =>
+                {
+                    Some(output)
+                }
+                _ => None,
+            })
     }
 
     /// Every set of contexts an identifier is checked against: the run's own,
@@ -2925,6 +2938,51 @@ fn call_output_goes_back_to_the_caller() {
         Step::Ended(RunEnding::Completed(result)) => assert!(result.is(&answer)),
         other => panic!("the asker's own output completes the run: {other:?}"),
     }
+}
+
+#[cfg(test)]
+#[test]
+fn called_output_from_its_own_pass() {
+    let mut source = IdSource::new();
+    // An asker reading its own output, given its first context: every pass is
+    // another activation of one instance, whose model names its calls alike.
+    let types = vec![
+        node_type("ask", &[("seed", "note")], "note"),
+        node_type("lookup", &[("query", "note"), ("scope", "note")], "note"),
+        node_type("pass", &[("input", "note")], "note"),
+    ];
+    let instances = vec![
+        instance("asker", "ask", &[("seed", "asker")]).with_calls(&["lookup"]),
+        instance("never", "pass", &[("input", "never")]),
+    ];
+    let workflow = definition(types, instances, &["never"]);
+    let arguments = Arguments::new().supply("asker", "seed", ctx(&mut source, "note"));
+    let mut run = Run::<Infallible>::start(&workflow, arguments, 10).expect("sound");
+
+    // The first pass calls, is answered, and produces.
+    offered(&mut run);
+    let (call, _, _) = lookup_call(&mut source, "call_1");
+    run.call(call).expect("declared");
+    offered(&mut run);
+    let found = ctx(&mut source, "note");
+    run.produced(found.clone()).expect("lookup's output");
+    assert!(run.called("call_1").is_some_and(|output| output.is(&found)));
+    run.produced(ctx(&mut source, "note"))
+        .expect("the first pass's own");
+
+    // The second pass has made no call yet: the first pass's answer to a call
+    // of the same name is not its.
+    let second = offered(&mut run);
+    assert_eq!((second.instance(), second.call()), ("asker", None));
+    assert!(run.called("call_1").is_none());
+
+    // Once it makes that call and is answered, it is given its own answer.
+    let (call, _, _) = lookup_call(&mut source, "call_1");
+    run.call(call).expect("declared");
+    offered(&mut run);
+    let again = ctx(&mut source, "note");
+    run.produced(again.clone()).expect("lookup's output");
+    assert!(run.called("call_1").is_some_and(|output| output.is(&again)));
 }
 
 #[cfg(test)]

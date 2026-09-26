@@ -161,6 +161,22 @@ The run
    Catches: taken as the calling instance's output; the calling activation left
    outstanding nowhere; the output not held.
 
+.. test_case:: A called output is given to its own activation alone
+   :id: TEST_RUN_CALLED_OUTPUT_FROM_ITS_OWN_PASS
+   :verifies: CREQ_RUN_CALL_OUTPUT_TO_CALLER
+   :test_kind: error_path
+   :coverage: partial
+
+   An instance reading its own output, given its first context, whose model
+   names its call ``call_1`` on each pass. After the first pass's call is
+   answered and the pass produces, the second pass is asked for ``call_1``
+   before making it, and is given nothing; once it makes the call and is
+   answered, it is given its own answer.
+
+   Catches: given back to a later activation of the same instance, which is
+   what the run did, a resumed second pass then being answered from the
+   first.
+
 .. test_case:: A call its instance does not declare is refused
    :id: TEST_RUN_UNDECLARED_CALL_IS_REFUSED
    :verifies: CREQ_RUN_REFUSES_UNDECLARED_CALL

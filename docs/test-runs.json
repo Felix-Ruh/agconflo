@@ -1398,6 +1398,15 @@
           "title": "agconflo-core record::resumed_run_ends_alike",
           "type": "test_run"
         },
+        "RUN_RECORD_RESUMES_MID_REPETITION": {
+          "executes": [
+            "TEST_RECORD_RESUMES_MID_REPETITION"
+          ],
+          "id": "RUN_RECORD_RESUMES_MID_REPETITION",
+          "test_outcome": "passed",
+          "title": "agconflo-core record::resumes_mid_repetition",
+          "type": "test_run"
+        },
         "RUN_RECORD_SOURCE_CONTINUES": {
           "executes": [
             "TEST_RECORD_SOURCE_CONTINUES"
@@ -1756,6 +1765,15 @@
           "id": "RUN_RUN_BUDGET_STOPS_AT_THE_LIMIT",
           "test_outcome": "passed",
           "title": "agconflo-core run::budget_stops_at_the_limit",
+          "type": "test_run"
+        },
+        "RUN_RUN_CALLED_OUTPUT_FROM_ITS_OWN_PASS": {
+          "executes": [
+            "TEST_RUN_CALLED_OUTPUT_FROM_ITS_OWN_PASS"
+          ],
+          "id": "RUN_RUN_CALLED_OUTPUT_FROM_ITS_OWN_PASS",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::called_output_from_its_own_pass",
           "type": "test_run"
         },
         "RUN_RUN_CALLED_OUTPUT_OF_UNDECLARED_TYPE_IS_REFUSED": {
