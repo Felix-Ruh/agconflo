@@ -1425,6 +1425,15 @@
           "title": "agconflo-core record::resumes_mid_repetition",
           "type": "test_run"
         },
+        "RUN_RECORD_ROUTES_KEPT": {
+          "executes": [
+            "TEST_RECORD_ROUTES_KEPT"
+          ],
+          "id": "RUN_RECORD_ROUTES_KEPT",
+          "test_outcome": "passed",
+          "title": "agconflo-core record::routes_kept",
+          "type": "test_run"
+        },
         "RUN_RECORD_SOURCE_CONTINUES": {
           "executes": [
             "TEST_RECORD_SOURCE_CONTINUES"
@@ -1767,6 +1776,15 @@
           "title": "agconflo-core run::argument_of_wrong_type_is_refused",
           "type": "test_run"
         },
+        "RUN_RUN_BAD_ROUTE_REFUSED": {
+          "executes": [
+            "TEST_RUN_BAD_ROUTE_REFUSED"
+          ],
+          "id": "RUN_RUN_BAD_ROUTE_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::bad_route_refused",
+          "type": "test_run"
+        },
         "RUN_RUN_BUDGET_COUNTS_EACH_PASS": {
           "executes": [
             "TEST_RUN_BUDGET_COUNTS_EACH_PASS"
@@ -2080,6 +2098,15 @@
           "id": "RUN_RUN_RESULT_IS_THE_DESIGNATED_CONTEXT",
           "test_outcome": "passed",
           "title": "agconflo-core run::result_is_the_designated_context",
+          "type": "test_run"
+        },
+        "RUN_RUN_ROUTED_WALKS_CHOSEN": {
+          "executes": [
+            "TEST_RUN_ROUTED_WALKS_CHOSEN"
+          ],
+          "id": "RUN_RUN_ROUTED_WALKS_CHOSEN",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::routed_walks_chosen",
           "type": "test_run"
         },
         "RUN_RUN_SIGNATURE_FILLED_EXACTLY_STARTS": {
