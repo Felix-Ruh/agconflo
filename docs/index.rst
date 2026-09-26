@@ -61,6 +61,7 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    tests/yield
    tests/runner
    tests/tools
+   tests/environment
    code/agconflo-core
    code/agconflo-lua
    code/agconflo-runner
