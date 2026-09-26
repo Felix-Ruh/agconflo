@@ -696,6 +696,24 @@
           "title": "agconflo-lua host::refused_output_fails_with_the_refusal",
           "type": "test_run"
         },
+        "RUN_HOST_ROUTE_NAMED": {
+          "executes": [
+            "TEST_HOST_ROUTE_NAMED"
+          ],
+          "id": "RUN_HOST_ROUTE_NAMED",
+          "test_outcome": "passed",
+          "title": "agconflo-lua host::route_named",
+          "type": "test_run"
+        },
+        "RUN_HOST_ROUTE_REFUSED": {
+          "executes": [
+            "TEST_HOST_ROUTE_REFUSED"
+          ],
+          "id": "RUN_HOST_ROUTE_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-lua host::route_refused",
+          "type": "test_run"
+        },
         "RUN_HOST_RUNAWAY_SCRIPT_IS_STOPPED": {
           "executes": [
             "TEST_HOST_RUNAWAY_SCRIPT_IS_STOPPED"
@@ -2692,6 +2710,15 @@
           "id": "RUN_SCRIPTED_RESUMED_MID_CALL_ASKS_NOTHING_TWICE",
           "test_outcome": "passed",
           "title": "agconflo-lua scripted::resumed_mid_call_asks_nothing_twice",
+          "type": "test_run"
+        },
+        "RUN_SCRIPTED_REVIEW_LOOP": {
+          "executes": [
+            "TEST_SCRIPTED_REVIEW_LOOP"
+          ],
+          "id": "RUN_SCRIPTED_REVIEW_LOOP",
+          "test_outcome": "passed",
+          "title": "agconflo-lua scripted::review_loop",
           "type": "test_run"
         },
         "RUN_SCRIPTED_SAME_WORKFLOW_TWO_PROVIDERS": {

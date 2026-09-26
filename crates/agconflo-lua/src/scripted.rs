@@ -262,8 +262,12 @@ async fn drive(
         }
 
         match perform_activation(&mut run, &activation, &mut env).await {
-            Performed::Output(output) => {
-                if let Err(refusal) = run.produced(output) {
+            Performed::Output(output, route) => {
+                let reported = match route {
+                    None => run.produced(output),
+                    Some(route) => run.routed(output, route),
+                };
+                if let Err(refusal) = reported {
                     return Ok(Outcome::Ended(fail(
                         run,
                         ScriptFailure::OutputRefused(refusal),
@@ -292,8 +296,8 @@ struct Env<'e> {
 
 /// How performing an activation came out.
 enum Performed {
-    /// Its output, not yet reported to the run.
-    Output(Context),
+    /// Its output, and a router's route, not yet reported to the run.
+    Output(Context, Option<Vec<String>>),
     /// The run cannot go on from it as it would from an output.
     Stopped(Stop),
 }
@@ -354,6 +358,12 @@ fn perform_activation<'f>(
             callees,
             replay,
             mailbox: mailbox.clone(),
+            routes: activation.call().is_none()
+                && env
+                    .definition
+                    .node_types
+                    .iter()
+                    .any(|declared| declared.name == activation.node_type() && declared.routes),
         };
 
         let source = env.source.clone();
@@ -386,7 +396,7 @@ fn perform_activation<'f>(
 
         match (stop, performed) {
             (Some(stop), _) => Performed::Stopped(stop),
-            (None, Ok(output)) => Performed::Output(output),
+            (None, Ok((output, route))) => Performed::Output(output, route),
             (None, Err(failure)) => Performed::Stopped(Stop::Failed(failure)),
         }
     })
@@ -427,7 +437,7 @@ async fn serve(
                 return stopping(Stop::Awaiting(called));
             }
             match perform_activation(run, &called, env).await {
-                Performed::Output(output) => match run.produced(output.clone()) {
+                Performed::Output(output, _) => match run.produced(output.clone()) {
                     Ok(()) => {
                         (env.keep)(run.record(&env.source.borrow()));
                         host::Given::Output(output)
@@ -1911,7 +1921,7 @@ fn refused_call_fails_with_the_refusal() {
                 node_type: "lookup".to_owned(),
             }
         ),
-        Performed::Output(output) => panic!("expected the call refused, got {output:?}"),
+        Performed::Output(output, _) => panic!("expected the call refused, got {output:?}"),
         Performed::Stopped(_) => panic!("expected the call refused, and it stopped otherwise"),
     }
     assert_eq!(stub.requests().len(), 1, "not asked again");
@@ -2325,4 +2335,107 @@ fn decision_replayed() {
         }
     );
     assert_eq!(sent, 0);
+}
+
+#[cfg(test)]
+#[test]
+fn review_loop() {
+    let types = r#"
+[types.give]
+required = { input = "note" }
+output = "note"
+
+[types.draft]
+required = { brief = "note", previous = "note" }
+output = "note"
+
+[types.review]
+required = { draft = "note" }
+output = "note"
+
+[types.route]
+required = { draft = "note", review = "note" }
+output = "note"
+routes = true
+
+[types.finish]
+required = { draft = "note" }
+output = "note"
+"#;
+    // The drafter reads the brief and the draft the router sends back, and the
+    // run gives it an empty draft for its first pass.
+    let flow = r#"
+name = "review"
+output = "finisher"
+
+[instances.brief]
+node_type = "give"
+
+[instances.drafter]
+node_type = "draft"
+bindings = { brief = "brief", previous = { from = "router", input = "draft" } }
+
+[instances.reviewer]
+node_type = "review"
+bindings = { draft = "drafter" }
+
+[instances.router]
+node_type = "route"
+bindings = { draft = "drafter", review = "reviewer" }
+
+[instances.finisher]
+node_type = "finish"
+bindings = { draft = { from = "router", input = "draft" } }
+"#;
+    let definition = workflow(types, flow);
+    let behaviours = Behaviours::new()
+        .define(
+            "give",
+            "give.lua",
+            "local given, host = ...\nreturn host.text(host.output, given.input:render())",
+        )
+        .define(
+            "draft",
+            "draft.lua",
+            "local given, host = ...\nreturn host.text(host.output, given.previous:render() .. '[' .. given.brief:render() .. ']')",
+        )
+        .define(
+            "review",
+            "review.lua",
+            "local given, host = ...\nreturn host.text(host.output, 'reviewed ' .. given.draft:render())",
+        )
+        // Sent back until the draft has had three passes, then on.
+        .define(
+            "route",
+            "route.lua",
+            "local given, host = ...\nlocal _, passes = given.draft:render():gsub('%[', '')\nif passes < 3 then host.route({'drafter'}) else host.route({'finisher'}) end\nreturn host.text(host.output, given.review:render())",
+        )
+        .define(
+            "finish",
+            "finish.lua",
+            "local given, host = ...\nreturn host.text(host.output, 'final ' .. given.draft:render())",
+        );
+    let mut source = IdSource::new();
+    let arguments = Arguments::new()
+        .supply("brief", "input", note(&mut source, "note", "B"))
+        .supply("drafter", "previous", note(&mut source, "note", ""));
+    let mut records = Vec::new();
+    let ended = block(run_scripted(
+        &definition,
+        &behaviours,
+        &offline(),
+        arguments,
+        &mut source,
+        40,
+        SMALL,
+        |record| records.push(record),
+    ));
+
+    // The third draft, each pass given the brief and the draft before it.
+    assert_eq!(rendered(ended), "final [B][B][B]");
+    let last = records.last().expect("records were handed over");
+    // The drafter's argument and three outputs, and the draft sent back twice.
+    assert_eq!(last.matches("instance = \"drafter\"").count(), 4, "{last}");
+    assert_eq!(last.matches("route = [\"drafter\"]").count(), 2, "{last}");
+    assert_eq!(last.matches("route = [\"finisher\"]").count(), 1, "{last}");
 }
