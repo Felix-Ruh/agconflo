@@ -12,7 +12,8 @@ OpenRouter's decisions endpoint, ``/api/alpha/decisions``, with the model
 ``~typesafe/jev-latest``, through a key the maintainer allowed for testing, from
 a cloud development container through its proxy, on 2026-09-26. "Alpha" is
 OpenRouter's word for the endpoint, and it may change shape; each finding
-below is of the day it was taken.
+below is of the day it was taken. The last was taken after, through what was
+specified and built on the others.
 
 .. evd:: A decisions model answers only on its own endpoint, in a shape of named questions
    :id: EVD_DECISIONS_MODEL_SHAPE
@@ -93,3 +94,28 @@ below is of the day it was taken.
    above were made with Python's ``urllib`` through the container's proxy,
    not through ``reqwest``; whether ``system-proxy`` reaches that proxy the
    same way was not measured.
+
+.. evd:: A router's script asked Jev through agconflo and branched on its choice
+   :id: EVD_JEV_THROUGH_AGCONFLO
+   :evd_kind: measurement
+   :observed_on: 2026-09-26
+   :observation: Through agconflo at 0e81bec, a router's host.decide chose accept for a clean review and revise for one with findings, confidence 1 each, in under 0.7 s a run; the record held an exchange offering nothing, and a bad key failed with 401.
+
+   Taken with the ``agconflo`` binary built for debugging, from a scratch
+   directory: a workflow of an entry instance giving a review and a router
+   instance declaring no calls, whose script asked ``host.decide`` one
+   question - revise or accept, with the instructions and criteria of
+   ``EVD_DECISIONS_REPEAT`` - and output the choice, the confidence and the
+   answer; a model mapping giving the role ``routing`` the decisions model
+   ``~typesafe/jev-latest`` at ``https://openrouter.ai/api/alpha/``, its key
+   in a variable given to that one process, as the maintainer allowed for
+   testing. ``check`` found nothing first.
+
+   Each run exited 0, its output the choice, its confidence and the answers
+   as the endpoint sent them, probabilities included. The times are whole
+   runs of the command. The record held the decision as ``exchange = {
+   offer = [], window = "4", answer = "5", calls = [] }``. With a key the
+   endpoint does not know, the run exited 5 with "the model for routing
+   answered 401" and the endpoint's body, "User not found.". The request went
+   through ``reqwest`` and the container's proxy, which
+   ``EVD_REQWEST_THROUGH_GENAI`` had left unmeasured.

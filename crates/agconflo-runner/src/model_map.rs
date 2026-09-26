@@ -3,12 +3,15 @@
 //!
 //! A model mapping is a TOML document with one table, `roles`, giving each
 //! role a model named with its provider, or a table naming the model, the
-//! endpoint its calls go to, and the environment variable its key is in:
+//! endpoint its calls go to, and the environment variable its key is in - or a
+//! decisions model, with an endpoint ending in a slash and a key variable,
+//! both required:
 //!
 //! ```toml
 //! [roles]
 //! drafting = "anthropic::claude-sonnet-5"
 //! asking = { model = "openai::qwen3", endpoint = "http://localhost:1234/v1/", key_env = "LM_API_TOKEN" }
+//! routing = { decisions = "~typesafe/jev-latest", endpoint = "https://openrouter.ai/api/alpha/", key_env = "OPEN_ROUTER_API_KEY" }
 //! ```
 
 use std::collections::HashMap;
@@ -65,6 +68,15 @@ pub enum ModelsFault {
         /// The model as the mapping names it.
         model: String,
     },
+    /// A role's entry names a decisions model it cannot be read with.
+    Decisions {
+        /// Where in the entry.
+        place: Place,
+        /// The role.
+        role: String,
+        /// What is wrong with it.
+        fault: DecisionsFault,
+    },
     /// A role's key is in a variable that is not set.
     UnsetVariable {
         /// Where the variable is named.
@@ -81,6 +93,39 @@ pub enum ModelsFault {
     },
 }
 
+/// Why a role's decisions entry is refused.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum DecisionsFault {
+    /// The entry also names a chat model.
+    BothKinds,
+    /// The entry names no endpoint.
+    NoEndpoint,
+    /// The entry's endpoint does not end in a slash.
+    EndpointWithoutSlash {
+        /// The endpoint as the mapping names it.
+        endpoint: String,
+    },
+    /// The entry names no variable to take the key from.
+    NoKeyVariable,
+}
+
+impl fmt::Display for DecisionsFault {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::BothKinds => f.write_str("it names both a model and a decisions model"),
+            Self::NoEndpoint => f.write_str("a decisions model needs an endpoint"),
+            Self::EndpointWithoutSlash { endpoint } => write!(
+                f,
+                "its endpoint {endpoint} does not end in a slash, and decisions is joined to it"
+            ),
+            Self::NoKeyVariable => {
+                f.write_str("a decisions model needs key_env, the variable its key is in")
+            }
+        }
+    }
+}
+
 impl fmt::Display for ModelsFault {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -90,6 +135,9 @@ impl fmt::Display for ModelsFault {
                 f,
                 "{place}: the role {role} names {model}, which does not name a provider as provider::model"
             ),
+            Self::Decisions { place, role, fault } => {
+                write!(f, "{place}: the role {role}'s entry is refused: {fault}")
+            }
             Self::UnsetVariable {
                 place,
                 role,
@@ -123,12 +171,22 @@ pub fn read_models(
     let roles = roles(&file, &text, &env)?;
     let targets = roles
         .iter()
-        .map(|role| (role.called_as(), role.target.clone()))
+        .filter_map(|role| match &role.plays {
+            Plays::Chat(target) => Some((role.called_as(target), target.clone())),
+            Plays::Decisions { .. } => None,
+        })
         .collect();
     let roster = roles
         .iter()
         .fold(Roster::new(client(targets)?), |roster, role| {
-            roster.map(&role.name, &role.called_as())
+            match &role.plays {
+                Plays::Chat(target) => roster.map(&role.name, &role.called_as(target)),
+                Plays::Decisions {
+                    model,
+                    endpoint,
+                    key,
+                } => roster.map_decisions(&role.name, model, endpoint, key),
+            }
         });
     Ok(ModelMap { roster })
 }
@@ -136,14 +194,26 @@ pub fn read_models(
 /// One role as the mapping gives it.
 struct Role {
     name: String,
-    target: Target,
+    plays: Plays,
+}
+
+/// What plays a role: a chat model at its target, or a decisions model at its
+/// endpoint with its key.
+enum Plays {
+    Chat(Target),
+    Decisions {
+        model: String,
+        endpoint: String,
+        key: String,
+    },
 }
 
 impl Role {
-    /// The name the roster calls the role's model by: the provider's namespace
-    /// and the role, which the client's resolver looks the role's target up by.
-    fn called_as(&self) -> String {
-        format!("{}::{}", self.target.adapter.as_lower_str(), self.name)
+    /// The name the roster calls the role's chat model by: the provider's
+    /// namespace and the role, which the client's resolver looks the role's
+    /// target up by.
+    fn called_as(&self, target: &Target) -> String {
+        format!("{}::{}", target.adapter.as_lower_str(), self.name)
     }
 }
 
@@ -190,8 +260,12 @@ fn roles(
                             found: article(item.type_name()),
                         },
                     })?;
-                toml.only(role, &key, &["model", "endpoint", "key_env"])
+                toml.only(role, &key, &["model", "decisions", "endpoint", "key_env"])
                     .map_err(mapping)?;
+                if let Some(decisions) = role.get("decisions") {
+                    roles.push(decider(&toml, env, name, &key, role, decisions)?);
+                    continue;
+                }
                 (
                     toml.needed(role, &key, "model").map_err(mapping)?,
                     path(&key, "model"),
@@ -229,15 +303,74 @@ fn roles(
 
         roles.push(Role {
             name: name.to_owned(),
-            target: Target {
+            plays: Plays::Chat(Target {
                 adapter,
                 model: model_name.to_owned(),
                 endpoint,
                 key: key_value,
-            },
+            }),
         });
     }
     Ok(roles)
+}
+
+/// The role `name`, whose entry `role` under `key` names the decisions model
+/// `decisions`: read with its endpoint and the key from the variable it names,
+/// or refused at the entry.
+// @A decisions entry read whole or refused at the entry,IMPL_MODEL_MAP_DECISIONS,impl,[CREQ_MODEL_MAP_READS_DECISIONS, CREQ_MODEL_MAP_REFUSES_BAD_DECISIONS_ENTRY, CREQ_MODEL_MAP_REFUSES_UNSET_VARIABLE],[DEC_DECISIONS_ROLE_IN_THE_MAP, DEC_KEYS_ONLY_BY_NAMED_VARIABLE]
+fn decider(
+    toml: &Toml<'_>,
+    env: &impl Fn(&str) -> Option<String>,
+    name: &str,
+    key: &[String],
+    role: &dyn toml_edit::TableLike,
+    decisions: &toml_edit::Item,
+) -> Result<Role, ModelsFault> {
+    let mapping = |(place, fault)| ModelsFault::Mapping { place, fault };
+    let refused = |item: &toml_edit::Item, fault| ModelsFault::Decisions {
+        place: toml.place(item.span()),
+        role: name.to_owned(),
+        fault,
+    };
+    let model = toml
+        .string(decisions, &path(key, "decisions"))
+        .map_err(mapping)?;
+    if role.get("model").is_some() {
+        return Err(refused(decisions, DecisionsFault::BothKinds));
+    }
+    let Some(endpoint_item) = role.get("endpoint") else {
+        return Err(refused(decisions, DecisionsFault::NoEndpoint));
+    };
+    let endpoint = toml
+        .string(endpoint_item, &path(key, "endpoint"))
+        .map_err(mapping)?;
+    if !endpoint.ends_with('/') {
+        return Err(refused(
+            endpoint_item,
+            DecisionsFault::EndpointWithoutSlash {
+                endpoint: endpoint.to_owned(),
+            },
+        ));
+    }
+    let Some(variable_item) = role.get("key_env") else {
+        return Err(refused(decisions, DecisionsFault::NoKeyVariable));
+    };
+    let variable = toml
+        .string(variable_item, &path(key, "key_env"))
+        .map_err(mapping)?;
+    let key_value = env(variable).ok_or_else(|| ModelsFault::UnsetVariable {
+        place: toml.place(variable_item.span()),
+        role: name.to_owned(),
+        variable: variable.to_owned(),
+    })?;
+    Ok(Role {
+        name: name.to_owned(),
+        plays: Plays::Decisions {
+            model: model.to_owned(),
+            endpoint: endpoint.to_owned(),
+            key: key_value,
+        },
+    })
 }
 
 /// The adapter a model named `provider::model` goes through, and the model's
@@ -602,4 +735,118 @@ fn unreadable_refused() {
         read_models(&absent, env(&[])),
         Err(ModelsFault::File(FileFault::Unreadable { file, .. })) if file == absent.display().to_string()
     ));
+}
+
+/// What a one-node workflow completes with through `map`, its script `script`,
+/// under a limit of `calls` model calls - or a panic naming how it ended.
+#[cfg(test)]
+fn scripted(map: &ModelMap, script: &str, calls: u32) -> String {
+    let types = read_node_types("types.toml", "[types.ask]\noutput = \"note\"\n").expect("types");
+    let catalogue = TypeCatalogue::gather([types]).expect("declared once");
+    let (definition, _) = read_workflow(
+        "flow.toml",
+        "name = \"asking\"\noutput = \"asked\"\n\n[instances.asked]\nnode_type = \"ask\"\n",
+        &catalogue,
+    )
+    .expect("the workflow");
+    let behaviours = Behaviours::new().define("ask", "ask.lua", script);
+    let limits = Limits {
+        model_calls: calls,
+        ..Limits::default()
+    };
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("a runtime");
+    match runtime.block_on(run_scripted(
+        &definition,
+        &behaviours,
+        map.roster(),
+        Arguments::new(),
+        &mut IdSource::new(),
+        3,
+        limits,
+        |_| {},
+    )) {
+        Ok(Outcome::Ended(RunEnding::Completed(result))) => result.render().into_owned(),
+        other => panic!("expected the run to complete, got {other:?}"),
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn decisions_reach_their_model() {
+    let chat = Stub::answering("chatted");
+    let decider = Stub::answering(r#"{"verdict":{"choice":"accept","confidence":1}}"#);
+    let scratch = Scratch::new("decisions_reach_their_model");
+    let mapping = scratch.write(
+        "models.toml",
+        format!(
+            "[roles]\nasking = {{ model = \"openai::alpha\", endpoint = \"{}\", key_env = \"CHAT_KEY\" }}\nrouting = {{ decisions = \"~typesafe/jev-latest\", endpoint = \"{}\", key_env = \"ROUTE_KEY\" }}\n",
+            chat.base, decider.base
+        ),
+    );
+    let map = read_models(
+        &mapping,
+        env(&[("CHAT_KEY", "k1"), ("ROUTE_KEY", "route-key")]),
+    )
+    .expect("the mapping reads");
+
+    let script = "local given, host = ...\nlocal said = host.complete('asking', host.text('note', 'q'))\nlocal answer, chosen = host.decide('routing', host.text('note', 's'), { verdict = { instructions = 'i', options = { accept = 'a', revise = 'r' } } }, 'decision')\nreturn host.text(host.output, said:render() .. ' ' .. chosen.verdict.choice)";
+    assert_eq!(scripted(&map, script, 2), "chatted accept");
+    assert_eq!(
+        chat.requests(),
+        [sent("/v1/chat/completions", "alpha", Some(2), None)]
+    );
+    assert_eq!(
+        decider.requests(),
+        [sent("/v1/decisions", "~typesafe/jev-latest", Some(9), None)]
+    );
+}
+
+#[cfg(test)]
+#[test]
+fn bad_decisions_entry_refused() {
+    let scratch = Scratch::new("bad_decisions_entry_refused");
+    let refused = |entry: &str| {
+        let text = format!("[roles]\nrouting = {{ {entry} }}\n");
+        match read_models(&scratch.write("models.toml", &text), env(&[("K", "k")])) {
+            Err(ModelsFault::Decisions { place, role, fault }) => {
+                assert_eq!(place.line, 2, "{entry}");
+                assert_eq!(role, "routing");
+                fault
+            }
+            other => panic!("expected {entry} refused, got {other:?}"),
+        }
+    };
+
+    assert_eq!(
+        refused(
+            "model = \"openai::a\", decisions = \"~d\", endpoint = \"http://x/\", key_env = \"K\""
+        ),
+        DecisionsFault::BothKinds
+    );
+    assert_eq!(
+        refused("decisions = \"~d\", endpoint = \"http://x/\""),
+        DecisionsFault::NoKeyVariable
+    );
+    assert_eq!(
+        refused("decisions = \"~d\", key_env = \"K\""),
+        DecisionsFault::NoEndpoint
+    );
+    assert_eq!(
+        refused("decisions = \"~d\", endpoint = \"http://x/api/alpha\", key_env = \"K\""),
+        DecisionsFault::EndpointWithoutSlash {
+            endpoint: "http://x/api/alpha".to_owned()
+        }
+    );
+
+    read_models(
+        &scratch.write(
+            "models.toml",
+            "[roles]\nrouting = { decisions = \"~d\", endpoint = \"http://x/\", key_env = \"K\" }\n",
+        ),
+        env(&[("K", "k")]),
+    )
+    .expect("a whole entry reads");
 }

@@ -151,8 +151,9 @@ pub(crate) struct Request {
 }
 
 /// A stub provider on the loopback interface, answering OpenAI's
-/// chat-completions format and Anthropic's messages format by the path each is
-/// sent to, and recording every request.
+/// chat-completions format, Anthropic's messages format and the decisions
+/// endpoint's by the path each is sent to, and recording every request. To a
+/// decision, a reply's text is the answers, as JSON text.
 pub(crate) struct Stub {
     pub(crate) base: String,
     seen: Arc<Mutex<Vec<(Request, String)>>>,
@@ -195,6 +196,7 @@ impl Stub {
                 };
                 let request = request(&head, &body);
                 let anthropic = request.path.ends_with("/messages");
+                let decides = request.path.ends_with("/decisions");
                 let index = {
                     let mut log = recorded.lock().expect("the log");
                     log.push((request, body));
@@ -205,12 +207,15 @@ impl Stub {
                     continue;
                 };
                 let (answer, calls) = &replies[index.min(replies.len() - 1)];
-                let reply = if anthropic {
+                let reply = if decides {
+                    format!("{{\"model\":\"stub\",\"answers\":{answer}}}")
+                } else if anthropic {
                     serde_json::json!({
                         "id": "m", "type": "message", "role": "assistant", "model": "stub",
                         "content": [{"type": "text", "text": answer}], "stop_reason": "end_turn",
                         "usage": {"input_tokens": 1, "output_tokens": 1}
                     })
+                    .to_string()
                 } else {
                     let mut message = serde_json::json!({"role": "assistant", "content": answer});
                     if !calls.is_empty() {
@@ -222,14 +227,18 @@ impl Stub {
                             })
                             .collect();
                     }
-                    let finish = if calls.is_empty() { "stop" } else { "tool_calls" };
+                    let finish = if calls.is_empty() {
+                        "stop"
+                    } else {
+                        "tool_calls"
+                    };
                     serde_json::json!({
                         "id": "c", "object": "chat.completion", "created": 0, "model": "stub",
                         "choices": [{"index": 0, "finish_reason": finish, "message": message}],
                         "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}
                     })
-                }
-                .to_string();
+                    .to_string()
+                };
                 let _ = write!(
                     connection,
                     "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{reply}",

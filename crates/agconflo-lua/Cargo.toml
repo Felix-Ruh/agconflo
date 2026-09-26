@@ -12,6 +12,7 @@ readme.workspace = true
 [dependencies]
 agconflo-core = { path = "../agconflo-core" }
 genai = { workspace = true }
+reqwest = { workspace = true }
 mlua = { workspace = true }
 serde_json = { workspace = true }
 
