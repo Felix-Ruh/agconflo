@@ -19,11 +19,11 @@ scratch directory mounted as ``/work``.
 
 What was not measured is named here: a build that needs a package registry
 with no network, and a Docker engine installed on Linux itself and used
-without root - rootless Docker or Podman among them. The last three below
-were taken on an engine installed on Linux and used by root, and each says
-so. A local model calling a
-node a tool performs was left to the live run of the feature, which the last
-measurement below records; its project needed no package.
+without root - rootless Docker or Podman among them. The last eight below
+were taken on an engine installed on Linux and used by root, in a cloud
+development container whose outgoing TLS is intercepted, and each says so. A
+local model calling a node a tool performs was left to the live run of the
+feature, which ``EVD_TOOLS_LIVE_RUN`` records; its project needed no package.
 
 .. evd:: A container reaches only the folders mounted into it
    :id: EVD_CONTAINER_CONFINES_TO_MOUNTS
@@ -428,3 +428,104 @@ measurement below records; its project needed no package.
    With the container's own process left as root, the same cleanup ended it:
    26 tests on that engine then failed at a step after it as the engine's
    failure, ``docker exec`` exiting 137 or the container no longer running.
+
+.. evd:: A container's outgoing TLS is intercepted where the host's is, and trusted only with the host's authority
+   :id: EVD_CONTAINER_TLS_INTERCEPTED
+   :evd_kind: measurement
+   :observed_on: 2026-09-26
+   :observation: From a bridge-network container, github.com was reached but refused as a self-signed chain, the host's proxy refused the bridge, and on the host network Python 3.14 refused the authority's certificate for its key usage.
+
+   The engine of ``EVD_ROOT_FOLDER_CLOSED_TO_1000``, where the host's own
+   HTTPS goes through a proxy whose certificate authority the host trusts
+   from a bundle. Each probe was ``urllib.request.urlopen`` in the pinned
+   ``python:3.14-slim``. On the bridge network, direct: "self-signed
+   certificate in certificate chain", so the connection left the container
+   and was intercepted. On the bridge network with the proxy named at the
+   bridge's gateway: "Connection refused", the proxy listening on the host's
+   loopback only. On the host network with the proxy and the bundle: "CA cert
+   does not include key usage extension", Python's own strictness about that
+   authority rather than a route refused.
+
+.. evd:: ubc checks a project in a locked-down container once the container trusts the host's authority
+   :id: EVD_UBC_IN_A_CONTAINER
+   :evd_kind: measurement
+   :observed_on: 2026-09-26
+   :observation: In a locked-down container on the bridge network, ubc 0.35.0 checked a clone's 73 documents and answered a Cypher query when the host's CA bundle was at the system path or named by SSL_CERT_FILE, and without it refused as not open source.
+
+   The image was the pinned ``python:3.14-slim`` with ``ubc`` copied in, built
+   locally and named by its image id; the container ran with a read-only
+   root, no capabilities, no new privileges and ``HOME=/tmp``, with a full
+   clone of this repository mounted. With the bundle mounted over
+   ``/etc/ssl/certs/ca-certificates.crt``, or mounted elsewhere and named by
+   ``SSL_CERT_FILE``, ``ubc check --deny warning`` found no errors and
+   ``query cypher`` counted 27 stakeholder requirements; with neither, the
+   check exited 1 with "Not determined to be an open source project", which
+   is ubc's answer to a licence determination it could not complete.
+
+.. evd:: ubc does not find its licence in a git worktree mounted into a container
+   :id: EVD_UBC_REFUSES_A_WORKTREE
+   :evd_kind: measurement
+   :observed_on: 2026-09-26
+   :observation: With the CA trusted, ubc refused a mounted git worktree as not open source, also with the worktree's git directory mounted read-only at its own path, where the clone it came from passed.
+
+   The worktree's ``.git`` is a file naming a directory outside the mounted
+   folder. Mounting that directory at the same absolute path, read-only,
+   changed nothing; why ubc still found no licence was not investigated.
+   The README advises granting a worktree, so a tool that runs ubc has to be
+   granted a clone instead.
+
+.. evd:: A single file bind-mounted read-only into a locked-down container stays unchanged and is trusted by ubc
+   :id: EVD_TRUST_FILE_MOUNTS_READ_ONLY
+   :evd_kind: measurement
+   :observed_on: 2026-09-26
+   :observation: A CA bundle bind-mounted read-only at /etc/agconflo/trust.pem into a read-only-root container could be neither removed nor written by a root or a 1000 step, and ubc trusted it through SSL_CERT_FILE.
+
+   The engine of ``EVD_UBC_IN_A_CONTAINER``, and a container made as the
+   sandbox makes one: ``--init``, the bridge network, a read-only root, a
+   ``/tmp`` in memory, no capabilities, no new privileges and its own process
+   as 65534, with a full clone mounted writable at ``/work/repo``. The host's
+   bundle, copied to a path holding a comma and a space, was mounted with
+   ``readonly`` at a target outside ``/work`` that the image does not hold;
+   the engine made the mount point on the read-only root itself.
+
+   As root and as 1000, ``rm`` answered "Read-only file system"; appending
+   answered the same for root and "Permission denied" for 1000; the host file
+   compared equal afterwards. ``docker inspect`` listed the two mounts, the
+   file's as not writable.
+
+   With the licence cache in the clone's ``docs/.ub_cache`` removed first,
+   ``ubc check --deny warning`` without ``SSL_CERT_FILE`` exited with "Not
+   determined to be an open source project", and then with it set found no
+   errors, and ``query cypher`` counted 27 stakeholder requirements. Two
+   confounds were met on the way and removed: a clone whose ``origin`` named
+   the local path rather than the GitHub repository was refused whatever was
+   trusted, and a run after a passing one passed without the file, answered
+   from that cache.
+
+.. evd:: A workflow's tool runs ubc through agconflo once the grants name the host's authorities
+   :id: EVD_UBC_THROUGH_AGCONFLO
+   :evd_kind: measurement
+   :observed_on: 2026-09-26
+   :observation: Through agconflo at bbc6f2c, a DeepSeek model ran ubc check and a Cypher query in a tool container in 6 s, "No errors found." and 27 goals; with the grants' trust line removed, both answered "Not determined to be an open source project".
+
+   Taken with the ``agconflo`` binary built for debugging, from a scratch
+   directory, as ``EVD_TOOLS_LIVE_RUN`` was: a manifest naming one tool,
+   ``run_ubc``, running commands in the image of ``EVD_UBC_IN_A_CONTAINER``
+   in a container of its own; a workflow of an entry instance giving a task
+   and one instance whose script asks the model once, declaring four calls
+   of the tool; ``deepseek/deepseek-v4.1-flash`` through OpenRouter, allowed
+   by the maintainer for testing, its key given to that one process; and
+   grants of the network, the ``run`` action, a limit of 120 seconds, and
+   one folder, ``repo``, writable, at a fresh clone of this repository whose
+   ``origin`` names it on GitHub. ``trust`` named the host's bundle. ``check``
+   found nothing first.
+
+   The task named the two commands. The model called the tool twice in one
+   turn, with each command as written, and answered with what each printed:
+   the check's "No errors found." over 74 files, and the query's one row,
+   27. The run exited 0; no container carried its label afterwards.
+
+   The control was the same run with the clone's ``docs/.ub_cache``, which
+   the first run had written, removed, and the grants without ``trust``: it
+   exited 0 too, the model reporting both commands answering "Not determined
+   to be an open source project" after "No license provided or found".

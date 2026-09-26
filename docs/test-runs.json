@@ -462,6 +462,24 @@
           "title": "agconflo-runner grants::tmp_limit_read",
           "type": "test_run"
         },
+        "RUN_GRANTS_TRUST_READ": {
+          "executes": [
+            "TEST_GRANTS_TRUST_READ"
+          ],
+          "id": "RUN_GRANTS_TRUST_READ",
+          "test_outcome": "passed",
+          "title": "agconflo-runner grants::trust_read",
+          "type": "test_run"
+        },
+        "RUN_GRANTS_TRUST_REFUSED": {
+          "executes": [
+            "TEST_GRANTS_TRUST_REFUSED"
+          ],
+          "id": "RUN_GRANTS_TRUST_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner grants::trust_refused",
+          "type": "test_run"
+        },
         "RUN_GRANTS_UNREADABLE_REFUSED": {
           "executes": [
             "TEST_GRANTS_UNREADABLE_REFUSED"
@@ -2098,6 +2116,15 @@
           "id": "RUN_SANDBOX_TMP_LIMITED",
           "test_outcome": "passed",
           "title": "agconflo-runner sandbox::tmp_limited",
+          "type": "test_run"
+        },
+        "RUN_SANDBOX_TRUST_GIVEN": {
+          "executes": [
+            "TEST_SANDBOX_TRUST_GIVEN"
+          ],
+          "id": "RUN_SANDBOX_TRUST_GIVEN",
+          "test_outcome": "passed",
+          "title": "agconflo-runner sandbox::trust_given",
           "type": "test_run"
         },
         "RUN_SANDBOX_USER_FROM_STATUS": {
