@@ -593,15 +593,15 @@ pub(crate) fn note(source: &mut IdSource, declared: &str, text: &str) -> Context
     Context::text(source, declared, text).expect("a fresh source issues")
 }
 
-/// Run `definition` with `behaviours` under the small limits, its one entry
-/// instance `entry` given `argument` for its parameter `input`, and no model.
+/// Run `definition` with `behaviours` under the small limits, the instance
+/// `given` names given its text for its parameter `input`, and no model.
 #[cfg(test)]
 pub(crate) fn run_with(
     definition: &WorkflowDefinition,
     behaviours: &Behaviours,
-    entry: Option<(&str, &str)>,
+    given: Option<(&str, &str)>,
 ) -> Result<Outcome, ScriptedRefusal> {
-    run_with_roster(definition, behaviours, &offline(), entry)
+    run_with_roster(definition, behaviours, &offline(), given)
 }
 
 /// As [`run_with`], with the scripts' model calls going through `roster`.
@@ -610,11 +610,11 @@ pub(crate) fn run_with_roster(
     definition: &WorkflowDefinition,
     behaviours: &Behaviours,
     roster: &Roster,
-    entry: Option<(&str, &str)>,
+    given: Option<(&str, &str)>,
 ) -> Result<Outcome, ScriptedRefusal> {
     let mut source = IdSource::new();
     let mut arguments = Arguments::new();
-    if let Some((instance, text)) = entry {
+    if let Some((instance, text)) = given {
         let argument = note(&mut source, "note", text);
         arguments = arguments.supply(instance, "input", argument);
     }
@@ -670,7 +670,7 @@ required = { input = \"note\" }
 output = \"note\"
 ";
 
-/// `first`, an entry `seed`, followed by `second` and `third`, each a `step`
+/// `first`, a `seed` given its input by the run, followed by `second` and `third`, each a `step`
 /// bound to the one before; `third` is designated.
 #[cfg(test)]
 pub(crate) const CHAIN: &str = "\
@@ -679,7 +679,6 @@ output = \"third\"
 
 [instances.first]
 node_type = \"seed\"
-entry = true
 
 [instances.second]
 node_type = \"step\"
@@ -784,9 +783,7 @@ proptest::proptest! {
                 "[types.t{index}]\nrequired = {{ input = \"note\" }}\noutput = \"note\"\n"
             );
             flow += &format!("\n[instances.n{index}]\nnode_type = \"t{index}\"\n");
-            if index == 0 {
-                flow += "entry = true\n";
-            } else {
+            if index > 0 {
                 flow += &format!("bindings = {{ input = \"n{}\" }}\n", index - 1);
             }
             behaviours = behaviours.define(&format!("t{index}"), &format!("t{index}.lua"), &appending(word));
@@ -1009,7 +1006,7 @@ required = { draft = \"note\", verdict = \"verdict\" }
 output = \"note\"
 ";
 
-/// `first`, an entry `seed`; `second`, a `review` of it; `third`, a `close`
+/// `first`, a `seed` given its input by the run; `second`, a `review` of it; `third`, a `close`
 /// bound to both, and designated.
 #[cfg(test)]
 const REVIEWED: &str = "\
@@ -1018,7 +1015,6 @@ output = \"third\"
 
 [instances.first]
 node_type = \"seed\"
-entry = true
 
 [instances.second]
 node_type = \"review\"

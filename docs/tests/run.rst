@@ -116,15 +116,16 @@ single requirement to verify.
    the parameters its type declares, and hands a script an activation missing
    one of them.
 
-.. test_case:: An entry instance is ready before anything has run
-   :id: TEST_SCHEDULER_ENTRY_IS_READY_AT_ONCE
+.. test_case:: An instance given its inputs is ready before anything has run
+   :id: TEST_SCHEDULER_INPUT_IS_READY_AT_ONCE
    :verifies: CREQ_SCHEDULER_READY_WHEN_BOUND
    :test_kind: positive
    :coverage: partial
 
-   The second half of the must-pass list. An entry instance's parameters come
-   from the run's arguments rather than from wires, so it is offered on the
-   first ask, with no instance having produced anything.
+   The second half of the must-pass list. A parameter nothing binds takes its
+   context from the run's arguments rather than from a wire, so an instance
+   whose every parameter is one is offered on the first ask, with no instance
+   having produced anything.
 
 .. test_case:: An instance bound to a name that resolves to nothing is never ready
    :id: TEST_SCHEDULER_UNRESOLVED_SOURCE_NEVER_READY
@@ -219,7 +220,8 @@ single requirement to verify.
    :coverage: partial
 
    Three instances in a cycle, each of a node type requiring two parameters, one
-   of which is bound to an entry instance that has produced. Every instance
+   of which is bound to an instance given its input by the run, which has
+   produced. Every instance
    holds a context for one parameter and waits for the other.
 
    A reading that reports quiescence only when no instance has any context at
@@ -422,9 +424,9 @@ single requirement to verify.
    :test_kind: error_path
    :coverage: partial
 
-   A workflow whose entry instance produces and whose remaining instances form a
-   cycle: the ending names the cycle's instances and not the entry instance,
-   which did its work.
+   A workflow whose first instance, given its input by the run, produces and
+   whose remaining instances form a cycle: the ending names the cycle's
+   instances and not the first, which did its work.
 
    Naming everything would point a reader at the whole graph, which is the same
    as naming nothing.
@@ -505,8 +507,8 @@ single requirement to verify.
    :test_kind: property
    :coverage: partial
 
-   For any well-formed definition with a generous budget and every entry
-   parameter supplied, a driven run completes and its result is the context its
+   For any well-formed definition with a generous budget and every parameter
+   nothing binds supplied, a driven run completes and its result is the context its
    designated instance produced.
 
    The counterweight to a file of refusals. Most requirements here say what must
@@ -519,8 +521,8 @@ single requirement to verify.
    :test_kind: error_path
    :coverage: partial
 
-   The measured defect (``EVD_RUN_ACCEPTS_UNDECLARED_OUTPUT``). An entry
-   instance whose node type declares one output type is answered with a context
+   The measured defect (``EVD_RUN_ACCEPTS_UNDECLARED_OUTPUT``). An
+   instance given its input by the run, whose node type declares one output type is answered with a context
    of another. The refusal names that instance, the declared type and the
    reported type, as values, and is told apart from a refusal for a held
    identifier by which it is.
@@ -560,8 +562,8 @@ single requirement to verify.
    :test_kind: error_path
    :coverage: partial
 
-   Half of the measured defect (``EVD_RUN_ACCEPTS_HELD_IDENTIFIER``). An entry
-   instance is answered with the argument it was given, whose type is the
+   Half of the measured defect (``EVD_RUN_ACCEPTS_HELD_IDENTIFIER``). An
+   instance given its input by the run is answered with the argument it was given, whose type is the
    declared output type so that only the identifier is wrong. The refusal names
    the instance and the argument's identifier. Then a part the argument was
    composed from is handed back, and is refused the same way: it is held, though
@@ -662,7 +664,7 @@ single requirement to verify.
    :test_kind: positive
    :coverage: partial
 
-   The same context supplied to two entry instances' parameters, and a second
+   The same context supplied to two instances' parameters, and a second
    context composed of it supplied to a third. The run starts and completes: one
    context under one identifier, however often it is reached.
 

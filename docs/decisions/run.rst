@@ -473,8 +473,8 @@ to leave every one of them open.
    :decided_on: 2026-09-26
    :statement: Agconflo shall hold the output of an instance with no edge into it that does not stand for every later activation reading it, as if its node type declared it standing.
 
-   Such an instance runs once (``DEC_RUN_AGAIN_ON_SOMETHING_NEW``): an entry
-   given the run's arguments, or a node reading nothing. Whatever reads its
+   Such an instance runs once (``DEC_RUN_AGAIN_ON_SOMETHING_NEW``): one given
+   every input by the run's arguments, or a node reading nothing. Whatever reads its
    output inside a repetition needs it on every pass, and it will never
    produce another, so an edge from it that ran out after one pass would stop
    the repetition it feeds on its second round. Declaring every such node type

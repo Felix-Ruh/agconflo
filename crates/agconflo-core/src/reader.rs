@@ -107,6 +107,13 @@ pub enum FaultKind {
         /// The key, from the top of the document down.
         key: Vec<String>,
     },
+    /// An instance is marked as an entry, which no instance is: a run is given
+    /// a context for each parameter nothing binds, on any instance. The place is
+    /// the key marking it.
+    EntryMarked {
+        /// The key, from the top of the document down.
+        key: Vec<String>,
+    },
 }
 
 impl fmt::Display for ReadFault {
@@ -139,6 +146,11 @@ impl fmt::Display for FaultKind {
             Self::OptionalParameters { key } => write!(
                 f,
                 "'{}' declares optional parameters, and every parameter is required: declare each under required and bind it an empty context when it has nothing to carry",
+                key.join(".")
+            ),
+            Self::EntryMarked { key } => write!(
+                f,
+                "'{}' marks an entry, and there are none: a run is given a context for each parameter nothing binds, on any instance; remove the key",
                 key.join(".")
             ),
         }
@@ -200,12 +212,12 @@ impl WorkflowDocument {
 ///
 /// The document names the workflow with `name` and may designate its output
 /// with `output`. Each instance is a table under `instances`, keyed by its name,
-/// holding the `node_type` it names, whether it is an `entry` node, and its
-/// `bindings`, each keying the instance a parameter is wired to by the
-/// parameter's name. Only `name` and each `node_type` are needed: an absent
-/// `output` designates none, an absent `entry` is not an entry node, and absent
-/// `instances` or `bindings` are none. The definition carries every declaration
-/// in the catalogue.
+/// holding the `node_type` it names and its `bindings`, each keying the
+/// instance a parameter is wired to by the parameter's name. Only `name` and
+/// each `node_type` are needed: an absent `output` designates none, and absent
+/// `instances` or `bindings` are none. An instance holding an `entry` key is
+/// refused at the key. The definition carries every declaration in the
+/// catalogue.
 // @A workflow document read into a definition,IMPL_READER_WORKFLOW,impl,[CREQ_READER_WORKFLOW],[DEC_ONE_OUTPUT_KEY, DEC_TOPOLOGY_IN_TOML]
 pub fn read_workflow(
     document: &str,
@@ -319,17 +331,7 @@ impl<'t> Reading<'t> {
             .string(node_type, &[&key[..], &["node_type"]].concat())?
             .to_owned();
 
-        let entry = match table.get("entry") {
-            None => false,
-            Some(entry) => entry.as_bool().ok_or_else(|| {
-                self.wrong_type(
-                    entry.span(),
-                    &[&key[..], &["entry"]].concat(),
-                    "boolean",
-                    entry.type_name(),
-                )
-            })?,
-        };
+        self.no_entry(table, &key)?;
 
         let mut bindings = Vec::new();
         if let Some(item) = table.get("bindings") {
@@ -347,10 +349,24 @@ impl<'t> Reading<'t> {
         Ok(NodeInstance {
             name: name.to_owned(),
             node_type,
-            entry,
             bindings,
             calls: self.calls(table, &key)?,
         })
+    }
+
+    /// Nothing, or a fault for the `entry` key `instance` holds, placed at the
+    /// key.
+    // @An entry mark refused at its key,IMPL_READER_NO_ENTRY,impl,[CREQ_READER_FAULT_LOCATED],[DEC_ENTRY_MARK_REFUSED]
+    fn no_entry(&self, instance: &dyn TableLike, key: &[&str]) -> Result<(), ReadFault> {
+        match instance.get_key_value("entry") {
+            None => Ok(()),
+            Some((written, _)) => Err(self.fault(
+                written.span(),
+                FaultKind::EntryMarked {
+                    key: path(&[key, &["entry"]].concat()),
+                },
+            )),
+        }
     }
 
     /// The node types an instance declares calls to, in the order its `calls`
@@ -579,8 +595,6 @@ pub(crate) struct Written {
 pub(crate) struct WrittenInstance {
     pub(crate) name: String,
     pub(crate) node_type: String,
-    /// The entry key: absent, or present and true or false.
-    pub(crate) entry: Option<bool>,
     pub(crate) bindings: Vec<(String, String)>,
     /// The node types it declares calls to, written as an array when there are
     /// any.
@@ -614,9 +628,6 @@ impl Written {
             for instance in others {
                 let at = format!("instances.{}", key(&instance.name));
                 text += &format!("{at}.node_type = {}\n", quoted(&instance.node_type));
-                if let Some(entry) = instance.entry {
-                    text += &format!("{at}.entry = {entry}\n");
-                }
                 if !instance.calls.is_empty() {
                     text += &format!("{at}.calls = {}\n", array(&instance.calls));
                 }
@@ -631,9 +642,6 @@ impl Written {
             }
             for instance in others {
                 let mut fields = vec![format!("node_type = {}", quoted(&instance.node_type))];
-                if let Some(entry) = instance.entry {
-                    fields.push(format!("entry = {entry}"));
-                }
                 if !instance.calls.is_empty() {
                     fields.push(format!("calls = {}", array(&instance.calls)));
                 }
@@ -650,9 +658,6 @@ impl Written {
         for instance in self.instances.iter().filter(|instance| instance.header) {
             let at = format!("instances.{}", key(&instance.name));
             text += &format!("\n[{at}]\nnode_type = {}\n", quoted(&instance.node_type));
-            if let Some(entry) = instance.entry {
-                text += &format!("entry = {entry}\n");
-            }
             if !instance.calls.is_empty() {
                 text += &format!("calls = {}\n", array(&instance.calls));
             }
@@ -682,7 +687,6 @@ impl Written {
                 .map(|written| NodeInstance {
                     name: written.name.clone(),
                     node_type: written.node_type.clone(),
-                    entry: written.entry.unwrap_or(false),
                     bindings: written
                         .bindings
                         .iter()
@@ -761,14 +765,12 @@ const INSTANCE_NAMES: [&str; 6] = ["a", "b", "fetch", "review", "two words", "x-
 
 /// Written workflow documents of every shape the format allows: instances as
 /// header tables, inline tables and dotted keys, bindings inline and under a
-/// header of their own, the entry key absent, true and false, and an output or
-/// none - naming what `pools` offers.
+/// header of their own, and an output or none - naming what `pools` offers.
 #[cfg(test)]
 pub(crate) fn any_written(pools: Pools) -> impl Strategy<Value = Written> {
     let shapes = vec(
         (
             any::<usize>(),
-            proptest::option::of(any::<bool>()),
             any::<bool>(),
             any::<bool>(),
             vec((any::<usize>(), any::<usize>()), 0..=3),
@@ -799,7 +801,7 @@ pub(crate) fn any_written(pools: Pools) -> impl Strategy<Value = Written> {
                 .iter()
                 .zip(&shapes)
                 .map(
-                    |(&instance, (declared, entry, header, bindings_header, wires, calls))| {
+                    |(&instance, (declared, header, bindings_header, wires, calls))| {
                         let mut bindings: Vec<(String, String)> = Vec::new();
                         for &(parameter, source) in wires {
                             let parameter = pools.parameters[parameter % pools.parameters.len()];
@@ -813,7 +815,6 @@ pub(crate) fn any_written(pools: Pools) -> impl Strategy<Value = Written> {
                         WrittenInstance {
                             name: instance.to_owned(),
                             node_type: pools.types[declared % pools.types.len()].to_owned(),
-                            entry: *entry,
                             bindings,
                             calls: calls
                                 .iter()
@@ -985,10 +986,9 @@ fn empty_context_type_is_a_fault() {
 #[cfg(test)]
 proptest! {
     /// For any document written in any of the forms TOML allows, reading gives
-    /// exactly what was written - the name, every instance with its type, entry
-    /// flag and bindings, and the output or none - and the catalogue's
-    /// declarations as its node types. The entry key is written absent, true and
-    /// false.
+    /// exactly what was written - the name, every instance with its type and
+    /// bindings, and the output or none - and the catalogue's declarations as its
+    /// node types.
     #[test]
     fn reads_what_is_written(written in any_written(RESOLVABLE)) {
         let catalogue = catalogue();
@@ -1131,7 +1131,7 @@ fn faults_carry_their_place() {
         ),
         (
             "untyped.toml",
-            "name = \"w\"\n\n[instances.a]\nentry = true\n",
+            "name = \"w\"\n\n[instances.a]\nbindings = { input = \"b\" }\n",
             (3, 1),
             FaultKind::MissingKey {
                 key: key(&["instances", "a", "node_type"]),
@@ -1352,6 +1352,50 @@ node_type = \"differ\"
             unresolved: "nowhere".to_owned(),
         }]
     );
+}
+
+#[test]
+fn entry_mark_refused() {
+    let key = |parts: &[&str]| parts.iter().map(|&part| part.to_owned()).collect();
+    let cases = [
+        // Under a header, after the node type, and false: any value is refused.
+        (
+            "header.toml",
+            "name = \"w\"\n\n[instances.a]\nnode_type = \"source\"\nentry = false\n",
+            (5, 1),
+        ),
+        // Inline, before the node type.
+        (
+            "inline.toml",
+            "name = \"w\"\n\n[instances]\na = { entry = true, node_type = \"source\" }\n",
+            (4, 7),
+        ),
+    ];
+
+    for (document, text, (line, column)) in cases {
+        let fault = read_workflow(document, text, &catalogue()).expect_err("it is refused");
+        assert_eq!(
+            (fault.document(), fault.line(), fault.column(), fault.kind()),
+            (
+                document,
+                line,
+                column,
+                &FaultKind::EntryMarked {
+                    key: key(&["instances", "a", "entry"])
+                }
+            ),
+            "{fault}"
+        );
+    }
+
+    // The control: the same instance unmarked reads.
+    let (definition, _) = read_workflow(
+        "unmarked.toml",
+        "name = \"w\"\n\n[instances.a]\nnode_type = \"source\"\n",
+        &catalogue(),
+    )
+    .expect("an unmarked instance reads");
+    assert_eq!(definition.instances.len(), 1);
 }
 
 #[test]

@@ -275,10 +275,10 @@ fn unbound_parameter_never_ready() {
 
 #[cfg(test)]
 #[test]
-fn entry_is_ready_at_once() {
+fn input_is_ready_at_once() {
     let mut source = IdSource::new();
-    let types = vec![node_type("Entry", &[("seed", "note")], "note")];
-    let instances = vec![instance("e", "Entry", &[]).into_entry()];
+    let types = vec![node_type("Given", &[("seed", "note")], "note")];
+    let instances = vec![instance("e", "Given", &[])];
     let workflow = definition(types, instances, &["e"]);
 
     let seed = ctx(&mut source, "note");
@@ -286,7 +286,7 @@ fn entry_is_ready_at_once() {
     let arguments = Arguments::new().supply("e", "seed", seed);
 
     let activation = next_activation(&workflow, &arguments, &Produced::new())
-        .expect("an entry instance is ready before anything has run");
+        .expect("an instance given its inputs is ready before anything has run");
     assert_eq!(activation.instance(), "e");
     assert_eq!(given(&activation), ["seed"]);
     assert_eq!(activation.inputs()[0].1.id(), seed_id);
@@ -430,11 +430,11 @@ fn partial_inputs_still_quiescent() {
     // Three instances in a cycle, each holding one of its two inputs and waiting
     // for the other.
     let types = vec![
-        node_type("Entry", &[], "note"),
+        node_type("Given", &[], "note"),
         node_type("Step", &[("held", "note"), ("awaited", "note")], "note"),
     ];
     let instances = vec![
-        instance("e", "Entry", &[]),
+        instance("e", "Given", &[]),
         instance("c1", "Step", &[("held", "e"), ("awaited", "c3")]),
         instance("c2", "Step", &[("held", "e"), ("awaited", "c1")]),
         instance("c3", "Step", &[("held", "e"), ("awaited", "c2")]),
@@ -503,7 +503,7 @@ proptest! {
                 );
                 // The context of the binding's own source, not of another.
                 let binding = node.bindings.iter().find(|b| &b.parameter == parameter)
-                    .expect("a non-entry instance is given only what it binds");
+                    .expect("an instance given no argument is given only what it binds");
                 prop_assert_eq!(context.id(), produced[&binding.source].id());
             }
 

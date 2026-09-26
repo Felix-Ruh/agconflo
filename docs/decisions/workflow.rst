@@ -223,8 +223,9 @@ and what it turned down.
    one. A node runs when its edges hold what it needs (``DEC_EDGE_GENERATIONS``),
    and that is the whole of when.
 
-   The four cases each need no graph of their own. An entry node is marked as
-   one. An ordering between nodes that act on the world is an edge: the node
+   The four cases each need no graph of their own. An entry node is an
+   instance with parameters nothing binds, which the run is given
+   (``DEC_SIGNATURE_IS_WHAT_NOTHING_BINDS``). An ordering between nodes that act on the world is an edge: the node
    that must come second is given the first one's output. A back edge is an
    edge walked again (``DEC_REPETITION_BY_EDGES``). And a router gates a branch
    by which edges it walks.
@@ -277,6 +278,27 @@ and what it turned down.
    every instance binding none of those parameters would stop starting, for a
    reason the document no longer shows. Ignoring the key was the other, and is
    the silent loss above.
+
+.. dec:: An instance still marked as an entry is refused
+   :id: DEC_ENTRY_MARK_REFUSED
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :statement: Agconflo shall refuse a workflow document that marks an instance as an entry, at the key marking it.
+
+   With a run's inputs the parameters nothing binds, on any instance
+   (``DEC_SIGNATURE_IS_WHAT_NOTHING_BINDS``), the ``entry`` key means
+   nothing. Read past, as keys the reader does not know are, it would do no
+   harm to a run - an entry instance's parameters were unbound, and are
+   inputs still - but it would tell every reader of the document that the
+   other instances cannot be given theirs, and the writer keeps keys it does
+   not read, so it would never leave the document. Refusing it at its place
+   says which line to delete and why, as ``DEC_OPTIONAL_PARAMETERS_REFUSED``
+   does for the key that went before it.
+
+   Reading past it was the alternative, and is the stale mark above. Reading
+   ``entry = false`` differently from ``entry = true`` was not one: the key
+   is refused whatever it holds, since either value states something that is
+   no longer a property of an instance.
 
 .. dec:: A list is handled item by item inside one node
    :id: DEC_LIST_HANDLED_IN_ONE_NODE

@@ -57,9 +57,10 @@ component requirement whose subject is anything else.
 
    Readiness is asked of every parameter the instance's node type declares, all
    of them required (``DEC_EVERY_INPUT_REQUIRED``): one the definition leaves
-   unbound never has a context, so its instance is never offered. An entry
-   instance's parameters are filled from the run's arguments instead, which are
-   present before the run starts or it does not start at all.
+   unbound and the run is not given never has a context, so its instance is
+   never offered. A parameter nothing binds is filled from the run's arguments
+   instead, which are present before the run starts or it does not start at all
+   (``CREQ_RUN_REFUSES_UNFILLED_SIGNATURE``).
 
    Failure modes, each of which produces a well-formed wrong answer rather than
    an error:
@@ -81,8 +82,8 @@ component requirement whose subject is anything else.
      that alone is the shape that loops forever; it runs again only on
      something new (``CREQ_SCHEDULER_OFFERS_AGAIN``).
 
-   Must pass unoffered and unreported: an entry instance, which is ready from
-   the start.
+   Must pass unoffered and unreported: an instance with no parameter bound,
+   which the run gives every input and which is ready from the start.
 
 .. comp_req:: An activation carries what was wired to its instance
    :id: CREQ_SCHEDULER_ACTIVATION_CARRIES
@@ -407,7 +408,7 @@ component requirement whose subject is anything else.
      argument passed through, and another instance's output passed through, were
      both accepted and the run completed.
    - **Outputs compared and arguments not.** The first half of the measurement
-     then still passes: an entry instance handing back its own argument is
+     then still passes: an instance handing back its own argument is
      credited with a context the caller made.
    - **Compared with the instance's own inputs alone.** A caller holding any
      context of the run can hand it back, including the output of an instance
@@ -476,11 +477,11 @@ component requirement whose subject is anything else.
      identifiers, one composed of a context that repeats the other's, pass it,
      and the lineage is as wrong as before.
    - **The same context supplied twice refused.** Passing one context to two
-     entry parameters is ordinary, and it is one context under one identifier.
+     parameters is ordinary, and it is one context under one identifier.
    - **The first shared identifier only.** A caller whose arguments came from two
      sources has as many collisions as the smaller source issued, and learns
      them one refusal at a time.
-   - **Reported as a signature fault.** Every signature fault names an entry
+   - **Reported as a signature fault.** Every signature fault names an
      instance and a parameter; a shared identifier belongs to no one parameter,
      and filing it under one sends the caller to the wrong place.
 

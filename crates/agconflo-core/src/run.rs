@@ -20,7 +20,7 @@ pub struct Arguments {
     supplied: Vec<Argument>,
 }
 
-/// One context supplied for one entry instance's parameter.
+/// One context supplied for one instance's parameter.
 #[derive(Clone, Debug)]
 struct Argument {
     instance: String,
@@ -1585,25 +1585,25 @@ proptest! {
         }
     }
 
-    /// A well-formed definition, every entry parameter supplied and a generous
+    /// A well-formed definition, every parameter nothing binds supplied and a generous
     /// budget, completes - and its result is what its designated instance
     /// produced.
     #[test]
     fn well_formed_runs_complete(workflow in well_formed_definition()) {
         let mut source = IdSource::new();
 
-        // Every entry instance's required parameters are the workflow's own.
+        // Every parameter nothing binds is the workflow's own.
         let mut arguments = Arguments::new();
         for node in &workflow.instances {
-            if !node.entry {
-                continue;
-            }
             let declared = workflow
                 .node_types
                 .iter()
                 .find(|declared| declared.name == node.node_type)
                 .expect("a well-formed definition declares every type it names");
             for parameter in &declared.required {
+                if node.bindings.iter().any(|b| b.parameter == parameter.name) {
+                    continue;
+                }
                 let supplied = ctx(&mut source, parameter.context_type.as_str());
                 arguments = arguments.supply(&node.name, &parameter.name, supplied);
             }
@@ -1635,23 +1635,24 @@ fn signature(refusal: StartRefusal) -> Vec<SignatureFault> {
     }
 }
 
-/// One entry instance of a type requiring `seed` of `declared`, designated.
+/// One instance of a type requiring `seed` of `declared`, nothing binding it,
+/// designated.
 #[cfg(test)]
-fn one_entry(declared: &str) -> WorkflowDefinition {
-    let types = vec![node_type("Entry", &[("seed", declared)], declared)];
-    let instances = vec![instance("e", "Entry", &[]).into_entry()];
+fn one_input(declared: &str) -> WorkflowDefinition {
+    let types = vec![node_type("Given", &[("seed", declared)], declared)];
+    let instances = vec![instance("e", "Given", &[])];
     definition(types, instances, &["e"])
 }
 
 #[cfg(test)]
 #[test]
 fn missing_argument_is_refused() {
-    let workflow = one_entry("note");
+    let workflow = one_input("note");
 
     // Which answer came back is the assertion, not merely that the run did not
     // complete.
     let refusal = Run::<Infallible>::start(&workflow, Arguments::new(), 10)
-        .expect_err("a required entry parameter with no argument is refused");
+        .expect_err("a parameter nothing binds with no argument is refused");
     assert_eq!(
         signature(refusal),
         vec![SignatureFault::ParameterUnfilled {
@@ -1666,7 +1667,7 @@ fn missing_argument_is_refused() {
 #[test]
 fn argument_of_wrong_type_is_refused() {
     let mut source = IdSource::new();
-    let workflow = one_entry("note");
+    let workflow = one_input("note");
 
     // No binding exists to compare, so the wiring validator cannot see this and
     // the run is the only thing that can.
@@ -1803,7 +1804,7 @@ fn inputs_given_where_nothing_binds() {
 #[test]
 fn argument_for_no_parameter_is_refused() {
     let mut source = IdSource::new();
-    let workflow = one_entry("note");
+    let workflow = one_input("note");
     let good = ctx(&mut source, "note");
 
     // A typo in the instance name. Ignoring it leaves the real parameter
@@ -1878,7 +1879,7 @@ fn argument_for_no_parameter_is_refused() {
 #[test]
 fn signature_filled_exactly_starts() {
     let mut source = IdSource::new();
-    // Two entry instances whose node types each declare a parameter called the
+    // Two instances whose node types each declare a parameter called the
     // same thing, for two different context types, and `p` and `p2`, two
     // instances of one node type: separate parameters, all of them.
     let types = vec![
@@ -1891,9 +1892,9 @@ fn signature_filled_exactly_starts() {
         ),
     ];
     let instances = vec![
-        instance("p", "Alpha", &[]).into_entry(),
-        instance("q", "Beta", &[]).into_entry(),
-        instance("p2", "Alpha", &[]).into_entry(),
+        instance("p", "Alpha", &[]),
+        instance("q", "Beta", &[]),
+        instance("p2", "Alpha", &[]),
         instance(
             "j",
             "Join",
@@ -1902,7 +1903,7 @@ fn signature_filled_exactly_starts() {
     ];
     let workflow = definition(types, instances, &["j"]);
 
-    // One argument per entry parameter, each of the declared type.
+    // One argument per parameter nothing binds, each of the declared type.
     let alpha_seed = ctx(&mut source, "note");
     let beta_seed = ctx(&mut source, "diff");
     let (alpha_id, beta_id) = (alpha_seed.id(), beta_seed.id());
@@ -1916,7 +1917,7 @@ fn signature_filled_exactly_starts() {
     let mut run =
         Run::<Infallible>::start(&workflow, arguments, 10).expect("the signature is filled");
 
-    // Each entry instance is given its own argument rather than one shared by
+    // Each instance is given its own argument rather than one shared by
     // name, which is the whole point of addressing them per instance.
     let mut seen = Vec::new();
     loop {
@@ -2149,7 +2150,7 @@ fn output_of_declared_type_is_accepted() {
 fn passed_through_argument_is_refused() {
     let mut source = IdSource::new();
     // Declared `note` in and `note` out, so only the identifier is wrong.
-    let workflow = one_entry("note");
+    let workflow = one_input("note");
     let argument = ctx(&mut source, "note");
     let held = argument.id();
     let arguments = Arguments::new().supply("e", "seed", argument);
@@ -2244,15 +2245,15 @@ fn output_composing_its_input_is_accepted() {
     }
 }
 
-/// A chain of `count` instances whose first is an entry instance taking one
+/// A chain of `count` instances whose first takes one
 /// `note` argument, the last designated.
 #[cfg(test)]
-fn entry_chain(count: usize) -> WorkflowDefinition {
+fn input_chain(count: usize) -> WorkflowDefinition {
     let types = vec![
-        node_type("Entry", &[("seed", "note")], "note"),
+        node_type("Given", &[("seed", "note")], "note"),
         node_type("Step", &[("input", "note")], "note"),
     ];
-    let mut instances = vec![instance("n0", "Entry", &[]).into_entry()];
+    let mut instances = vec![instance("n0", "Given", &[])];
     for step in 1..count {
         instances.push(instance(
             &format!("n{step}"),
@@ -2295,7 +2296,7 @@ proptest! {
         ),
     ) {
         let mut source = IdSource::new();
-        let workflow = entry_chain(answers.len());
+        let workflow = input_chain(answers.len());
         let argument = ctx(&mut source, "note");
         let mut held = vec![argument.clone()];
         let arguments = Arguments::new().supply("n0", "seed", argument);
@@ -2404,12 +2405,12 @@ fn refused_output_can_be_failed() {
     }
 }
 
-/// Four entry instances of one type, each taking one `note`, all feeding a
+/// Four instances of one type, each taking one `note` from the run, all feeding a
 /// join that is designated.
 #[cfg(test)]
 fn four_entries() -> WorkflowDefinition {
     let types = vec![
-        node_type("Entry", &[("seed", "note")], "note"),
+        node_type("Given", &[("seed", "note")], "note"),
         node_type(
             "Join",
             &[("a", "note"), ("b", "note"), ("c", "note"), ("d", "note")],
@@ -2417,10 +2418,10 @@ fn four_entries() -> WorkflowDefinition {
         ),
     ];
     let instances = vec![
-        instance("pa", "Entry", &[]).into_entry(),
-        instance("pb", "Entry", &[]).into_entry(),
-        instance("pc", "Entry", &[]).into_entry(),
-        instance("pd", "Entry", &[]).into_entry(),
+        instance("pa", "Given", &[]),
+        instance("pb", "Given", &[]),
+        instance("pc", "Given", &[]),
+        instance("pd", "Given", &[]),
         instance(
             "j",
             "Join",
@@ -2486,7 +2487,7 @@ fn one_context_for_two_parameters_starts() {
 #[cfg(test)]
 #[test]
 fn part_sharing_an_identifier_is_refused() {
-    let workflow = entry_chain(3);
+    let workflow = input_chain(3);
     let (mut own, mut other) = (IdSource::new(), IdSource::new());
     let argument = ctx(&mut own, "note");
     let arguments = Arguments::new().supply("n0", "seed", argument.clone());
@@ -2571,7 +2572,7 @@ fn parts_sharing_an_identifier_are_refused() {
 #[test]
 fn output_composing_held_parts_is_accepted() {
     let mut source = IdSource::new();
-    let workflow = entry_chain(1);
+    let workflow = input_chain(1);
     let inner = ctx(&mut source, "note");
     let argument = Context::compose(&mut source, context_type("note"), [&inner], "")
         .expect("a fresh source issues");
@@ -2624,7 +2625,7 @@ proptest! {
             1..7,
         ),
     ) {
-        let workflow = entry_chain(answers.len());
+        let workflow = input_chain(answers.len());
         let mut sources = [IdSource::new(), IdSource::new()];
         let argument = ctx(&mut sources[0], "note");
         let mut accepted = vec![argument.clone()];

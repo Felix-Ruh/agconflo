@@ -313,14 +313,13 @@ pub(crate) fn any_definition() -> impl Strategy<Value = WorkflowDefinition> {
     const CALLS: [&str; 4] = ["t0", "t2", "t9", "a.b"];
 
     let declarations = vec((0..=2usize, 0..=1usize, 0..2usize), 1..=3);
-    // Per node: its type, whether it is an entry node, its bindings, whether a
+    // Per node: its type, its bindings, whether a
     // parameter may be bound more than once, and an earlier node whose name it
     // takes - an index at or past its own position keeps a name of its own.
     // @The range a shared name is drawn from,TRACE_WIRING_GENERATOR_RANGE,trace,[],[NOTE_WIRING_GENERATOR_RANGE]
     let nodes = vec(
         (
             0..4usize,
-            any::<bool>(),
             vec((0..3usize, 0..5usize), 0..=3),
             any::<bool>(),
             0..10usize,
@@ -349,7 +348,7 @@ pub(crate) fn any_definition() -> impl Strategy<Value = WorkflowDefinition> {
         // A node taking an earlier node's name shares it, with that node and
         // with any other that took it too.
         let mut names: Vec<String> = Vec::new();
-        for (node, &(_, _, _, _, earlier, _)) in nodes.iter().enumerate() {
+        for (node, &(_, _, _, earlier, _)) in nodes.iter().enumerate() {
             let name = if earlier < node {
                 names[earlier].clone()
             } else {
@@ -361,7 +360,7 @@ pub(crate) fn any_definition() -> impl Strategy<Value = WorkflowDefinition> {
         let instances: Vec<NodeInstance> = nodes
             .iter()
             .zip(&names)
-            .map(|((declared, entry, bindings, repeats, _, calls), name)| {
+            .map(|((declared, bindings, repeats, _, calls), name)| {
                 // A type index past the declarations names a type nobody
                 // supplied; a source index past the instances names a node the
                 // definition does not carry, and so may one naming a node whose
@@ -389,8 +388,7 @@ pub(crate) fn any_definition() -> impl Strategy<Value = WorkflowDefinition> {
                     .map(|(parameter, source)| (*parameter, source.as_str()))
                     .collect();
                 let calls: Vec<&str> = calls.iter().map(|&call| CALLS[call]).collect();
-                let built = instance(name, &declared, &bound).with_calls(&calls);
-                if *entry { built.into_entry() } else { built }
+                instance(name, &declared, &bound).with_calls(&calls)
             })
             .collect();
 
@@ -626,8 +624,9 @@ proptest! {
     }
 
     /// The control: generated sound definitions, each holding a cycle of two
-    /// nodes, a pair no entry node reaches, an unbound global, an output bound by several parameters, and an entry node
-    /// whose required parameter is the workflow's own, are reported clean.
+    /// nodes, a pair nothing reaches, an unbound global, an output bound by
+    /// several parameters, and an instance whose parameter nothing binds, are
+    /// reported clean.
     #[test]
     fn well_formed_definitions_pass(workflow in well_formed_definition()) {
         prop_assert_eq!(validate_wiring(&workflow), Vec::new());
@@ -650,9 +649,9 @@ pub(crate) fn well_formed_definition() -> impl Strategy<Value = WorkflowDefiniti
         let mut instances = vec![
             instance("seed", "seed_note", &[]),
             instance("seed_diff", "seed_diff", &[]),
-            // An entry node: its required parameter is the workflow's own.
-            instance("entry", "pass_note", &[]).into_entry(),
-            // A cycle of two, which no entry node reaches. Both are legal.
+            // A parameter nothing binds, which is the workflow's own.
+            instance("given", "pass_note", &[]),
+            // A cycle of two, which nothing reaches. Both are legal.
             instance("loop_a", "pass_note", &[("input", "loop_b")]),
             instance("loop_b", "pass_note", &[("input", "loop_a")]),
             // One output bound by several parameters.

@@ -1106,11 +1106,9 @@ output = "j"
 
 [instances.one]
 node_type = "make"
-entry = true
 
 [instances.two]
 node_type = "make"
-entry = true
 
 [instances.j]
 node_type = "join"

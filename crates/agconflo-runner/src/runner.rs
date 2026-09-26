@@ -662,7 +662,7 @@ use agconflo_lua::ScriptFailure;
 #[cfg(test)]
 use proptest::prelude::*;
 
-/// Every node type the tests' workflows use: an entry taking a brief, and four
+/// Every node type the tests' workflows use: one taking a brief, and four
 /// types taking what came before - one asking a
 /// model, one adding to it, one a person performs, and one whose script fails.
 #[cfg(test)]
@@ -698,7 +698,7 @@ fn project(scratch: &Scratch, middle: &str, budget: usize) -> std::path::PathBuf
     scratch.write(
         "flow.toml",
         format!(
-            "name = \"chain\"\noutput = \"third\"\n\n[instances.first]\nnode_type = \"begin\"\nentry = true\n\n[instances.second]\nnode_type = \"{middle}\"\nbindings = {{ before = \"first\" }}\n\n[instances.third]\nnode_type = \"add\"\nbindings = {{ before = \"second\" }}\n"
+            "name = \"chain\"\noutput = \"third\"\n\n[instances.first]\nnode_type = \"begin\"\n\n[instances.second]\nnode_type = \"{middle}\"\nbindings = {{ before = \"first\" }}\n\n[instances.third]\nnode_type = \"add\"\nbindings = {{ before = \"second\" }}\n"
         ),
     );
     scratch.write(
@@ -1064,7 +1064,7 @@ fn check_runs_nothing() {
 
     scratch.write(
         "flow.toml",
-        "name = \"broken\"\noutput = \"third\"\n\n[instances.first]\nnode_type = \"begin\"\nentry = true\n\n[instances.second]\nnode_type = \"add\"\nbindings = { before = \"nobody\" }\n\n[instances.third]\nnode_type = \"add\"\nbindings = { before = \"gone\" }\n",
+        "name = \"broken\"\noutput = \"third\"\n\n[instances.first]\nnode_type = \"begin\"\n\n[instances.second]\nnode_type = \"add\"\nbindings = { before = \"nobody\" }\n\n[instances.third]\nnode_type = \"add\"\nbindings = { before = \"gone\" }\n",
     );
     scratch.write("add.lua", "local given, host = ...\nreturn (\n");
     let findings = check(sources);
@@ -1236,10 +1236,10 @@ use agconflo_core::Activation;
 #[cfg(test)]
 const TOOL_TYPES: &str = "[types.fetch]\nrequired = { path = \"note\" }\noutput = \"note\"\n\n[types.exec]\nrequired = { command = \"note\" }\noutput = \"note\"\n";
 
-/// A chain from the entry through `fetch` reading what the entry made, `exec`
+/// A chain from `first` through `fetch` reading what `first` made, `exec`
 /// running what that read, `add`, and a person's review.
 #[cfg(test)]
-const TOOL_FLOW: &str = "name = \"tooled\"\noutput = \"reviewed\"\n\n[instances.first]\nnode_type = \"begin\"\nentry = true\n\n[instances.fetched]\nnode_type = \"fetch\"\nbindings = { path = \"first\" }\n\n[instances.executed]\nnode_type = \"exec\"\nbindings = { command = \"fetched\" }\n\n[instances.joined]\nnode_type = \"add\"\nbindings = { before = \"executed\" }\n\n[instances.reviewed]\nnode_type = \"review\"\nbindings = { before = \"joined\" }\n";
+const TOOL_FLOW: &str = "name = \"tooled\"\noutput = \"reviewed\"\n\n[instances.first]\nnode_type = \"begin\"\n\n[instances.fetched]\nnode_type = \"fetch\"\nbindings = { path = \"first\" }\n\n[instances.executed]\nnode_type = \"exec\"\nbindings = { command = \"fetched\" }\n\n[instances.joined]\nnode_type = \"add\"\nbindings = { before = \"executed\" }\n\n[instances.reviewed]\nnode_type = \"review\"\nbindings = { before = \"joined\" }\n";
 
 /// A project in `scratch` whose workflow is `flow`, with the tests' scripts,
 /// `persons` performing what they name, `tools` naming each tool's node type
@@ -1438,7 +1438,7 @@ proptest! {
         let grants = granting(&scratch, "\"read\"");
         let manifest = tooled(
             &scratch,
-            "name = \"fetching\"\noutput = \"fetched\"\n\n[instances.first]\nnode_type = \"begin\"\nentry = true\n\n[instances.fetched]\nnode_type = \"fetch\"\nbindings = { path = \"first\" }\n",
+            "name = \"fetching\"\noutput = \"fetched\"\n\n[instances.first]\nnode_type = \"begin\"\n\n[instances.fetched]\nnode_type = \"fetch\"\nbindings = { path = \"first\" }\n",
             &["review"],
             &[("fetch", "read")],
             "",
@@ -1492,13 +1492,13 @@ fn recorded_tool_step_not_repeated() {
     assert_eq!(steps(&fresh), []);
 }
 
-/// A workflow of the entry and an asker whose model may call `fetch` `calls`
+/// A workflow of `first` and an asker whose model may call `fetch` `calls`
 /// times, the asker designated.
 #[cfg(test)]
 fn asking_flow(calls: usize) -> String {
     let calls = vec!["\"fetch\""; calls].join(", ");
     format!(
-        "name = \"asking\"\noutput = \"asker\"\n\n[instances.first]\nnode_type = \"begin\"\nentry = true\n\n[instances.asker]\nnode_type = \"ask\"\nbindings = {{ before = \"first\" }}\ncalls = [{calls}]\n"
+        "name = \"asking\"\noutput = \"asker\"\n\n[instances.first]\nnode_type = \"begin\"\n\n[instances.asker]\nnode_type = \"ask\"\nbindings = {{ before = \"first\" }}\ncalls = [{calls}]\n"
     )
 }
 
@@ -1901,7 +1901,7 @@ fn tool_steps_end_to_end() {
     );
     scratch.write(
         "flow.toml",
-        "name = \"end-to-end\"\noutput = \"reviewed\"\n\n[instances.first]\nnode_type = \"begin\"\nentry = true\n\n[instances.named]\nnode_type = \"name\"\nbindings = { before = \"first\" }\n\n[instances.saved]\nnode_type = \"save\"\nbindings = { path = \"named\", text = \"first\" }\n\n[instances.commanded]\nnode_type = \"command\"\nbindings = { before = \"saved\" }\n\n[instances.catted]\nnode_type = \"exec\"\nbindings = { command = \"commanded\" }\n\n[instances.reviewed]\nnode_type = \"review\"\nbindings = { before = \"catted\" }\n",
+        "name = \"end-to-end\"\noutput = \"reviewed\"\n\n[instances.first]\nnode_type = \"begin\"\n\n[instances.named]\nnode_type = \"name\"\nbindings = { before = \"first\" }\n\n[instances.saved]\nnode_type = \"save\"\nbindings = { path = \"named\", text = \"first\" }\n\n[instances.commanded]\nnode_type = \"command\"\nbindings = { before = \"saved\" }\n\n[instances.catted]\nnode_type = \"exec\"\nbindings = { command = \"commanded\" }\n\n[instances.reviewed]\nnode_type = \"review\"\nbindings = { before = \"catted\" }\n",
     );
     let manifest = scratch.write(
         "manifest.toml",
@@ -2190,7 +2190,7 @@ fn check_reports_tool_environment() {
     assert_eq!(steps(&stand_in), []);
 }
 
-/// A project in `scratch` whose entry is followed by each of `steps` - a
+/// A project in `scratch` whose `first` is followed by each of `steps` - a
 /// command a script names, performed by a tool of its own - and then by
 /// `after`, from the tests' types beside a `pair` joining two notes. Each
 /// step is `(tool, entry, command)`: the tool's node type, its manifest
@@ -2210,7 +2210,7 @@ fn stepping(
         "[types.pair]\nrequired = { a = \"note\", b = \"note\" }\noutput = \"note\"\n",
     );
     let mut flow = format!(
-        "name = \"stepping\"\noutput = \"{output}\"\n\n[instances.first]\nnode_type = \"begin\"\nentry = true\n"
+        "name = \"stepping\"\noutput = \"{output}\"\n\n[instances.first]\nnode_type = \"begin\"\n"
     );
     let mut scripts = String::from("begin = \"begin.lua\"\npair = \"pair.lua\"\n");
     let mut tools = String::new();

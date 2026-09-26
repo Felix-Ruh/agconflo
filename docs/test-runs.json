@@ -1218,6 +1218,15 @@
           "title": "agconflo-core reader::empty_documents_read",
           "type": "test_run"
         },
+        "RUN_READER_ENTRY_MARK_REFUSED": {
+          "executes": [
+            "TEST_READER_ENTRY_MARK_REFUSED"
+          ],
+          "id": "RUN_READER_ENTRY_MARK_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-core reader::entry_mark_refused",
+          "type": "test_run"
+        },
         "RUN_READER_EVERY_WIRING_DEFECT_READS": {
           "executes": [
             "TEST_READER_EVERY_WIRING_DEFECT_READS"
@@ -2262,15 +2271,6 @@
           "title": "agconflo-core scheduler::each_parameter_gets_its_own",
           "type": "test_run"
         },
-        "RUN_SCHEDULER_ENTRY_IS_READY_AT_ONCE": {
-          "executes": [
-            "TEST_SCHEDULER_ENTRY_IS_READY_AT_ONCE"
-          ],
-          "id": "RUN_SCHEDULER_ENTRY_IS_READY_AT_ONCE",
-          "test_outcome": "passed",
-          "title": "agconflo-core scheduler::entry_is_ready_at_once",
-          "type": "test_run"
-        },
         "RUN_SCHEDULER_EVERY_INPUT_IS_AWAITED": {
           "executes": [
             "TEST_SCHEDULER_EVERY_INPUT_IS_AWAITED"
@@ -2305,6 +2305,15 @@
           "id": "RUN_SCHEDULER_INPUTS_IN_DECLARED_ORDER",
           "test_outcome": "passed",
           "title": "agconflo-core scheduler::inputs_in_declared_order",
+          "type": "test_run"
+        },
+        "RUN_SCHEDULER_INPUT_IS_READY_AT_ONCE": {
+          "executes": [
+            "TEST_SCHEDULER_INPUT_IS_READY_AT_ONCE"
+          ],
+          "id": "RUN_SCHEDULER_INPUT_IS_READY_AT_ONCE",
+          "test_outcome": "passed",
+          "title": "agconflo-core scheduler::input_is_ready_at_once",
           "type": "test_run"
         },
         "RUN_SCHEDULER_NONE_READY_ONLY_WHEN_NONE": {
