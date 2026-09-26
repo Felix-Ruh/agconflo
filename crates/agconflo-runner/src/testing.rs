@@ -10,6 +10,10 @@ use std::sync::{Arc, Mutex};
 pub(crate) const IMAGE: &str =
     "alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6";
 
+/// A second image, whose sh is dash and whose timeout is GNU's, by its digest.
+pub(crate) const PYTHON: &str =
+    "python@sha256:cea0e6040540fb2b965b6e7fb5ffa00871e632eef63719f0ea54bca189ce14a6";
+
 /// A directory for one test's files, emptied when it is made and removed when
 /// it is dropped.
 pub(crate) struct Scratch {
@@ -62,10 +66,15 @@ pub(crate) fn needs_docker() {
         ),
         Err(error) => panic!("this test needs Docker, and docker could not be run: {error}"),
     }
-    let image = docker(&["image", "inspect", "--format", "{{.Id}}", IMAGE]);
+    needs_image(IMAGE);
+}
+
+/// `image` present, or a panic naming it and how to pull it.
+pub(crate) fn needs_image(image: &str) {
+    let inspected = docker(&["image", "inspect", "--format", "{{.Id}}", image]);
     assert!(
-        image.status.success(),
-        "this test needs the image {IMAGE}; pull it with: docker pull {IMAGE}"
+        inspected.status.success(),
+        "this test needs the image {image}; pull it with: docker pull {image}"
     );
 }
 
@@ -101,8 +110,8 @@ pub(crate) fn grants(
     limits: crate::grants::CommandLimits,
 ) -> crate::grants::Grants {
     let mut text = format!(
-        "image = \"{IMAGE}\"\nnetwork = {network}\nactions = [\"read\", \"write\", \"run\"]\n\n[limits]\nseconds = {}\noutput = {}\n",
-        limits.seconds, limits.output
+        "image = \"{IMAGE}\"\nimages = [\"{PYTHON}\"]\nnetwork = {network}\nactions = [\"read\", \"write\", \"run\"]\n\n[limits]\nseconds = {}\noutput = {}\ntmp = {}\n",
+        limits.seconds, limits.output, limits.tmp
     );
     for (name, writable) in folders {
         std::fs::create_dir_all(scratch.path(name)).expect("the folder");

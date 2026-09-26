@@ -1893,6 +1893,24 @@
           "title": "agconflo-runner sandbox::confined_to_grants",
           "type": "test_run"
         },
+        "RUN_SANDBOX_CONTAINER_PER_NAME": {
+          "executes": [
+            "TEST_SANDBOX_CONTAINER_PER_NAME"
+          ],
+          "id": "RUN_SANDBOX_CONTAINER_PER_NAME",
+          "test_outcome": "passed",
+          "title": "agconflo-runner sandbox::container_per_name",
+          "type": "test_run"
+        },
+        "RUN_SANDBOX_EACH_IMAGE_READY": {
+          "executes": [
+            "TEST_SANDBOX_EACH_IMAGE_READY"
+          ],
+          "id": "RUN_SANDBOX_EACH_IMAGE_READY",
+          "test_outcome": "passed",
+          "title": "agconflo-runner sandbox::each_image_ready",
+          "type": "test_run"
+        },
         "RUN_SANDBOX_ENGINE_FAILURE_APART": {
           "executes": [
             "TEST_SANDBOX_ENGINE_FAILURE_APART"
@@ -1900,6 +1918,15 @@
           "id": "RUN_SANDBOX_ENGINE_FAILURE_APART",
           "test_outcome": "passed",
           "title": "agconflo-runner sandbox::engine_failure_apart",
+          "type": "test_run"
+        },
+        "RUN_SANDBOX_FULL_TMP_TOLD": {
+          "executes": [
+            "TEST_SANDBOX_FULL_TMP_TOLD"
+          ],
+          "id": "RUN_SANDBOX_FULL_TMP_TOLD",
+          "test_outcome": "passed",
+          "title": "agconflo-runner sandbox::full_tmp_told",
           "type": "test_run"
         },
         "RUN_SANDBOX_IMAGE_NOT_READY": {
@@ -1965,6 +1992,15 @@
           "title": "agconflo-runner sandbox::removed_at_the_end",
           "type": "test_run"
         },
+        "RUN_SANDBOX_STEP_HOME": {
+          "executes": [
+            "TEST_SANDBOX_STEP_HOME"
+          ],
+          "id": "RUN_SANDBOX_STEP_HOME",
+          "test_outcome": "passed",
+          "title": "agconflo-runner sandbox::step_home",
+          "type": "test_run"
+        },
         "RUN_SANDBOX_STEP_USER": {
           "executes": [
             "TEST_SANDBOX_STEP_USER"
@@ -1983,6 +2019,15 @@
           "title": "agconflo-runner sandbox::time_limit",
           "type": "test_run"
         },
+        "RUN_SANDBOX_TMP_LIMITED": {
+          "executes": [
+            "TEST_SANDBOX_TMP_LIMITED"
+          ],
+          "id": "RUN_SANDBOX_TMP_LIMITED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner sandbox::tmp_limited",
+          "type": "test_run"
+        },
         "RUN_SANDBOX_USER_FROM_STATUS": {
           "executes": [
             "TEST_SANDBOX_USER_FROM_STATUS"
@@ -1990,6 +2035,15 @@
           "id": "RUN_SANDBOX_USER_FROM_STATUS",
           "test_outcome": "passed",
           "title": "agconflo-runner sandbox::user_from_status",
+          "type": "test_run"
+        },
+        "RUN_SANDBOX_WRAPPER_IN_ANOTHER_IMAGE": {
+          "executes": [
+            "TEST_SANDBOX_WRAPPER_IN_ANOTHER_IMAGE"
+          ],
+          "id": "RUN_SANDBOX_WRAPPER_IN_ANOTHER_IMAGE",
+          "test_outcome": "passed",
+          "title": "agconflo-runner sandbox::wrapper_in_another_image",
           "type": "test_run"
         },
         "RUN_SCHEDULER_ACTIVATION_IS_EXACTLY_ITS_BINDINGS": {
