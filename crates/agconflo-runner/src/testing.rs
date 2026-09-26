@@ -273,3 +273,100 @@ fn read_request(connection: &mut std::net::TcpStream) -> Option<(String, String)
     let body = String::from_utf8_lossy(&received[head_end + 4..head_end + 4 + length]).to_string();
     Some((head, body))
 }
+
+/// One thing a stand-in for the sandbox was asked.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum Asked {
+    /// Whether the image is ready.
+    Ready,
+    /// A read of this path.
+    Read(String),
+    /// A write of this text to this path.
+    Write(String, String),
+    /// A run of this command.
+    Run(String),
+}
+
+/// What a stand-in answers a step it is asked for with.
+type Answer = Box<dyn FnMut(&Asked) -> Result<crate::Done, crate::EngineFailure>>;
+
+/// A stand-in for the sandbox: it answers each step as it was told to, finds
+/// the image ready unless told otherwise, and records everything it was
+/// asked. Its clones share what they answer with and what they were asked.
+#[derive(Clone)]
+pub(crate) struct StandIn {
+    inner: std::rc::Rc<std::cell::RefCell<Inner>>,
+}
+
+struct Inner {
+    answer: Answer,
+    ready: Result<(), crate::NotReady>,
+    asked: Vec<Asked>,
+}
+
+impl StandIn {
+    /// A stand-in answering every step with `answer`.
+    pub(crate) fn with(
+        answer: impl FnMut(&Asked) -> Result<crate::Done, crate::EngineFailure> + 'static,
+    ) -> Self {
+        Self {
+            inner: std::rc::Rc::new(std::cell::RefCell::new(Inner {
+                answer: Box::new(answer),
+                ready: Ok(()),
+                asked: Vec::new(),
+            })),
+        }
+    }
+
+    /// A stand-in answering every step with status 0 and `output`.
+    pub(crate) fn answering(output: &str) -> Self {
+        let output = output.to_owned();
+        Self::with(move |_| {
+            Ok(crate::Done {
+                status: 0,
+                output: output.clone(),
+            })
+        })
+    }
+
+    /// A stand-in answering every step with the engine's failure, `message`.
+    pub(crate) fn failing(message: &str) -> Self {
+        let message = message.to_owned();
+        Self::with(move |_| {
+            Err(crate::EngineFailure {
+                message: message.clone(),
+            })
+        })
+    }
+
+    /// Everything asked so far, in order.
+    pub(crate) fn asked(&self) -> Vec<Asked> {
+        self.inner.borrow().asked.clone()
+    }
+
+    fn step(&mut self, asked: Asked) -> Result<crate::Done, crate::EngineFailure> {
+        let mut inner = self.inner.borrow_mut();
+        inner.asked.push(asked.clone());
+        (inner.answer)(&asked)
+    }
+}
+
+impl crate::performer::Container for StandIn {
+    fn ready(&self) -> Result<(), crate::NotReady> {
+        let mut inner = self.inner.borrow_mut();
+        inner.asked.push(Asked::Ready);
+        inner.ready.clone()
+    }
+
+    fn read(&mut self, path: &str) -> Result<crate::Done, crate::EngineFailure> {
+        self.step(Asked::Read(path.to_owned()))
+    }
+
+    fn write(&mut self, path: &str, text: &str) -> Result<crate::Done, crate::EngineFailure> {
+        self.step(Asked::Write(path.to_owned(), text.to_owned()))
+    }
+
+    fn run(&mut self, command: &str) -> Result<crate::Done, crate::EngineFailure> {
+        self.step(Asked::Run(command.to_owned()))
+    }
+}

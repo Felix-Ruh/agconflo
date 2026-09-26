@@ -840,6 +840,51 @@
           "title": "agconflo-runner model_map::unset_variable_refused",
           "type": "test_run"
         },
+        "RUN_PERFORMER_ACTIONS_PERFORMED": {
+          "executes": [
+            "TEST_PERFORMER_ACTIONS_PERFORMED"
+          ],
+          "id": "RUN_PERFORMER_ACTIONS_PERFORMED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner performer::actions_performed",
+          "type": "test_run"
+        },
+        "RUN_PERFORMER_ENGINE_FAILURE_PASSED": {
+          "executes": [
+            "TEST_PERFORMER_ENGINE_FAILURE_PASSED"
+          ],
+          "id": "RUN_PERFORMER_ENGINE_FAILURE_PASSED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner performer::engine_failure_passed",
+          "type": "test_run"
+        },
+        "RUN_PERFORMER_FAILURE_ANSWERED_AS_TEXT": {
+          "executes": [
+            "TEST_PERFORMER_FAILURE_ANSWERED_AS_TEXT"
+          ],
+          "id": "RUN_PERFORMER_FAILURE_ANSWERED_AS_TEXT",
+          "test_outcome": "passed",
+          "title": "agconflo-runner performer::failure_answered_as_text",
+          "type": "test_run"
+        },
+        "RUN_PERFORMER_PATH_REFUSED": {
+          "executes": [
+            "TEST_PERFORMER_PATH_REFUSED"
+          ],
+          "id": "RUN_PERFORMER_PATH_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner performer::path_refused",
+          "type": "test_run"
+        },
+        "RUN_PERFORMER_TEXT_KEPT_EXACTLY": {
+          "executes": [
+            "TEST_PERFORMER_TEXT_KEPT_EXACTLY"
+          ],
+          "id": "RUN_PERFORMER_TEXT_KEPT_EXACTLY",
+          "test_outcome": "passed",
+          "title": "agconflo-runner performer::text_kept_exactly",
+          "type": "test_run"
+        },
         "RUN_PROJECT_FAULTS_CARRY_THEIR_PLACE": {
           "executes": [
             "TEST_PROJECT_FAULTS_CARRY_THEIR_PLACE"
