@@ -1263,6 +1263,15 @@
           "title": "agconflo-runner runner::arguments_kept_exactly",
           "type": "test_run"
         },
+        "RUN_RUNNER_CHECK_REPORTS_TOOLS": {
+          "executes": [
+            "TEST_RUNNER_CHECK_REPORTS_TOOLS"
+          ],
+          "id": "RUN_RUNNER_CHECK_REPORTS_TOOLS",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::check_reports_tools",
+          "type": "test_run"
+        },
         "RUN_RUNNER_CHECK_RUNS_NOTHING": {
           "executes": [
             "TEST_RUNNER_CHECK_RUNS_NOTHING"
@@ -1281,6 +1290,42 @@
           "title": "agconflo-runner runner::endings_handed_back",
           "type": "test_run"
         },
+        "RUN_RUNNER_ENGINE_FAILURE_LEAVES_THE_STEP": {
+          "executes": [
+            "TEST_RUNNER_ENGINE_FAILURE_LEAVES_THE_STEP"
+          ],
+          "id": "RUN_RUNNER_ENGINE_FAILURE_LEAVES_THE_STEP",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::engine_failure_leaves_the_step",
+          "type": "test_run"
+        },
+        "RUN_RUNNER_MODEL_CALLS_A_TOOL": {
+          "executes": [
+            "TEST_RUNNER_MODEL_CALLS_A_TOOL"
+          ],
+          "id": "RUN_RUNNER_MODEL_CALLS_A_TOOL",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::model_calls_a_tool",
+          "type": "test_run"
+        },
+        "RUN_RUNNER_PERFORMS_TOOL_STEPS": {
+          "executes": [
+            "TEST_RUNNER_PERFORMS_TOOL_STEPS"
+          ],
+          "id": "RUN_RUNNER_PERFORMS_TOOL_STEPS",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::performs_tool_steps",
+          "type": "test_run"
+        },
+        "RUN_RUNNER_RECORDED_TOOL_STEP_NOT_REPEATED": {
+          "executes": [
+            "TEST_RUNNER_RECORDED_TOOL_STEP_NOT_REPEATED"
+          ],
+          "id": "RUN_RUNNER_RECORDED_TOOL_STEP_NOT_REPEATED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::recorded_tool_step_not_repeated",
+          "type": "test_run"
+        },
         "RUN_RUNNER_REFUSED_START_TAKES_NOTHING": {
           "executes": [
             "TEST_RUNNER_REFUSED_START_TAKES_NOTHING"
@@ -1288,6 +1333,24 @@
           "id": "RUN_RUNNER_REFUSED_START_TAKES_NOTHING",
           "test_outcome": "passed",
           "title": "agconflo-runner runner::refused_start_takes_nothing",
+          "type": "test_run"
+        },
+        "RUN_RUNNER_REFUSES_UNGRANTED": {
+          "executes": [
+            "TEST_RUNNER_REFUSES_UNGRANTED"
+          ],
+          "id": "RUN_RUNNER_REFUSES_UNGRANTED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::refuses_ungranted",
+          "type": "test_run"
+        },
+        "RUN_RUNNER_REFUSES_WITHOUT_GRANTS": {
+          "executes": [
+            "TEST_RUNNER_REFUSES_WITHOUT_GRANTS"
+          ],
+          "id": "RUN_RUNNER_REFUSES_WITHOUT_GRANTS",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::refuses_without_grants",
           "type": "test_run"
         },
         "RUN_RUNNER_RESUMES_AN_INTERRUPTED_RUN": {
@@ -1306,6 +1369,33 @@
           "id": "RUN_RUNNER_RUNS_TO_COMPLETION",
           "test_outcome": "passed",
           "title": "agconflo-runner runner::runs_to_completion",
+          "type": "test_run"
+        },
+        "RUN_RUNNER_TOOL_STEPS_COUNT_AGAINST_BUDGET": {
+          "executes": [
+            "TEST_RUNNER_TOOL_STEPS_COUNT_AGAINST_BUDGET"
+          ],
+          "id": "RUN_RUNNER_TOOL_STEPS_COUNT_AGAINST_BUDGET",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::tool_steps_count_against_budget",
+          "type": "test_run"
+        },
+        "RUN_RUNNER_TOOL_STEPS_END_TO_END": {
+          "executes": [
+            "TEST_RUNNER_TOOL_STEPS_END_TO_END"
+          ],
+          "id": "RUN_RUNNER_TOOL_STEPS_END_TO_END",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::tool_steps_end_to_end",
+          "type": "test_run"
+        },
+        "RUN_RUNNER_TOOL_TEXT_IS_THE_OUTPUT": {
+          "executes": [
+            "TEST_RUNNER_TOOL_TEXT_IS_THE_OUTPUT"
+          ],
+          "id": "RUN_RUNNER_TOOL_TEXT_IS_THE_OUTPUT",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::tool_text_is_the_output",
           "type": "test_run"
         },
         "RUN_RUNNER_UNKNOWN_ARGUMENT_REFUSED": {

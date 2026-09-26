@@ -83,6 +83,7 @@ impl Files {
         Sources {
             manifest: &self.manifest,
             models: self.models.as_deref(),
+            grants: None,
         }
     }
 }
@@ -134,6 +135,7 @@ async fn perform(command: Command) -> u8 {
             return checked(Sources {
                 manifest: &manifest,
                 models: models.as_deref(),
+                grants: None,
             });
         }
         Command::Run {

@@ -146,13 +146,17 @@ pub(crate) struct Request {
 /// sent to, and recording every request.
 pub(crate) struct Stub {
     pub(crate) base: String,
-    seen: Arc<Mutex<Vec<Request>>>,
+    seen: Arc<Mutex<Vec<(Request, String)>>>,
 }
+
+/// A model's call in a stub's reply: its identifier, the node type it calls,
+/// and its arguments as JSON text.
+pub(crate) type Call = (String, String, String);
 
 impl Stub {
     /// A stub answering every request with `answer`.
     pub(crate) fn answering(answer: &str) -> Self {
-        Self::serving(Some(answer.to_owned()))
+        Self::serving(Some(vec![(answer.to_owned(), Vec::new())]))
     }
 
     /// A stub holding every request open without a word: a provider a run can
@@ -161,7 +165,15 @@ impl Stub {
         Self::serving(None)
     }
 
-    fn serving(answer: Option<String>) -> Self {
+    /// A stub answering its n-th request with the n-th of `replies` - a text
+    /// and the calls it makes - and every request past the last with the last,
+    /// in OpenAI's format.
+    pub(crate) fn replying(replies: Vec<(String, Vec<Call>)>) -> Self {
+        assert!(!replies.is_empty(), "a stub replies with something");
+        Self::serving(Some(replies))
+    }
+
+    fn serving(replies: Option<Vec<(String, Vec<Call>)>>) -> Self {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("a loopback port");
         let base = format!("http://{}/v1/", listener.local_addr().expect("an address"));
         let seen = Arc::new(Mutex::new(Vec::new()));
@@ -174,11 +186,16 @@ impl Stub {
                 };
                 let request = request(&head, &body);
                 let anthropic = request.path.ends_with("/messages");
-                recorded.lock().expect("the log").push(request);
-                let Some(answer) = &answer else {
+                let index = {
+                    let mut log = recorded.lock().expect("the log");
+                    log.push((request, body));
+                    log.len() - 1
+                };
+                let Some(replies) = &replies else {
                     held.push(connection);
                     continue;
                 };
+                let (answer, calls) = &replies[index.min(replies.len() - 1)];
                 let reply = if anthropic {
                     serde_json::json!({
                         "id": "m", "type": "message", "role": "assistant", "model": "stub",
@@ -186,10 +203,20 @@ impl Stub {
                         "usage": {"input_tokens": 1, "output_tokens": 1}
                     })
                 } else {
+                    let mut message = serde_json::json!({"role": "assistant", "content": answer});
+                    if !calls.is_empty() {
+                        message["tool_calls"] = calls
+                            .iter()
+                            .map(|(id, name, arguments)| {
+                                serde_json::json!({"id": id, "type": "function",
+                                                   "function": {"name": name, "arguments": arguments}})
+                            })
+                            .collect();
+                    }
+                    let finish = if calls.is_empty() { "stop" } else { "tool_calls" };
                     serde_json::json!({
                         "id": "c", "object": "chat.completion", "created": 0, "model": "stub",
-                        "choices": [{"index": 0, "finish_reason": "stop",
-                                     "message": {"role": "assistant", "content": answer}}],
+                        "choices": [{"index": 0, "finish_reason": finish, "message": message}],
                         "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}
                     })
                 }
@@ -206,7 +233,14 @@ impl Stub {
 
     /// Every request received so far.
     pub(crate) fn requests(&self) -> Vec<Request> {
-        self.seen.lock().expect("the log").clone()
+        let log = self.seen.lock().expect("the log");
+        log.iter().map(|(request, _)| request.clone()).collect()
+    }
+
+    /// The body of every request received so far.
+    pub(crate) fn bodies(&self) -> Vec<String> {
+        let log = self.seen.lock().expect("the log");
+        log.iter().map(|(_, body)| body.clone()).collect()
     }
 }
 
@@ -337,6 +371,12 @@ impl StandIn {
                 message: message.clone(),
             })
         })
+    }
+
+    /// The same stand-in, finding the image not ready for `why`.
+    pub(crate) fn not_ready(self, why: crate::NotReady) -> Self {
+        self.inner.borrow_mut().ready = Err(why);
+        self
     }
 
     /// Everything asked so far, in order.

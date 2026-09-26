@@ -9,7 +9,8 @@
 //! grants reader reads it. The sandbox is the container a run's tool steps are
 //! performed in, and the tool performer performs one step's action in it. The record keeper holds a run's record file for one run at
 //! a time and replaces it with each record the run hands over. The runner
-//! starts, resumes, answers and checks a run from all three.
+//! starts, resumes, answers and checks a run from all of them, performing its
+//! tool steps as they come.
 
 mod grants;
 mod keeper;
@@ -28,6 +29,8 @@ pub use keeper::{KeeperRefusal, RecordKeeper, Unkept};
 pub use model_map::{ModelMap, ModelsFault, read_models};
 pub use performer::{Container, parameters, perform};
 pub use project::{Project, ProjectFault, Script, Tool, read_project};
-pub use runner::{Argument, Finding, Refusal, Sources, Stopped, answer, check, resume, start};
+pub use runner::{
+    Argument, Finding, Refusal, Sources, Stopped, ToolFault, answer, check, resume, start,
+};
 pub use sandbox::{Done, EngineFailure, NotReady, Sandbox};
 pub use text::{FileFault, KeyFault, Place};
