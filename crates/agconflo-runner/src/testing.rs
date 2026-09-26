@@ -48,6 +48,71 @@ impl Scratch {
     }
 }
 
+/// Docker's engine reached and the test image present, or a panic naming
+/// which is missing and how to mend it.
+pub(crate) fn needs_docker() {
+    let version = Command::new("docker")
+        .args(["version", "--format", "{{.Server.Version}}"])
+        .output();
+    match version {
+        Ok(version) if version.status.success() => {}
+        Ok(version) => panic!(
+            "this test needs Docker, and its engine was not reached: {}",
+            String::from_utf8_lossy(&version.stderr).trim()
+        ),
+        Err(error) => panic!("this test needs Docker, and docker could not be run: {error}"),
+    }
+    let image = docker(&["image", "inspect", "--format", "{{.Id}}", IMAGE]);
+    assert!(
+        image.status.success(),
+        "this test needs the image {IMAGE}; pull it with: docker pull {IMAGE}"
+    );
+}
+
+/// `docker` run with `args`, and what it gave back.
+pub(crate) fn docker(args: &[&str]) -> std::process::Output {
+    Command::new("docker")
+        .args(args)
+        .output()
+        .expect("docker could be run")
+}
+
+/// Every container labelled with the record file `record`, by its full id.
+pub(crate) fn labelled(record: &Path) -> Vec<String> {
+    let filter = format!(
+        "label={}={}",
+        crate::sandbox::LABEL,
+        crate::sandbox::label(record)
+    );
+    let listed = docker(&["ps", "-aq", "--no-trunc", "--filter", &filter]);
+    String::from_utf8_lossy(&listed.stdout)
+        .split_whitespace()
+        .map(str::to_owned)
+        .collect()
+}
+
+/// Grants of the test image written to `scratch`: each of `folders` made
+/// there and granted by its name, writable or not, the network if `network`,
+/// every action, and `limits`.
+pub(crate) fn grants(
+    scratch: &Scratch,
+    folders: &[(&str, bool)],
+    network: bool,
+    limits: crate::grants::CommandLimits,
+) -> crate::grants::Grants {
+    let mut text = format!(
+        "image = \"{IMAGE}\"\nnetwork = {network}\nactions = [\"read\", \"write\", \"run\"]\n\n[limits]\nseconds = {}\noutput = {}\n",
+        limits.seconds, limits.output
+    );
+    for (name, writable) in folders {
+        std::fs::create_dir_all(scratch.path(name)).expect("the folder");
+        text.push_str(&format!(
+            "\n[folders.{name}]\npath = \"{name}\"\nwritable = {writable}\n"
+        ));
+    }
+    crate::grants::read_grants(&scratch.write("grants.toml", text)).expect("the grants")
+}
+
 /// `command` with every variable named `*_API_KEY` removed from the
 /// environment it will run in.
 pub(crate) fn without_keys(command: &mut Command) -> &mut Command {

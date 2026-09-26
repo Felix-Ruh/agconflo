@@ -9,7 +9,7 @@ it can change is kept to what the person running the workflow granted, as
 node types are tools and a person says what they may do, what confines them,
 and what a person is told when a tool could not be performed.
 
-Twelve rest on measurements recorded in ``evidence/tools``. The other six
+Thirteen rest on measurements recorded in ``evidence/tools``. The other six
 are judgements between the alternatives each names.
 
 What they do not settle is named here. Nothing below decides a tool reached
@@ -391,3 +391,30 @@ worktree.
 
    Docker becomes a prerequisite of development like Rust, and the image is
    pulled by its digest in continuous integration, as a step of its own.
+
+.. dec:: A step whose wrapper ended without its status is the engine's failure only once its container is gone
+   :id: DEC_KILLED_WRAPPER_TOLD_BY_ITS_CONTAINER
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :supported_by: EVD_REMOVED_CONTAINER_LOOKS_KILLED
+   :statement: Agconflo shall take a tool step whose wrapper was ended by a signal as the step's own result while its container still runs, and as the container engine's failure once it does not.
+
+   ``DEC_COMMAND_WRAPPED`` tells a command's status from the engine's failure
+   by what the wrapper writes to standard error. A command can end the
+   wrapper itself: it runs as the same user, and a ``kill -9 -1`` or a
+   ``pkill`` a model makes up reaches it. ``docker exec`` then reports exactly
+   what it reports for a container removed during the step
+   (``EVD_REMOVED_CONTAINER_LOOKS_KILLED``), and taking both as the engine's
+   failure stops a run over a command, which ``DEC_TOOL_FAILURE_IS_OUTPUT``
+   answers with text instead.
+
+   Whether the container still runs tells the two apart, at the cost of one
+   ``docker inspect`` for a step that ended so. Once it is the step's own
+   doing, whatever the step's user left is killed, as the wrapper would have.
+   Running the wrapper as a user the step cannot signal was the alternative:
+   switching to the step's user from another needs a capability the container
+   drops (``DEC_CONTAINER_LOCKED_DOWN``).
+
+   The status is the last line the wrapper writes to standard error. A command
+   that removes the wrapper's output file makes the wrapper say so first, and
+   that line is added to the step's output rather than taken for the engine's.

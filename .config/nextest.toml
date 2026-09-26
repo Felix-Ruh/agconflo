@@ -20,3 +20,13 @@ slow-timeout = { period = "10s", terminate-after = 2 }
 # Relative to the profile's directory, so the report lands at
 # target/nextest/default/junit.xml.
 path = "junit.xml"
+
+# Tests that make containers share one Docker engine, and each container
+# started beside others starts more slowly. At most eight run at once, which
+# keeps each well inside the 20 s above as more of them are added.
+[test-groups]
+docker = { max-threads = 8 }
+
+[[profile.default.overrides]]
+filter = 'package(agconflo-runner) & test(/^sandbox::/)'
+test-group = 'docker'

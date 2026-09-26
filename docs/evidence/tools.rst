@@ -239,3 +239,22 @@ than to its design.
    ``--pull never``, and its first command was ``true`` as uid 1000. The two
    ``image inspect`` times are for that digest, present, and for a digest of
    zeros, absent.
+
+.. evd:: A container removed during a command looks to docker exec like a command that killed its wrapper
+   :id: EVD_REMOVED_CONTAINER_LOOKS_KILLED
+   :evd_kind: measurement
+   :observed_on: 2026-09-26
+   :observation: docker exec exited 137 with nothing on stderr when its container was removed during a sleep and when the command killed every process of its user; docker inspect then failed for the first and gave the second as running.
+
+   The first was ``docker exec -u 1000:1000 c sh -c 'sleep 5'``, with ``docker
+   rm -f c`` run 1.5 s in; ``docker inspect`` of the container then exited 1
+   with "no such object". The second was the sandbox's own wrapper running
+   ``kill -KILL -1; kill -KILL 1`` as uid 1000: the wrapper runs as the step's
+   user, so the command's ``kill`` ended it too, and ``docker inspect`` gave
+   the container ``running``. Its own process, root's, was out of the
+   command's reach, as ``EVD_KILL_ALL_AFTER_A_COMMAND`` found.
+
+   A third, ``rm -rf /`` run through the same wrapper, removed the file in
+   ``/tmp`` the wrapper writes the output to. The wrapper then wrote "can't
+   open /tmp/out" to standard error before the status, and ``docker exec``
+   exited 0.

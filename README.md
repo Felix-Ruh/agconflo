@@ -125,6 +125,8 @@ not be kept, whatever else happened.
   so the right ones are installed on first use. `agconflo-lua` builds Lua from its C source, so it
   needs the C compiler Rust's own toolchain already relies on — the MSVC build tools on Windows —
   and no Lua installed anywhere.
+- **Docker**, running, for the tests of a tool's container, with the image they pin present:
+  `docker pull alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6`. Those tests fail, naming what is missing, rather than skip.
 
 The documentation toolchain is [ubCode](https://ubcode.useblocks.com/) (`ubc`) and nothing else — no
 Python, no Sphinx, no Java. The tests run under [cargo-nextest](https://nexte.st/), because it writes

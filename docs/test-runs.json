@@ -1668,6 +1668,114 @@
           "title": "agconflo-core run::zero_budget_activates_nothing",
           "type": "test_run"
         },
+        "RUN_SANDBOX_CONFINED_TO_GRANTS": {
+          "executes": [
+            "TEST_SANDBOX_CONFINED_TO_GRANTS"
+          ],
+          "id": "RUN_SANDBOX_CONFINED_TO_GRANTS",
+          "test_outcome": "passed",
+          "title": "agconflo-runner sandbox::confined_to_grants",
+          "type": "test_run"
+        },
+        "RUN_SANDBOX_ENGINE_FAILURE_APART": {
+          "executes": [
+            "TEST_SANDBOX_ENGINE_FAILURE_APART"
+          ],
+          "id": "RUN_SANDBOX_ENGINE_FAILURE_APART",
+          "test_outcome": "passed",
+          "title": "agconflo-runner sandbox::engine_failure_apart",
+          "type": "test_run"
+        },
+        "RUN_SANDBOX_IMAGE_NOT_READY": {
+          "executes": [
+            "TEST_SANDBOX_IMAGE_NOT_READY"
+          ],
+          "id": "RUN_SANDBOX_IMAGE_NOT_READY",
+          "test_outcome": "passed",
+          "title": "agconflo-runner sandbox::image_not_ready",
+          "type": "test_run"
+        },
+        "RUN_SANDBOX_LEFTOVERS_REMOVED": {
+          "executes": [
+            "TEST_SANDBOX_LEFTOVERS_REMOVED"
+          ],
+          "id": "RUN_SANDBOX_LEFTOVERS_REMOVED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner sandbox::leftovers_removed",
+          "type": "test_run"
+        },
+        "RUN_SANDBOX_NOTHING_LEFT_RUNNING": {
+          "executes": [
+            "TEST_SANDBOX_NOTHING_LEFT_RUNNING"
+          ],
+          "id": "RUN_SANDBOX_NOTHING_LEFT_RUNNING",
+          "test_outcome": "passed",
+          "title": "agconflo-runner sandbox::nothing_left_running",
+          "type": "test_run"
+        },
+        "RUN_SANDBOX_OUTPUT_KEEPS_BOTH_ENDS": {
+          "executes": [
+            "TEST_SANDBOX_OUTPUT_KEEPS_BOTH_ENDS"
+          ],
+          "id": "RUN_SANDBOX_OUTPUT_KEEPS_BOTH_ENDS",
+          "test_outcome": "passed",
+          "title": "agconflo-runner sandbox::output_keeps_both_ends",
+          "type": "test_run"
+        },
+        "RUN_SANDBOX_OWN_PROCESS_SURVIVES": {
+          "executes": [
+            "TEST_SANDBOX_OWN_PROCESS_SURVIVES"
+          ],
+          "id": "RUN_SANDBOX_OWN_PROCESS_SURVIVES",
+          "test_outcome": "passed",
+          "title": "agconflo-runner sandbox::own_process_survives",
+          "type": "test_run"
+        },
+        "RUN_SANDBOX_PATHS_AND_TEXT_NOT_SHELL": {
+          "executes": [
+            "TEST_SANDBOX_PATHS_AND_TEXT_NOT_SHELL"
+          ],
+          "id": "RUN_SANDBOX_PATHS_AND_TEXT_NOT_SHELL",
+          "test_outcome": "passed",
+          "title": "agconflo-runner sandbox::paths_and_text_not_shell",
+          "type": "test_run"
+        },
+        "RUN_SANDBOX_REMOVED_AT_THE_END": {
+          "executes": [
+            "TEST_SANDBOX_REMOVED_AT_THE_END"
+          ],
+          "id": "RUN_SANDBOX_REMOVED_AT_THE_END",
+          "test_outcome": "passed",
+          "title": "agconflo-runner sandbox::removed_at_the_end",
+          "type": "test_run"
+        },
+        "RUN_SANDBOX_STEP_USER": {
+          "executes": [
+            "TEST_SANDBOX_STEP_USER"
+          ],
+          "id": "RUN_SANDBOX_STEP_USER",
+          "test_outcome": "passed",
+          "title": "agconflo-runner sandbox::step_user",
+          "type": "test_run"
+        },
+        "RUN_SANDBOX_TIME_LIMIT": {
+          "executes": [
+            "TEST_SANDBOX_TIME_LIMIT"
+          ],
+          "id": "RUN_SANDBOX_TIME_LIMIT",
+          "test_outcome": "passed",
+          "title": "agconflo-runner sandbox::time_limit",
+          "type": "test_run"
+        },
+        "RUN_SANDBOX_USER_FROM_STATUS": {
+          "executes": [
+            "TEST_SANDBOX_USER_FROM_STATUS"
+          ],
+          "id": "RUN_SANDBOX_USER_FROM_STATUS",
+          "test_outcome": "passed",
+          "title": "agconflo-runner sandbox::user_from_status",
+          "type": "test_run"
+        },
         "RUN_SCHEDULER_ACTIVATION_IS_EXACTLY_ITS_BINDINGS": {
           "executes": [
             "TEST_SCHEDULER_ACTIVATION_IS_EXACTLY_ITS_BINDINGS"
