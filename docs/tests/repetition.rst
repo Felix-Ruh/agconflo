@@ -103,11 +103,14 @@ named by the case that catches it.
    :test_kind: positive
    :coverage: partial
 
-   A workflow of an instance giving the brief the run gave it, a drafter reading the brief and a
-   router's input back, a reviewer, and a router sending the draft back to the
-   drafter twice and then on to a finisher: the run completes with the third
+   A workflow of an instance giving the brief the run gave it, a drafter reading
+   the brief and a router's input back, a reviewer, and a router sending the
+   draft back to the drafter twice and then on to a finisher. The run gives the
+   drafter an empty draft for its first pass
+   (``CREQ_RUN_ARGUMENT_FIRST_ON_ITS_EDGE``). The run completes with the third
    draft, the drafter having run three times, each time with the brief and the
-   draft before it. Performed by scripts, with no model.
+   draft before it, and its record holds each route. Performed by scripts, with
+   no model.
 
    Catches, as a whole: every requirement of the feature, and
    ``FEAT_STANDING_SERVES_LATER_PASSES`` and ``FEAT_ROUTE_WALKS_CHOSEN_EDGES``

@@ -398,6 +398,25 @@ pub enum OutputRefusal {
         /// The first identifier found shared.
         id: ContextId,
     },
+    /// A router's output was reported without the instances its run goes on
+    /// to.
+    Unrouted {
+        /// The router the output was reported for.
+        instance: String,
+    },
+    /// Instances to go on to were named with the output of an activation that
+    /// is not a router's own.
+    NotARouter {
+        /// The instance the output was reported for.
+        instance: String,
+    },
+    /// A router named an instance that no edge out of it enters.
+    NoEdgeTo {
+        /// The router.
+        instance: String,
+        /// The instance it named.
+        named: String,
+    },
 }
 
 impl fmt::Display for OutputRefusal {
@@ -422,6 +441,20 @@ impl fmt::Display for OutputRefusal {
                 f,
                 "{instance} was reported producing a context composed of a second context under {id:?}"
             ),
+            Self::Unrouted { instance } => write!(
+                f,
+                "{instance} is a router, and its output was reported without the instances its run goes on to"
+            ),
+            Self::NotARouter { instance } => write!(
+                f,
+                "{instance} was reported naming instances to go on to, and its activation is not a router's own"
+            ),
+            Self::NoEdgeTo { instance, named } => {
+                write!(
+                    f,
+                    "{instance} named {named}, which no edge out of it enters"
+                )
+            }
         }
     }
 }
@@ -787,10 +820,12 @@ pub(crate) enum Event {
     },
     /// A call the activation for `instance` made.
     Call { instance: String, call: Call },
-    /// An output accepted for an activation.
+    /// An output accepted for an activation, and for a router's own the
+    /// instances it named.
     Output {
         activation: Activation,
         output: Context,
+        route: Option<Vec<String>>,
     },
 }
 
@@ -946,11 +981,66 @@ impl<'a, F> Run<'a, F> {
     /// output goes to it alone.
     // @An output is checked before it is recorded,IMPL_RUN_PRODUCED,impl,[CREQ_RUN_REFUSES_UNDECLARED_OUTPUT, CREQ_RUN_REFUSES_HELD_IDENTIFIER, CREQ_RUN_REFUSES_SHARED_OUTPUT_IDENTIFIER, CREQ_RUN_REFUSED_OUTPUT_OUTSTANDING, CREQ_RUN_CALL_OUTPUT_TO_CALLER],[DEC_REFUSED_OUTPUT_OUTSTANDING, DEC_CALL_IS_AN_ACTIVATION]
     pub fn produced(&mut self, context: Context) -> Result<(), OutputRefusal> {
+        self.accept(context, None)
+    }
+
+    /// Report what the outstanding activation of a router produced, and the
+    /// instances it named for its run to go on to, in the order named, none
+    /// meaning nowhere.
+    ///
+    /// Refused as [`Run::produced`] refuses an output, and also when the
+    /// activation is not a router's own, or a name is of an instance no edge
+    /// out of the router enters. Accepted, the output is walked along each edge
+    /// out of the router into an instance named, or the router's input the edge
+    /// takes, and along no other.
+    // @A routed output checked and walked where named,IMPL_RUN_ROUTED,impl,[CREQ_RUN_WALKS_ROUTED, CREQ_RUN_REFUSES_BAD_ROUTE],[DEC_ONE_GRAPH, DEC_ROUTER_OUTPUT_IS_ITS_DECISION]
+    pub fn routed(&mut self, context: Context, route: Vec<String>) -> Result<(), OutputRefusal> {
+        self.accept(context, Some(route))
+    }
+
+    /// Whether `activation` is a router's own: its instance's, and of a node
+    /// type that routes.
+    fn routes(&self, activation: &Activation) -> bool {
+        activation.call().is_none()
+            && self
+                .definition
+                .node_types
+                .iter()
+                .any(|declared| declared.name == activation.node_type() && declared.routes)
+    }
+
+    /// An output checked and accepted, with the route a router named.
+    fn accept(
+        &mut self,
+        context: Context,
+        route: Option<Vec<String>>,
+    ) -> Result<(), OutputRefusal> {
         let outstanding = self
             .outstanding
             .as_ref()
             .ok_or(OutputRefusal::NothingOutstanding)?;
         let activation = &outstanding.activation;
+        let instance = activation.instance().to_owned();
+
+        match (self.routes(activation), &route) {
+            (true, None) => return Err(OutputRefusal::Unrouted { instance }),
+            (false, Some(_)) => return Err(OutputRefusal::NotARouter { instance }),
+            (true, Some(named)) => {
+                let entered = |named: &str| {
+                    self.definition.instances.iter().any(|consumer| {
+                        consumer.name == named
+                            && consumer.bindings.iter().any(|b| b.source == instance)
+                    })
+                };
+                if let Some(named) = named.iter().find(|named| !entered(named)) {
+                    return Err(OutputRefusal::NoEdgeTo {
+                        instance,
+                        named: named.clone(),
+                    });
+                }
+            }
+            (false, None) => {}
+        }
 
         if context.declared_type() != activation.output() {
             return Err(OutputRefusal::UndeclaredType {
@@ -985,12 +1075,17 @@ impl<'a, F> Run<'a, F> {
         self.held.extend(done.contexts);
         self.held.extend(brought);
         if done.activation.call().is_none() {
-            self.edges
-                .produced(self.definition, &done.activation, &context);
+            self.edges.produced(
+                self.definition,
+                &done.activation,
+                &context,
+                route.as_deref(),
+            );
         }
         self.log.push(Event::Output {
             activation: done.activation,
             output: context,
+            route,
         });
         self.settled_exchanges.push(done.exchanges);
         self.outstanding = self.suspended.take();
@@ -1161,9 +1256,10 @@ impl<'a, F> Run<'a, F> {
                     if activation.instance() == caller.instance() && activation.call().is_none())
             })
             .find_map(|event| match event {
-                Event::Output { activation, output }
-                    if activation.instance() == caller.instance()
-                        && activation.call() == Some(id) =>
+                Event::Output {
+                    activation, output, ..
+                } if activation.instance() == caller.instance()
+                    && activation.call() == Some(id) =>
                 {
                     Some(output)
                 }
@@ -1851,6 +1947,139 @@ fn budget_counts_each_pass() {
         assert_eq!(pair[0].0, "x");
         assert_eq!(pair[1].1, [pair[0].2]);
     }
+}
+
+/// A router given a draft and a review, with two branches after it: `revise`
+/// taking its output and its input `draft`, and `close` taking its input
+/// `review`. The designated instance reads itself and never runs.
+#[cfg(test)]
+fn branching() -> WorkflowDefinition {
+    let types = vec![
+        node_type("Src", &[], "note"),
+        node_type("route", &[("draft", "note"), ("review", "note")], "note").routing(),
+        node_type("revise", &[("verdict", "note"), ("draft", "note")], "note"),
+        node_type("Take", &[("seed", "note")], "note"),
+    ];
+    let instances = vec![
+        instance("d", "Src", &[]),
+        instance("w", "Src", &[]),
+        instance("r", "route", &[("draft", "d"), ("review", "w")]),
+        instance("revise", "revise", &[("verdict", "r")]).taking("draft", "r", "draft"),
+        instance("close", "Take", &[]).taking("seed", "r", "review"),
+        instance("never", "Take", &[("seed", "never")]),
+    ];
+    definition(types, instances, &["never"])
+}
+
+/// The run of `branching()` up to its router's activation, with what the two
+/// sources produced.
+#[cfg(test)]
+fn at_the_router<'w>(
+    workflow: &'w WorkflowDefinition,
+    source: &mut IdSource,
+) -> (Run<'w, Infallible>, Context, Context) {
+    let mut run = Run::<Infallible>::start(workflow, Arguments::new(), 20).expect("sound");
+    let mut made = Vec::new();
+    for expected in ["d", "w"] {
+        assert_eq!(offered(&mut run).instance(), expected);
+        let output = ctx(source, "note");
+        made.push(output.clone());
+        run.produced(output).expect("of the declared type");
+    }
+    assert_eq!(offered(&mut run).instance(), "r");
+    (run, made[0].clone(), made[1].clone())
+}
+
+#[cfg(test)]
+#[test]
+fn routed_walks_chosen() {
+    let workflow = branching();
+
+    // Named for the first branch: it is given the router's output and the very
+    // draft the router was given, and the other branch is given nothing.
+    let mut source = IdSource::new();
+    let (mut run, draft, _) = at_the_router(&workflow, &mut source);
+    let verdict = ctx(&mut source, "note");
+    run.routed(verdict.clone(), vec!["revise".to_owned()])
+        .expect("a router naming a branch it has an edge into");
+    let next = offered(&mut run);
+    assert_eq!(next.instance(), "revise");
+    assert!(next.inputs()[0].1.is(&verdict));
+    assert!(next.inputs()[1].1.is(&draft));
+    run.produced(ctx(&mut source, "note")).expect("revised");
+    match run.step() {
+        Step::Ended(RunEnding::Quiescent { waiting }) => {
+            assert!(waiting.contains(&"close".to_owned()), "{waiting:?}");
+        }
+        other => panic!("close is given nothing, and the run can go no further: {other:?}"),
+    }
+
+    // Named for both: each is given its own.
+    let mut source = IdSource::new();
+    let (mut run, draft, review) = at_the_router(&workflow, &mut source);
+    run.routed(
+        ctx(&mut source, "note"),
+        vec!["close".to_owned(), "revise".to_owned()],
+    )
+    .expect("both branches");
+    let mut given = HashMap::new();
+    for _ in 0..2 {
+        let next = offered(&mut run);
+        given.insert(next.instance().to_owned(), next.inputs().to_vec());
+        run.produced(ctx(&mut source, "note"))
+            .expect("of the declared type");
+    }
+    assert!(given["revise"][1].1.is(&draft));
+    assert!(given["close"][0].1.is(&review));
+}
+
+#[cfg(test)]
+#[test]
+fn bad_route_refused() {
+    let workflow = branching();
+    let mut source = IdSource::new();
+    let (mut run, _, _) = at_the_router(&workflow, &mut source);
+
+    // A router's output reported with no route at all.
+    assert_eq!(
+        run.produced(ctx(&mut source, "note")),
+        Err(OutputRefusal::Unrouted {
+            instance: "r".to_owned()
+        })
+    );
+    // An instance no edge out of the router enters, beside one that is fine.
+    assert_eq!(
+        run.routed(
+            ctx(&mut source, "note"),
+            vec!["revise".to_owned(), "never".to_owned()]
+        ),
+        Err(OutputRefusal::NoEdgeTo {
+            instance: "r".to_owned(),
+            named: "never".to_owned(),
+        })
+    );
+    // Refused, nothing was walked: the router is still outstanding.
+    assert_eq!(offered(&mut run).instance(), "r");
+
+    // Naming none is a route: the run goes nowhere from here.
+    run.routed(ctx(&mut source, "note"), Vec::new())
+        .expect("a router may name nothing");
+    assert!(matches!(
+        run.step(),
+        Step::Ended(RunEnding::Quiescent { .. })
+    ));
+
+    // A transform's output reported with a route.
+    let mut source = IdSource::new();
+    let mut run = Run::<Infallible>::start(&workflow, Arguments::new(), 20).expect("sound");
+    assert_eq!(offered(&mut run).instance(), "d");
+    assert_eq!(
+        run.routed(ctx(&mut source, "note"), vec!["r".to_owned()]),
+        Err(OutputRefusal::NotARouter {
+            instance: "d".to_owned()
+        })
+    );
+    assert_eq!(offered(&mut run).instance(), "d");
 }
 
 #[cfg(test)]

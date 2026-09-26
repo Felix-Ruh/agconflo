@@ -52,12 +52,15 @@ impl Edges {
     }
 
     /// Record that `activation`, an instance's own, produced `output`: what it
-    /// took, and `output` walked along every edge out of its instance.
+    /// took, and `output` walked along every edge out of its instance - or for
+    /// a router, along its edges into the instances `route` names, each
+    /// carrying its output or the input of the router's it takes.
     pub(crate) fn produced(
         &mut self,
         definition: &WorkflowDefinition,
         activation: &Activation,
         output: &Context,
+        route: Option<&[String]>,
     ) {
         for (parameter, generation) in &activation.taken {
             let taken = self
@@ -67,7 +70,47 @@ impl Edges {
             *taken = (*taken).max(generation + 1);
         }
         *self.runs.entry(activation.instance.clone()).or_default() += 1;
-        self.walk(definition, &activation.instance, output);
+        match route {
+            None => self.walk(definition, &activation.instance, output),
+            Some(route) => self.walk_routed(definition, activation, output, route),
+        }
+    }
+
+    /// A router's `output` walked along each edge out of it into an instance
+    /// `route` names, and along no other: the output, or where the edge takes
+    /// one of the router's inputs, the context the activation was given for it.
+    // @A router's edges walked where it named,IMPL_RUN_WALKS_ROUTED,impl,[CREQ_RUN_WALKS_ROUTED],[DEC_ONE_GRAPH, DEC_ROUTER_OUTPUT_IS_ITS_DECISION]
+    fn walk_routed(
+        &mut self,
+        definition: &WorkflowDefinition,
+        activation: &Activation,
+        output: &Context,
+        route: &[String],
+    ) {
+        let router = &activation.instance;
+        for consumer in definition
+            .instances
+            .iter()
+            .filter(|consumer| route.contains(&consumer.name))
+        {
+            for binding in consumer.bindings.iter().filter(|b| &b.source == router) {
+                let walked = match &binding.input {
+                    None => Some(output),
+                    Some(input) => activation
+                        .inputs
+                        .iter()
+                        .find(|(parameter, _)| parameter == input)
+                        .map(|(_, given)| given),
+                };
+                if let Some(walked) = walked {
+                    self.held
+                        .entry((consumer.name.clone(), binding.parameter.clone()))
+                        .or_default()
+                        .push(walked.clone());
+                }
+            }
+        }
+        self.latest.insert(router.clone(), output.clone());
     }
 
     /// `output` walked along every edge out of `instance`, as the next context
@@ -388,7 +431,7 @@ fn answers(workflow: &WorkflowDefinition) -> Vec<String> {
             given(&activation).join(",")
         ));
         let context = ctx(&mut source, "note");
-        edges.produced(workflow, &activation, &context);
+        edges.produced(workflow, &activation, &context, None);
     }
 
     answers.sort();
@@ -713,7 +756,7 @@ fn takes_earliest() {
     // The earliest of each, not the latest of the left.
     let first = offered(&workflow, &edges, "c").expect("both edges hold one");
     assert_eq!(ids(&first), [lefts[0].id(), first_right.id()]);
-    edges.produced(&workflow, &first, &ctx(&mut source, "note"));
+    edges.produced(&workflow, &first, &ctx(&mut source, "note"), None);
 
     // The right edge holds nothing new, so the left edge's second waits.
     assert!(offered(&workflow, &edges, "c").is_none());
@@ -746,18 +789,18 @@ fn offered_again_on_something_new() {
 
     // An instance reading nothing is offered once, and never again.
     let src = offered(&workflow, &edges, "v").expect("nothing to wait for");
-    edges.produced(&workflow, &src, &ctx(&mut source, "note"));
+    edges.produced(&workflow, &src, &ctx(&mut source, "note"), None);
     for _ in 0..3 {
         assert!(offered(&workflow, &edges, "v").is_none());
     }
 
     let brief = offered(&workflow, &edges, "s").expect("nothing to wait for");
-    edges.produced(&workflow, &brief, &ctx(&mut source, "note"));
+    edges.produced(&workflow, &brief, &ctx(&mut source, "note"), None);
 
     // Offered on a standing output and a new one; then, with nothing new on
     // the changing edge, not offered however often it is asked.
     let first = offered(&workflow, &edges, "c").expect("both edges hold one");
-    edges.produced(&workflow, &first, &ctx(&mut source, "note"));
+    edges.produced(&workflow, &first, &ctx(&mut source, "note"), None);
     for _ in 0..3 {
         assert!(offered(&workflow, &edges, "c").is_none());
     }
@@ -769,7 +812,7 @@ fn offered_again_on_something_new() {
     // An instance reading only a standing output is offered once, and not
     // again on the same output.
     let only = offered(&workflow, &edges, "only").expect("the brief is there");
-    edges.produced(&workflow, &only, &ctx(&mut source, "note"));
+    edges.produced(&workflow, &only, &ctx(&mut source, "note"), None);
     for _ in 0..3 {
         assert!(offered(&workflow, &edges, "only").is_none());
     }
@@ -815,8 +858,8 @@ fn standing_serves_later() {
         let d = offered(&workflow, &edges, "d").expect("a new context on the right");
         passes.push(c.inputs()[0].1.id());
         passes.push(d.inputs()[0].1.id());
-        edges.produced(&workflow, &c, &ctx(&mut source, "note"));
-        edges.produced(&workflow, &d, &ctx(&mut source, "note"));
+        edges.produced(&workflow, &c, &ctx(&mut source, "note"), None);
+        edges.produced(&workflow, &d, &ctx(&mut source, "note"), None);
     }
 
     let second_brief = passes[4];

@@ -405,3 +405,19 @@ together.
    every unwritable one, and a writer that runs the validator first refuses these -
    acting as a validator it is not, and making a half-finished workflow impossible
    to save.
+
+.. test_case:: A binding taking a router's input is written as a table of from and input
+   :id: TEST_WRITER_ROUTED_INPUT_WRITTEN
+   :verifies: CREQ_WRITER_WRITES
+   :test_kind: positive
+   :coverage: partial
+
+   A document binding a parameter to ``{ from = "r", input = "draft" }``, with a
+   comment beside it, is written back unchanged byte for byte. Then that binding
+   is repointed to the router's output, and a new instance takes the router's
+   input: the first is written as the name ``"r"``, the second as a table of
+   ``from`` and ``input``, and the document reads back as the definition.
+
+   Catches: a routed input written as its source's name alone, which reads back
+   as the router's output (``DEC_ROUTED_INPUT_BOUND_BY_TABLE``); an unchanged
+   table rewritten and its comment lost.

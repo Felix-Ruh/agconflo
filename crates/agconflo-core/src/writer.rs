@@ -162,11 +162,22 @@ fn write_bindings(written: &mut dyn TableLike, bindings: &[Binding]) {
         .collect();
     remove_all_but(table, &kept);
     for binding in bindings {
-        set_value(
-            table,
-            &binding.parameter,
-            Value::from(binding.source.as_str()),
-        );
+        set_value(table, &binding.parameter, bound(binding));
+    }
+}
+
+/// What a binding is written as: the name of the instance whose output it
+/// carries, or a table of that instance and the input of it it carries.
+// @A binding written as a name or as a table of from and input,IMPL_WRITER_ROUTED_INPUT,impl,[CREQ_WRITER_WRITES],[DEC_ROUTED_INPUT_BOUND_BY_TABLE]
+fn bound(binding: &Binding) -> Value {
+    match &binding.input {
+        None => Value::from(binding.source.as_str()),
+        Some(input) => {
+            let mut table = InlineTable::new();
+            table.insert("from", Value::from(binding.source.as_str()));
+            table.insert("input", Value::from(input.as_str()));
+            Value::InlineTable(table)
+        }
     }
 }
 
@@ -199,8 +210,8 @@ fn set_value(table: &mut dyn TableLike, key: &str, new: Value) {
     }
 }
 
-/// Whether two values hold the same string, the same boolean or the same array
-/// of those, however each is written.
+/// Whether two values hold the same string, the same boolean, or the same array
+/// or inline table of those, however each is written.
 fn same(written: &Value, new: &Value) -> bool {
     match (written, new) {
         (Value::String(written), Value::String(new)) => written.value() == new.value(),
@@ -211,6 +222,12 @@ fn same(written: &Value, new: &Value) -> bool {
                     .iter()
                     .zip(new.iter())
                     .all(|(written, new)| same(written, new))
+        }
+        (Value::InlineTable(written), Value::InlineTable(new)) => {
+            written.len() == new.len()
+                && written
+                    .iter()
+                    .all(|(key, value)| new.get(key).is_some_and(|new| same(value, new)))
         }
         _ => false,
     }
@@ -244,7 +261,7 @@ fn array(calls: &[String]) -> Array {
 fn inline(bindings: &[Binding]) -> InlineTable {
     let mut table = InlineTable::new();
     for binding in bindings {
-        table.insert(&binding.parameter, Value::from(binding.source.as_str()));
+        table.insert(&binding.parameter, bound(binding));
     }
     table
 }
@@ -482,6 +499,7 @@ fn apply(definition: &mut WorkflowDefinition, change: &Change) {
                     added.bindings.push(Binding {
                         parameter: "input".to_owned(),
                         source: wired_to(wire / 2),
+                        input: None,
                     });
                 }
                 definition.instances.insert(wire % (count + 1), added);
@@ -502,6 +520,7 @@ fn apply(definition: &mut WorkflowDefinition, change: &Change) {
                 bound.push(Binding {
                     parameter: parameter.to_owned(),
                     source: wired_to(source),
+                    input: None,
                 });
             }
         }
@@ -783,6 +802,7 @@ bindings = { input = \"a\" }
     definition.instances[1].bindings.push(Binding {
         parameter: "input".to_owned(),
         source: "b".to_owned(),
+        input: None,
     });
     definition.designated_outputs = vec!["a".to_owned(), "b".to_owned()];
 
@@ -803,6 +823,53 @@ bindings = { input = \"a\" }
         ]
     );
     assert_eq!(document.to_string(), before, "the document was edited");
+}
+
+#[test]
+fn routed_input_written() {
+    let catalogue = TypeCatalogue::gather(vec![node_type_document(
+        "types.toml",
+        vec![
+            node_type("route", &[("draft", "note")], "note").routing(),
+            node_type("sink", &[("input", "note")], "note"),
+        ],
+    )])
+    .expect("two distinct types gather");
+    let text = "\
+name = \"w\"
+output = \"b\"
+
+[instances.r]
+node_type = \"route\"
+
+[instances.b]
+node_type = \"sink\"
+bindings = { input = { from = \"r\", input = \"draft\" } }   # the draft, sent on
+";
+    let (mut definition, mut document) =
+        read_workflow("w.toml", text, &catalogue).expect("it reads");
+
+    // Written back unchanged, the table is left as it is, comment and all.
+    write_workflow(&mut document, &definition).expect("it writes");
+    assert_eq!(document.to_string(), text);
+
+    // A new instance taking the router's input, and the old one repointed to
+    // its output: each written as the definition holds it, and read back.
+    definition
+        .instances
+        .push(instance("c", "sink", &[]).taking("input", "r", "draft"));
+    definition.instances[1].bindings[0].input = None;
+    write_workflow(&mut document, &definition).expect("it writes");
+    let written = document.to_string();
+    assert!(
+        written.contains("bindings = { input = \"r\" }"),
+        "{written}"
+    );
+    assert!(
+        written.contains("bindings = { input = { from = \"r\", input = \"draft\" } }"),
+        "{written}"
+    );
+    assert_eq!(read_back(&document, &catalogue), definition);
 }
 
 #[test]

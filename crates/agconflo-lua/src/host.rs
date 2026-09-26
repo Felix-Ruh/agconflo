@@ -57,6 +57,9 @@ pub enum ScriptFailure {
         /// message worth the name: a table renders as its address.
         message: String,
     },
+    /// A router's script ended without naming the instances its run goes on
+    /// to.
+    NoRoute,
     /// The script returned something other than exactly one context.
     NotOneContext {
         /// What it returned: `nothing`, a Lua type's name, or how many values.
@@ -148,6 +151,9 @@ impl fmt::Display for ScriptFailure {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Raised { message } => write!(f, "the script raised an error: {message}"),
+            Self::NoRoute => f.write_str(
+                "the script of a router ended without naming, through host.route, where its run goes on to",
+            ),
             Self::NotOneContext { found } => {
                 write!(f, "the script returned {found} rather than one context")
             }
@@ -310,7 +316,14 @@ pub(crate) struct Performing {
     pub(crate) callees: Vec<NodeType>,
     pub(crate) replay: Replay,
     pub(crate) mailbox: Rc<Mailbox>,
+    /// Whether the activation is a router's own, whose script names where its
+    /// run goes on to.
+    pub(crate) routes: bool,
 }
+
+/// What a script produced: its one output, and for a router's the instances
+/// it named, in the order named.
+pub(crate) type Produced = (Context, Option<Vec<String>>);
 
 /// Perform `activation` by running `script` in a new state and a thread of its
 /// own, or say how it failed.
@@ -319,7 +332,8 @@ pub(crate) struct Performing {
 /// activation's inputs under their parameters' names; and the host functions -
 /// `host.text(type, text)`, `host.compose(type, parts, separator)`,
 /// `host.complete(role, prompt, type)`, `host.decide(role, state, questions,
-/// type)` and `host.output`, the type the output is declared as.
+/// type)`, `host.route(names)`, which a router's script calls once, and
+/// `host.output`, the type the output is declared as.
 ///
 /// Contexts the script makes are issued identifiers from `source`, which must be
 /// the source the run's arguments came from; the run refuses another's.
@@ -331,13 +345,20 @@ pub(crate) async fn perform(
     roster: &Roster,
     limits: Limits,
     performing: Performing,
-) -> Result<Context, ScriptFailure> {
+) -> Result<Produced, ScriptFailure> {
     let lua = sandbox().map_err(raised)?;
     lua.set_memory_limit(limits.memory).map_err(raised)?;
     let calls = Rc::new(Calls::default());
+    let routes = performing.routes;
+    let route: Rc<RefCell<Option<Vec<String>>>> = Rc::default();
 
     let host = host_functions(&lua, activation, source, roster, &calls, limits, performing)
         .map_err(raised)?;
+    host.raw_set(
+        "route",
+        route_function(&lua, routes, &route).map_err(raised)?,
+    )
+    .map_err(raised)?;
     close_coroutines(&lua).map_err(raised)?;
     let given = lua.create_table().map_err(raised)?;
     for (parameter, context) in activation.inputs() {
@@ -358,7 +379,39 @@ pub(crate) async fn perform(
         Err(error) => Err(error),
     };
 
-    outcome(returned, &over_instructions, &calls)
+    let output = outcome(returned, &over_instructions, &calls)?;
+    let route = route.take();
+    if routes && route.is_none() {
+        return Err(ScriptFailure::NoRoute);
+    }
+    Ok((output, route))
+}
+
+/// `host.route(names)`: in a router's script, the instances its run goes on
+/// to, named once, none meaning nowhere; anywhere else, or a second time, an
+/// error raised in the script.
+// @A router names where its run goes on to once,IMPL_HOST_ROUTE,impl,[CREQ_HOST_ROUTE_NAMED, CREQ_HOST_REFUSES_ROUTE],[DEC_ROUTER_DECLARED]
+fn route_function(
+    lua: &Lua,
+    routes: bool,
+    route: &Rc<RefCell<Option<Vec<String>>>>,
+) -> LuaResult<LuaFunction> {
+    let route = route.clone();
+    lua.create_function(move |_, names: Vec<String>| {
+        if !routes {
+            return Err(LuaError::external(
+                "host.route is a router's: this node type does not declare routes = true",
+            ));
+        }
+        let mut named = route.borrow_mut();
+        if named.is_some() {
+            return Err(LuaError::external(
+                "host.route was already called in this activation",
+            ));
+        }
+        *named = Some(names);
+        Ok(())
+    })
 }
 
 /// The host table: the context API, the one model call, and the output type.
@@ -1739,4 +1792,157 @@ fn decisions_counted() {
     ));
     assert_eq!(failure, ScriptFailure::ModelCallLimit);
     assert_eq!(stub.requests().len(), 2);
+}
+
+/// A router `r` reading a seed and sending it on to `a`, `b`, both or neither,
+/// with `j` joining the two designated.
+#[cfg(test)]
+const ROUTED_TYPES: &str = r#"
+[types.seed]
+required = { input = "note" }
+output = "note"
+
+[types.route]
+required = { input = "note" }
+output = "note"
+routes = true
+
+[types.take]
+required = { input = "note" }
+output = "note"
+
+[types.join]
+required = { left = "note", right = "note" }
+output = "note"
+"#;
+
+#[cfg(test)]
+const ROUTED: &str = r#"
+name = "routed"
+output = "j"
+
+[instances.s]
+node_type = "seed"
+
+[instances.r]
+node_type = "route"
+bindings = { input = "s" }
+
+[instances.a]
+node_type = "take"
+bindings = { input = "r" }
+
+[instances.b]
+node_type = "take"
+bindings = { input = "r" }
+
+[instances.j]
+node_type = "join"
+bindings = { left = "a", right = "b" }
+"#;
+
+/// `ROUTED` run with the router performed by `router`, and every record the
+/// run handed over.
+#[cfg(test)]
+fn routed_run(router: &str) -> (Result<crate::Outcome, crate::ScriptedRefusal>, Vec<String>) {
+    let definition = workflow(ROUTED_TYPES, ROUTED);
+    let pass = "local given, host = ...\nreturn host.text(host.output, given.input:render())";
+    let join =
+        "local given, host = ...\nreturn host.compose(host.output, {given.left, given.right}, ' ')";
+    let behaviours = Behaviours::new()
+        .define("seed", "seed.lua", pass)
+        .define("route", "route.lua", router)
+        .define("take", "take.lua", pass)
+        .define("join", "join.lua", join);
+    let mut source = agconflo_core::IdSource::new();
+    let arguments =
+        agconflo_core::Arguments::new().supply("s", "input", note(&mut source, "note", "seed"));
+    let mut records = Vec::new();
+    let ended = crate::scripted::block(crate::run_scripted(
+        &definition,
+        &behaviours,
+        &crate::scripted::offline(),
+        arguments,
+        &mut source,
+        20,
+        SMALL,
+        |record| records.push(record),
+    ));
+    (ended, records)
+}
+
+#[cfg(test)]
+#[test]
+fn route_named() {
+    // Two names, in an order that is not the definition's: both branches run,
+    // and the router's output is reported with the names as named.
+    let (ended, records) = routed_run(
+        "local given, host = ...\nhost.route({'b', 'a'})\nreturn host.text(host.output, 'both')",
+    );
+    assert_eq!(rendered(ended), "both both");
+    assert!(
+        records
+            .iter()
+            .any(|record| record.contains("route = [\"b\", \"a\"]")),
+        "{records:?}"
+    );
+
+    // None: the router's output is reported with no names, and the run goes
+    // nowhere from it.
+    let (ended, records) = routed_run(
+        "local given, host = ...\nhost.route({})\nreturn host.text(host.output, 'neither')",
+    );
+    assert!(
+        matches!(
+            ended,
+            Ok(crate::Outcome::Ended(
+                agconflo_core::RunEnding::Quiescent { .. }
+            ))
+        ),
+        "{ended:?}"
+    );
+    assert!(
+        records.iter().any(|record| record.contains("route = []")),
+        "{records:?}"
+    );
+}
+
+#[cfg(test)]
+#[test]
+fn route_refused() {
+    // A transform's script routing.
+    let definition = workflow(CHAIN_TYPES, CHAIN);
+    let behaviours = Behaviours::new()
+        .define("seed", "seed.lua", &appending("a"))
+        .define(
+            "step",
+            "step.lua",
+            "local given, host = ...\nhost.route({'third'})\nreturn given.input",
+        );
+    let (instance, failure) = failed(run_with(&definition, &behaviours, Some(("first", "x"))));
+    assert_eq!(instance, "second");
+    assert!(
+        matches!(&failure, ScriptFailure::Raised { message } if message.contains("host.route is a router's")),
+        "{failure:?}"
+    );
+
+    // A router naming twice.
+    let (ended, _) = routed_run(
+        "local given, host = ...\nhost.route({'a'})\nhost.route({'b'})\nreturn host.text(host.output, 'twice')",
+    );
+    let (instance, failure) = failed(ended);
+    assert_eq!(instance, "r");
+    assert!(
+        matches!(&failure, ScriptFailure::Raised { message } if message.contains("already called")),
+        "{failure:?}"
+    );
+
+    // A router ending without naming.
+    let (ended, _) =
+        routed_run("local given, host = ...\nreturn host.text(host.output, 'nowhere')");
+    let (instance, failure) = failed(ended);
+    assert_eq!(
+        (instance.as_str(), &failure),
+        ("r", &ScriptFailure::NoRoute)
+    );
 }

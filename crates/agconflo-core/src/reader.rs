@@ -114,6 +114,12 @@ pub enum FaultKind {
         /// The key, from the top of the document down.
         key: Vec<String>,
     },
+    /// A table holds a key the reader has no place for, where it reads every
+    /// key of that table: a binding's table holds `from` and `input` alone.
+    UnknownKey {
+        /// The key, from the top of the document down.
+        key: Vec<String>,
+    },
 }
 
 impl fmt::Display for ReadFault {
@@ -148,6 +154,9 @@ impl fmt::Display for FaultKind {
                 "'{}' declares optional parameters, and every parameter is required: declare each under required and bind it an empty context when it has nothing to carry",
                 key.join(".")
             ),
+            Self::UnknownKey { key } => {
+                write!(f, "'{}' is not a key this table holds", key.join("."))
+            }
             Self::EntryMarked { key } => write!(
                 f,
                 "'{}' marks an entry, and there are none: a run is given a context for each parameter nothing binds, on any instance; remove the key",
@@ -339,12 +348,7 @@ impl<'t> Reading<'t> {
         if let Some(item) = table.get("bindings") {
             let key = [&key[..], &["bindings"]].concat();
             for (parameter, source) in self.table(item, &key)?.iter() {
-                bindings.push(Binding {
-                    parameter: parameter.to_owned(),
-                    source: self
-                        .string(source, &[&key[..], &[parameter]].concat())?
-                        .to_owned(),
-                });
+                bindings.push(self.binding(parameter, source, &key)?);
             }
         }
 
@@ -462,24 +466,72 @@ impl<'t> Reading<'t> {
             required,
             globals: self.globals(declaration, &key)?,
             output: self.context_type(output, &[&key[..], &["output"]].concat())?,
-            standing: self.standing(declaration, &key)?,
+            standing: self.flag(declaration, &key, "standing")?,
+            routes: self.flag(declaration, &key, "routes")?,
         })
     }
 
-    /// Whether `declaration` says its output stands: its `standing` key, which
-    /// has to be a boolean, or false when it has none.
-    // @Whether an output stands read from its type,IMPL_READER_STANDING,impl,[CREQ_READER_READS_STANDING],[DEC_STANDING_OUTPUTS]
-    fn standing(&self, declaration: &dyn TableLike, key: &[&str]) -> Result<bool, ReadFault> {
-        let Some(item) = declaration.get("standing") else {
+    /// What `declaration` says under `name`, `standing` or `routes`: a boolean,
+    /// or false when it has none.
+    // @Whether an output stands and whether a type routes read from its type,IMPL_READER_STANDING,impl,[CREQ_READER_READS_STANDING, CREQ_READER_READS_ROUTES],[DEC_STANDING_OUTPUTS, DEC_ROUTER_DECLARED]
+    fn flag(
+        &self,
+        declaration: &dyn TableLike,
+        key: &[&str],
+        name: &str,
+    ) -> Result<bool, ReadFault> {
+        let Some(item) = declaration.get(name) else {
             return Ok(false);
         };
         item.as_bool().ok_or_else(|| {
             self.wrong_type(
                 item.span(),
-                &[key, &["standing"]].concat(),
+                &[key, &[name]].concat(),
                 "boolean",
                 item.type_name(),
             )
+        })
+    }
+
+    /// One binding, written under `key` as `parameter = source`: a string
+    /// naming the instance whose output it carries, or a table of `from`, that
+    /// instance, and `input`, the input of it the binding carries, both needed
+    /// and nothing else.
+    // @A binding read as an output or a router's input,IMPL_READER_ROUTED_INPUT,impl,[CREQ_READER_READS_ROUTED_INPUT],[DEC_ROUTED_INPUT_BOUND_BY_TABLE]
+    fn binding(&self, parameter: &str, source: &Item, key: &[&str]) -> Result<Binding, ReadFault> {
+        let at = [key, &[parameter]].concat();
+        if let Some(source) = source.as_str() {
+            return Ok(Binding {
+                parameter: parameter.to_owned(),
+                source: source.to_owned(),
+                input: None,
+            });
+        }
+        let Some(table) = source.as_table_like() else {
+            return Err(self.wrong_type(source.span(), &at, "string or table", source.type_name()));
+        };
+        for (name, _) in table.iter() {
+            if name != "from" && name != "input" {
+                let span = table.key(name).and_then(|written| written.span());
+                return Err(self.fault(
+                    span,
+                    FaultKind::UnknownKey {
+                        key: path(&[&at[..], &[name]].concat()),
+                    },
+                ));
+            }
+        }
+        let from = self.needed(source, table, &at, "from")?;
+        let input = self.needed(source, table, &at, "input")?;
+        Ok(Binding {
+            parameter: parameter.to_owned(),
+            source: self
+                .string(from, &[&at[..], &["from"]].concat())?
+                .to_owned(),
+            input: Some(
+                self.string(input, &[&at[..], &["input"]].concat())?
+                    .to_owned(),
+            ),
         })
     }
 
@@ -712,6 +764,7 @@ impl Written {
                         .iter()
                         .map(|(parameter, source)| Binding {
                             parameter: parameter.clone(),
+                            input: None,
                             source: source.clone(),
                         })
                         .collect(),
@@ -1145,7 +1198,7 @@ fn faults_carry_their_place() {
             (5, 38),
             FaultKind::WrongType {
                 key: key(&["instances", "b", "bindings", "input"]),
-                expected: "string",
+                expected: "string or table",
                 found: "integer",
             },
         ),
@@ -1416,6 +1469,98 @@ fn entry_mark_refused() {
     )
     .expect("an unmarked instance reads");
     assert_eq!(definition.instances.len(), 1);
+}
+
+#[test]
+fn routes_read() {
+    let text = "[types.route]\noutput = \"note\"\nroutes = true\n\n[types.draft]\noutput = \"note\"\nroutes = false\n\n[types.review]\noutput = \"note\"\n";
+    let read = read_node_types("types.toml", text).expect("it reads");
+    let routes: Vec<(&str, bool)> = read
+        .node_types()
+        .iter()
+        .map(|declared| (declared.name.as_str(), declared.routes))
+        .collect();
+    assert_eq!(
+        routes,
+        [("route", true), ("draft", false), ("review", false)]
+    );
+
+    // A value that is not a boolean is refused where it is written.
+    let fault = read_node_types(
+        "wrong.toml",
+        "[types.route]\noutput = \"note\"\nroutes = 1\n",
+    )
+    .expect_err("a number is not a boolean");
+    assert_eq!(
+        (fault.line(), fault.column(), fault.kind()),
+        (
+            3,
+            10,
+            &FaultKind::WrongType {
+                key: vec!["types".to_owned(), "route".to_owned(), "routes".to_owned()],
+                expected: "boolean",
+                found: "integer",
+            }
+        )
+    );
+}
+
+#[test]
+fn routed_input_read() {
+    let key = |parts: &[&str]| {
+        parts
+            .iter()
+            .map(|&part| part.to_owned())
+            .collect::<Vec<_>>()
+    };
+    let text = "name = \"w\"\n\n[instances.next]\nnode_type = \"sink\"\nbindings = { input = { from = \"router\", input = \"draft\" }, hint = \"router\" }\n";
+    let (definition, _) = read_workflow("w.toml", text, &catalogue()).expect("it reads");
+    let bindings: Vec<(&str, &str, Option<&str>)> = definition.instances[0]
+        .bindings
+        .iter()
+        .map(|b| (b.parameter.as_str(), b.source.as_str(), b.input.as_deref()))
+        .collect();
+    // The table is the router's input `draft`, and the name beside it the
+    // router's output.
+    assert_eq!(
+        bindings,
+        [("input", "router", Some("draft")), ("hint", "router", None)]
+    );
+
+    // A table missing its input, and one holding a key besides the two, are
+    // refused where they are written.
+    let missing = read_workflow(
+        "missing.toml",
+        "name = \"w\"\n\n[instances.next]\nnode_type = \"sink\"\nbindings = { input = { from = \"router\" } }\n",
+        &catalogue(),
+    )
+    .expect_err("no input");
+    assert_eq!(
+        (missing.line(), missing.column(), missing.kind()),
+        (
+            5,
+            22,
+            &FaultKind::MissingKey {
+                key: key(&["instances", "next", "bindings", "input", "input"])
+            }
+        )
+    );
+    let extra = read_workflow(
+        "extra.toml",
+        "name = \"w\"\n\n[instances.next]\nnode_type = \"sink\"\nbindings = { input = { from = \"router\", input = \"draft\", as = \"x\" } }\n",
+        &catalogue(),
+    )
+    .expect_err("a third key");
+    assert_eq!(
+        (extra.line(), extra.column(), extra.kind()),
+        (
+            5,
+            58,
+            &FaultKind::UnknownKey {
+                key: key(&["instances", "next", "bindings", "input", "as"])
+            }
+        )
+    );
 }
 
 #[test]
