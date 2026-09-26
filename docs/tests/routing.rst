@@ -14,7 +14,9 @@ test here can show, and no key is needed or held.
 
 A case's id is the path of the Rust test that implements it, uppercased: the
 host's in the module ``host``, the roster's in ``models``, a resumed script's in
-``scripted`` and the model map's in ``model_map``. Every failure mode listed in
+``scripted`` and the model map's in ``model_map``; and, for taking a branch,
+the reader's in ``reader``, the validator's in ``wiring``, the run's in ``run``
+and the record's in ``record``, all in ``agconflo-core``. Every failure mode listed in
 ``components/routing`` is named by the case that catches it.
 
 .. test_case:: A script is given each question's choice and the answer as a context
@@ -161,3 +163,109 @@ host's in the module ``host``, the roster's in ``models``, a resumed script's in
 
    Catches: both names accepted; an endpoint without its slash accepted; a
    missing key variable read as an empty key.
+
+.. test_case:: A node type's routes declaration is read
+   :id: TEST_READER_ROUTES_READ
+   :verifies: CREQ_READER_READS_ROUTES
+   :test_kind: positive
+   :coverage: full
+
+   Types declaring ``routes = true``, ``routes = false`` and neither read as a
+   router, not a router and not a router; ``routes = 1`` is refused at its
+   value.
+
+   Catches: the key read past; ``routes = false`` read as a router.
+
+.. test_case:: A binding written as a table takes a router's input
+   :id: TEST_READER_ROUTED_INPUT_READ
+   :verifies: CREQ_READER_READS_ROUTED_INPUT
+   :test_kind: positive
+   :coverage: full
+
+   ``draft = { from = "router", input = "draft" }`` reads as the edge carrying
+   ``router``'s input ``draft``, and ``verdict = "router"`` beside it as the
+   edge carrying its output; a table missing ``input``, and one holding a key
+   besides the two, are each refused at their place.
+
+   Catches: the table read as the router's output; ``from`` and ``input``
+   swapped.
+
+.. test_case:: A binding taking an input a node does not route is reported
+   :id: TEST_WIRING_ROUTED_INPUT_CHECKED
+   :verifies: CREQ_VALIDATOR_ROUTED_INPUT
+   :test_kind: error_path
+   :coverage: full
+
+   Bindings taking an input of a node that does not route, and an input a
+   router does not declare, are each reported naming the binding; one taking
+   a ``note`` input into a ``diff`` parameter is reported as a disagreement;
+   one taking a declared input of a router into a parameter of its type passes.
+
+   Catches: the binding passed; the input's type not compared.
+
+.. test_case:: A router's script names where its run goes
+   :id: TEST_HOST_ROUTE_NAMED
+   :verifies: CREQ_HOST_ROUTE_NAMED
+   :test_kind: positive
+   :coverage: full
+
+   A router's script naming two instances, and one naming none: each
+   activation's output is reported with those names in the order named, and
+   with none.
+
+   Catches: the names dropped; the names reported in another order.
+
+.. test_case:: A route named where none may be, or not named where one must be, fails
+   :id: TEST_HOST_ROUTE_REFUSED
+   :verifies: CREQ_HOST_REFUSES_ROUTE
+   :test_kind: error_path
+   :coverage: full
+
+   A script of a node type that does not route calling ``host.route``; a
+   router's script calling it twice; and one returning without calling it:
+   each fails as a script error, and nothing is reported to the run.
+
+   Catches: a transform's script routing; a router ending without a route read
+   as every edge; the second naming kept.
+
+.. test_case:: A router's output goes only into the instances named
+   :id: TEST_RUN_ROUTED_WALKS_CHOSEN
+   :verifies: CREQ_RUN_WALKS_ROUTED
+   :test_kind: positive
+   :coverage: full
+
+   A router given a draft and a review, bound by two branches - one taking its
+   output and its input ``draft``, the other its input ``review`` - and named
+   for the first: that branch is given the router's output and the very draft
+   context the router was given, by identifier, and the other is given
+   nothing. Named for both, both are given theirs.
+
+   Catches: every edge walked; an input walked as a copy; the input of another
+   pass walked.
+
+.. test_case:: A route the run cannot take is refused
+   :id: TEST_RUN_BAD_ROUTE_REFUSED
+   :verifies: CREQ_RUN_REFUSES_BAD_ROUTE
+   :test_kind: error_path
+   :coverage: full
+
+   A router's output reported without names, one naming an instance no edge
+   from it enters, and a transform's output reported with names: each is
+   refused, and nothing is walked.
+
+   Catches: a name no edge enters ignored; a transform's output walked only
+   where named.
+
+.. test_case:: A router's naming is kept and resumed
+   :id: TEST_RECORD_ROUTES_KEPT
+   :verifies: CREQ_RECORD_HOLDS_ROUTES
+   :test_kind: positive
+   :coverage: full
+
+   A run whose router named one of two branches, written after the router's
+   output and resumed: the resumed run offers the branch named and not the
+   other, and a record naming an instance the workflow no longer has is
+   refused as diverging.
+
+   Catches: the output resumed without its names; a record naming an instance
+   the workflow no longer has resumed.
