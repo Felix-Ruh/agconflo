@@ -605,3 +605,65 @@ that changed them show through, and are revised here.
      of a run started while the engine was out of reach, in its own words.
    - Text, the marker above, and the requirement's own body, whose sentence
      saying an unreachable engine is refused here is rewritten.
+
+.. dec:: Revised: a tool container mounts nothing but what the grants name
+   :id: DEC_CHANGE_SANDBOX_LOCKED_DOWN
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :supported_by: EVD_IMPACT_SANDBOX_LOCKED_DOWN
+   :statement: Agconflo's requirements project shall state what CREQ_SANDBOX_LOCKED_DOWN mounts as what the run's grants name, as its parent speaks of what the grants allow, rather than as the granted folders.
+
+   Amends ``CREQ_SANDBOX_LOCKED_DOWN``.
+
+   Before: "When a container is made for a run, Sandbox shall make it with an
+   init process, no capabilities, no new privileges, a read-only root, only
+   the granted folders mounted and no network unless granted." After: "When a
+   container is made for a run, Sandbox shall make it with an init process,
+   no capabilities, no new privileges, a read-only root, nothing mounted but
+   what the run's grants name and no network unless granted."
+
+   Raised by the maintainer's choice to mount a grants file's certificate
+   authorities read-only rather than copy them, which the old wording ruled
+   out.
+
+   Justification: it is wrong against its own parent. ``FEAT_TOOL_KEPT_TO_ITS_GRANT``
+   keeps a tool from changing anything outside what the run's grants allow,
+   and ``STKH_TOOLS_CONFINED`` above it anything outside what the person
+   granted. Both speak of the grants; the requirement spoke of the one thing
+   a grants file could grant when it was written, folders, and so named that
+   mechanism as the only one - the shape ``EVD_AMENDMENTS_CAME_SIDEWAYS``
+   found behind five of the first six changes. Its parent could hold while it
+   is false: a file the person names in the grants, mounted read-only,
+   changes nothing outside the grant. The revision states the property in the
+   parent's own terms and names nothing a grants file holds; it would read
+   the same had the trust file never been proposed. It still claims more than
+   its parent in one respect, kept on purpose: nothing ungranted is mounted at
+   all, readable or not, where the parent speaks only of changing. Dropping
+   that was the other option, a wider change nobody asked for that would let
+   a host path the person never named be read.
+
+   Verdicts on the impact analysis (``EVD_IMPACT_SANDBOX_LOCKED_DOWN``):
+
+   - Up, ``FEAT_TOOL_KEPT_TO_ITS_GRANT`` and ``STKH_TOOLS_CONFINED``: the
+     justification above; neither changes.
+   - Down, ``IMPL_SANDBOX_MAKE``: meets the revised statement unchanged, since
+     it mounts the granted folders; the trust file's mount is made there too
+     and carries its own marker.
+   - Down, ``TEST_SANDBOX_CONFINED_TO_GRANTS``: changing, adding what no test
+     asserted before - that the container's mounts are the granted folders
+     and nothing else. ``TEST_SANDBOX_OWN_PROCESS_SURVIVES`` and
+     ``TEST_SANDBOX_ROOT_STEP_CLEANED_UP``: unaffected, being about the
+     container's own process; all three runs pass at the head of this change.
+   - Sideways, ``CREQ_SANDBOX_TRUSTS_GRANTED``: new in this change and written
+     for the mount. The other fourteen requirements of the sandbox:
+     unaffected, none being about what is mounted.
+   - Outside the analysis, since it shares no component with this
+     requirement: ``CREQ_GRANTS_READS_TRUST``, also new in this change, gives
+     the trust file's path rather than its content, which a mount no longer
+     needs, with any link in the path resolved so that the file mounted is the
+     one the grants name.
+   - Text, the marker in ``sandbox.rs``: unchanged. The line of
+     ``components/environment`` in ``CREQ_SANDBOX_TRUSTS_GRANTED``'s body and
+     the line of ``decisions/tools`` in the trust decision: rewritten for the
+     mount. The other line of ``components/environment`` and the one of
+     ``decisions/changes``: unaffected, neither being about mounts.

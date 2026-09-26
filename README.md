@@ -159,9 +159,9 @@ command from what was not granted; it is no defence against code built to escape
 A network where outgoing TLS is intercepted, as a proxy with its own certificate authority does,
 refuses a container's connections unless it trusts that authority. `trust` names a file of
 certificates, read from the grants file's directory, and a file that cannot be read refuses the
-grants. Its content is copied into each container's `/tmp` before the container's first step, and
-every step is told of the copy through `SSL_CERT_FILE`, which `ubc` was measured reading; nothing is
-mounted for it.
+grants. It is mounted read-only in each container at `/etc/agconflo/trust.pem`, and every step is
+told of it through `SSL_CERT_FILE`, which `ubc` was measured reading. Nothing else is mounted but the
+granted folders.
 
 **Grant a git worktree, not your checkout.** Inside a writable folder a tool may change anything,
 mistakes included. `git worktree add ../work -b tool-run` gives it a copy whose every change

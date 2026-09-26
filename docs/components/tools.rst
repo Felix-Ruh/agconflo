@@ -258,7 +258,7 @@ component requirement whose subject is anything else.
    :derived_from: FEAT_TOOL_KEPT_TO_ITS_GRANT
    :allocated_to: COMP_SANDBOX
    :ears_pattern: event
-   :statement: When a container is made for a run, Sandbox shall make it with an init process, no capabilities, no new privileges, a read-only root, only the granted folders mounted and no network unless granted.
+   :statement: When a container is made for a run, Sandbox shall make it with an init process, no capabilities, no new privileges, a read-only root, nothing mounted but what the run's grants name and no network unless granted.
 
    ``DEC_CONTAINER_OWN_USER_APART`` and ``DEC_GRANTS_NARROW_BY_DEFAULT``. Each
    folder is mounted at ``/work`` under its name, read-only unless granted
@@ -266,10 +266,13 @@ component requirement whose subject is anything else.
    labelled with the run's record file and started from the image by its
    digest, never pulled. Its own process runs with no capabilities as a user
    no step runs as - root, or 65534 beside a step run as root - so a step's
-   user cannot reach it.
+   user cannot reach it. Changed by ``DEC_CHANGE_SANDBOX_LOCKED_DOWN``, which
+   stated what is mounted by what the grants name rather than by the folders
+   alone.
 
    Failure modes:
 
+   - **A host path mounted that the grants do not name.**
    - **A folder mounted writable that was granted read-only**, which
      ``EVD_CONTAINER_CONFINES_TO_MOUNTS`` shows emptied through the container.
    - **The engine's default network left on.**

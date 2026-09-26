@@ -263,17 +263,20 @@ image each step was asked in. No case reaches the network or a provider.
    exits 4 naming the second tool. No record file is left by any. The same
    run with the Python image listed and present completes - the control.
 
-.. test_case:: A grants file gives the content of the trust file it names
+.. test_case:: A grants file gives the path of the trust file it names
    :id: TEST_GRANTS_TRUST_READ
    :verifies: CREQ_GRANTS_READS_TRUST
    :test_kind: positive
    :coverage: full
 
    A grants file in one directory naming ``certs/ca.pem`` beside it, read from
-   another working directory: its content comes back byte for byte, two
-   certificates' worth of text included. A grants file naming none gives none.
+   another working directory, gives that file's path, absolute and without
+   the verbatim prefix Windows puts on a resolved path; naming a link to it
+   gives the file's path, not the link's. A grants file naming none gives
+   none.
 
-   Catches: the path read from the working directory; the content altered.
+   Catches: the path read from the working directory; a link given as the
+   path.
 
 .. test_case:: A trust file that is missing, a directory or not text refuses the grants at its key
    :id: TEST_GRANTS_TRUST_REFUSED
@@ -287,17 +290,19 @@ image each step was asked in. No case reaches the network or a provider.
 
    Catches: a missing file read as no trust; a directory accepted.
 
-.. test_case:: A step trusts a copy of the granted authorities, and nothing is mounted for it
+.. test_case:: A step trusts the granted authorities, mounted read-only
    :id: TEST_SANDBOX_TRUST_GIVEN
    :verifies: CREQ_SANDBOX_TRUSTS_GRANTED
    :test_kind: positive
    :coverage: full
 
    Under grants naming a trust file, a step printing ``$SSL_CERT_FILE`` and
-   the file it names prints the path of a copy in ``/tmp`` and the granted
-   content exactly, in the shared container and in a container of another
-   name. The containers' mounts are the granted folders and nothing else.
-   Under grants naming none, ``SSL_CERT_FILE`` is unset.
+   the file it names prints a path outside ``/work`` and the granted content
+   exactly, in the shared container and in a container of another name, and
+   a step appending to that file fails and leaves the host's file unchanged.
+   Each container's mounts are the granted folder and that file, the file's
+   not writable. Under grants naming none, ``SSL_CERT_FILE`` is unset and the
+   mounts are the granted folder alone.
 
-   Catches: the file mounted from the host; the variable without the copy,
-   or the copy in one container only; trust given where none was granted.
+   Catches: the file mounted writable; the variable without the mount, or the
+   mount in one container only; trust given where none was granted.

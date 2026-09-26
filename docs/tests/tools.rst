@@ -233,10 +233,12 @@ catches it, and where one is caught only in part the case says so.
    unchanged and the writable one emptied, which the grant allows. The step's
    effective capabilities in ``/proc/self/status`` are zero. Without the
    network granted, ``/sys/class/net`` lists only ``lo``; with it, it lists
-   another as well - the control.
+   another as well - the control. The container's mounts are the two granted
+   folders and nothing else.
 
    Catches: a folder mounted writable that was granted read-only, the
-   engine's default network left on.
+   engine's default network left on, a host path mounted that the grants do
+   not name.
 
 .. test_case:: A step that kills everything it can leaves the container running
    :id: TEST_SANDBOX_OWN_PROCESS_SURVIVES

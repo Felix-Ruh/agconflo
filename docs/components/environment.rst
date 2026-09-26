@@ -249,18 +249,17 @@ the sandbox.
    :derived_from: FEAT_TOOL_TRUSTS_GRANTED_AUTHORITIES
    :allocated_to: COMP_GRANTS_READER
    :ears_pattern: event
-   :statement: When a grants file names a trust file, Grants reader shall give that file's content, read from its path relative to the grants file's directory.
+   :statement: When a grants file names a trust file, Grants reader shall give that file's path, read relative to the grants file's directory.
 
-   ``DEC_TRUST_IN_THE_GRANTS``. The file is read with the grants, so what a
-   run trusts is what the file held when the run was asked for, like every
-   other grant.
+   ``DEC_TRUST_IN_THE_GRANTS``. The path is the file itself, a link resolved,
+   so what is mounted is the file the grants name and not whatever a link
+   names later; the file is checked with the grants, like a granted folder.
 
    Failure modes:
 
    - **The path read from the working directory**, and a run started elsewhere
      trusting another file or none.
-   - **The content altered on the way**, a bundle of many certificates cut to
-     the first.
+   - **A link given as the path**, and the mount following it to another file.
 
 .. comp_req:: A trust file that cannot be read refuses the grants at its key
    :id: CREQ_GRANTS_REFUSES_BAD_TRUST
@@ -278,21 +277,20 @@ the sandbox.
      later at the first tool reaching the network, far from the cause.
    - **A directory accepted** as the file.
 
-.. comp_req:: A step runs trusting a copy of the granted authorities
+.. comp_req:: A step runs trusting the granted authorities mounted read-only
    :id: CREQ_SANDBOX_TRUSTS_GRANTED
    :derived_from: FEAT_TOOL_TRUSTS_GRANTED_AUTHORITIES
    :allocated_to: COMP_SANDBOX
    :ears_pattern: event
-   :statement: When a step is run under grants that name a trust file, Sandbox shall run it with SSL_CERT_FILE naming a copy of that file's content in its container.
+   :statement: When a step is run under grants that name a trust file, Sandbox shall run it with SSL_CERT_FILE naming that file mounted read-only in its container.
 
-   ``DEC_TRUST_COPIED_INTO_TMP``: the copy is written to ``/tmp`` when the
-   container is made, and nothing is mounted for it, so
-   ``CREQ_SANDBOX_LOCKED_DOWN`` holds as it is.
+   ``DEC_TRUST_MOUNTED_READ_ONLY``: the file is mounted when the container is
+   made, which ``CREQ_SANDBOX_LOCKED_DOWN`` allows since the grants name it.
 
    Failure modes:
 
-   - **The file mounted from the host**, one host file in the container that
-     is not a granted folder.
-   - **The variable set without the copy**, or the copy made in one container
-     of a run and not in another.
+   - **The file mounted writable**, and a step able to change what every later
+     step of the container trusts, or the host's file.
+   - **The variable set without the mount**, or the mount made in one
+     container of a run and not in another.
    - **A step without trust given one**, where the grants name none.

@@ -148,6 +148,6 @@ own, ``ARCH_TOOL_TRUST``, since it came after the first three were allocated.
 
    The grants reader answers what was granted: the file of authorities, read
    when the grants are, or the grants refused where it names one that cannot
-   be read. The sandbox answers what a container does with it: a copy made in
-   each container, and every step run trusting it
-   (``DEC_TRUST_IN_THE_GRANTS``, ``DEC_TRUST_COPIED_INTO_TMP``).
+   be read. The sandbox answers what a container does with it: the file
+   mounted read-only in each container, and every step run trusting it
+   (``DEC_TRUST_IN_THE_GRANTS``, ``DEC_TRUST_MOUNTED_READ_ONLY``).

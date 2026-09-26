@@ -8,9 +8,8 @@
 //! its container through `docker exec` with no capabilities, as a user other
 //! than the one the container's own process runs as, with `/tmp` as its home,
 //! and every container is removed when the sandbox is dropped. When the grants
-//! name a trust file, its content is copied into each container's `/tmp`
-//! before the container's first step, and every step is told of it through
-//! `SSL_CERT_FILE`.
+//! name a trust file, it is mounted read-only in each container, and every
+//! step is told of it through `SSL_CERT_FILE`.
 
 use std::fmt;
 use std::io::Write;
@@ -33,8 +32,8 @@ pub const SHARED: &str = "tools";
 /// as root.
 const OWN_USER_BESIDE_ROOT: &str = "65534:65534";
 
-/// Where the copy of the grants' trust file is written in each container.
-const TRUST: &str = "/tmp/.agconflo-trust.pem";
+/// Where the grants' trust file is mounted in each container.
+const TRUST: &str = "/etc/agconflo/trust.pem";
 
 /// The script each step runs in: the command given as `$3`, with any further
 /// arguments as its own, under `timeout` for `$1` seconds, its output and
@@ -147,7 +146,7 @@ pub struct Sandbox {
     image: String,
     folders: Vec<Folder>,
     network: bool,
-    trust: Option<String>,
+    trust: Option<PathBuf>,
     limits: CommandLimits,
     label: String,
     run: String,
@@ -165,7 +164,7 @@ impl Sandbox {
             image: grants.image().to_owned(),
             folders: grants.folders().to_vec(),
             network: grants.network(),
-            trust: grants.trust().map(str::to_owned),
+            trust: grants.trust().map(Path::to_owned),
             limits: grants.limits(),
             label: label(record),
             run: run_id(record),
@@ -327,7 +326,7 @@ impl Sandbox {
     /// container still runs: whatever the step's user left is killed, and the
     /// step comes to `docker exec`'s status and what was printed. Otherwise it
     /// is the engine's failure.
-    // @A path as an argument and text as input to the wrapped command,IMPL_SANDBOX_STEP,impl,[CREQ_SANDBOX_PATHS_AS_ARGUMENTS, CREQ_SANDBOX_STEP_USER, CREQ_SANDBOX_TIME_LIMIT, CREQ_SANDBOX_NOTHING_LEFT_RUNNING, CREQ_SANDBOX_OUTPUT_LIMIT, CREQ_SANDBOX_ENGINE_FAILURE_APART, CREQ_SANDBOX_STEP_HOME, CREQ_SANDBOX_TELLS_FULL_TMP, CREQ_SANDBOX_TRUSTS_GRANTED],[DEC_PATHS_AS_ARGUMENTS, DEC_COMMAND_WRAPPED, DEC_STEP_USER_ROOT_INCLUDED, DEC_ENGINE_THROUGH_ITS_COMMAND, DEC_KILLED_WRAPPER_TOLD_BY_ITS_CONTAINER, DEC_STEP_HOME_IN_TMP, DEC_TRUST_COPIED_INTO_TMP]
+    // @A path as an argument and text as input to the wrapped command,IMPL_SANDBOX_STEP,impl,[CREQ_SANDBOX_PATHS_AS_ARGUMENTS, CREQ_SANDBOX_STEP_USER, CREQ_SANDBOX_TIME_LIMIT, CREQ_SANDBOX_NOTHING_LEFT_RUNNING, CREQ_SANDBOX_OUTPUT_LIMIT, CREQ_SANDBOX_ENGINE_FAILURE_APART, CREQ_SANDBOX_STEP_HOME, CREQ_SANDBOX_TELLS_FULL_TMP, CREQ_SANDBOX_TRUSTS_GRANTED],[DEC_PATHS_AS_ARGUMENTS, DEC_COMMAND_WRAPPED, DEC_STEP_USER_ROOT_INCLUDED, DEC_ENGINE_THROUGH_ITS_COMMAND, DEC_KILLED_WRAPPER_TOLD_BY_ITS_CONTAINER, DEC_STEP_HOME_IN_TMP, DEC_TRUST_MOUNTED_READ_ONLY]
     fn step(
         &mut self,
         environment: Environment<'_>,
@@ -411,7 +410,8 @@ impl Sandbox {
         let name = format!("agconflo-{}-{}", self.run, environment.container);
         let tmp = format!("/tmp:mode=1777,size={}", self.limits.tmp);
         let network = if self.network { "bridge" } else { "none" };
-        let mounts: Vec<String> = self.folders.iter().map(mount).collect();
+        let mut mounts: Vec<String> = self.folders.iter().map(mount).collect();
+        mounts.extend(self.trust.as_deref().map(trusted));
         let mut args = vec![
             "run",
             "-d",
@@ -449,33 +449,9 @@ impl Sandbox {
             return Err(failure(&made));
         }
         let id = String::from_utf8_lossy(&made.stdout).trim().to_owned();
-        if let Err(failed) = self.trusted(&id) {
-            let _ = self.docker(&["rm", "-f", &id], b"");
-            return Err(failed);
-        }
         self.containers
             .push((environment.container.to_owned(), id.clone()));
         Ok(id)
-    }
-
-    /// Nothing, when the grants name no trust file; otherwise its content
-    /// written to the container `id`'s `/tmp` as the step's user, or the
-    /// engine's failure to.
-    // @The trust file's content copied into the container's /tmp,IMPL_SANDBOX_TRUST,impl,[CREQ_SANDBOX_TRUSTS_GRANTED],[DEC_TRUST_COPIED_INTO_TMP]
-    fn trusted(&self, id: &str) -> Result<(), EngineFailure> {
-        let Some(trust) = &self.trust else {
-            return Ok(());
-        };
-        let user = format!("{}:{}", self.user.0, self.user.1);
-        let script = format!("cat > {TRUST}");
-        let copied = self.docker(
-            &["exec", "-i", "-u", &user, id, "sh", "-c", &script],
-            trust.as_bytes(),
-        )?;
-        if !copied.status.success() {
-            return Err(failure(&copied));
-        }
-        Ok(())
     }
 
     /// Every container carrying the run's label removed.
@@ -566,17 +542,34 @@ fn shared(image: &str) -> Environment<'_> {
 }
 
 /// `folder` as `docker run`'s `--mount` value: its absolute path bound at
-/// `/work` under its name, read-only unless it is writable, with each field
-/// quoted and a comma in it kept.
+/// `/work` under its name, read-only unless it is writable.
 fn mount(folder: &Folder) -> String {
-    let source: PathBuf = std::path::absolute(&folder.path).unwrap_or_else(|_| folder.path.clone());
+    bind(
+        &folder.path,
+        &format!("/work/{}", folder.name),
+        folder.writable,
+    )
+}
+
+/// The trust file at `path` as `docker run`'s `--mount` value: bound
+/// read-only where every step is told it is.
+// @The trust file mounted read-only outside /work,IMPL_SANDBOX_TRUST,impl,[CREQ_SANDBOX_TRUSTS_GRANTED],[DEC_TRUST_MOUNTED_READ_ONLY]
+fn trusted(path: &Path) -> String {
+    bind(path, TRUST, false)
+}
+
+/// A bind of `source`, made absolute, at `target` as `docker run`'s `--mount`
+/// value, read-only unless `writable`, with each field quoted and a comma in
+/// it kept.
+fn bind(source: &Path, target: &str, writable: bool) -> String {
+    let source: PathBuf = std::path::absolute(source).unwrap_or_else(|_| source.to_owned());
     let quoted = |field: String| format!("\"{}\"", field.replace('"', "\"\""));
     let mut mount = format!(
         "type=bind,{},{}",
         quoted(format!("source={}", source.display())),
-        quoted(format!("target=/work/{}", folder.name))
+        quoted(format!("target={target}"))
     );
-    if !folder.writable {
+    if !writable {
         mount.push_str(",readonly");
     }
     mount
@@ -653,6 +646,26 @@ fn done(done: Result<Done, EngineFailure>) -> Done {
     done.unwrap_or_else(|failure| panic!("expected the step performed, got {failure}"))
 }
 
+/// Each mount of the container `id`, as its target and whether it is
+/// writable, sorted.
+#[cfg(test)]
+fn mounts(id: &str) -> Vec<(String, bool)> {
+    let listed = docker(&[
+        "inspect",
+        "--format",
+        "{{range .Mounts}}{{.Destination}} {{.RW}}\n{{end}}",
+        id,
+    ]);
+    assert!(listed.status.success(), "{listed:?}");
+    let mut mounts: Vec<(String, bool)> = String::from_utf8_lossy(&listed.stdout)
+        .lines()
+        .filter_map(|line| line.rsplit_once(' '))
+        .map(|(target, writable)| (target.to_owned(), writable == "true"))
+        .collect();
+    mounts.sort();
+    mounts
+}
+
 #[cfg(test)]
 #[test]
 fn paths_and_text_not_shell() {
@@ -715,6 +728,15 @@ fn confined_to_grants() {
         Some("0000000000000000"),
         "{}",
         capabilities.output
+    );
+
+    let id = sandbox.container().expect("a container");
+    assert_eq!(
+        mounts(id),
+        [
+            ("/work/kept".to_owned(), false),
+            ("/work/open".to_owned(), true)
+        ]
     );
 
     let offline = done(sandbox.run("ls /sys/class/net"));
@@ -1366,7 +1388,7 @@ fn trust_given() {
     let granted = crate::grants::read_grants(&scratch.write(
         "grants.toml",
         format!(
-            "image = \"{IMAGE}\"\nactions = [\"run\"]\ntrust = \"ca.pem\"\n\n[folders.w]\npath = \"w\"\n"
+            "image = \"{IMAGE}\"\nactions = [\"run\"]\ntrust = \"ca.pem\"\n\n[folders.w]\npath = \"w\"\nwritable = true\n"
         ),
     ))
     .expect("the grants");
@@ -1381,21 +1403,30 @@ fn trust_given() {
         let printed = done(trusted.run_in(environment, print));
         assert_eq!(printed.status, 0, "{}", printed.output);
         let (path, content) = printed.output.split_once('\n').expect("a path");
-        assert!(path.starts_with("/tmp/"), "{path}");
+        assert!(!path.is_empty() && !path.starts_with("/work"), "{path}");
         assert_eq!(content, pem);
 
+        let changed = done(trusted.run_in(
+            environment,
+            "echo more >> \"$SSL_CERT_FILE\" || rm -f \"$SSL_CERT_FILE\"; cat \"$SSL_CERT_FILE\"",
+        ));
+        assert!(changed.output.ends_with(pem), "{}", changed.output);
+        assert_eq!(
+            std::fs::read_to_string(scratch.path("ca.pem")).expect("ca.pem"),
+            pem
+        );
+
         let id = trusted.container_named(container).expect("a container");
-        let mounts = docker(&[
-            "inspect",
-            "--format",
-            "{{range .Mounts}}{{.Destination}} {{end}}",
-            id,
-        ]);
-        assert_eq!(String::from_utf8_lossy(&mounts.stdout).trim(), "/work/w");
+        assert_eq!(
+            mounts(id),
+            [(path.to_owned(), false), ("/work/w".to_owned(), true)]
+        );
     }
     drop(trusted);
 
-    let mut sandbox = sandbox(&scratch, &[], false, CommandLimits::default());
+    let mut sandbox = sandbox(&scratch, &[("w", true)], false, CommandLimits::default());
     let printed = done(sandbox.run("echo \"${SSL_CERT_FILE-unset}\""));
     assert_eq!(printed.output, "unset\n");
+    let id = sandbox.container().expect("a container");
+    assert_eq!(mounts(id), [("/work/w".to_owned(), true)]);
 }

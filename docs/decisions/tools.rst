@@ -662,26 +662,29 @@ worktree.
    A grants file naming none trusts nothing more, as before: nothing narrows
    by being left out (``DEC_GRANTS_NARROW_BY_DEFAULT``).
 
-.. dec:: The granted authorities are copied into the container's /tmp and named in SSL_CERT_FILE
-   :id: DEC_TRUST_COPIED_INTO_TMP
+.. dec:: The granted authorities are mounted read-only and named in SSL_CERT_FILE
+   :id: DEC_TRUST_MOUNTED_READ_ONLY
    :dec_status: accepted
    :decided_on: 2026-09-26
-   :supported_by: EVD_UBC_IN_A_CONTAINER
-   :statement: Agconflo shall copy the granted certificate authorities into each tool container's /tmp when it is made, and run every step there with SSL_CERT_FILE naming that copy.
+   :supported_by: EVD_UBC_IN_A_CONTAINER, EVD_TRUST_FILE_MOUNTS_READ_ONLY
+   :statement: Agconflo shall mount the granted file of certificate authorities read-only in each tool container, outside /work, and run every step there with SSL_CERT_FILE naming it.
 
    ``ubc`` trusted the bundle named by ``SSL_CERT_FILE`` as it trusted the one
-   at the system path (``EVD_UBC_IN_A_CONTAINER``), so the variable is enough,
-   and it is the convention OpenSSL and the libraries following it read.
+   at the system path (``EVD_UBC_IN_A_CONTAINER``), so the variable is enough.
+   Mounted read-only, the file can be neither removed nor changed by a step,
+   root included, and the host's file stays as it was
+   (``EVD_TRUST_FILE_MOUNTS_READ_ONLY``). It sits at
+   ``/etc/agconflo/trust.pem``, outside ``/work``, where a granted folder of
+   any name cannot meet it.
 
-   Mounting the file from the host was the alternative, and it would be the
-   one host file in the container that is not a granted folder:
-   ``CREQ_SANDBOX_LOCKED_DOWN`` makes a container with "only the granted folders
-   mounted", which is right for its parent - nothing outside the grant is
-   changed - and so the design goes around it rather than through it. A copy
-   is content, like anything a step writes to ``/tmp``, and mounts nothing.
+   Copying its content into each container's ``/tmp`` was the alternative:
+   it mounts nothing, but a step can remove the copy and break its
+   container's TLS for every later step there, and it costs a step of the
+   engine's per container. A mount follows the file as it is on the host
+   when each container is made. Mounting it over the image's own bundle was
+   the other, and it would replace the public authorities rather than add to
+   them, at a path that differs from image to image.
 
-   The copy is written as the step's user before the container's first step.
-   A step that removes it breaks its own container's TLS and nothing else;
-   the next call makes a new container and a new copy. Tools reading another
-   variable - ``GIT_SSL_CAINFO``, ``REQUESTS_CA_BUNDLE``,
-   ``NODE_EXTRA_CA_CERTS`` - were not measured and are not set.
+   Tools reading another variable - ``GIT_SSL_CAINFO``,
+   ``REQUESTS_CA_BUNDLE``, ``NODE_EXTRA_CA_CERTS`` - were not measured and
+   are not set.

@@ -107,7 +107,7 @@ pub struct Grants {
     folders: Vec<Folder>,
     network: bool,
     actions: Vec<Action>,
-    trust: Option<String>,
+    trust: Option<PathBuf>,
     limits: CommandLimits,
 }
 
@@ -147,9 +147,9 @@ impl Grants {
         self.actions.contains(&action)
     }
 
-    /// The content of the trust file, if the file names one: the
-    /// certificate authorities a step trusts.
-    pub fn trust(&self) -> Option<&str> {
+    /// The trust file's path, any link in it resolved, if the file names
+    /// one: the certificate authorities a step trusts.
+    pub fn trust(&self) -> Option<&Path> {
         self.trust.as_deref()
     }
 
@@ -372,15 +372,16 @@ pub fn read_grants(grants: &Path) -> Result<Grants, GrantsFault> {
     })
 }
 
-/// The content of the trust file `item`, under `key`, names, read from
-/// `directory` - or refused at that key.
+/// The path of the trust file `item`, under `key`, names, read from
+/// `directory` with any link in it resolved - or refused at that key when it
+/// is not a file that can be read.
 // @A trust file read from the grants file's directory or refused at its key,IMPL_GRANTS_TRUST,impl,[CREQ_GRANTS_READS_TRUST, CREQ_GRANTS_REFUSES_BAD_TRUST],[DEC_TRUST_IN_THE_GRANTS]
 fn trust(
     toml: &Toml<'_>,
     directory: &Path,
     item: &toml_edit::Item,
     key: &[String],
-) -> Result<String, GrantsFault> {
+) -> Result<PathBuf, GrantsFault> {
     let written = toml
         .string(item, key)
         .map_err(|(place, fault)| GrantsFault::Grants { place, fault })?;
@@ -390,9 +391,14 @@ fn trust(
         path: written.to_owned(),
         message,
     };
-    match std::fs::metadata(&joined) {
+    let file = std::fs::canonicalize(&joined).map_err(|error| refused(error.to_string()))?;
+    let file = unverbatim(file);
+    match std::fs::metadata(&file) {
         Ok(metadata) if !metadata.is_file() => Err(refused("it is not a file".to_owned())),
-        Ok(_) => std::fs::read_to_string(&joined).map_err(|error| refused(error.to_string())),
+        Ok(_) => match std::fs::File::open(&file) {
+            Ok(_) => Ok(file),
+            Err(error) => Err(refused(error.to_string())),
+        },
         Err(error) => Err(refused(error.to_string())),
     }
 }
@@ -471,6 +477,22 @@ fn images(
         }
     }
     Ok(named)
+}
+
+/// `path` without the `\\?\` prefix Windows gives a resolved path on a drive,
+/// as [`std::path::absolute`] writes one; any other path as it is.
+fn unverbatim(path: PathBuf) -> PathBuf {
+    if cfg!(windows) {
+        let drive = path
+            .to_str()
+            .and_then(|text| text.strip_prefix(r"\\?\"))
+            .filter(|rest| !rest.starts_with(r"UNC\"))
+            .map(PathBuf::from);
+        if let Some(drive) = drive {
+            return drive;
+        }
+    }
+    path
 }
 
 /// Whether `name` is one plain part of a path: not empty, not `.` or `..`,
@@ -843,19 +865,37 @@ fn bad_folder_refused() {
 #[test]
 fn trust_read() {
     let scratch = Scratch::new("grants_trust_read");
-    let pem = "-----BEGIN CERTIFICATE-----\nMIIBone\n-----END CERTIFICATE-----\n-----BEGIN CERTIFICATE-----\r\nMIIBtwo\r\n-----END CERTIFICATE-----\n";
-    scratch.write("certs/ca.pem", pem);
-    let grants = scratch.write(
-        "grants.toml",
-        format!("image = \"{IMAGE}\"\ntrust = \"certs/ca.pem\"\n"),
-    );
+    scratch.write("certs/ca.pem", "");
+    let file = std::fs::canonicalize(scratch.path("certs/ca.pem")).expect("the file");
     assert_ne!(
         std::env::current_dir().expect("a working directory"),
         scratch.path("")
     );
 
-    let grants = read_grants(&grants).expect("the grants read");
-    assert_eq!(grants.trust(), Some(pem));
+    let grants = read_grants(&scratch.write(
+        "grants.toml",
+        format!("image = \"{IMAGE}\"\ntrust = \"certs/ca.pem\"\n"),
+    ))
+    .expect("the grants read");
+    let given = grants.trust().expect("a trust file");
+    assert!(given.is_absolute(), "{}", given.display());
+    assert!(
+        !given.to_string_lossy().starts_with(r"\\?\"),
+        "{}",
+        given.display()
+    );
+    assert_eq!(std::fs::canonicalize(given).expect("the file"), file);
+
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink("certs/ca.pem", scratch.path("link.pem")).expect("a link");
+        let grants = read_grants(&scratch.write(
+            "grants.toml",
+            format!("image = \"{IMAGE}\"\ntrust = \"link.pem\"\n"),
+        ))
+        .expect("the grants read");
+        assert_eq!(grants.trust(), Some(file.as_path()));
+    }
 
     let grants = read_grants(&scratch.write("grants.toml", format!("image = \"{IMAGE}\"\n")))
         .expect("the grants read");
