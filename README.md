@@ -113,14 +113,22 @@ names, which the node type declares: `read` takes `path`, `write` takes `path` a
 [tools]
 read_file = "read"
 write_file = "write"
-run_command = "run"
+run_tests = { action = "run", image = "python@sha256:cea0e6040540fb2b965b6e7fb5ffa00871e632eef63719f0ea54bca189ce14a6", container = "py" }
 ```
+
+A tool may name the **image** it runs in, by digest, and the **container** it runs in, by name. Tools
+naming one container share it, and what a step leaves outside the granted folders - in `/tmp`, in
+its home - the next step there sees, within one `run`, `resume` or `answer`; a tool naming another
+container sees none of it. A tool naming neither runs in the grants' image, in a container every such
+tool shares, `tools`. A container has one image, so a tool naming its own image needs a container of
+its own too.
 
 What the tools may do is the person's to say, in a **grants file** of its own, given with `--grants`
 to every command, `check` included:
 
 ```toml
 image = "alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6"
+images = ["python@sha256:cea0e6040540fb2b965b6e7fb5ffa00871e632eef63719f0ea54bca189ce14a6"]
 actions = ["read", "write", "run"]   # none unless named
 network = false                      # the default
 
@@ -131,16 +139,20 @@ writable = true                      # read-only unless true
 [limits]                             # each optional
 seconds = 60                         # the time a command may run
 output = 16384                       # the bytes a step gives back
+tmp = 268435456                      # the bytes /tmp may hold
 ```
 
-The image is named by its digest or an image id and **never pulled**: pull it yourself, and a run
-whose image is absent is refused. A path a tool is given names a granted folder and a place in it,
+The grants' `image` is where a tool naming none runs, and `images` lists the others a tool may
+name; a tool naming an image outside both is refused. Every image is named by its digest or an image
+id and **never pulled**: pull it yourself, and a run whose image is absent is refused. A path a tool is given names a granted folder and a place in it,
 `project/src/main.c`, and a command runs in `/work`, where each folder sits under its name; an
 absolute path, or one naming a parent folder, is refused. What goes wrong in a tool — a file not
 there, a command exiting 1 — is the step's output, for the model to act on. Each step runs as your
-user on Linux, unless that is root, and as 1000 otherwise, under the time limit, with everything it started killed after
-it, and output past the limit keeps its start and its end. One container serves each `run`,
-`resume` or `answer`, and is removed when it stops. The container keeps a mistaken command from
+user on Linux, unless that is root, and as 1000 otherwise, with `/tmp` as its home, under the time
+limit, with everything it started killed after it, and output past the limit keeps its start and its
+end. `/tmp` holds no more than `tmp`, and a step that fills it is told its output may have been
+lost. Each container is named `agconflo-<run>-<name>`, where `docker ps` shows it, and removed
+when the `run`, `resume` or `answer` that made it stops. The container keeps a mistaken command from
 what was not granted; it is no defence against code built to escape one.
 
 **Grant a git worktree, not your checkout.** Inside a writable folder a tool may change anything,
@@ -148,9 +160,10 @@ mistakes included. `git worktree add ../work -b tool-run` gives it a copy whose 
 `git diff` shows, and `git worktree remove` discards.
 
 A run whose manifest names a tool is refused before anything runs when its grants are missing,
-cannot be read or do not cover a tool, or its image is not ready. If Docker fails while a step is
-performed, the run stops awaiting that step, exit status 3, with the reason on standard error; once
-Docker is back, `agconflo resume` performs the step again, or `agconflo answer` supplies its output.
+cannot be read or do not cover a tool, or an image it needs is absent. If Docker cannot be reached,
+or fails while a step is performed, the run stops awaiting the tool step it reached, exit status 3,
+with the reason on standard error: `agconflo resume` performs it again once Docker is back, and
+`agconflo answer` supplies its output at once. `agconflo check` reports Docker out of reach.
 
 ```
 agconflo run manifest.toml --record run.toml --models models.toml --grants grants.toml --arg-file given brief task.txt
@@ -182,8 +195,10 @@ agconflo run manifest.toml --record run.toml --models models.toml --grants grant
   so the right ones are installed on first use. `agconflo-lua` builds Lua from its C source, so it
   needs the C compiler Rust's own toolchain already relies on — the MSVC build tools on Windows —
   and no Lua installed anywhere.
-- **Docker**, running, for the tests of a tool's container, with the image they pin present:
-  `docker pull alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6`. Those tests fail, naming what is missing, rather than skip.
+- **Docker**, running, for the tests of a tool's container, with the two images they pin present:
+  `docker pull alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6` and
+  `docker pull python@sha256:cea0e6040540fb2b965b6e7fb5ffa00871e632eef63719f0ea54bca189ce14a6`.
+  Those tests fail, naming what is missing, rather than skip.
 
 The documentation toolchain is [ubCode](https://ubcode.useblocks.com/) (`ubc`) and nothing else — no
 Python, no Sphinx, no Java. The tests run under [cargo-nextest](https://nexte.st/), because it writes

@@ -9,12 +9,14 @@ it can change is kept to what the person running the workflow granted, as
 node types are tools and a person says what they may do, what confines them,
 and what a person is told when a tool could not be performed.
 
-Thirteen rest on measurements recorded in ``evidence/tools``. The other six
-are judgements between the alternatives each names.
+Seventeen rest on measurements recorded in ``evidence/tools``. The other nine
+are judgements between the alternatives each names. Two of the twenty-six are
+superseded by later ones, and say so.
 
 What they do not settle is named here. Nothing below decides a tool reached
-through MCP, a tool of any kind but the three actions, an image per node type,
-a network reachable only in part, or a file that is not text. Each is one
+through MCP, a tool of any kind but the three actions, grants that differ from
+one container to another, a network reachable only in part, or a file that is
+not text. Each is one
 more action, or one more field of a grant, of the shape these decisions give,
 and waits for a workflow that needs it. Nothing decides how a person reviews
 what a tool changed inside a writable grant; ``STKH_TOOLS_CONFINED`` allows
@@ -161,7 +163,7 @@ worktree.
 
 .. dec:: A run's tool steps are performed in one container for each time the run is asked for
    :id: DEC_ONE_CONTAINER_PER_CALL
-   :dec_status: accepted
+   :dec_status: superseded
    :decided_on: 2026-09-26
    :supported_by: EVD_EXEC_COST, EVD_CONTAINER_START_COST, EVD_CONTAINER_OUTLIVES_ITS_CLIENT
    :statement: Agconflo shall perform the tool steps of one start, resume or answer of a run in one container, made at its first tool step, labelled with the run's record file, and removed when it stops.
@@ -228,7 +230,7 @@ worktree.
 
 .. dec:: A tool step runs as the person's user on Linux
    :id: DEC_STEP_USER_IS_THE_PERSONS
-   :dec_status: accepted
+   :dec_status: superseded
    :decided_on: 2026-09-26
    :supported_by: EVD_MOUNT_OWNERSHIP_ON_LINUX, EVD_UID_READABLE_FROM_PROC
    :statement: Agconflo shall perform tool steps on Linux as the user and group of the process running the run, read from /proc/self/status, and elsewhere as user and group 1000.
@@ -418,3 +420,151 @@ worktree.
    The status is the last line the wrapper writes to standard error. A command
    that removes the wrapper's output file makes the wrapper say so first, and
    that line is added to the step's output rather than taken for the engine's.
+
+.. dec:: A tool may name its image and its container beside its action
+   :id: DEC_TOOL_NAMES_ITS_ENVIRONMENT
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :statement: Agconflo shall let a manifest name beside a tool's action an image by digest or image id and a container, and perform a tool naming neither in the grants' image and the container every such tool shares.
+
+   ``STKH_TOOL_ENVIRONMENT`` has the workflow name where each tool runs, and
+   the manifest is where it already says what each node type does
+   (``DEC_TOOLS_NAMED_IN_THE_MANIFEST``). A tool's entry is its action, as
+   before, or a table of the action, the image and the container. A tool
+   naming no image runs in the grants' image, and one naming no container in
+   the container of that name every tool naming none shares, so a manifest
+   written for the first slice of tools means what it meant.
+
+   Naming the container apart from the image is what the goal asks for: a
+   build and the tests of what it built share one container by naming it,
+   while a third tool of the same image names another and sees nothing of
+   theirs. A container per node type was the alternative, and no two tools
+   could then share what one of them left.
+
+   The grants mapping container names to images was the other, which keeps
+   the image wholly the person's but ties a grants file to one workflow's
+   names, and puts what a workflow means in a file written for one machine.
+   The maintainer chose the manifest; the grants still decide which images a
+   run may use at all (``DEC_GRANTS_LIST_IMAGES``).
+
+.. dec:: A tool runs only in an image its grants name
+   :id: DEC_GRANTS_LIST_IMAGES
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :statement: Agconflo shall perform a tool only in an image its grants name as their image or among their images, and refuse before it starts a run whose manifest gives a tool any other.
+
+   An image is what a tool can run, so it stays part of the grant
+   (``STKH_TOOLS_CONFINED``): a manifest asking for an image the person has
+   not listed is refused, as one asking for an action they have not allowed
+   is. The grants' ``image`` stays required and is the image of every tool
+   naming none; ``images`` lists the others a tool may name.
+
+   Making ``image`` optional when every tool names its own was the
+   alternative, and would change what a grants file lacking one means - a
+   refusal today - to save one line.
+
+.. dec:: A run's tool steps are performed in one container for each name, each time the run is asked for
+   :id: DEC_ONE_CONTAINER_PER_NAME
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :supported_by: EVD_EXEC_COST, EVD_CONTAINER_START_COST, EVD_CONTAINER_OUTLIVES_ITS_CLIENT, EVD_CONTAINER_NAME_IN_USE
+   :supersedes: DEC_ONE_CONTAINER_PER_CALL
+   :statement: Agconflo shall perform the tool steps of one start, resume or answer of a run in one container per container name its tools use, each made at its first step, labelled and named after the run, and removed when the call stops.
+
+   What ``DEC_ONE_CONTAINER_PER_CALL`` decided stands for each name: a
+   container made at the first step that needs it, shared by the steps of one
+   call to the runner, removed when the call stops, and never kept between
+   calls, since nothing could then tell whether another process was using it.
+   Its one container becomes one per name, since a tool may now name its own
+   (``DEC_TOOL_NAMES_ITS_ENVIRONMENT``).
+
+   Two tools naming one container must name one image, and a manifest that
+   does otherwise is refused when it is read: a container has one image.
+
+   Each container is named ``agconflo-``, eight hexadecimal digits of a hash
+   of the run's record file, ``-`` and its name, so the person finds a run's
+   containers by name in ``docker ps``, as the maintainer asked; the record
+   file is the run's identity, since one run at a time holds it. A container
+   name is lower-case letters, digits, ``_``, ``.`` and ``-``, beginning with a
+   letter or a digit, which the engine accepts in a name. A name in use
+   refuses a new container (``EVD_CONTAINER_NAME_IN_USE``), which is why every
+   container carrying the run's label is removed before any is made
+   (``DEC_LEFTOVER_CONTAINERS_REMOVED``): a killed run's container holds its
+   name until then.
+
+.. dec:: A tool step runs as the person's user on Linux unless that is root
+   :id: DEC_STEP_USER_NEVER_ROOT
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :supported_by: EVD_MOUNT_OWNERSHIP_ON_LINUX, EVD_UID_READABLE_FROM_PROC, EVD_KILL_ALL_AFTER_A_COMMAND
+   :supersedes: DEC_STEP_USER_IS_THE_PERSONS
+   :statement: Agconflo shall perform tool steps on Linux as the user and group of the process running the run unless that user is root, and otherwise as user and group 1000.
+
+   What ``DEC_STEP_USER_IS_THE_PERSONS`` decided stands for a person who is
+   not root: a file a step writes is theirs, and what they could not read the
+   step cannot either (``EVD_MOUNT_OWNERSHIP_ON_LINUX``). For a person who is
+   root it cannot hold beside ``DEC_CONTAINER_LOCKED_DOWN``, which runs every
+   step as an unprivileged user: as root, the step's cleanup - killing every
+   process of its user - reaches the container's own process
+   (``EVD_KILL_ALL_AFTER_A_COMMAND``), and every later step fails as the
+   engine's failure.
+
+   User 1000 serves a root person as it serves anyone off Linux: what it
+   writes, root may change, and it can change nothing root could not. The
+   code of the first slice already did this; the decision it followed said
+   otherwise, which is what this one mends.
+
+.. dec:: A tool step's home folder is /tmp
+   :id: DEC_STEP_HOME_IN_TMP
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :supported_by: EVD_STEP_HOME_NOT_WRITABLE
+   :statement: Agconflo shall set the home folder of every tool step to /tmp.
+
+   A step runs as a user no image's passwd names, so its home is ``/`` and
+   read-only, and a tool keeping anything in its home fails; with ``/tmp`` it
+   writes there (``EVD_STEP_HOME_NOT_WRITABLE``). An environment of its own is
+   of little use to a tool that cannot work in it.
+
+   A home in a granted folder was the alternative, and would write a tool's
+   caches and settings into the person's project.
+
+.. dec:: A tool container's /tmp is limited by the grants, and a step that fills it is told so
+   :id: DEC_TMP_LIMITED_BY_GRANTS
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :supported_by: EVD_FULL_TMP_LOSES_OUTPUT
+   :statement: Agconflo shall limit each tool container's /tmp to the size its grants give, 268435456 bytes unless they say otherwise, and add to the output of a step that ends with /tmp full a line saying so.
+
+   ``/tmp`` is held in memory, and without a limit a command writing without
+   end - a runaway build, a log - fills the machine's memory before its time
+   runs out. The limit is the person's, beside the grants' others, and 256
+   MiB unless they give one: the home folder is there too
+   (``DEC_STEP_HOME_IN_TMP``), and caches grow.
+
+   A full ``/tmp`` loses a step's output silently, its own and the next
+   one's (``EVD_FULL_TMP_LOSES_OUTPUT``), since the output is written there
+   first. The model would read an empty answer as a command that printed
+   nothing. The wrapper therefore looks at ``/tmp`` once the command ends and
+   says when it is full. Writing the output to a file system of its own was
+   the alternative: one more mount, sized apart, to save the output of a
+   command that filled ``/tmp`` itself, which the line tells the model to
+   stop doing.
+
+.. dec:: An unreachable container engine refuses no run
+   :id: DEC_UNREACHABLE_ENGINE_REFUSES_NO_RUN
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :statement: Agconflo shall start, resume and answer a run whose container engine cannot be reached, leaving the first tool step it reaches awaiting with the engine's failure, and report the unreachable engine to a check.
+
+   An engine that cannot be reached says nothing about the workflow or its
+   grants: it is the failure ``DEC_ENGINE_FAILURE_LEAVES_THE_STEP`` leaves a
+   step awaiting for, found before the step rather than during it. Refusing
+   the run for it refused, too, the answer that decision offers a person for
+   a step the engine could not perform - one of its two ways on, and the only
+   one that does not wait for the engine.
+
+   Refusing only a start was the alternative: two rules for one failure, and
+   a run refused at its start only to stop, a minute later on a resume, at the
+   same step with the same failure. A check still reports it, since a person
+   checking a workflow wants to know.

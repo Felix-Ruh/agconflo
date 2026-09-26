@@ -293,3 +293,88 @@ measurement below records; its project needed no package.
    the run's label. One run of one model on one small task: it shows the
    feature working end to end, and says nothing of how often such a model
    finds its way, or of a task needing the network.
+
+.. evd:: A step's user has no home it can write unless it is given one
+   :id: EVD_STEP_HOME_NOT_WRITABLE
+   :evd_kind: measurement
+   :observed_on: 2026-09-26
+   :observation: Run as uid 1000, which neither image's passwd names, a step in alpine and in python:3.14-slim had HOME set to / and could not write there; given HOME=/tmp, the shell's home and Python's were /tmp and writable.
+
+   Each container was locked down as a tool's is, read-only root and a
+   writable ``/tmp`` included. ``cd ~ && touch here`` failed with
+   "Read-only file system" in both images. With ``docker exec -e HOME=/tmp``
+   the same command succeeded, and in the Python image ``Path.home()`` gave
+   ``/tmp`` and a ``.cache`` folder could be made under it. No build tool was
+   run: which of them write to the home directory was not measured here.
+
+.. evd:: A full /tmp loses a step's output, and the next step's
+   :id: EVD_FULL_TMP_LOSES_OUTPUT
+   :evd_kind: measurement
+   :observed_on: 2026-09-26
+   :observation: With /tmp limited to 1 MiB, a command filling it and then printing came back through the wrapper with status 1 and no output at all, and the next command's output was lost too while /tmp stayed full, with status 0 and no word of it.
+
+   The container was alpine's, locked down, with ``--tmpfs
+   /tmp:mode=1777,size=1m``; the wrapper was the sandbox's own, which writes a
+   step's output to a file in ``/tmp`` before cutting it. The first command
+   wrote 2 MB to ``/tmp/big`` and then echoed a word; the second echoed a
+   word and removed the file; the third, with ``/tmp`` free again, echoed the
+   word and it came back. Neither the command's own error nor the wrapper's
+   reached standard error: only the status did.
+
+.. evd:: A container name in use refuses a new container until the old one is removed
+   :id: EVD_CONTAINER_NAME_IN_USE
+   :evd_kind: measurement
+   :observed_on: 2026-09-26
+   :observation: docker run --name exited 125 with a conflict naming the container already holding the name, and the same run succeeded once the containers carrying the first one's label had been removed.
+
+   The first container was left running under the name and a label; the
+   second run gave "Conflict. The container name ... is already in use by
+   container ..." on standard error. ``docker rm -f`` of every container the
+   label filter listed freed the name.
+
+.. evd:: The wrapper behaves the same under dash and GNU coreutils
+   :id: EVD_WRAPPER_UNDER_DASH
+   :evd_kind: measurement
+   :observed_on: 2026-09-26
+   :observation: In python:3.14-slim, whose sh is dash and whose timeout is GNU coreutils 9.7, the wrapper gave 3 with both streams, 137 after 2.28 s with what was printed first, 992 bytes named cut from 1092, and left only the container's own processes.
+
+   The container was locked down as a tool's is, with ``--init`` and ``sleep
+   infinity`` as root; each command ran through the sandbox's own wrapper as
+   uid 1000 under a limit of 2 seconds and 100 bytes. The commands were an
+   exit 3 writing a line to each stream, ``echo started; sleep 30; echo
+   never``, ``seq 1 300``, and a background sleep beside a double fork
+   ignoring TERM and HUP; afterwards ``/proc`` listed only ``docker-init``,
+   ``sleep infinity`` and the listing, all root's. A command running ``kill
+   -KILL -1`` ended its own wrapper and ``docker exec`` exited 137 with
+   nothing on standard error, as in alpine
+   (``EVD_REMOVED_CONTAINER_LOOKS_KILLED``).
+
+.. evd:: A local model fixes a failing Python project through a tool of its own image
+   :id: EVD_TOOL_ENVIRONMENT_LIVE_RUN
+   :evd_kind: measurement
+   :observed_on: 2026-09-26
+   :observation: Against qwen3.8-27b-ridge on LM Studio, a run whose run_tests tool named python:3.14-slim and a container of its own fixed a failing Python project in a granted worktree in 11 s, over 5 calls, its 3 tests then passing.
+
+   Taken with the ``agconflo`` binary at ``9eb2b37``, built for debugging,
+   from a scratch directory: the workflow of ``EVD_TOOLS_LIVE_RUN``, with
+   ``read_file`` and ``write_file`` as before and a ``run_tests`` tool
+   naming the Python image by its digest and the container ``py``; grants of
+   the pinned ``alpine`` as their image, the Python image among their
+   images, all three actions, 60 seconds and 8000 bytes, no network, and
+   ``project`` writable at a git worktree. Every ``*_API_KEY`` variable was
+   removed from the process's environment. ``check`` found nothing; with the
+   Python image left out of the grants it named ``run_tests`` and exited 4.
+
+   The project was ``slug.py``, whose ``slug`` only turned spaces into
+   hyphens, and ``test_slug.py``, of whose three ``unittest`` cases two
+   failed. The model read both files in one turn, ran the tests through
+   ``run_tests`` - ``python3`` answered, which the alpine image has not -
+   wrote ``"-".join(title.lower().split())``, ran them again, and answered
+   with a paragraph saying what was wrong. It spent 7 of a budget of 60.
+
+   Afterwards, on the host, the tests passed; ``git status`` in the worktree
+   named ``slug.py`` changed, with the one line the model wrote, and two
+   files of ``__pycache__`` Python wrote beside it, inside the grant; the
+   repository the worktree came from was unchanged; and no container carried
+   the run's label. One run, one small task: it shows two environments
+   serving one run, and says nothing of how often a model finds its way.

@@ -875,3 +875,75 @@ fn tool_kept_to_its_grant() {
         0
     );
 }
+
+/// A second image by its digest, present on a machine running these tests.
+const PYTHON: &str =
+    "python@sha256:cea0e6040540fb2b965b6e7fb5ffa00871e632eef63719f0ea54bca189ce14a6";
+
+#[test]
+fn environment_ungranted_refused() {
+    needs_docker();
+    let python = docker(&["image", "inspect", "--format", "{{.Id}}", PYTHON]);
+    assert!(
+        !python.is_empty(),
+        "this test needs the image {PYTHON}; pull it with: docker pull {PYTHON}"
+    );
+    let scratch = Scratch::new("environment_ungranted_refused");
+    let in_python =
+        format!("exec = {{ action = \"run\", container = \"py\", image = \"{PYTHON}\" }}\n");
+    let absent = format!("python@sha256:{}", "0".repeat(64));
+    let run = |scratch: &Scratch| {
+        scratch.ran(&[
+            "run",
+            "manifest.toml",
+            "--record",
+            "run.toml",
+            "--grants",
+            "grants.toml",
+            "--arg",
+            "first",
+            "brief",
+            "python3 -c 'print(40 + 2)'",
+        ])
+    };
+
+    for (tools, images, named) in [
+        (in_python.clone(), String::new(), "exec".to_owned()),
+        (
+            format!("exec = {{ action = \"run\", container = \"py\", image = \"{absent}\" }}\n"),
+            format!("images = [\"{absent}\"]\n"),
+            absent.clone(),
+        ),
+    ] {
+        scratch.tool_project(RUN_BRIEF, &tools, "\"run\"", "");
+        let grants = std::fs::read_to_string(scratch.path("grants.toml")).expect("the grants");
+        scratch.write("grants.toml", format!("{images}{grants}"));
+        let (status, out, err) = run(&scratch);
+        assert_eq!((status, out.as_str()), (4, ""), "{err}");
+        assert!(err.contains(&named), "{err}");
+        assert!(!scratch.path("run.toml").exists());
+    }
+
+    // Two tools, one container, two images: refused when the manifest is read.
+    scratch.tool_project(
+        RUN_BRIEF,
+        &format!("{in_python}say = {{ action = \"read\", container = \"py\" }}\n"),
+        "\"run\", \"read\"",
+        "",
+    );
+    let manifest = std::fs::read_to_string(scratch.path("manifest.toml"))
+        .expect("the manifest")
+        .replace("say = \"say.lua\"\n", "");
+    scratch.write("manifest.toml", manifest);
+    let (status, _, err) = run(&scratch);
+    assert_eq!(status, 4, "{err}");
+    assert!(err.contains("say") && err.contains("container py"), "{err}");
+    assert!(!scratch.path("run.toml").exists());
+
+    // The image listed and present: the run completes in it.
+    scratch.tool_project(RUN_BRIEF, &in_python, "\"run\"", "");
+    let grants = std::fs::read_to_string(scratch.path("grants.toml")).expect("the grants");
+    scratch.write("grants.toml", format!("images = [\"{PYTHON}\"]\n{grants}"));
+    let (status, out, err) = run(&scratch);
+    assert_eq!((status, out.as_str()), (0, "exit status 0\n42\n"), "{err}");
+}

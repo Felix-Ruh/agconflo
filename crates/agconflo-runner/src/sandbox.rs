@@ -1,11 +1,12 @@
-//! The sandbox: the container a run's tool steps are performed in, reached
+//! The sandbox: the containers a run's tool steps are performed in, reached
 //! through the `docker` command.
 //!
-//! One container is made at the first step it is asked for, from the grants'
-//! image, locked down, with each granted folder mounted under `/work` by its
-//! name, and labelled with the run's record file. Each step runs in it through
-//! `docker exec` as an unprivileged user, and the container is removed when
-//! the sandbox is dropped.
+//! One container is made for each container name at the first step asked for
+//! in it, from that step's image, locked down, with each granted folder mounted
+//! under `/work` by its name and a `/tmp` of the grants' size, labelled with
+//! the run's record file and named after the run and itself. Each step runs in
+//! its container through `docker exec` as an unprivileged user whose home is
+//! `/tmp`, and every container is removed when the sandbox is dropped.
 
 use std::fmt;
 use std::io::Write;
@@ -18,18 +19,26 @@ use crate::grants::{CommandLimits, Folder, Grants};
 /// as its value.
 pub(crate) const LABEL: &str = "agconflo.record";
 
+/// The label every container carries with its container name as its value.
+const CONTAINER_LABEL: &str = "agconflo.container";
+
+/// The container name a step runs in when it is asked for with none.
+pub const SHARED: &str = "tools";
+
 /// The script each step runs in: the command given as `$3`, with any further
 /// arguments as its own, under `timeout` for `$1` seconds, its output and
 /// errors to a file; then every process of the step's user killed, the output
 /// written to standard output whole up to `$2` bytes or cut to its first and
-/// last halves, and the command's status alone to standard error.
-// @The command under timeout and its status alone on standard error,TRACE_SANDBOX_WRAPPER,trace,[],[DEC_COMMAND_WRAPPED, DEC_OUTPUT_KEEPS_BOTH_ENDS]
+/// last halves, a line after it when `/tmp` is full, and the command's status
+/// alone to standard error.
+// @The command under timeout and its status alone on standard error,TRACE_SANDBOX_WRAPPER,trace,[],[DEC_COMMAND_WRAPPED, DEC_OUTPUT_KEEPS_BOTH_ENDS, DEC_TMP_LIMITED_BY_GRANTS]
 const WRAPPER: &str = r#"t=$1 l=$2 c=$3; shift 3
 timeout -s KILL "$t" sh -c "$c" sh "$@" >/tmp/out 2>&1
 s=$?
 kill -KILL -1 2>/dev/null
 n=$(wc -c </tmp/out)
 if [ "$n" -le "$l" ]; then cat /tmp/out; else h=$((l / 2)); head -c "$h" /tmp/out; printf "\n[%d bytes cut]\n" $((n - l)); tail -c $((l - h)) /tmp/out; fi
+if set -- $(df -P /tmp 2>/dev/null | tail -n 1) && [ "${4:-1}" = 0 ]; then printf "\n[/tmp is full: what the command printed may have been lost]\n"; fi
 rm -f /tmp/out
 echo "$s" >&2"#;
 
@@ -110,8 +119,18 @@ pub struct Done {
     pub output: String,
 }
 
-/// The container a run's tool steps are performed in, made at the first step
-/// and removed when this is dropped.
+/// Where a step is performed: the container it runs in, by name, and the image
+/// that container is made from.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Environment<'e> {
+    /// The container's name.
+    pub container: &'e str,
+    /// The image it is made from.
+    pub image: &'e str,
+}
+
+/// The containers a run's tool steps are performed in, each made at the first
+/// step asked for in it and all removed when this is dropped.
 #[derive(Debug)]
 pub struct Sandbox {
     image: String,
@@ -119,9 +138,11 @@ pub struct Sandbox {
     network: bool,
     limits: CommandLimits,
     label: String,
+    run: String,
     user: (u32, u32),
     env: Vec<(String, String)>,
-    container: Option<String>,
+    containers: Vec<(String, String)>,
+    cleared: bool,
 }
 
 impl Sandbox {
@@ -134,9 +155,11 @@ impl Sandbox {
             network: grants.network(),
             limits: grants.limits(),
             label: label(record),
+            run: run_id(record),
             user: step_ids(),
             env: Vec::new(),
-            container: None,
+            containers: Vec::new(),
+            cleared: false,
         }
     }
 
@@ -147,24 +170,37 @@ impl Sandbox {
         self
     }
 
-    /// The container made for the run, if one has been.
+    /// The first container made for the run, if one has been.
     #[cfg(test)]
     pub(crate) fn container(&self) -> Option<&str> {
-        self.container.as_deref()
+        self.containers.first().map(|(_, id)| id.as_str())
     }
 
-    /// Nothing, or why the grants' image cannot be used: absent, holding no
-    /// `sh` or no `timeout`, or the engine not reached. The image is never
-    /// pulled, and nothing is made but one short container of the image's own,
-    /// removed as it ends.
-    // @An image found present with sh and timeout and never pulled,IMPL_SANDBOX_READY,impl,[CREQ_SANDBOX_IMAGE_READY],[DEC_IMAGE_BY_DIGEST_NEVER_PULLED]
+    /// The container of the name `container`, if one has been made.
+    #[cfg(test)]
+    pub(crate) fn container_named(&self, container: &str) -> Option<&str> {
+        self.containers
+            .iter()
+            .find(|(name, _)| name == container)
+            .map(|(_, id)| id.as_str())
+    }
+
+    /// Nothing, or why the grants' image cannot be used, as [`Sandbox::ready_image`]
+    /// says.
     pub fn ready(&self) -> Result<(), NotReady> {
-        let image = || self.image.clone();
+        self.ready_image(&self.image)
+    }
+
+    /// Nothing, or why `image` cannot be used: absent, holding no `sh` or no
+    /// `timeout`, or the engine not reached. The image is never pulled, and
+    /// nothing is made but one short container of the image's own, removed as
+    /// it ends.
+    // @An image found present with sh and timeout and never pulled,IMPL_SANDBOX_READY,impl,[CREQ_SANDBOX_IMAGE_READY, CREQ_SANDBOX_EACH_IMAGE_READY],[DEC_IMAGE_BY_DIGEST_NEVER_PULLED]
+    pub fn ready_image(&self, image: &str) -> Result<(), NotReady> {
+        let named = image;
+        let image = || named.to_owned();
         let inspected = self
-            .docker(
-                &["image", "inspect", "--format", "{{.Id}}", &self.image],
-                b"",
-            )
+            .docker(&["image", "inspect", "--format", "{{.Id}}", named], b"")
             .map_err(NotReady::Engine)?;
         if !inspected.status.success() {
             let version = self
@@ -192,7 +228,7 @@ impl Sandbox {
                     "no-new-privileges",
                     "--entrypoint",
                     "sh",
-                    &self.image,
+                    named,
                     "-c",
                     "command -v timeout >/dev/null && echo ready || echo no-timeout",
                 ],
@@ -210,24 +246,59 @@ impl Sandbox {
     }
 
     /// The file at `path`, relative to `/work`: its text as the command's
-    /// output, or what `cat` said and its status.
+    /// output, or what `cat` said and its status - in the shared container,
+    /// of the grants' image.
     pub fn read(&mut self, path: &str) -> Result<Done, EngineFailure> {
-        self.step(READ, Some(path), b"")
+        let image = self.image.clone();
+        self.read_in(shared(&image), path)
     }
 
     /// The file at `path`, relative to `/work`, replaced by `text` exactly,
-    /// with the folders it lies in made first.
+    /// with the folders it lies in made first - in the shared container, of
+    /// the grants' image.
     pub fn write(&mut self, path: &str, text: &str) -> Result<Done, EngineFailure> {
-        self.step(WRITE, Some(path), text.as_bytes())
+        let image = self.image.clone();
+        self.write_in(shared(&image), path, text)
     }
 
-    /// `command` run by `sh` in `/work`.
+    /// `command` run by `sh` in `/work` - in the shared container, of the
+    /// grants' image.
     pub fn run(&mut self, command: &str) -> Result<Done, EngineFailure> {
-        self.step(command, None, b"")
+        let image = self.image.clone();
+        self.run_in(shared(&image), command)
     }
 
-    /// `script` run in the container, with `argument` as its `$1` and `input`
-    /// on its standard input: its status and output, or the engine's failure.
+    /// [`Sandbox::read`], in `environment`.
+    pub fn read_in(
+        &mut self,
+        environment: Environment<'_>,
+        path: &str,
+    ) -> Result<Done, EngineFailure> {
+        self.step(environment, READ, Some(path), b"")
+    }
+
+    /// [`Sandbox::write`], in `environment`.
+    pub fn write_in(
+        &mut self,
+        environment: Environment<'_>,
+        path: &str,
+        text: &str,
+    ) -> Result<Done, EngineFailure> {
+        self.step(environment, WRITE, Some(path), text.as_bytes())
+    }
+
+    /// [`Sandbox::run`], in `environment`.
+    pub fn run_in(
+        &mut self,
+        environment: Environment<'_>,
+        command: &str,
+    ) -> Result<Done, EngineFailure> {
+        self.step(environment, command, None, b"")
+    }
+
+    /// `script` run in the container of `environment`, as its home `/tmp`,
+    /// with `argument` as its `$1` and `input` on its standard input: its
+    /// status and output, or the engine's failure.
     ///
     /// The status is the last line the wrapper writes to standard error; any
     /// line before it, which the wrapper writes only when the command removed
@@ -236,20 +307,35 @@ impl Sandbox {
     /// container still runs: whatever the step's user left is killed, and the
     /// step comes to `docker exec`'s status and what was printed. Otherwise it
     /// is the engine's failure.
-    // @A path as an argument and text as input to the wrapped command,IMPL_SANDBOX_STEP,impl,[CREQ_SANDBOX_PATHS_AS_ARGUMENTS, CREQ_SANDBOX_STEP_USER, CREQ_SANDBOX_TIME_LIMIT, CREQ_SANDBOX_NOTHING_LEFT_RUNNING, CREQ_SANDBOX_OUTPUT_LIMIT, CREQ_SANDBOX_ENGINE_FAILURE_APART],[DEC_PATHS_AS_ARGUMENTS, DEC_COMMAND_WRAPPED, DEC_STEP_USER_IS_THE_PERSONS, DEC_ENGINE_THROUGH_ITS_COMMAND, DEC_KILLED_WRAPPER_TOLD_BY_ITS_CONTAINER]
+    // @A path as an argument and text as input to the wrapped command,IMPL_SANDBOX_STEP,impl,[CREQ_SANDBOX_PATHS_AS_ARGUMENTS, CREQ_SANDBOX_STEP_USER, CREQ_SANDBOX_TIME_LIMIT, CREQ_SANDBOX_NOTHING_LEFT_RUNNING, CREQ_SANDBOX_OUTPUT_LIMIT, CREQ_SANDBOX_ENGINE_FAILURE_APART, CREQ_SANDBOX_STEP_HOME, CREQ_SANDBOX_TELLS_FULL_TMP],[DEC_PATHS_AS_ARGUMENTS, DEC_COMMAND_WRAPPED, DEC_STEP_USER_NEVER_ROOT, DEC_ENGINE_THROUGH_ITS_COMMAND, DEC_KILLED_WRAPPER_TOLD_BY_ITS_CONTAINER, DEC_STEP_HOME_IN_TMP]
     fn step(
         &mut self,
+        environment: Environment<'_>,
         script: &str,
         argument: Option<&str>,
         input: &[u8],
     ) -> Result<Done, EngineFailure> {
-        let container = self.made()?;
+        let container = self.made(environment)?;
         let user = format!("{}:{}", self.user.0, self.user.1);
         let seconds = self.limits.seconds.to_string();
         let output = self.limits.output.to_string();
         let mut args = vec![
-            "exec", "-i", "-u", &user, "-w", "/work", &container, "sh", "-c", WRAPPER, "wrapper",
-            &seconds, &output, script,
+            "exec",
+            "-i",
+            "-u",
+            &user,
+            "-e",
+            "HOME=/tmp",
+            "-w",
+            "/work",
+            &container,
+            "sh",
+            "-c",
+            WRAPPER,
+            "wrapper",
+            &seconds,
+            &output,
+            script,
         ];
         args.extend(argument);
         let done = self.docker(&args, input)?;
@@ -293,14 +379,69 @@ impl Sandbox {
         })
     }
 
-    /// The run's container, made first if it has not been, with every
-    /// container a killed run left under the same label removed before it.
-    // @Leftovers removed before the run's container is made locked down,IMPL_SANDBOX_MAKE,impl,[CREQ_SANDBOX_LOCKED_DOWN, CREQ_SANDBOX_REMOVES_LEFTOVERS],[DEC_CONTAINER_LOCKED_DOWN, DEC_GRANTS_NARROW_BY_DEFAULT, DEC_LEFTOVER_CONTAINERS_REMOVED, DEC_ONE_CONTAINER_PER_CALL, DEC_PATHS_IN_GRANTED_FOLDERS]
-    fn made(&mut self) -> Result<String, EngineFailure> {
-        if let Some(container) = &self.container {
-            return Ok(container.clone());
+    /// The container of `environment`'s name, made from its image first if
+    /// it has not been, with every container a killed run left under the same
+    /// label removed before the first is made.
+    // @Leftovers removed before each named container is made locked down,IMPL_SANDBOX_MAKE,impl,[CREQ_SANDBOX_LOCKED_DOWN, CREQ_SANDBOX_REMOVES_LEFTOVERS, CREQ_SANDBOX_CONTAINER_PER_NAME, CREQ_SANDBOX_TMP_LIMIT],[DEC_CONTAINER_LOCKED_DOWN, DEC_GRANTS_NARROW_BY_DEFAULT, DEC_LEFTOVER_CONTAINERS_REMOVED, DEC_ONE_CONTAINER_PER_NAME, DEC_PATHS_IN_GRANTED_FOLDERS, DEC_TMP_LIMITED_BY_GRANTS]
+    fn made(&mut self, environment: Environment<'_>) -> Result<String, EngineFailure> {
+        if let Some((_, id)) = self
+            .containers
+            .iter()
+            .find(|(name, _)| name == environment.container)
+        {
+            return Ok(id.clone());
+        }
+        if !self.cleared {
+            self.clear()?;
+            self.cleared = true;
         }
 
+        let label = format!("{LABEL}={}", self.label);
+        let named = format!("{CONTAINER_LABEL}={}", environment.container);
+        let name = format!("agconflo-{}-{}", self.run, environment.container);
+        let tmp = format!("/tmp:mode=1777,size={}", self.limits.tmp);
+        let network = if self.network { "bridge" } else { "none" };
+        let mounts: Vec<String> = self.folders.iter().map(mount).collect();
+        let mut args = vec![
+            "run",
+            "-d",
+            "--pull",
+            "never",
+            "--init",
+            "--name",
+            &name,
+            "--network",
+            network,
+            "--read-only",
+            "--tmpfs",
+            &tmp,
+            "--cap-drop",
+            "ALL",
+            "--security-opt",
+            "no-new-privileges",
+            "--label",
+            &label,
+            "--label",
+            &named,
+            "--workdir",
+            "/work",
+        ];
+        for mount in &mounts {
+            args.extend(["--mount", mount]);
+        }
+        args.extend([environment.image, "sleep", "infinity"]);
+        let made = self.docker(&args, b"")?;
+        if !made.status.success() {
+            return Err(failure(&made));
+        }
+        let id = String::from_utf8_lossy(&made.stdout).trim().to_owned();
+        self.containers
+            .push((environment.container.to_owned(), id.clone()));
+        Ok(id)
+    }
+
+    /// Every container carrying the run's label removed.
+    fn clear(&self) -> Result<(), EngineFailure> {
         let filter = format!("label={LABEL}={}", self.label);
         let listed = self.docker(&["ps", "-aq", "--no-trunc", "--filter", &filter], b"")?;
         if !listed.status.success() {
@@ -316,41 +457,7 @@ impl Sandbox {
                 return Err(failure(&removed));
             }
         }
-
-        let label = format!("{LABEL}={}", self.label);
-        let network = if self.network { "bridge" } else { "none" };
-        let mounts: Vec<String> = self.folders.iter().map(mount).collect();
-        let mut args = vec![
-            "run",
-            "-d",
-            "--pull",
-            "never",
-            "--init",
-            "--network",
-            network,
-            "--read-only",
-            "--tmpfs",
-            "/tmp:mode=1777",
-            "--cap-drop",
-            "ALL",
-            "--security-opt",
-            "no-new-privileges",
-            "--label",
-            &label,
-            "--workdir",
-            "/work",
-        ];
-        for mount in &mounts {
-            args.extend(["--mount", mount]);
-        }
-        args.extend([self.image.as_str(), "sleep", "infinity"]);
-        let made = self.docker(&args, b"")?;
-        if !made.status.success() {
-            return Err(failure(&made));
-        }
-        let container = String::from_utf8_lossy(&made.stdout).trim().to_owned();
-        self.container = Some(container.clone());
-        Ok(container)
+        Ok(())
     }
 
     /// `docker` run with `args` and `input` on its standard input, with this
@@ -381,12 +488,15 @@ impl Sandbox {
 }
 
 impl Drop for Sandbox {
-    /// The run's container removed, if one was made. A failure to remove it
-    /// is left for the next call of the same run, which removes it first.
-    // @The container removed however its call ends,IMPL_SANDBOX_REMOVE,impl,[CREQ_SANDBOX_REMOVED_AT_THE_END],[DEC_ONE_CONTAINER_PER_CALL]
+    /// Every container made for the run removed. A failure to remove one is
+    /// left for the next call of the same run, which removes it first.
+    // @Every container removed however its call ends,IMPL_SANDBOX_REMOVE,impl,[CREQ_SANDBOX_REMOVED_AT_THE_END],[DEC_ONE_CONTAINER_PER_NAME]
     fn drop(&mut self) {
-        if let Some(container) = self.container.take() {
-            let _ = self.docker(&["rm", "-f", &container], b"");
+        let containers: Vec<String> = self.containers.drain(..).map(|(_, id)| id).collect();
+        if !containers.is_empty() {
+            let mut args = vec!["rm", "-f"];
+            args.extend(containers.iter().map(String::as_str));
+            let _ = self.docker(&args, b"");
         }
     }
 }
@@ -398,6 +508,23 @@ pub(crate) fn label(record: &Path) -> String {
         .unwrap_or_else(|_| record.to_owned())
         .display()
         .to_string()
+}
+
+/// Eight hexadecimal digits of the FNV-1a hash of the run's record file's
+/// absolute path, which name its containers.
+fn run_id(record: &Path) -> String {
+    let hash = label(record).bytes().fold(0x811c_9dc5_u32, |hash, byte| {
+        (hash ^ u32::from(byte)).wrapping_mul(0x0100_0193)
+    });
+    format!("{hash:08x}")
+}
+
+/// The shared container, of `image`.
+fn shared(image: &str) -> Environment<'_> {
+    Environment {
+        container: SHARED,
+        image,
+    }
 }
 
 /// `folder` as `docker run`'s `--mount` value: its absolute path bound at
@@ -433,7 +560,7 @@ fn failure(output: &Output) -> EngineFailure {
 /// The user and group a step runs as: on Linux the effective ones of this
 /// process, unless that is root or cannot be read, and elsewhere 1000 and
 /// 1000.
-// @The person's user on Linux and never root,IMPL_SANDBOX_STEP_USER,impl,[CREQ_SANDBOX_STEP_USER],[DEC_STEP_USER_IS_THE_PERSONS, DEC_CONTAINER_LOCKED_DOWN]
+// @The person's user on Linux and never root,IMPL_SANDBOX_STEP_USER,impl,[CREQ_SANDBOX_STEP_USER],[DEC_STEP_USER_NEVER_ROOT, DEC_CONTAINER_LOCKED_DOWN]
 fn step_ids() -> (u32, u32) {
     let own = if cfg!(target_os = "linux") {
         std::fs::read_to_string("/proc/self/status")
@@ -465,7 +592,7 @@ fn ids_from_status(status: &str) -> Option<(u32, u32)> {
 // Bare functions named after their test cases.
 
 #[cfg(test)]
-use crate::testing::{IMAGE, Scratch, docker, grants, labelled, needs_docker};
+use crate::testing::{IMAGE, PYTHON, Scratch, docker, grants, labelled, needs_docker, needs_image};
 #[cfg(test)]
 use std::time::{Duration, Instant};
 
@@ -918,4 +1045,224 @@ fn image_not_ready() {
     assert_eq!(no_shell, Err(NotReady::NoShell { image: empty }));
     assert_eq!(no_timeout, Err(NotReady::NoTimeout { image: untimed }));
     assert_eq!(with_image(IMAGE).ready(), Ok(()));
+}
+
+/// The containers carrying the label of the run whose record file is in
+/// `scratch`, by name, sorted.
+#[cfg(test)]
+fn names(scratch: &Scratch) -> Vec<String> {
+    let filter = format!("label={LABEL}={}", label(&scratch.path("run.toml")));
+    let listed = docker(&["ps", "-a", "--filter", &filter, "--format", "{{.Names}}"]);
+    let mut names: Vec<String> = String::from_utf8_lossy(&listed.stdout)
+        .split_whitespace()
+        .map(str::to_owned)
+        .collect();
+    names.sort();
+    names
+}
+
+#[cfg(test)]
+#[test]
+fn container_per_name() {
+    let scratch = Scratch::new("sandbox_container_per_name");
+    needs_image(PYTHON);
+    let mut sandbox = sandbox(&scratch, &[], false, CommandLimits::default());
+    let a = Environment {
+        container: "a",
+        image: IMAGE,
+    };
+    let b = Environment {
+        container: "b",
+        image: PYTHON,
+    };
+    let record = scratch.path("run.toml");
+    let prefix = format!("agconflo-{}-", run_id(&record));
+    assert_eq!(prefix.len(), "agconflo-".len() + 8 + 1);
+
+    // A killed run's container, holding the name a is to be made under.
+    let left = docker(&[
+        "run",
+        "-d",
+        "--pull",
+        "never",
+        "--name",
+        &format!("{prefix}a"),
+        "--label",
+        &format!("{LABEL}={}", label(&record)),
+        IMAGE,
+        "sleep",
+        "60",
+    ]);
+    assert!(left.status.success(), "{left:?}");
+    let left = String::from_utf8_lossy(&left.stdout).trim().to_owned();
+
+    done(sandbox.run_in(a, "echo left > /tmp/mark"));
+    assert_eq!(done(sandbox.run_in(a, "cat /tmp/mark")).output, "left\n");
+    let in_b = done(sandbox.run_in(b, "cat /tmp/mark; python3 -c 'print(6 * 7)'"));
+    assert!(!in_b.output.contains("left\n"), "{}", in_b.output);
+    assert!(in_b.output.contains("42"), "{}", in_b.output);
+    assert_ne!(done(sandbox.run_in(a, "command -v python3")).status, 0);
+
+    assert_eq!(
+        names(&scratch),
+        [format!("{prefix}a"), format!("{prefix}b")]
+    );
+    assert_ne!(sandbox.container_named("a"), Some(left.as_str()));
+    assert!(sandbox.container_named("b").is_some());
+    drop(sandbox);
+    assert_eq!(names(&scratch), Vec::<String>::new());
+}
+
+#[cfg(test)]
+#[test]
+fn wrapper_in_another_image() {
+    let scratch = Scratch::new("sandbox_wrapper_in_another_image");
+    needs_image(PYTHON);
+    let limits = CommandLimits {
+        seconds: 2,
+        output: 100,
+        ..CommandLimits::default()
+    };
+    let mut sandbox = sandbox(&scratch, &[], false, limits);
+    let python = Environment {
+        container: "py",
+        image: PYTHON,
+    };
+
+    let three = done(sandbox.run_in(python, "echo out; echo err >&2; exit 3"));
+    assert_eq!((three.status, three.output.as_str()), (3, "out\nerr\n"));
+
+    let started = Instant::now();
+    let ended = done(sandbox.run_in(python, "echo started; sleep 30; echo never"));
+    assert!(started.elapsed() < Duration::from_secs(10));
+    assert_eq!(ended.status, 137);
+    assert!(ended.output.starts_with("started"), "{}", ended.output);
+    assert!(!ended.output.contains("never"), "{}", ended.output);
+
+    let counted = done(sandbox.run_in(python, "seq 1 300"));
+    let text: String = (1..=300).map(|n| format!("{n}\n")).collect();
+    assert_eq!(
+        counted.output,
+        format!(
+            "{}\n[{} bytes cut]\n{}",
+            &text[..50],
+            text.len() - 100,
+            &text[text.len() - 50..]
+        )
+    );
+
+    let left = done(sandbox.run_in(
+        python,
+        "sleep 40 & (trap '' TERM HUP; sh -c 'sleep 50 &'); echo ok",
+    ));
+    assert_eq!(left.output, "ok\n");
+    let processes = done(sandbox.run_in(
+        python,
+        "for p in /proc/[0-9]*; do tr '\\0' ' ' < $p/cmdline; echo; done",
+    ));
+    assert!(
+        !processes.output.contains("sleep 40"),
+        "{}",
+        processes.output
+    );
+    assert!(
+        !processes.output.contains("sleep 50"),
+        "{}",
+        processes.output
+    );
+}
+
+#[cfg(test)]
+#[test]
+fn step_home() {
+    let scratch = Scratch::new("sandbox_step_home");
+    needs_image(PYTHON);
+    let mut sandbox = sandbox(&scratch, &[], false, CommandLimits::default());
+    for environment in [
+        Environment {
+            container: "a",
+            image: IMAGE,
+        },
+        Environment {
+            container: "py",
+            image: PYTHON,
+        },
+    ] {
+        let made = done(sandbox.run_in(environment, "cd ~ && touch here && pwd"));
+        assert_eq!((made.status, made.output.as_str()), (0, "/tmp\n"));
+        assert_eq!(done(sandbox.run_in(environment, "ls ~/here")).status, 0);
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn tmp_limited() {
+    let scratch = Scratch::new("sandbox_tmp_limited");
+    let limits = CommandLimits {
+        tmp: 1_048_576,
+        ..CommandLimits::default()
+    };
+    let mut sandbox = sandbox(&scratch, &[], false, limits);
+    let blocks = |sandbox: &mut Sandbox| {
+        let listed = done(sandbox.run("df -P /tmp | tail -n 1"));
+        listed.output.split_whitespace().nth(1).map(str::to_owned)
+    };
+
+    let filled = done(sandbox.run("head -c 2000000 /dev/zero > /tmp/big"));
+    assert_ne!(filled.status, 0);
+    done(sandbox.run("rm -f /tmp/big"));
+    assert_eq!(blocks(&mut sandbox).as_deref(), Some("1024"));
+
+    drop(sandbox);
+    let scratch = Scratch::new("sandbox_tmp_limited_default");
+    let mut sandbox = self::sandbox(&scratch, &[], false, CommandLimits::default());
+    assert_eq!(blocks(&mut sandbox).as_deref(), Some("262144"));
+}
+
+#[cfg(test)]
+#[test]
+fn full_tmp_told() {
+    let scratch = Scratch::new("sandbox_full_tmp_told");
+    let limits = CommandLimits {
+        tmp: 1_048_576,
+        ..CommandLimits::default()
+    };
+    let mut sandbox = sandbox(&scratch, &[], false, limits);
+    let told = "[/tmp is full: what the command printed may have been lost]";
+
+    let filled = done(sandbox.run("head -c 2000000 /dev/zero > /tmp/big; echo word"));
+    assert!(filled.output.contains(told), "{:?}", filled.output);
+    let next = done(sandbox.run("echo again"));
+    assert!(next.output.contains(told), "{:?}", next.output);
+
+    done(sandbox.run("rm -f /tmp/big"));
+    let quiet = done(sandbox.run("true"));
+    assert_eq!((quiet.status, quiet.output.as_str()), (0, ""));
+}
+
+#[cfg(test)]
+#[test]
+fn each_image_ready() {
+    let scratch = Scratch::new("sandbox_each_image_ready");
+    needs_image(PYTHON);
+    let sandbox = sandbox(&scratch, &[], false, CommandLimits::default());
+
+    assert_eq!(sandbox.ready_image(IMAGE), Ok(()));
+    assert_eq!(sandbox.ready_image(PYTHON), Ok(()));
+    let absent = format!("python@sha256:{}", "0".repeat(64));
+    assert_eq!(
+        sandbox.ready_image(&absent),
+        Err(NotReady::Absent {
+            image: absent.clone()
+        })
+    );
+    let listed = docker(&[
+        "image",
+        "ls",
+        "-q",
+        "--no-trunc",
+        "--filter",
+        "reference=python",
+    ]);
+    assert!(!String::from_utf8_lossy(&listed.stdout).contains(&"0".repeat(64)));
 }

@@ -122,3 +122,30 @@ or keeps, on the commit named. Re-running one later shows what has moved since.
    ``TEST_RUN_UNDECLARED_OUTPUT_IS_REFUSED``. Beside it: every other
    requirement of ``COMP_WORKFLOW_RUN``. In prose: two lines of ``run.rs``, one
    of ``scheduler.rs``, one of ``features/behaviour`` and two of ``tests/run``.
+
+.. evd:: The impact of stating the user a tool step runs as by what it may change
+   :id: EVD_IMPACT_SANDBOX_STEP_USER
+   :evd_kind: measurement
+   :observed_on: 2026-09-26
+   :observation: CREQ_SANDBOX_STEP_USER answers to 2 needs, has 6 below it by link and 9 requirements sharing its component, and is named on 2 lines of prose.
+
+   Run as ``sh scripts/impact.sh CREQ_SANDBOX_STEP_USER`` on ``0e8fdb1``.
+   Above it: ``FEAT_TOOL_KEPT_TO_ITS_GRANT`` and ``STKH_TOOLS_CONFINED``. Below
+   it: ``IMPL_SANDBOX_STEP`` and ``IMPL_SANDBOX_STEP_USER``, and
+   ``TEST_SANDBOX_STEP_USER`` and ``TEST_SANDBOX_USER_FROM_STATUS`` with their
+   runs. Beside it: every other requirement of ``COMP_SANDBOX``. In prose: the
+   two markers, both in ``sandbox.rs``. No architecture uses a component it
+   is allocated to beyond its own.
+
+.. evd:: The impact of refusing a run for its image and not its engine
+   :id: EVD_IMPACT_RUNNER_REFUSES_UNGRANTED
+   :evd_kind: measurement
+   :observed_on: 2026-09-26
+   :observation: CREQ_RUNNER_REFUSES_UNGRANTED answers to 3 needs, has 3 below it by link and 12 requirements sharing its component, and is named on 1 line of prose.
+
+   Run as ``sh scripts/impact.sh CREQ_RUNNER_REFUSES_UNGRANTED`` on
+   ``0e8fdb1``. Above it: ``FEAT_TOOL_UNGRANTED_REFUSED``,
+   ``STKH_WIRING_CHECKED`` and ``STKH_TOOLS_CONFINED``. Below it:
+   ``IMPL_RUNNER_PREPARED``, and ``TEST_RUNNER_REFUSES_UNGRANTED`` with its
+   run. Beside it: every other requirement of ``COMP_RUNNER``. In prose: the
+   marker, in ``runner.rs``.

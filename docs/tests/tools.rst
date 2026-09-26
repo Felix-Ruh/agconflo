@@ -260,7 +260,9 @@ catches it, and where one is caught only in part the case says so.
    the step writes into a writable folder belongs on the host to the test's
    user.
 
-   Catches: root.
+   Catches: root. It checks the property ``CREQ_SANDBOX_STEP_USER`` states
+   through the user ``DEC_STEP_USER_NEVER_ROOT`` picks: the test's own on
+   Linux, which is never root on CI, and 1000 elsewhere.
 
 .. test_case:: A process's user and group are read from its status file
    :id: TEST_SANDBOX_USER_FROM_STATUS

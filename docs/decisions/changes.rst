@@ -496,3 +496,112 @@ that changed them show through, and are revised here.
      trace marker on the run's output check still meets it. ``features/behaviour``
      cites it for refusing an output of the wrong type, and ``tests/run`` twice
      for failure modes its cases assert; all three still hold.
+
+.. dec:: Revised: a step runs as a user the person can answer for, not as the process's own
+   :id: DEC_CHANGE_SANDBOX_STEP_USER
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :supported_by: EVD_IMPACT_SANDBOX_STEP_USER
+   :statement: Agconflo's requirements project shall state CREQ_SANDBOX_STEP_USER as what its parent needs of the user a step runs as, rather than the user it is run as today.
+
+   Amends ``CREQ_SANDBOX_STEP_USER``.
+
+   Before: "When a step is run, Sandbox shall run it on Linux as the user and
+   group the running process has and elsewhere as user and group 1000."
+   After: "When a step is run, Sandbox shall run it as a user whose files the
+   person running the run can change and who can change no file on the host
+   that person could not."
+
+   Raised by the review of #48, which found that for a person running as root
+   the requirement asked for a step run as root, which
+   ``DEC_CONTAINER_LOCKED_DOWN`` rules out: the cleanup after each step then
+   kills the container's own process.
+
+   Justification: it is wrong against its own parent. ``FEAT_TOOL_KEPT_TO_ITS_GRANT``
+   keeps a tool from changing anything outside what the grants allow, and
+   what it needs of the user a step runs as is what the requirement's own body
+   gave as its reason: a file the step writes is the person's to change, and
+   the step can change nothing the person could not. The statement named the
+   user that delivers that today - the process's, and 1000 elsewhere - which
+   is a decision's to name, and in naming it claimed, for a root person, a
+   root step the parent does not need. The revised statement is the property
+   and names no user; the decision below it now says which
+   (``DEC_STEP_USER_NEVER_ROOT``). The new work of this pull request, an
+   environment per tool, does not show in it: it would read the same had
+   that work never been proposed.
+
+   Verdicts on the impact analysis (``EVD_IMPACT_SANDBOX_STEP_USER``):
+
+   - Up, ``FEAT_TOOL_KEPT_TO_ITS_GRANT`` and ``STKH_TOOLS_CONFINED``: the
+     justification above; neither changes.
+   - Down, ``IMPL_SANDBOX_STEP`` and ``IMPL_SANDBOX_STEP_USER``: the code
+     meets the revised statement unchanged - it already ran a root person's
+     steps as 1000 - and each marker now follows ``DEC_STEP_USER_NEVER_ROOT``
+     in place of the decision it supersedes.
+   - Down, ``TEST_SANDBOX_STEP_USER`` and ``TEST_SANDBOX_USER_FROM_STATUS``:
+     unaffected in what they assert - the first that a step runs as the ids
+     the decision picks and never as root, and on Linux that its file belongs
+     to the test's user; the second how those ids are read - and both runs
+     pass at the head of this change. The first's body says it checks the
+     property through the decision's user.
+   - Sideways, the nine other requirements of the sandbox: unaffected.
+     ``CREQ_SANDBOX_LOCKED_DOWN`` and ``CREQ_SANDBOX_NOTHING_LEFT_RUNNING`` are
+     the two the old wording collided with for a root person, and the
+     revision is what removes the collision; neither changes.
+   - Text, the two markers above.
+
+.. dec:: Revised: a run is refused for an absent image, not for an engine out of reach
+   :id: DEC_CHANGE_RUNNER_REFUSES_UNGRANTED
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :supported_by: EVD_IMPACT_RUNNER_REFUSES_UNGRANTED
+   :statement: Agconflo's requirements project shall state what CREQ_RUNNER_REFUSES_UNGRANTED refuses a run for about its image as the image absent or lacking sh or timeout, as its parent does, rather than not ready.
+
+   Amends ``CREQ_RUNNER_REFUSES_UNGRANTED``.
+
+   Before: "If a tool the manifest names has an action its grants do not allow
+   or lacks a parameter its action takes or the sandbox finds the image not
+   ready, then Runner shall refuse the run before any node runs naming each
+   tool and why." After: "If a tool the manifest names has an action its
+   grants do not allow or lacks a parameter its action takes or the image is
+   absent or lacks sh or timeout, then Runner shall refuse the run before any
+   node runs naming each tool and why."
+
+   Raised by the review of #48: while the engine cannot be reached, a person
+   cannot answer a tool step by hand, since every answer asks for the image.
+
+   Justification: it is wrong against its own parent. ``FEAT_TOOL_UNGRANTED_REFUSED``
+   refuses a run whose tool lacks its grant or a parameter "or the image its
+   grants name is absent", each, its body says, "a run that cannot finish as
+   written". "Not ready", as the requirement's body read it, also covered an
+   engine that could not be reached, which is no fault of the run as written
+   and says nothing of the image: refusing for it claimed more than the parent
+   asks. The revision names what is wrong with the image itself, and drops
+   "the sandbox finds", which named the component that finds it.
+
+   It keeps one surplus, and says so: an image lacking ``sh`` or ``timeout``
+   is not "absent" in the parent's words. It is kept because the parent's
+   body covers it - such an image performs no step, so the run cannot finish
+   as written - and dropping it would let a run start that must fail at its
+   first tool.
+
+   Verdicts on the impact analysis (``EVD_IMPACT_RUNNER_REFUSES_UNGRANTED``):
+
+   - Up, ``FEAT_TOOL_UNGRANTED_REFUSED``, ``STKH_WIRING_CHECKED`` and
+     ``STKH_TOOLS_CONFINED``: the justification above; none changes.
+   - Down, ``IMPL_RUNNER_PREPARED``: changes. An engine that cannot be reached
+     no longer refuses a start, a resume or an answer
+     (``DEC_UNREACHABLE_ENGINE_REFUSES_NO_RUN``); the first tool step then
+     comes to the engine's failure through the sandbox, as it does when the
+     engine stops mid-run.
+   - Down, ``TEST_RUNNER_REFUSES_UNGRANTED``: unaffected in what it asserts,
+     which is an absent image refusing the run, and its run passes. A new case
+     checks the narrowing: a start and an answer with the engine out of reach
+     go on to the tool step and leave it awaiting.
+   - Sideways, the twelve other requirements of the runner: unaffected.
+     ``CREQ_RUNNER_CHECKS_TOOLS`` keeps reporting an engine out of reach, since
+     a check reports what would stop a run as well as what refuses one.
+     ``CREQ_RUNNER_ENGINE_FAILURE_STOPS`` now also covers the first tool step
+     of a run started while the engine was out of reach, in its own words.
+   - Text, the marker above, and the requirement's own body, whose sentence
+     saying an unreachable engine is refused here is rewritten.

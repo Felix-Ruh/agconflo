@@ -10,6 +10,10 @@ use std::sync::{Arc, Mutex};
 pub(crate) const IMAGE: &str =
     "alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6";
 
+/// A second image, whose sh is dash and whose timeout is GNU's, by its digest.
+pub(crate) const PYTHON: &str =
+    "python@sha256:cea0e6040540fb2b965b6e7fb5ffa00871e632eef63719f0ea54bca189ce14a6";
+
 /// A directory for one test's files, emptied when it is made and removed when
 /// it is dropped.
 pub(crate) struct Scratch {
@@ -62,10 +66,15 @@ pub(crate) fn needs_docker() {
         ),
         Err(error) => panic!("this test needs Docker, and docker could not be run: {error}"),
     }
-    let image = docker(&["image", "inspect", "--format", "{{.Id}}", IMAGE]);
+    needs_image(IMAGE);
+}
+
+/// `image` present, or a panic naming it and how to pull it.
+pub(crate) fn needs_image(image: &str) {
+    let inspected = docker(&["image", "inspect", "--format", "{{.Id}}", image]);
     assert!(
-        image.status.success(),
-        "this test needs the image {IMAGE}; pull it with: docker pull {IMAGE}"
+        inspected.status.success(),
+        "this test needs the image {image}; pull it with: docker pull {image}"
     );
 }
 
@@ -101,8 +110,8 @@ pub(crate) fn grants(
     limits: crate::grants::CommandLimits,
 ) -> crate::grants::Grants {
     let mut text = format!(
-        "image = \"{IMAGE}\"\nnetwork = {network}\nactions = [\"read\", \"write\", \"run\"]\n\n[limits]\nseconds = {}\noutput = {}\n",
-        limits.seconds, limits.output
+        "image = \"{IMAGE}\"\nimages = [\"{PYTHON}\"]\nnetwork = {network}\nactions = [\"read\", \"write\", \"run\"]\n\n[limits]\nseconds = {}\noutput = {}\ntmp = {}\n",
+        limits.seconds, limits.output, limits.tmp
     );
     for (name, writable) in folders {
         std::fs::create_dir_all(scratch.path(name)).expect("the folder");
@@ -335,7 +344,10 @@ pub(crate) struct StandIn {
 struct Inner {
     answer: Answer,
     ready: Result<(), crate::NotReady>,
+    not_ready: Vec<(String, crate::NotReady)>,
     asked: Vec<Asked>,
+    environments: Vec<(String, String)>,
+    images: Vec<String>,
 }
 
 impl StandIn {
@@ -347,7 +359,10 @@ impl StandIn {
             inner: std::rc::Rc::new(std::cell::RefCell::new(Inner {
                 answer: Box::new(answer),
                 ready: Ok(()),
+                not_ready: Vec::new(),
                 asked: Vec::new(),
+                environments: Vec::new(),
+                images: Vec::new(),
             })),
         }
     }
@@ -373,10 +388,29 @@ impl StandIn {
         })
     }
 
-    /// The same stand-in, finding the image not ready for `why`.
+    /// The same stand-in, finding every image not ready for `why`.
     pub(crate) fn not_ready(self, why: crate::NotReady) -> Self {
         self.inner.borrow_mut().ready = Err(why);
         self
+    }
+
+    /// The same stand-in, finding `image` not ready for `why`.
+    pub(crate) fn not_ready_for(self, image: &str, why: crate::NotReady) -> Self {
+        self.inner
+            .borrow_mut()
+            .not_ready
+            .push((image.to_owned(), why));
+        self
+    }
+
+    /// The container and the image of every step asked for, in order.
+    pub(crate) fn environments(&self) -> Vec<(String, String)> {
+        self.inner.borrow().environments.clone()
+    }
+
+    /// Every image asked about, in order.
+    pub(crate) fn images(&self) -> Vec<String> {
+        self.inner.borrow().images.clone()
     }
 
     /// Everything asked so far, in order.
@@ -384,29 +418,54 @@ impl StandIn {
         self.inner.borrow().asked.clone()
     }
 
-    fn step(&mut self, asked: Asked) -> Result<crate::Done, crate::EngineFailure> {
+    fn step(
+        &mut self,
+        environment: crate::Environment<'_>,
+        asked: Asked,
+    ) -> Result<crate::Done, crate::EngineFailure> {
         let mut inner = self.inner.borrow_mut();
         inner.asked.push(asked.clone());
+        inner.environments.push((
+            environment.container.to_owned(),
+            environment.image.to_owned(),
+        ));
         (inner.answer)(&asked)
     }
 }
 
 impl crate::performer::Container for StandIn {
-    fn ready(&self) -> Result<(), crate::NotReady> {
+    fn ready(&self, image: &str) -> Result<(), crate::NotReady> {
         let mut inner = self.inner.borrow_mut();
         inner.asked.push(Asked::Ready);
-        inner.ready.clone()
+        inner.images.push(image.to_owned());
+        match inner.not_ready.iter().find(|(named, _)| named == image) {
+            Some((_, why)) => Err(why.clone()),
+            None => inner.ready.clone(),
+        }
     }
 
-    fn read(&mut self, path: &str) -> Result<crate::Done, crate::EngineFailure> {
-        self.step(Asked::Read(path.to_owned()))
+    fn read(
+        &mut self,
+        environment: crate::Environment<'_>,
+        path: &str,
+    ) -> Result<crate::Done, crate::EngineFailure> {
+        self.step(environment, Asked::Read(path.to_owned()))
     }
 
-    fn write(&mut self, path: &str, text: &str) -> Result<crate::Done, crate::EngineFailure> {
-        self.step(Asked::Write(path.to_owned(), text.to_owned()))
+    fn write(
+        &mut self,
+        environment: crate::Environment<'_>,
+        path: &str,
+        text: &str,
+    ) -> Result<crate::Done, crate::EngineFailure> {
+        self.step(environment, Asked::Write(path.to_owned(), text.to_owned()))
     }
 
-    fn run(&mut self, command: &str) -> Result<crate::Done, crate::EngineFailure> {
-        self.step(Asked::Run(command.to_owned()))
+    fn run(
+        &mut self,
+        environment: crate::Environment<'_>,
+        command: &str,
+    ) -> Result<crate::Done, crate::EngineFailure> {
+        self.step(environment, Asked::Run(command.to_owned()))
     }
 }

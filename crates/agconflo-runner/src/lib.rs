@@ -32,5 +32,5 @@ pub use project::{Project, ProjectFault, Script, Tool, read_project};
 pub use runner::{
     Argument, Finding, Refusal, Sources, Stopped, ToolFault, answer, check, resume, start,
 };
-pub use sandbox::{Done, EngineFailure, NotReady, Sandbox};
+pub use sandbox::{Done, EngineFailure, Environment, NotReady, SHARED, Sandbox};
 pub use text::{FileFault, KeyFault, Place};
