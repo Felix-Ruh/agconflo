@@ -37,6 +37,7 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    features/yield
    features/runner
    features/tools
+   features/environment
    components/context
    components/wiring
    components/topology
