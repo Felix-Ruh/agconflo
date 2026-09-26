@@ -106,7 +106,7 @@ fn check_instance(
 /// Every parameter the declaration requires carries a binding, walked over the
 /// declaration rather than the bindings. Optional parameters, declared globals
 /// and an entry node's parameters need none.
-// @Every required parameter carries a binding,IMPL_WIRING_REQUIRED_BOUND,impl,[CREQ_VALIDATOR_REQUIRED_BOUND],[DEC_DECLARED_PARAMETERS, DEC_WORKFLOW_SIGNATURE]
+// @Every required parameter carries a binding,IMPL_WIRING_REQUIRED_BOUND,impl,[CREQ_VALIDATOR_REQUIRED_BOUND],[DEC_EVERY_INPUT_REQUIRED, DEC_WORKFLOW_SIGNATURE]
 fn check_required_bound(
     instance: &NodeInstance,
     declaration: &NodeType,
@@ -199,7 +199,7 @@ fn bound_more_than_once(
 /// The parameter `binding` fills, as its instance's type declares it in either
 /// list - or nothing, and a defect saying so. A requested global is not a
 /// parameter. Only an instance whose declaration resolved gets here.
-// @Every bound parameter declared by its instance's type,IMPL_WIRING_PARAMETER_DECLARED,impl,[CREQ_VALIDATOR_PARAMETER_DECLARED],[DEC_DECLARED_PARAMETERS]
+// @Every bound parameter declared by its instance's type,IMPL_WIRING_PARAMETER_DECLARED,impl,[CREQ_VALIDATOR_PARAMETER_DECLARED],[DEC_EVERY_INPUT_REQUIRED]
 fn declared_parameter<'d>(
     instance: &NodeInstance,
     declaration: &'d NodeType,
@@ -209,7 +209,6 @@ fn declared_parameter<'d>(
     let declared = declaration
         .required
         .iter()
-        .chain(&declaration.optional)
         .find(|parameter| parameter.name == binding.parameter);
     if declared.is_none() {
         defects.push(WiringDefect::UndeclaredParameter {
@@ -341,7 +340,7 @@ pub(crate) fn any_definition() -> impl Strategy<Value = WorkflowDefinition> {
     // provider would accept as a tool's name, which is also declared nowhere.
     const CALLS: [&str; 4] = ["t0", "t2", "t9", "a.b"];
 
-    let declarations = vec((0..=2usize, 0..=1usize, 0..=1usize, 0..2usize), 1..=3);
+    let declarations = vec((0..=2usize, 0..=1usize, 0..2usize), 1..=3);
     // Per node: its type, whether it is an entry node, its bindings, whether a
     // parameter may be bound more than once, and an earlier node whose name it
     // takes - an index at or past its own position keeps a name of its own.
@@ -363,19 +362,14 @@ pub(crate) fn any_definition() -> impl Strategy<Value = WorkflowDefinition> {
         let node_types: Vec<NodeType> = declarations
             .iter()
             .enumerate()
-            .map(|(declared, &(required, optional, globals, output))| {
+            .map(|(declared, &(required, globals, output))| {
                 let required: Vec<(&str, &str)> = PARAMETERS[..required]
                     .iter()
                     .enumerate()
                     .map(|(p, &name)| (name, CONTEXT_TYPES[(declared + p) % 2]))
                     .collect();
-                let optional: Vec<(&str, &str)> = PARAMETERS[2..2 + optional]
-                    .iter()
-                    .map(|&name| (name, CONTEXT_TYPES[declared % 2]))
-                    .collect();
                 let read: Vec<&str> = ["policy"][..globals].to_vec();
                 node_type(&format!("t{declared}"), &required, CONTEXT_TYPES[output])
-                    .with_optional(&optional)
                     .with_globals(&read)
             })
             .collect();
@@ -522,43 +516,35 @@ fn bound_twice(instance: &str, parameter: &str) -> WiringDefect {
 
 #[cfg(test)]
 proptest! {
-    /// Each instance is of a type of its own, declaring required parameters,
-    /// optional parameters and requested globals together; the first instance is
-    /// given no bindings. The expected report is worked out from the masks.
+    /// Each instance is of a type of its own, declaring required parameters and
+    /// requested globals together; the first instance is given no bindings. The expected report is worked out from the masks.
     #[test]
     fn every_unbound_required_is_reported(
-        shapes in vec((1..=3usize, 0..=2usize, 0..=2usize, any::<u8>()), 1..=4)
+        shapes in vec((1..=3usize, 0..=2usize, any::<u8>()), 1..=4)
     ) {
         let mut node_types = Vec::new();
         let mut instances = Vec::new();
         let mut expected = Vec::new();
 
-        for (node, &(required, optional, globals, mask)) in shapes.iter().enumerate() {
+        for (node, &(required, globals, mask)) in shapes.iter().enumerate() {
             let name = format!("n{node}");
             let declared_type = format!("t{node}");
             let required_names: Vec<String> = (0..required).map(|p| format!("r{p}")).collect();
-            let optional_names: Vec<String> = (0..optional).map(|p| format!("o{p}")).collect();
             let global_names: Vec<String> = (0..globals).map(|g| format!("g{g}")).collect();
 
             let declared: Vec<(&str, &str)> =
                 required_names.iter().map(|p| (p.as_str(), "note")).collect();
-            let accepted: Vec<(&str, &str)> =
-                optional_names.iter().map(|p| (p.as_str(), "note")).collect();
             let read: Vec<&str> = global_names.iter().map(String::as_str).collect();
-            node_types.push(
-                node_type(&declared_type, &declared, "note")
-                    .with_optional(&accepted)
-                    .with_globals(&read),
-            );
+            node_types.push(node_type(&declared_type, &declared, "note").with_globals(&read));
 
             // The first instance carries no bindings at all; every other binds
             // the subset its mask picks, always to a name that resolves.
             let mask = if node == 0 { 0 } else { mask };
             let mut bindings = Vec::new();
-            for (bit, parameter) in required_names.iter().chain(&optional_names).enumerate() {
+            for (bit, parameter) in required_names.iter().enumerate() {
                 if mask & (1u8 << bit) != 0 {
                     bindings.push((parameter.as_str(), "n0"));
-                } else if bit < required {
+                } else {
                     expected.push(unbound(&name, parameter));
                 }
             }
@@ -602,15 +588,14 @@ proptest! {
         prop_assert_eq!(report, expected);
     }
 
-    /// Each instance is of a type of its own declaring required parameters,
-    /// optional parameters and requested globals in any number, or of a type
-    /// nobody supplied, and binds names from one pool: every name either list
-    /// could declare, names spelled like the globals, and a name nothing
-    /// declares. Only undeclared-parameter defects are compared.
+    /// Each instance is of a type of its own declaring parameters and requested
+    /// globals in any number, or of a type nobody supplied, and binds names from
+    /// one pool: every name it could declare, names spelled like the globals, and
+    /// names nothing declares. Only undeclared-parameter defects are compared.
     #[test]
     fn every_undeclared_parameter_is_reported(
         shapes in vec(
-            (0..=2usize, 0..=2usize, 0..=2usize, any::<bool>(), vec(0..7usize, 0..=5)),
+            (0..=2usize, 0..=2usize, any::<bool>(), vec(0..7usize, 0..=5)),
             1..=4,
         )
     ) {
@@ -619,19 +604,16 @@ proptest! {
         let mut instances = vec![instance("s", "source", &[])];
         let mut expected = Vec::new();
 
-        for (node, (required, optional, globals, supplied, picks)) in shapes.iter().enumerate() {
+        for (node, (required, globals, supplied, picks)) in shapes.iter().enumerate() {
             let name = format!("n{node}");
             let required = &POOL[..*required];
-            let optional = &POOL[2..2 + optional];
             let declared_type = if *supplied {
                 let typed = |names: &[&'static str]| -> Vec<(&str, &str)> {
                     names.iter().map(|&name| (name, "note")).collect()
                 };
                 let name = format!("t{node}");
                 node_types.push(
-                    node_type(&name, &typed(required), "note")
-                        .with_optional(&typed(optional))
-                        .with_globals(&POOL[4..4 + globals]),
+                    node_type(&name, &typed(required), "note").with_globals(&POOL[4..4 + globals]),
                 );
                 name
             } else {
@@ -647,9 +629,7 @@ proptest! {
                 }
             }
             for &parameter in &bound {
-                let is_declared =
-                    required.contains(&parameter) || optional.contains(&parameter);
-                if *supplied && !is_declared {
+                if *supplied && !required.contains(&parameter) {
                     expected.push(undeclared(&name, parameter));
                 }
             }
@@ -724,8 +704,7 @@ proptest! {
     }
 
     /// The control: generated sound definitions, each holding a cycle of two
-    /// nodes, a pair no entry node reaches, an unbound optional parameter, an
-    /// unbound global, an output bound by several parameters, and an entry node
+    /// nodes, a pair no entry node reaches, an unbound global, an output bound by several parameters, and an entry node
     /// whose required parameter is the workflow's own, are reported clean.
     #[test]
     fn well_formed_definitions_pass(workflow in well_formed_definition()) {
@@ -737,15 +716,13 @@ proptest! {
 /// on top of a skeleton carrying every legal shape a strict validator refuses.
 #[cfg(test)]
 pub(crate) fn well_formed_definition() -> impl Strategy<Value = WorkflowDefinition> {
-    vec((0..2usize, any::<bool>()), 0..=3).prop_map(|extras| {
+    vec(0..2usize, 0..=3).prop_map(|extras| {
         let node_types = vec![
             node_type("seed_note", &[], "note"),
             node_type("seed_diff", &[], "diff"),
             node_type("pass_note", &[("input", "note")], "note"),
             node_type("pass_diff", &[("input", "diff")], "diff"),
-            node_type("lenient", &[], "note")
-                .with_optional(&[("hint", "note")])
-                .with_globals(&["policy"]),
+            node_type("lenient", &[], "note").with_globals(&["policy"]),
         ];
 
         let mut instances = vec![
@@ -759,24 +736,16 @@ pub(crate) fn well_formed_definition() -> impl Strategy<Value = WorkflowDefiniti
             // One output bound by several parameters.
             instance("fan_x", "pass_note", &[("input", "seed")]),
             instance("fan_y", "pass_note", &[("input", "seed")]),
-            // An optional left unbound, and a declared global nothing carries -
-            // and calls, one of them listed twice, to node types it carries.
+            // A declared global nothing carries - and calls, one of them listed
+            // twice, to node types it carries.
             instance("lax", "lenient", &[]).with_calls(&["pass_note", "seed_diff", "pass_note"]),
         ];
 
-        for (extra, &(kind, bind_optional)) in extras.iter().enumerate() {
+        for (extra, &kind) in extras.iter().enumerate() {
             instances.push(match kind {
                 0 => instance(&format!("x{extra}"), "pass_note", &[("input", "seed")]),
                 _ => instance(&format!("x{extra}"), "pass_diff", &[("input", "seed_diff")]),
             });
-            if bind_optional {
-                // The same optional parameter, this time wired, and agreeing.
-                instances.push(instance(
-                    &format!("l{extra}"),
-                    "lenient",
-                    &[("hint", "seed")],
-                ));
-            }
         }
 
         definition(node_types, instances, &["fan_x"])
@@ -820,9 +789,6 @@ fn malformed_definition_still_reports() {
         node_type("sink", &[("input", "note")], "note"),
     ];
 
-    let mut declared_both_ways = node_type("both", &[("input", "note")], "note");
-    declared_both_ways.optional = crate::workflow::parameters(&[("input", "diff")]);
-
     let malformed = [
         // Two node types sharing one name within the definition.
         definition(
@@ -834,17 +800,6 @@ fn malformed_definition_still_reports() {
             vec![
                 instance("a", "source", &[]),
                 instance("b", "sink", &[("input", "a")]),
-            ],
-            &["b"],
-        ),
-        // One parameter declared as both required and optional, bound and
-        // unbound.
-        definition(
-            vec![node_type("source", &[], "note"), declared_both_ways],
-            vec![
-                instance("a", "source", &[]),
-                instance("b", "both", &[("input", "a")]),
-                instance("c", "both", &[]),
             ],
             &["b"],
         ),
@@ -937,10 +892,8 @@ fn unwired_instance_is_reported() {
 #[test]
 fn degenerate_declarations_pass() {
     let types = vec![
-        // Optionals all unbound, and a global that no binding carries.
-        node_type("lenient", &[], "note")
-            .with_optional(&[("hint", "note")])
-            .with_globals(&["policy"]),
+        // A global that no binding carries.
+        node_type("lenient", &[], "note").with_globals(&["policy"]),
         // A type declaring no parameters at all.
         node_type("bare", &[], "note"),
         // Required parameters, supplied by the workflow rather than by wires.
@@ -1080,17 +1033,15 @@ fn undeclared_parameter_is_reported() {
     let types = vec![
         node_type("source", &[], "note"),
         node_type("differ", &[], "diff"),
-        node_type("lenient", &[("input", "note")], "note")
-            .with_optional(&[("hint", "note")])
-            .with_globals(&["policy"]),
+        node_type("lenient", &[("input", "note")], "note").with_globals(&["policy"]),
     ];
     let instances = vec![
         instance("a", "source", &[]),
         // What the undeclared bindings are wired from: an output no declared
         // parameter shares.
         instance("z", "differ", &[]),
-        // A typo of the optional parameter, and a binding spelled like the
-        // requested global. Nothing else about b is wrong.
+        // A name no parameter has, and a binding spelled like the requested
+        // global. Nothing else about b is wrong.
         instance(
             "b",
             "lenient",
@@ -1118,11 +1069,11 @@ fn undeclared_parameter_is_reported() {
 
 #[test]
 fn declared_parameters_pass() {
-    // The optional parameter bound beside the required one.
+    // Both parameters bound, each to a source of its type.
     let fed = definition(
         vec![
             node_type("source", &[], "note"),
-            node_type("lenient", &[("input", "note")], "note").with_optional(&[("hint", "note")]),
+            node_type("lenient", &[("input", "note"), ("hint", "note")], "note"),
         ],
         vec![
             instance("a", "source", &[]),
@@ -1313,15 +1264,15 @@ fn singly_bound_parameters_pass() {
 fn name_defects_reported_together() {
     let types = vec![
         node_type("source", &[], "note"),
-        node_type("lenient", &[("input", "note")], "note").with_optional(&[("hint", "note")]),
+        node_type("lenient", &[("input", "note")], "note"),
     ];
     let instances = vec![
         // A name two instances share, first in the definition.
         instance("a", "source", &[]),
         instance("a", "source", &[]),
         instance("s", "source", &[]),
-        // On one instance: its required parameter unbound, and a typo of its
-        // optional one bound twice.
+        // On one instance: its parameter unbound, and a name it does not
+        // declare bound twice.
         instance("b", "lenient", &[("hnit", "s"), ("hnit", "s")]),
     ];
     // And an output naming no instance.

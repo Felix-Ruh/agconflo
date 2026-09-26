@@ -127,10 +127,10 @@ and names the components they are divided between, which are defined in
    instances are written in: the same definition with one line moved gave one
    node both of its inputs and then only one, with no report either time.
 
-   ``DEC_BINDING_IS_AWAITED`` settles it in the other direction, and the reading
-   of "optional" it rests on is the one ``DEC_DECLARED_PARAMETERS`` already
-   wrote down: optional says what a definition may leave unwired, not what may
-   arrive late.
+   ``DEC_BINDING_IS_AWAITED`` settled it in the other direction, reading
+   "optional" as what a definition may leave unwired and not what may arrive
+   late. ``DEC_EVERY_INPUT_REQUIRED`` has since removed optional parameters, so
+   every parameter an instance's type declares is bound and waited for.
 
 .. feat_req:: A run stops at its budget
    :id: FEAT_RUN_BUDGET_STOPS
@@ -361,9 +361,8 @@ and names the components they are divided between, which are defined in
    - ``DEC_RUN_IS_DRIVEN``: the run hands its caller one activation at a time and
      takes back a context or a failure. Neither component performs an activation,
      which is what keeps a provider, a script and a runtime out of this feature.
-   - ``DEC_BINDING_IS_AWAITED``: a bound parameter is waited for whether it is
-     declared required or optional, so readiness is asked of what an instance
-     binds rather than of what its type requires.
+   - ``DEC_EVERY_INPUT_REQUIRED``, superseding ``DEC_BINDING_IS_AWAITED``:
+     every parameter a type declares is required, bound and waited for.
    - ``DEC_ARGUMENTS_PER_ENTRY``: an argument is addressed by the entry instance
      and parameter it fills, so two entry instances declaring one name are two
      parameters.

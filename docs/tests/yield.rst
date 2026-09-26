@@ -184,15 +184,16 @@ The run
    :test_kind: error_path
    :coverage: full
 
-   One call giving a parameter the node type does not declare, leaving a
-   required one without a context, and giving another a context of the wrong
-   type is refused once, naming all three parameters. Nothing is offered, the
-   budget is unchanged, and the calling activation is outstanding.
+   One call giving a parameter the node type does not declare, leaving one it
+   declares without a context, and giving another a context of the wrong type
+   is refused once, naming all three parameters. Nothing is offered, the budget
+   is unchanged, and the calling activation is outstanding.
 
-   Control that must pass: a call leaving an optional parameter unfilled.
+   Control that must pass: a call filling every parameter with its declared
+   type.
 
-   Catches: an unfilled optional parameter refused; the first fault reported;
-   refused having offered the activation.
+   Catches: a call as declared refused; the first fault reported; refused
+   having offered the activation.
 
 .. test_case:: A call or exchange bringing a second context under a held identifier is refused
    :id: TEST_RUN_CALL_SHARING_AN_IDENTIFIER_IS_REFUSED
@@ -523,12 +524,14 @@ The model roster
    :test_kind: positive
    :coverage: full
 
-   A node type with one required and one optional parameter and an empty
-   description is sent, in both formats, as a tool of its name with an empty
-   description, two string parameters and only the first listed as required. A
-   call offering nothing sends no tools field.
+   An offer naming two parameters, the first marked required and the second
+   not, and an empty description is sent, in both formats, as a tool of its
+   name with an empty description, two string parameters and only the first
+   listed as required. A call offering nothing sends no tools field. The host
+   marks every parameter it offers required (``DEC_EVERY_INPUT_REQUIRED``); the
+   roster sends the marks it is given.
 
-   Catches: an optional parameter listed as required; an empty description sent
+   Catches: a parameter not marked required listed as required; an empty description sent
    as absent, or absent sent as empty; an empty tool list sent when nothing is
    offered.
 

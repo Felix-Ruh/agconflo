@@ -11,15 +11,15 @@ use std::time::{Duration, Instant};
 const BINARY: &str = env!("CARGO_BIN_EXE_agconflo");
 
 /// Every node type the tests' workflows use.
-const TYPES: &str = "[types.begin]\nrequired = { brief = \"note\" }\noptional = { extra = \"note\" }\noutput = \"note\"\n\n[types.ask]\nrequired = { before = \"note\" }\noutput = \"note\"\n\n[types.count]\nrequired = { before = \"note\" }\noutput = \"note\"\n\n[types.review]\nrequired = { before = \"note\" }\noutput = \"note\"\n\n[types.join]\nrequired = { before = \"note\", start = \"note\" }\noutput = \"note\"\n\n[types.add]\nrequired = { before = \"note\" }\noutput = \"note\"\n\n[types.broken]\nrequired = { before = \"note\" }\noutput = \"note\"\n";
+const TYPES: &str = "[types.begin]\nrequired = { brief = \"note\" }\noutput = \"note\"\n\n[types.ask]\nrequired = { before = \"note\" }\noutput = \"note\"\n\n[types.count]\nrequired = { before = \"note\" }\noutput = \"note\"\n\n[types.review]\nrequired = { before = \"note\" }\noutput = \"note\"\n\n[types.join]\nrequired = { before = \"note\", start = \"note\" }\noutput = \"note\"\n\n[types.add]\nrequired = { before = \"note\" }\noutput = \"note\"\n\n[types.broken]\nrequired = { before = \"note\" }\noutput = \"note\"\n";
 
-/// The scripts, by file: `begin` joins its brief and extra with `|`, `ask` and
+/// The scripts, by file: `begin` passes its brief on, `ask` and
 /// `count` put what came before to the roles `helping` and `counting`, `join`
 /// joins the start and what came before with `/`, `add` appends `+c`.
 const SCRIPTS: [(&str, &str); 6] = [
     (
         "begin.lua",
-        "local given, host = ...\nreturn host.compose(host.output, {given.brief, given.extra}, '|')\n",
+        "local given, host = ...\nreturn host.compose(host.output, {given.brief}, '')\n",
     ),
     (
         "ask.lua",
@@ -248,7 +248,7 @@ impl Drop for Running {
 fn commands_reach_the_runner() {
     let scratch = Scratch::new("commands_reach_the_runner");
     scratch.project(PERSON, 5);
-    scratch.write("extra.txt", "X Y\r\n");
+    scratch.write("brief.txt", "a b|X Y\r\n");
     scratch.write("answer.txt", "ans wer\r\n");
 
     let (status, out, _) = scratch.ran(&["check", "manifest.toml"]);
@@ -259,14 +259,10 @@ fn commands_reach_the_runner() {
         "manifest.toml",
         "--record",
         "run.toml",
-        "--arg",
-        "first",
-        "brief",
-        "a b",
         "--arg-file",
         "first",
-        "extra",
-        "extra.txt",
+        "brief",
+        "brief.txt",
     ]);
     assert_eq!(status, 3, "{err}");
     assert!(out.contains("instance: second"), "{out}");

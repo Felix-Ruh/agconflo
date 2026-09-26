@@ -177,9 +177,6 @@ nothing to it (``DEC_BEHAVIOUR_OWN_CRATE``).
    - **Inputs by position rather than by name.** A script then depends on the
      order its node type declares its parameters, and reordering a declaration
      silently swaps what each name means.
-   - **An optional parameter left unbound handed over as an empty context.** The
-     activation leaves it absent (``CREQ_SCHEDULER_ACTIVATION_CARRIES``), and a
-     script must be able to tell absent from empty the same way.
    - **The script of another node type run.** A workflow whose node types have
      different scripts finds it; one where every type's script happens to agree
      passes against a host that runs any of them.

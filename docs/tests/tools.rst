@@ -190,8 +190,8 @@ catches it, and where one is caught only in part the case says so.
    In a container: a ``read`` of a file that does not exist answers with text
    naming the read and what the container printed, not with nothing; a
    ``write`` into a folder granted read-only answers the same way. Against the
-   stand-in, a ``read`` step whose optional ``path`` was left unbound answers
-   with text naming the missing input, and the stand-in was asked nothing.
+   stand-in, a ``read`` step given no ``path`` answers with text naming the
+   missing input, and the stand-in was asked nothing.
    None of them fails the node.
 
    Catches: a failed read answered with nothing, a missing input failing the
@@ -486,10 +486,9 @@ catches it, and where one is caught only in part the case says so.
    not allow is refused naming both; a ``read`` tool whose node type declares
    no ``path`` is refused naming it; the stand-in reporting the image not
    ready refuses the run with its report. None takes the record file. A
-   ``read`` tool declaring ``path`` as optional starts - the control.
+   ``read`` tool declaring ``path``, its image ready, starts - the control.
 
-   Catches: only the first ungranted tool named, an optional parameter taken
-   as missing.
+   Catches: only the first ungranted tool named.
 
 .. test_case:: An engine's failure stops the run awaiting the step, resumable either way
    :id: TEST_RUNNER_ENGINE_FAILURE_LEAVES_THE_STEP

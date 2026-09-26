@@ -36,8 +36,8 @@ pub enum WiringDefect {
         /// The node type name that resolved to nothing, as it was written.
         unresolved: String,
     },
-    /// A binding names a parameter that the node type of its instance declares
-    /// neither as required nor as optional.
+    /// A binding names a parameter that the node type of its instance does not
+    /// declare.
     UndeclaredParameter {
         /// The instance carrying the binding.
         instance: String,
@@ -290,7 +290,6 @@ proptest! {
                     declared
                         .required
                         .iter()
-                        .chain(&declared.optional)
                         .any(|declared| declared.name == parameter)
                 });
             let wired = instance

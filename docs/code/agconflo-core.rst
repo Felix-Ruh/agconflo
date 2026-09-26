@@ -131,15 +131,6 @@ error, since code comes after its requirement; the review report
    they gave faults in the syntax and missing keys, and not one value of the
    wrong kind.
 
-.. code_note:: An unbound parameter is absent from an activation
-   :id: NOTE_SCHEDULER_ABSENT_PARAMETER
-
-   A parameter the definition leaves unbound is absent from the activation's
-   inputs rather than present and empty. That is the only way an optional
-   parameter left unwired can be told from one bound to something that rendered
-   to nothing, and a script host hands it on the same way, as a name with no
-   value.
-
 .. code_note:: A run keeps one ordered list of what it accepted
    :id: NOTE_RUN_ONE_EVENT_LIST
 

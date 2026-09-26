@@ -1451,9 +1451,8 @@ output = \"note\"
 #[cfg(test)]
 use crate::models::{Reply, Stub, client_for, sent_messages, sent_tools};
 
-/// Node types for a model yielding: `ask`, which asks; `lookup`, described, one
-/// required parameter and one optional; and `search`, which nothing declares a
-/// call to.
+/// Node types for a model yielding: `ask`, which asks; `lookup`, described,
+/// taking one parameter; and `search`, which nothing declares a call to.
 #[cfg(test)]
 pub(crate) const YIELD_TYPES: &str = "\
 [types.ask]
@@ -1462,7 +1461,6 @@ output = \"note\"
 [types.lookup]
 description = \"Looks a codeword up.\"
 required = { query = \"note\" }
-optional = { hint = \"note\" }
 output = \"note\"
 
 [types.search]
@@ -1691,10 +1689,7 @@ fn offer_is_the_declared_calls() {
     let lookup_offered = Some(vec![(
         "lookup".to_owned(),
         Some("Looks a codeword up.".to_owned()),
-        vec![
-            ("query".to_owned(), "string".to_owned()),
-            ("hint".to_owned(), "string".to_owned()),
-        ],
+        vec![("query".to_owned(), "string".to_owned())],
         vec!["query".to_owned()],
     )]);
     // Declared twice, offered once; `search` is in the catalogue and not
@@ -1723,7 +1718,7 @@ fn offer_is_the_declared_calls() {
         .iter()
         .map(|part| text_of(last, part.as_str().expect("an identifier")))
         .collect();
-    assert_eq!(parts, ["lookup", "Looks a codeword up.", "query", "hint"]);
+    assert_eq!(parts, ["lookup", "Looks a codeword up.", "query"]);
 
     // A node declaring no calls offers nothing.
     let plain = Stub::replying(vec![Reply::text("plain")]);
@@ -1843,7 +1838,7 @@ fn malformed_call_fails() {
         ),
         (
             "lookup",
-            "{\"hint\": \"x\"}",
+            "{}",
             ModelCallFault::RequiredMissing {
                 parameter: "query".to_owned(),
             },

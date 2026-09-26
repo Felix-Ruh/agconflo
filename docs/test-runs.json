@@ -705,15 +705,6 @@
           "title": "agconflo-lua host::runaway_script_is_stopped",
           "type": "test_run"
         },
-        "RUN_HOST_UNBOUND_OPTIONAL_IS_ABSENT": {
-          "executes": [
-            "TEST_HOST_UNBOUND_OPTIONAL_IS_ABSENT"
-          ],
-          "id": "RUN_HOST_UNBOUND_OPTIONAL_IS_ABSENT",
-          "test_outcome": "passed",
-          "title": "agconflo-lua host::unbound_optional_is_absent",
-          "type": "test_run"
-        },
         "RUN_ID_CANNOT_BE_FORGED": {
           "executes": [
             "TEST_ID_CANNOT_BE_FORGED"
@@ -1245,6 +1236,15 @@
           "title": "agconflo-core reader::faults_carry_their_place",
           "type": "test_run"
         },
+        "RUN_READER_LISTS_KEPT_APART": {
+          "executes": [
+            "TEST_READER_LISTS_KEPT_APART"
+          ],
+          "id": "RUN_READER_LISTS_KEPT_APART",
+          "test_outcome": "passed",
+          "title": "agconflo-core reader::lists_kept_apart",
+          "type": "test_run"
+        },
         "RUN_READER_MALFORMED_CALLS_LOCATED": {
           "executes": [
             "TEST_READER_MALFORMED_CALLS_LOCATED"
@@ -1254,13 +1254,13 @@
           "title": "agconflo-core reader::malformed_calls_located",
           "type": "test_run"
         },
-        "RUN_READER_PARAMETER_DECLARED_TWICE_IS_A_FAULT": {
+        "RUN_READER_OPTIONAL_PARAMETERS_REFUSED": {
           "executes": [
-            "TEST_READER_PARAMETER_DECLARED_TWICE_IS_A_FAULT"
+            "TEST_READER_OPTIONAL_PARAMETERS_REFUSED"
           ],
-          "id": "RUN_READER_PARAMETER_DECLARED_TWICE_IS_A_FAULT",
+          "id": "RUN_READER_OPTIONAL_PARAMETERS_REFUSED",
           "test_outcome": "passed",
-          "title": "agconflo-core reader::parameter_declared_twice_is_a_fault",
+          "title": "agconflo-core reader::optional_parameters_refused",
           "type": "test_run"
         },
         "RUN_READER_PARAMETER_ORDER_IS_KEPT": {
@@ -1288,15 +1288,6 @@
           "id": "RUN_READER_READS_WHAT_IS_WRITTEN",
           "test_outcome": "passed",
           "title": "agconflo-core reader::reads_what_is_written",
-          "type": "test_run"
-        },
-        "RUN_READER_THREE_LISTS_KEPT_APART": {
-          "executes": [
-            "TEST_READER_THREE_LISTS_KEPT_APART"
-          ],
-          "id": "RUN_READER_THREE_LISTS_KEPT_APART",
-          "test_outcome": "passed",
-          "title": "agconflo-core reader::three_lists_kept_apart",
           "type": "test_run"
         },
         "RUN_READER_UNNAMED_KEYS_ARE_READ": {
@@ -2244,15 +2235,6 @@
           "title": "agconflo-core scheduler::activation_is_exactly_its_bindings",
           "type": "test_run"
         },
-        "RUN_SCHEDULER_BOUND_OPTIONAL_IS_AWAITED": {
-          "executes": [
-            "TEST_SCHEDULER_BOUND_OPTIONAL_IS_AWAITED"
-          ],
-          "id": "RUN_SCHEDULER_BOUND_OPTIONAL_IS_AWAITED",
-          "test_outcome": "passed",
-          "title": "agconflo-core scheduler::bound_optional_is_awaited",
-          "type": "test_run"
-        },
         "RUN_SCHEDULER_EACH_PARAMETER_GETS_ITS_OWN": {
           "executes": [
             "TEST_SCHEDULER_EACH_PARAMETER_GETS_ITS_OWN"
@@ -2269,6 +2251,15 @@
           "id": "RUN_SCHEDULER_ENTRY_IS_READY_AT_ONCE",
           "test_outcome": "passed",
           "title": "agconflo-core scheduler::entry_is_ready_at_once",
+          "type": "test_run"
+        },
+        "RUN_SCHEDULER_EVERY_INPUT_IS_AWAITED": {
+          "executes": [
+            "TEST_SCHEDULER_EVERY_INPUT_IS_AWAITED"
+          ],
+          "id": "RUN_SCHEDULER_EVERY_INPUT_IS_AWAITED",
+          "test_outcome": "passed",
+          "title": "agconflo-core scheduler::every_input_is_awaited",
           "type": "test_run"
         },
         "RUN_SCHEDULER_GLOBALS_ARE_NOT_GIVEN": {
@@ -2325,13 +2316,13 @@
           "title": "agconflo-core scheduler::produced_instance_not_offered",
           "type": "test_run"
         },
-        "RUN_SCHEDULER_UNBOUND_OPTIONAL_IS_READY": {
+        "RUN_SCHEDULER_UNBOUND_PARAMETER_NEVER_READY": {
           "executes": [
-            "TEST_SCHEDULER_UNBOUND_OPTIONAL_IS_READY"
+            "TEST_SCHEDULER_UNBOUND_PARAMETER_NEVER_READY"
           ],
-          "id": "RUN_SCHEDULER_UNBOUND_OPTIONAL_IS_READY",
+          "id": "RUN_SCHEDULER_UNBOUND_PARAMETER_NEVER_READY",
           "test_outcome": "passed",
-          "title": "agconflo-core scheduler::unbound_optional_is_ready",
+          "title": "agconflo-core scheduler::unbound_parameter_never_ready",
           "type": "test_run"
         },
         "RUN_SCHEDULER_UNRESOLVED_SOURCE_NEVER_READY": {

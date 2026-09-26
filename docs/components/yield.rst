@@ -187,8 +187,6 @@ The run
 
    Failure modes:
 
-   - **An unfilled optional parameter refused.** It may go without, as an
-     unbound optional parameter of an instance does.
    - **The first fault reported.** A caller fixing its call learns one at a
      time.
    - **Refused having offered the activation.** The node type runs without its
@@ -505,8 +503,10 @@ The model roster
 
    Failure modes:
 
-   - **An optional parameter listed as required.** The model fills it with
-     something rather than leave it out.
+   - **A parameter not marked required listed as required.** The model fills
+     it with something rather than leave it out. The host marks every parameter
+     it offers required (``DEC_EVERY_INPUT_REQUIRED``); the roster sends the
+     marks it is given.
    - **An empty description sent as absent, or absent sent as empty.** Either
      is a different tool from the one offered.
    - **An empty tool list sent when nothing is offered.** Every model call a

@@ -8,7 +8,7 @@ use crate::ContextType;
 
 /// One parameter a node type declares: its name, and the context type it is
 /// declared for.
-// @A parameter declared by name and type,TRACE_WORKFLOW_PARAMETER,trace,[],[DEC_DECLARED_PARAMETERS]
+// @A parameter declared by name and type,TRACE_WORKFLOW_PARAMETER,trace,[],[DEC_EVERY_INPUT_REQUIRED]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Parameter {
     /// The name a binding uses to reach this parameter.
@@ -18,9 +18,9 @@ pub struct Parameter {
 }
 
 /// What one kind of node consumes and produces, declared once and instantiated
-/// as often as a workflow likes: required and optional parameters, the global
-/// context types it reads by declaration, and one typed output.
-// @A node type declared once,TRACE_WORKFLOW_NODE_TYPE,trace,[],[DEC_TWO_LAYERS, DEC_DECLARED_PARAMETERS]
+/// as often as a workflow likes: the parameters it requires, the global context
+/// types it reads by declaration, and one typed output.
+// @A node type declared once,TRACE_WORKFLOW_NODE_TYPE,trace,[],[DEC_TWO_LAYERS, DEC_EVERY_INPUT_REQUIRED]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NodeType {
     /// The name an instance names to reach this declaration.
@@ -29,10 +29,9 @@ pub struct NodeType {
     /// when it gives none.
     // @A node type's description,TRACE_WORKFLOW_DESCRIPTION,trace,[],[DEC_TOOLS_OFFERED_AS_CONTEXTS]
     pub description: String,
-    /// Parameters a node of this type cannot run without.
+    /// Parameters a node of this type cannot run without, which are all of
+    /// its parameters.
     pub required: Vec<Parameter>,
-    /// Parameters a node of this type uses when they are wired.
-    pub optional: Vec<Parameter>,
     /// Context types read by declaration rather than through a binding.
     pub globals: Vec<ContextType>,
     /// The context type of the one output a node of this type produces.
@@ -96,15 +95,13 @@ pub(crate) fn context_type(name: &str) -> ContextType {
     ContextType::new(name).expect("a non-empty type name is accepted")
 }
 
-/// A node type requiring `required` and producing `output`, with no optional
-/// parameters and no globals. Each parameter is `(name, context type)`.
+/// A node type requiring `required` and producing `output`, with no globals. Each parameter is `(name, context type)`.
 #[cfg(test)]
 pub(crate) fn node_type(name: &str, required: &[(&str, &str)], output: &str) -> NodeType {
     NodeType {
         name: name.to_owned(),
         description: String::new(),
         required: parameters(required),
-        optional: Vec::new(),
         globals: Vec::new(),
         output: context_type(output),
     }
@@ -112,12 +109,6 @@ pub(crate) fn node_type(name: &str, required: &[(&str, &str)], output: &str) -> 
 
 #[cfg(test)]
 impl NodeType {
-    /// The same declaration, also accepting `optional`.
-    pub(crate) fn with_optional(mut self, optional: &[(&str, &str)]) -> Self {
-        self.optional = parameters(optional);
-        self
-    }
-
     /// The same declaration, described as `description`.
     pub(crate) fn described(mut self, description: &str) -> Self {
         self.description = description.to_owned();

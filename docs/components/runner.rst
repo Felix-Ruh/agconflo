@@ -334,7 +334,7 @@ component requirement whose subject is anything else.
    :statement: When text is given for an entry instance's parameter, Runner shall supply the run a context of the type that parameter declares holding that text exactly.
 
    ``DEC_ARGUMENTS_AS_TEXT``. The type is the one the instance's node type
-   declares for the parameter, required or optional.
+   declares for the parameter.
 
    Failure modes:
 

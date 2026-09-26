@@ -42,10 +42,11 @@ component requirement whose subject is anything else.
    separates it from the run that keeps asking.
 
    This is where the one measured failure of the slice lives
-   (``EVD_RUN_OPTIONAL_BY_ORDER``): a walk that asks readiness of the required
-   parameters alone lets an instance activate before an optional parameter's
-   source has produced, and which instance that is depends on the order the
-   definition carries them in.
+   (``EVD_RUN_OPTIONAL_BY_ORDER``): a walk that asked readiness of the required
+   parameters alone let an instance activate before an optional parameter's
+   source had produced, and which instance that was depended on the order the
+   definition carried them in. Every parameter is required now
+   (``DEC_EVERY_INPUT_REQUIRED``), and readiness is asked of all of them.
 
 .. comp_req:: An instance is offered only once everything it binds has arrived
    :id: CREQ_SCHEDULER_READY_WHEN_BOUND
@@ -54,23 +55,23 @@ component requirement whose subject is anything else.
    :ears_pattern: ubiquitous
    :statement: Run scheduler shall offer an instance for activation only once every parameter that instance binds has a context.
 
-   Readiness is asked of what an instance binds, not of what its node type
-   requires (``DEC_BINDING_IS_AWAITED``). An entry instance's parameters are
-   filled from the run's arguments instead, which are present before the run
-   starts or it does not start at all.
+   Readiness is asked of every parameter the instance's node type declares, all
+   of them required (``DEC_EVERY_INPUT_REQUIRED``): one the definition leaves
+   unbound never has a context, so its instance is never offered. An entry
+   instance's parameters are filled from the run's arguments instead, which are
+   present before the run starts or it does not start at all.
 
    Failure modes, each of which produces a well-formed wrong answer rather than
    an error:
 
-   - **Readiness asked of the required parameters alone.** The measured one
-     (``EVD_RUN_OPTIONAL_BY_ORDER``). An instance is offered before an optional
-     parameter's source has produced, and is given a strict subset of what was
-     wired to it. Nothing reports it, both runs complete, and which subset
-     arrives depends on the order the definition carries its instances in.
-   - **Readiness asked of every parameter the type declares.** The opposite
-     error, and it deadlocks instead: an optional parameter that the definition
-     deliberately leaves unbound never gets a context, so the instance is never
-     offered and the run is quiescent.
+   - **Readiness asked of some of the parameters alone.** The measured shape
+     (``EVD_RUN_OPTIONAL_BY_ORDER``). An instance is offered before one of its
+     sources has produced, and is given a strict subset of what was wired to it.
+     Nothing reports it, both runs complete, and which subset arrives depends on
+     the order the definition carries its instances in.
+   - **Readiness asked of the bindings an instance has.** An instance whose
+     definition leaves a parameter unbound is then offered with that parameter
+     missing, and its script meets a name with no value.
    - **A binding whose source is not an instance treated as filled.** A source
      naming nothing cannot arrive, so an instance bound to it is never ready.
      Treating an unresolvable name as absent and therefore ignorable would offer
@@ -79,9 +80,8 @@ component requirement whose subject is anything else.
      (``DEC_ACTIVATION_ONCE_PER_RUN``), and an instance that has produced has a
      context for everything it binds, so this is the shape that loops forever.
 
-   Must pass unoffered and unreported: an instance whose optional parameter is
-   unbound in the definition, which is ready as soon as its bound parameters have
-   contexts, and an entry instance, which is ready from the start.
+   Must pass unoffered and unreported: an entry instance, which is ready from
+   the start.
 
 .. comp_req:: An activation carries what was wired to its instance
    :id: CREQ_SCHEDULER_ACTIVATION_CARRIES
@@ -107,7 +107,7 @@ component requirement whose subject is anything else.
    - **A global context included.** A node type declares the global types it
      reads and nothing supplies them, so anything arriving under that heading was
      invented.
-   - **An optional parameter bound but omitted from the activation.**
+   - **A parameter bound but omitted from the activation.**
      ``CREQ_SCHEDULER_READY_WHEN_BOUND`` waited for it, and dropping it here
      throws away what the waiting was for.
 
@@ -211,12 +211,11 @@ component requirement whose subject is anything else.
    - **An argument naming an instance or parameter the workflow does not have.**
      A typo in a parameter name then leaves the real parameter unfilled while the
      caller believes it supplied it.
-   - **An argument for an optional entry parameter treated as required.** An
-     entry instance's optional parameter may legitimately go unsupplied, and
-     refusing it would make a workflow unusable that is not wrong.
+   - **An entry parameter left unsupplied and the run started.** Every
+     parameter is required (``DEC_EVERY_INPUT_REQUIRED``), so the entry node
+     would be given an activation missing it.
 
-   Must pass unreported: one argument per required entry parameter of the
-   declared type, and two entry instances of the same node type, whose parameters
+   Must pass unreported: one argument per entry parameter of the declared type, and two entry instances of the same node type, whose parameters
    share names and are two parameters all the same.
 
 .. comp_req:: A run stops at its budget rather than past it

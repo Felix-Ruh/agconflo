@@ -68,9 +68,9 @@ requirement for when authoring lands.
    type, when a key the reader needs is missing, or when a name is repeated
    within it. Since every name is a table key (``DEC_NAMES_AS_KEYS``), a name
    repeated within one table is a repeated key and not TOML at all. Of the names
-   written as keys, the one the parser cannot see repeated is a parameter a node
-   type declares under both its required and its optional list, which are two
-   tables, so the reader refuses that itself. Each is a fault in the text rather
+   written as keys, the parser cannot see that an ``optional`` list on a node
+   type means something that no longer exists, so the reader refuses that
+   itself (``DEC_OPTIONAL_PARAMETERS_REFUSED``). Each is a fault in the text rather
    than in the workflow, and nothing further can be checked until it is fixed.
 
    Naming the document matters as soon as there are several: a fault reported at

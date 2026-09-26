@@ -51,11 +51,13 @@ is a dead link that fails the build rather than a result nobody noticed.
 
 Two shapes are asserted on but not classified, and the distinction is the whole
 reason ``TEST_WIRING_MALFORMED_DEFINITION_STILL_REPORTS`` reads the way it does:
-two node types sharing one name within a definition, and one parameter declared
-as both required and optional. ``CREQ_VALIDATOR_BINDING_RESOLVES`` records both as
-still open, so which defect each earns is unsettled, and a case asserting one
-would be inventing a requirement rather than checking one. What is settled is
-that neither may stop the walk, and that is what the case asserts. The three
+two node types sharing one name within a definition, and - until every parameter
+was required (``DEC_EVERY_INPUT_REQUIRED``) - one parameter declared as both
+required and optional, which a declaration can no longer hold.
+``CREQ_VALIDATOR_BINDING_RESOLVES`` records the first as still open, so which
+defect it earns is unsettled, and a case asserting one would be inventing a
+requirement rather than checking one. What is settled is that it may not stop
+the walk, and that is what the case asserts. The three
 shapes it held before them are classified now, each by cases of its own below.
 The third shape still open, a binding into an entry node, is legal today and
 checked like any other binding, so no case singles it out.
@@ -66,16 +68,15 @@ checked like any other binding, so no case singles it out.
    :test_kind: property
    :coverage: partial
 
-   For any definition whose node types declare required parameters, optional
-   parameters and requested global types, with an arbitrary subset of each bound,
-   the unbound-parameter defects are exactly the required parameters carrying no
-   binding, computed independently by the test.
+   For any definition whose node types declare parameters and requested global
+   types, with an arbitrary subset of the parameters bound, the unbound-parameter
+   defects are exactly the parameters carrying no binding, computed independently
+   by the test.
 
    The generator must reach an instance with no bindings at all, since that is
-   the case a walk over the bindings never visits, and it must declare optionals
-   and globals on the same instances as required parameters, since a walk that
-   reports those is over-blocking and no case built only from required parameters
-   would see it.
+   the case a walk over the bindings never visits, and it must declare globals on
+   the same instances as parameters, since a walk that reports those is
+   over-blocking and no case built only from parameters would see it.
 
 .. test_case:: An instance with no bindings is reported once per parameter
    :id: TEST_WIRING_UNWIRED_INSTANCE_IS_REPORTED
@@ -93,15 +94,14 @@ checked like any other binding, so no case singles it out.
    would satisfy "a defect is reported" and leave the author to work out which
    parameters it meant.
 
-.. test_case:: Optionals, globals and empty declarations pass
+.. test_case:: Globals and empty declarations pass
    :id: TEST_WIRING_DEGENERATE_DECLARATIONS_PASS
    :verifies: CREQ_VALIDATOR_REQUIRED_BOUND
    :test_kind: positive
    :coverage: partial
 
    Nothing is reported for each shape the requirement names as legal: a node
-   whose optional parameters are all unbound; a node type declaring no parameters
-   at all; a node requesting a global context type that no binding carries; an
+   type declaring no parameters at all; a node requesting a global context type that no binding carries; an
    entry node, whose parameters are the workflow's own rather than wires.
 
    A generator reaches a node type with an empty parameter list rarely, and never
@@ -244,16 +244,16 @@ checked like any other binding, so no case singles it out.
    :test_kind: error_path
    :coverage: partial
 
-   On instances of a node type requiring one parameter, accepting another as
-   optional and requesting a global type, each of these bindings is reported as
-   one defect naming its instance and the parameter as it was written: a typo of
-   the optional parameter; a binding spelled like the requested global; a typo of
+   On instances of a node type requiring one parameter and requesting a global
+   type, each of these bindings is reported as one defect naming its instance
+   and the parameter as it was written: a name no parameter has; a binding
+   spelled like the requested global; a typo of
    the required parameter, reported beside the required parameter it leaves
    unbound; and an undeclared parameter bound to an instance that is not there,
    reported beside that unresolved source.
 
-   The first is the case the requirement exists for: nothing else about it is
-   wrong, and it used to pass. The last two are what a walk moving on after one
+   The first is the case the requirement exists for: nothing else about the
+   instance is wrong. The last two are what a walk moving on after one
    defect gets wrong, each hiding a second fix behind the first. And no context
    type disagreement is reported for any of them, although the instance they are
    wired from produces a type no declared parameter has: an undeclared parameter
@@ -266,17 +266,17 @@ checked like any other binding, so no case singles it out.
    :test_kind: property
    :coverage: partial
 
-   For any definition whose node types declare required parameters, optional
-   parameters and requested globals in any number, and whose instances bind names
-   drawn from a pool holding every declared parameter, a name spelled like a
-   requested global and a name nothing declares, the undeclared-parameter defects
-   are exactly the bindings whose name neither list declares, computed
+   For any definition whose node types declare parameters and requested globals
+   in any number, and whose instances bind names drawn from a pool holding every
+   declared parameter, names spelled like requested globals and names nothing
+   declares, the undeclared-parameter defects are exactly the bindings whose name
+   no parameter has, computed
    independently by the test. Some instances are of a node type that was not
    supplied, and nothing about them is reported as undeclared.
 
    The pool puts declared and undeclared names side by side on one instance,
-   because a check reading the wrong list, or one list short, passes every
-   instance whose bindings are all of one kind.
+   because a check reading the wrong list passes every instance whose bindings
+   are all of one kind.
 
 .. test_case:: Bindings to declared parameters pass
    :id: TEST_WIRING_DECLARED_PARAMETERS_PASS
@@ -284,12 +284,11 @@ checked like any other binding, so no case singles it out.
    :test_kind: positive
    :coverage: partial
 
-   Nothing is reported for an instance binding its optional parameter as well as
-   its required one.
+   Nothing is reported for an instance binding both of the parameters its node
+   type declares, each from a source of its type.
 
-   An optional parameter is the one a check searching the required list alone
-   reports, and bound beside a required one it is the shape where both lists have
-   to be searched.
+   The control against a check reporting a declared parameter: with two, one
+   searching only the first entry of the list reports the second.
 
 .. test_case:: An output naming no instance is reported
    :id: TEST_WIRING_OUTPUT_NAMING_NOTHING_IS_REPORTED
@@ -455,15 +454,14 @@ checked like any other binding, so no case singles it out.
    :coverage: partial
 
    Each of these returns a report rather than ending the run: two node types
-   sharing one name; one parameter declared as both required and optional; a
-   binding naming an empty instance name; a definition declaring node types it has
+   sharing one name; a binding naming an empty instance name; a definition declaring node types it has
    no instances of.
 
    Not ending the run is the whole assertion, and it is deliberately the whole of
    it. An index out of range, or an unwrap on a declaration that is not there,
    stops the walk at the first defect wearing different clothes, and a process
    that aborts reports nothing at all - so ``CREQ_VALIDATOR_EVERY_DEFECT`` is
-   what these shapes are held to. Which defect, if any, the first two earn is
+   what these shapes are held to. Which defect, if any, the first earns is
    recorded as still open under ``CREQ_VALIDATOR_BINDING_RESOLVES``, and
    asserting a class here would pin behaviour no requirement asks for and make
    the next slice's answer a regression.
@@ -485,8 +483,7 @@ checked like any other binding, so no case singles it out.
 
    The generator carries this case, and it must reach the shapes a validator
    written to be strict refuses by accident: a cycle, a node no entry node
-   reaches, an unbound optional parameter, a declared global that no binding
-   carries, and an output bound by several parameters. A generator producing only
+   reaches, a declared global that no binding carries, and an output bound by several parameters. A generator producing only
    trees would pass against a validator that refuses every one of them, which
    would make this the weakest case in the document rather than the control every
    other case here is measured against.

@@ -138,17 +138,6 @@ time a test is allowed.
 
    Catches: inputs handed over by position.
 
-.. test_case:: An unbound optional parameter is absent from what a script is given
-   :id: TEST_HOST_UNBOUND_OPTIONAL_IS_ABSENT
-   :verifies: CREQ_HOST_RUNS_THE_SCRIPT
-   :test_kind: positive
-   :coverage: partial
-
-   A node type with an optional parameter the workflow leaves unbound. The
-   script finds it ``nil``, and says so in its output.
-
-   Catches: an unbound optional parameter handed over as an empty context.
-
 .. test_case:: Each node type runs its own script
    :id: TEST_HOST_EACH_TYPE_RUNS_ITS_OWN_SCRIPT
    :verifies: CREQ_HOST_RUNS_THE_SCRIPT

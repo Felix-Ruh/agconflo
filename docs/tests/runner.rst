@@ -320,8 +320,8 @@ catches it.
    :coverage: full
 
    For any text with LF and CRLF line endings, and leading and trailing
-   spaces, given as an argument for an entry instance's required parameter
-   of one type and its optional parameter of another, the entry node's script
+   spaces, given as arguments for two parameters of an entry instance, each
+   of its own type, the entry node's script
    returns what it was given, and the run completes with the rendering of
    exactly that text and with each input's declared type.
 

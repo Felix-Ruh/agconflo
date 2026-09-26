@@ -478,16 +478,13 @@ component requirement whose subject is anything else.
    ``CREQ_RUNNER_ENGINE_FAILURE_STOPS``).
 
    Found before the record file is taken. A parameter is found when the
-   tool's node type declares it, as required or optional; one declared and
-   left unbound at a step is that step's failure
-   (``CREQ_PERFORMER_FAILURE_AS_TEXT``).
+   tool's node type declares it; one declared and missing at a step is that
+   step's failure (``CREQ_PERFORMER_FAILURE_AS_TEXT``).
 
    Failure modes:
 
    - **Only the first ungranted tool named**, and the person fixing the
      grants one run at a time.
-   - **An optional parameter taken as missing**, refusing a workflow that is
-     sound.
 
 .. comp_req:: A step the engine could not perform stops the run awaiting it
    :id: CREQ_RUNNER_ENGINE_FAILURE_STOPS

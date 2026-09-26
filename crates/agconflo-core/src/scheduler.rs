@@ -45,11 +45,9 @@ impl Activation {
         self.call.as_deref()
     }
 
-    /// One context per parameter the instance is given, each named by that
-    /// parameter, in the order its node type declares them: the required list in
-    /// its own order, then the optional list in its own. A parameter the
-    /// definition leaves unbound is absent rather than empty.
-    // @Inputs in declared order and an unbound one absent,TRACE_SCHEDULER_INPUTS,trace,[],[DEC_DECLARED_PARAMETERS, NOTE_SCHEDULER_ABSENT_PARAMETER]
+    /// One context per parameter the instance's node type declares, each named
+    /// by that parameter, in the order its node type declares them.
+    // @Inputs in declared order,TRACE_SCHEDULER_INPUTS,trace,[],[DEC_EVERY_INPUT_REQUIRED]
     pub fn inputs(&self) -> &[(String, Context)] {
         &self.inputs
     }
@@ -77,11 +75,10 @@ pub(crate) fn next_activation(
 }
 
 /// The activation `instance` may have now, or `None` when it may not activate:
-/// when it has not already produced and every parameter it binds has a context,
-/// required or optional. A parameter left unbound is skipped when it is optional
-/// and blocks for ever when it is required. An entry instance's parameters are
-/// taken from the arguments alone.
-// @Readiness and the activation it carries,IMPL_SCHEDULER_READY,impl,[CREQ_SCHEDULER_READY_WHEN_BOUND, CREQ_SCHEDULER_ACTIVATION_CARRIES],[DEC_BINDING_IS_AWAITED]
+/// when it has not already produced and every parameter its node type declares
+/// has a context. A parameter left unbound blocks for ever. An entry instance's
+/// parameters are taken from the arguments alone.
+// @Readiness and the activation it carries,IMPL_SCHEDULER_READY,impl,[CREQ_SCHEDULER_READY_WHEN_BOUND, CREQ_SCHEDULER_ACTIVATION_CARRIES],[DEC_EVERY_INPUT_REQUIRED]
 pub(crate) fn activation_for(
     definition: &WorkflowDefinition,
     arguments: &Arguments,
@@ -97,14 +94,10 @@ pub(crate) fn activation_for(
         .iter()
         .find(|declared| declared.name == instance.node_type)?;
 
-    let listed = (declared.required.iter().map(|p| (p, true)))
-        .chain(declared.optional.iter().map(|p| (p, false)));
-
     let mut inputs = Vec::new();
-    for (parameter, required) in listed {
+    for parameter in &declared.required {
         match filling(arguments, produced, instance, &parameter.name) {
             Filling::Ready(context) => inputs.push((parameter.name.clone(), context.clone())),
-            Filling::Unwired if !required => continue,
             Filling::Unwired | Filling::Waiting => return None,
         }
     }
@@ -214,11 +207,11 @@ fn answers(workflow: &WorkflowDefinition) -> Vec<String> {
 
 #[cfg(test)]
 #[test]
-fn bound_optional_is_awaited() {
+fn every_input_is_awaited() {
     let mut source = IdSource::new();
     let types = vec![
         node_type("Src", &[], "note"),
-        node_type("Sink", &[("must", "note")], "note").with_optional(&[("may", "note")]),
+        node_type("Sink", &[("must", "note"), ("may", "note")], "note"),
     ];
     let instances = vec![
         instance("a", "Src", &[]),
@@ -229,8 +222,8 @@ fn bound_optional_is_awaited() {
     let arguments = Arguments::new();
     let sink = &workflow.instances[2];
 
-    // The required parameter has arrived and the optional one has not. The
-    // optional one is bound, so it is waited for.
+    // The first parameter has arrived and the second has not, so it is
+    // waited for.
     let mut produced = produced_by(&mut source, &["a"], "note");
     assert!(activation_for(&workflow, &arguments, &produced, sink).is_none());
 
@@ -247,26 +240,40 @@ fn bound_optional_is_awaited() {
 
 #[cfg(test)]
 #[test]
-fn unbound_optional_is_ready() {
+fn unbound_parameter_never_ready() {
     let mut source = IdSource::new();
     let types = vec![
         node_type("Src", &[], "note"),
-        node_type("Sink", &[("must", "note")], "note").with_optional(&[("may", "note")]),
+        node_type("Sink", &[("must", "note"), ("may", "note")], "note"),
+        node_type("Bound", &[("must", "note")], "note"),
     ];
     let instances = vec![
         instance("a", "Src", &[]),
         instance("sink", "Sink", &[("must", "a")]),
+        instance("bound", "Bound", &[("must", "a")]),
     ];
     let workflow = definition(types, instances, &["sink"]);
     let produced = produced_by(&mut source, &["a"], "note");
 
+    // Every binding it has holds a context, and one parameter it declares has
+    // none: it is never offered.
+    assert!(
+        activation_for(
+            &workflow,
+            &Arguments::new(),
+            &produced,
+            &workflow.instances[1]
+        )
+        .is_none()
+    );
+    // The control: bound in full, the same source is enough.
     let activation = activation_for(
         &workflow,
         &Arguments::new(),
         &produced,
-        &workflow.instances[1],
+        &workflow.instances[2],
     )
-    .expect("an unbound optional parameter holds nothing back");
+    .expect("every parameter bound and filled");
     assert_eq!(given(&activation), ["must"]);
 }
 
@@ -496,8 +503,7 @@ proptest! {
             for (parameter, context) in activation.inputs() {
                 // Declared by the node type, rather than invented or a global.
                 prop_assert!(
-                    declared.required.iter().chain(&declared.optional)
-                        .any(|p| &p.name == parameter)
+                    declared.required.iter().any(|p| &p.name == parameter)
                 );
                 // The context of the binding's own source, not of another.
                 let binding = node.bindings.iter().find(|b| &b.parameter == parameter)

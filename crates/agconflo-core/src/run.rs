@@ -222,10 +222,7 @@ fn signature_faults(definition: &WorkflowDefinition, arguments: &Arguments) -> V
             continue;
         };
 
-        let listed = (declared.required.iter().map(|p| (p, true)))
-            .chain(declared.optional.iter().map(|p| (p, false)));
-
-        for (parameter, required) in listed {
+        for parameter in &declared.required {
             matched.push((&node.name, &parameter.name));
 
             // A wire is a second source whatever else is there.
@@ -256,13 +253,11 @@ fn signature_faults(definition: &WorkflowDefinition, arguments: &Arguments) -> V
                     });
                 }
                 Some(_) => {}
-                // An optional entry parameter may go unsupplied.
-                None if required => faults.push(SignatureFault::ParameterUnfilled {
+                None => faults.push(SignatureFault::ParameterUnfilled {
                     instance: node.name.clone(),
                     parameter: parameter.name.clone(),
                     expected: parameter.context_type.clone(),
                 }),
-                None => {}
             }
         }
     }
@@ -351,7 +346,6 @@ fn call_faults(declared: &NodeType, call: &Call) -> Vec<CallFault> {
         let declaration = declared
             .required
             .iter()
-            .chain(&declared.optional)
             .find(|declaration| declaration.name == *parameter);
         match declaration {
             None => faults.push(CallFault::UndeclaredParameter {
@@ -1089,8 +1083,9 @@ impl<'a, F> Run<'a, F> {
             brought_all.extend(brought);
         }
 
-        let listed = declared.required.iter().chain(&declared.optional);
-        let inputs = listed
+        let inputs = declared
+            .required
+            .iter()
             .filter_map(|parameter| {
                 call.inputs
                     .iter()
@@ -1807,7 +1802,7 @@ fn signature_filled_exactly_starts() {
     // instances of one node type: separate parameters, all of them.
     let types = vec![
         node_type("Alpha", &[("seed", "note")], "note"),
-        node_type("Beta", &[("seed", "diff")], "note").with_optional(&[("hint", "note")]),
+        node_type("Beta", &[("seed", "diff")], "note"),
         node_type(
             "Join",
             &[("left", "note"), ("right", "note"), ("extra", "note")],
@@ -1826,8 +1821,7 @@ fn signature_filled_exactly_starts() {
     ];
     let workflow = definition(types, instances, &["j"]);
 
-    // One argument per required entry parameter, each of the declared type, and
-    // `q`'s optional parameter unsupplied.
+    // One argument per entry parameter, each of the declared type.
     let alpha_seed = ctx(&mut source, "note");
     let beta_seed = ctx(&mut source, "diff");
     let (alpha_id, beta_id) = (alpha_seed.id(), beta_seed.id());
@@ -1859,11 +1853,7 @@ fn signature_filled_exactly_starts() {
                     assert_eq!(activation.inputs()[0].1.id(), p2_id);
                 }
                 if activation.instance() == "q" {
-                    assert_eq!(
-                        activation.inputs().len(),
-                        1,
-                        "the optional one is unsupplied"
-                    );
+                    assert_eq!(activation.inputs().len(), 1, "its one parameter");
                     assert_eq!(activation.inputs()[0].1.id(), beta_id);
                 }
                 seen.push(activation.instance().to_owned());
@@ -2601,15 +2591,14 @@ proptest! {
 
 // --- calls and exchanges -------------------------------------------------------
 
-/// A workflow whose `asker` may call `lookup` - two required parameters and an
-/// optional one - beside `second`, which is ready at the same time, and `after`,
+/// A workflow whose `asker` may call `lookup` - two parameters - beside
+/// `second`, which is ready at the same time, and `after`,
 /// which consumes the asker's output. `designated` names the result.
 #[cfg(test)]
 fn calling(designated: &str) -> WorkflowDefinition {
     let types = vec![
         node_type("ask", &[], "note"),
-        node_type("lookup", &[("query", "note"), ("scope", "note")], "note")
-            .with_optional(&[("hint", "note")]),
+        node_type("lookup", &[("query", "note"), ("scope", "note")], "note"),
         node_type("other", &[], "note"),
         node_type("pass", &[("input", "note")], "note"),
     ];
@@ -2814,10 +2803,9 @@ fn unfilled_call_is_refused() {
     assert_eq!(run.recorded().spent, 1, "nothing offered or spent");
     assert_eq!(offered(&mut run).call(), None, "the asker is outstanding");
 
-    // Leaving the optional parameter unfilled is a call as declared.
+    // Every parameter filled with its declared type is a call as declared.
     let (call, ..) = lookup_call(&mut source, "call_2");
-    run.call(call)
-        .expect("an optional parameter may go unfilled");
+    run.call(call).expect("a call as declared");
 }
 
 #[cfg(test)]
