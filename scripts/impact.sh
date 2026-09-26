@@ -20,7 +20,9 @@
 #             requirements realised by the same architecture. A change
 #             is most likely to break these by accident, because no link says so.
 #   TEXT      every line naming it in prose - decision and evidence bodies, doc
-#             comments, the README - which no link carries and no query finds.
+#             comments, the README - which no link carries. A need's body is in
+#             the graph as its content, but the comments and the README are not,
+#             so this direction searches the files.
 #
 # A need id nothing matches is refused rather than reported as having no impact:
 # an empty analysis and a mistyped id look identical otherwise.

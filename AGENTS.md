@@ -14,9 +14,9 @@ committing.**
 ## The cycle
 
 1. A change is requested.
-2. **Gather facts from the repository first.** Read the rule as it stands in `schemas.json`, run
-   the query, check what `ubproject.toml` actually declares. Never plan from a remembered account
-   of how something works.
+2. **Gather facts from the repository first**, asking the requirements graph before searching its
+   files (below). Read the rule as it stands in `schemas.json`, check what `ubproject.toml`
+   actually declares. Never plan from a remembered account of how something works.
 3. **Present a plan** in the format below, and wait for approval.
 4. **Implement as a series of commits**, one at a time, each independently verifiable, with the
    gates green between each.
@@ -26,6 +26,57 @@ committing.**
 
 Do one commit at a time: read its brief, do exactly that, verify it, report back. Do not run ahead
 into the next commit because it looks small.
+
+## Asking the graph
+
+Anything the requirements graph can answer is asked of the graph first, and its files are searched
+after, for what it cannot (`STKH_GRAPH_QUERIED_FIRST`, `DEC_GRAPH_ASKED_THROUGH_UBC`). That goes
+for every agent working here, in a chat or as a node of a workflow, and for every question about a
+need: reading one, finding the ones that say something, and following what joins them. The graph
+holds every need with its fields and its body, every link, each code marker with a permalink to its
+line, and each test's latest outcome. A query follows a link where a search of the files finds a
+link and a mention in prose alike (`EVD_GRAPH_TELLS_LINK_FROM_MENTION`).
+
+    tools/ubc query cypher --project docs --strict -f json '<query>'
+
+- **Need types are labels, links are relationships, fields are properties.** The labels:
+  `stkh_req`, `feat_req`, `feat_arch`, `comp`, `comp_req`, `test_case`, `test_run`, `dec`, `evd`,
+  `impl`, `trace`, `code_note`. The links: `derived_from`, `realises`, `uses`, `allocated_to`,
+  `verifies`, `executes`, `implements`, `follows`, `supported_by`, `supersedes`.
+- **A need's body is `n.content`**, exactly as written, markup and all
+  (`EVD_CONTENT_IS_THE_BODY`). Implementations, traces and test runs have none.
+- **Always `--strict`, and count the rows.** Without it, a label or property the graph lacks
+  answers `[]` with exit 0. With it, that exits 1, but a well-formed query matching nothing still
+  answers `[]` with exit 0 (`EVD_CYPHER_EMPTY_UNLESS_STRICT`). Believe an empty answer only once a
+  control that should return rows has returned them.
+- **Search text with `CONTAINS`, or a regex opened with `(?s)`.** Every body spans lines, and `.`
+  does not cross a line break: `n.content =~ ".*nobody.*"` matched nothing where
+  `"(?s).*nobody.*"` matched 45 needs (`EVD_REGEX_STOPS_AT_A_LINE_BREAK`). `CONTAINS` keeps case;
+  `toLower(...)` or `(?is)` does not. A regex matches the whole value, as "Gates that go green
+  without checking anything" says.
+- **The files are for what the graph does not hold**: a function's body, the text of a file that is
+  not a need, and checking a query's answer. When `ubc` cannot run, its licence grant out of reach,
+  say so and search the files.
+
+Questions this repository has asked, each one query, each checked to return rows:
+
+```
+# Read a need
+MATCH (n) WHERE n.id = "STKH_GRAPH_QUERIED_FIRST" RETURN n.title, n.statement, n.content
+# Find needs by what they say, in any of their text
+MATCH (n) WHERE any(f IN [n.title, n.statement, n.observation, n.content] WHERE f CONTAINS "setuid")
+RETURN n.id, n.type
+# What links to a need, and by which link: not the prose naming it
+MATCH (a)-[r]->(d) WHERE d.id = "DEC_STEP_USER_NEVER_ROOT" RETURN a.id, type(r)
+# Which cases verify a component's requirements, and how each last ran
+MATCH (r:test_run)-[:executes]->(t:test_case)-[:verifies]->(c:comp_req)-[:allocated_to]->(k:comp)
+WHERE k.id = "COMP_SANDBOX" RETURN c.id, t.id, r.test_outcome ORDER BY c.id
+# Where the code meeting a requirement is
+MATCH (i:impl)-[:implements]->(c:comp_req) WHERE c.id = "CREQ_SANDBOX_STEP_USER" RETURN i.id, i.code_url
+```
+
+`sh scripts/impact.sh <ID>` asks the graph the up, down and sideways questions of a change, and
+searches the files for the prose naming it.
 
 ## Planning
 

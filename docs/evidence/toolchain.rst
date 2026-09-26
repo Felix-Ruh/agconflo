@@ -431,3 +431,77 @@ against.
    The download server gave 200 for 0.35.0 and 403 for 0.35.1, 0.35.2, 0.36.0,
    0.36.1, 0.37.0, 0.38.0, 0.40.0 and 1.0.0, so no newer release was there to
    try.
+
+.. evd:: A query of the graph tells a link from a mention, and joins in one line what the files need a script for
+   :id: EVD_GRAPH_TELLS_LINK_FROM_MENTION
+   :evd_kind: measurement
+   :observed_on: 2026-09-26
+   :observation: Of six lines naming DEC_STEP_USER_NEVER_ROOT, one query found the one link among five prose mentions, and one query gave the 19 cases of the sandbox's 15 requirements with outcomes, as a 26-line script over three sets of files did.
+
+   Taken at ``e7980c0`` against ubc 0.35.0. ``grep -rIn`` over ``docs`` and
+   ``crates`` found the id on three lines of ``decisions/tools``, two of
+   ``decisions/changes`` and one of ``features/environment``, and without
+   ``-I`` it also reported matches in the binary index under
+   ``docs/.ub_cache``. ``MATCH (a)-[r]->(d) WHERE d.id = ... RETURN a.id,
+   type(r)`` returned one row: ``DEC_STEP_USER_ROOT_INCLUDED``, ``supersedes``.
+   The other five are prose naming it, which no query follows and grep cannot
+   tell from a link.
+
+   The second question was which test cases verify a requirement allocated to
+   ``COMP_SANDBOX``, and how each last ran. One query, from ``test_run``
+   through ``executes``, ``verifies`` and ``allocated_to``, returned 19 rows
+   over 15 requirements, all passed. A script reading ``components/*.rst``
+   for the requirements, ``tests/*.rst`` for their cases and
+   ``test-runs.json`` for the outcomes gave the same 19 rows, compared with
+   ``diff``.
+
+   A third question, which code follows a superseded decision, was answered
+   by a query with no rows. That answer was believed only once two controls
+   returned rows: 9 decisions superseded, as ``grep`` of ``dec_status`` also
+   counted, and 213 links following accepted ones.
+
+.. evd:: A Cypher query naming what the graph lacks answers nothing and succeeds unless strict
+   :id: EVD_CYPHER_EMPTY_UNLESS_STRICT
+   :evd_kind: measurement
+   :observed_on: 2026-09-26
+   :observation: ubc query cypher gave [] and exit 0 for a label the graph lacks, with a warning on stderr, and exit 1 under --strict, while a well-formed query matching nothing gave [] and exit 0 either way.
+
+   ubc 0.35.0, run from the repository root with ``--project docs -f json``.
+   The label was ``not_a_real_type``; ubc wrote "unknown label" to standard
+   error in both runs. The well-formed query asked for a decision of an id
+   that does not exist. So ``--strict`` tells a query that could never match
+   from one that did not, and nothing tells an empty answer from a wrong one
+   but a control that should return rows.
+
+.. evd:: A need's content in the graph is its body as written
+   :id: EVD_CONTENT_IS_THE_BODY
+   :evd_kind: measurement
+   :observed_on: 2026-09-26
+   :observation: For all 926 needs written in docs, the graph's content was their body exactly as written, markup included, the longest at 4506 characters, while implementations, traces and test runs had none.
+
+   ubc 0.35.0, one query returning every need's id, type and ``content``,
+   compared with each directive's body in the ``.rst`` files: the lines after
+   its options, indented three spaces, dedented and stripped of blank lines
+   at either end. All 926 were equal, all 926 non-empty, among them
+   ``DEC_CHANGE_MODEL_WINDOW`` at 4506 characters and bodies of bullet
+   lists, bold text and literals, which came back as reStructuredText and
+   not rendered. The 310 test runs, 116 implementations and 70 traces come
+   from the test report and the code's markers and carry no body. A body
+   edited on disk was in the next query's answer with nothing rebuilt.
+
+.. evd:: A regular expression over a need's content stops at a line break unless told otherwise
+   :id: EVD_REGEX_STOPS_AT_A_LINE_BREAK
+   :evd_kind: measurement
+   :observed_on: 2026-09-26
+   :observation: n.content =~ ".*nobody.*" matched no need and exited 0 under --strict, where "(?s).*nobody.*" and CONTAINS "nobody" matched the 45 needs whose text a search of the files found, and CONTAINS matched case as written.
+
+   ubc 0.35.0 with ``--strict``. Every body runs over more than one line, and
+   ``.`` in ubc's regular expressions does not match a line break, so a
+   pattern that must cross one matches nothing; ``(?s)`` lets it. The 45
+   were compared with the needs whose directive block names ``nobody`` in the
+   ``.rst`` files, and were the same. ``CONTAINS "Nobody"`` matched none,
+   ``toLower(n.content) CONTAINS "nobody"`` and ``=~ "(?is).*NOBODY.*"`` the
+   45. For ``setuid``, ``content`` alone matched one need and the files two:
+   the other names it in its observation, and ``any(f IN [n.title,
+   n.statement, n.observation, n.content] WHERE f CONTAINS "setuid")``
+   matched both.
