@@ -2,7 +2,7 @@
 //!
 //! A manifest names a workflow document, its node type documents, a script
 //! for each node type a script performs, the node types a person performs,
-//! and the run's budget and limits. The project reader reads all of it into
+//! the node types a tool performs, and the run's budget and limits. The project reader reads all of it into
 //! what a scripted run is started with. A model mapping names the model each
 //! role is played by, and the model map reads it into the roster models are
 //! called through. A grants file names what a run's tools may do, and the
@@ -23,6 +23,6 @@ mod testing;
 pub use grants::{Action, CommandLimits, Folder, FolderFault, Grants, GrantsFault, read_grants};
 pub use keeper::{KeeperRefusal, RecordKeeper, Unkept};
 pub use model_map::{ModelMap, ModelsFault, read_models};
-pub use project::{Project, ProjectFault, Script, read_project};
+pub use project::{Project, ProjectFault, Script, Tool, read_project};
 pub use runner::{Argument, Finding, Refusal, Sources, Stopped, answer, check, resume, start};
 pub use text::{FileFault, KeyFault, Place};

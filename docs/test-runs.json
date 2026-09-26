@@ -885,6 +885,15 @@
           "title": "agconflo-runner project::paths_from_the_manifest",
           "type": "test_run"
         },
+        "RUN_PROJECT_READS_TOOLS": {
+          "executes": [
+            "TEST_PROJECT_READS_TOOLS"
+          ],
+          "id": "RUN_PROJECT_READS_TOOLS",
+          "test_outcome": "passed",
+          "title": "agconflo-runner project::reads_tools",
+          "type": "test_run"
+        },
         "RUN_PROJECT_READS_WHAT_IT_NAMES": {
           "executes": [
             "TEST_PROJECT_READS_WHAT_IT_NAMES"
@@ -901,6 +910,15 @@
           "id": "RUN_PROJECT_SCRIPTS_KEPT_EXACTLY",
           "test_outcome": "passed",
           "title": "agconflo-runner project::scripts_kept_exactly",
+          "type": "test_run"
+        },
+        "RUN_PROJECT_TOOL_FAULTS_REFUSED": {
+          "executes": [
+            "TEST_PROJECT_TOOL_FAULTS_REFUSED"
+          ],
+          "id": "RUN_PROJECT_TOOL_FAULTS_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner project::tool_faults_refused",
           "type": "test_run"
         },
         "RUN_PROJECT_UNDECODABLE_FILE_REFUSED": {
