@@ -28,5 +28,5 @@ path = "junit.xml"
 docker = { max-threads = 8 }
 
 [[profile.default.overrides]]
-filter = '(package(agconflo-runner) & (test(/^(sandbox|performer)::/) | test(=runner::tool_steps_end_to_end))) | (package(agconflo-cli) & test(/^(grants_handed_on|engine_failure_told|killed_tool_step_performed_alone|tool_kept_to_its_grant)$/))'
+filter = '(package(agconflo-runner) & (test(/^(sandbox|performer)::/) | test(/^runner::(tool_steps_end_to_end|environments_end_to_end|environment_shared_end_to_end)$/))) | (package(agconflo-cli) & test(/^(grants_handed_on|engine_failure_told|killed_tool_step_performed_alone|tool_kept_to_its_grant|environment_ungranted_refused)$/))'
 test-group = 'docker'

@@ -17,7 +17,7 @@ use crate::keeper::{KeeperRefusal, RecordKeeper, Unkept};
 use crate::model_map::{ModelMap, ModelsFault, read_models};
 use crate::performer::{Container, parameters, perform};
 use crate::project::{Project, ProjectFault, read_project};
-use crate::sandbox::{EngineFailure, NotReady, Sandbox};
+use crate::sandbox::{EngineFailure, Environment, NotReady, Sandbox};
 
 /// The files a run is read from: its manifest, the model mapping when it has
 /// one, and the grants when it has them.
@@ -133,7 +133,14 @@ pub enum ToolFault {
         /// The parameter it lacks.
         parameter: &'static str,
     },
-    /// The grants' image cannot be used.
+    /// The tool names an image the grants do not list.
+    ImageNotGranted {
+        /// The tool's node type.
+        node_type: String,
+        /// The image it names.
+        image: String,
+    },
+    /// An image the run's tools run in cannot be used.
     NotReady(NotReady),
 }
 
@@ -151,6 +158,10 @@ impl fmt::Display for ToolFault {
             } => write!(
                 f,
                 "the tool {node_type} would {action}, and its node type declares no parameter {parameter}"
+            ),
+            Self::ImageNotGranted { node_type, image } => write!(
+                f,
+                "the tool {node_type} names the image {image}, which the grants do not list"
             ),
             Self::NotReady(why) => why.fmt(f),
         }
@@ -214,7 +225,7 @@ async fn start_in<C: Container>(
     make: impl FnOnce(&Grants, &Path) -> C,
 ) -> Result<Stopped, Refusal> {
     let (project, models) = read(sources)?;
-    let mut container = prepared(sources, &project, record, make)?;
+    let mut prepared = prepared(sources, &project, record, make, Unreachable::GoesOn)?;
     let mut source = IdSource::new();
     let supplied = supplied(project.definition(), arguments, &mut source)?;
     let mut kept = Kept::new(RecordKeeper::new_run(record).map_err(Refusal::Record)?);
@@ -235,7 +246,7 @@ async fn start_in<C: Container>(
         behaviours: &behaviours,
         models: &models,
     };
-    let (outcome, engine) = run.tools(container.as_mut(), &mut kept, outcome).await;
+    let (outcome, engine) = run.tools(prepared.as_mut(), &mut kept, outcome).await;
     stopped(kept, outcome, engine)
 }
 
@@ -254,7 +265,7 @@ async fn resume_in<C: Container>(
     make: impl FnOnce(&Grants, &Path) -> C,
 ) -> Result<Stopped, Refusal> {
     let (project, models) = read(sources)?;
-    let mut container = prepared(sources, &project, record, make)?;
+    let mut prepared = prepared(sources, &project, record, make, Unreachable::GoesOn)?;
     let (keeper, text) = RecordKeeper::resume(record).map_err(Refusal::Record)?;
     let mut kept = Kept::new(keeper);
     let behaviours = project.behaviours();
@@ -273,7 +284,7 @@ async fn resume_in<C: Container>(
         behaviours: &behaviours,
         models: &models,
     };
-    let (outcome, engine) = run.tools(container.as_mut(), &mut kept, outcome).await;
+    let (outcome, engine) = run.tools(prepared.as_mut(), &mut kept, outcome).await;
     stopped(kept, outcome, engine)
 }
 
@@ -300,7 +311,7 @@ async fn answer_in<C: Container>(
     make: impl FnOnce(&Grants, &Path) -> C,
 ) -> Result<Stopped, Refusal> {
     let (project, models) = read(sources)?;
-    let mut container = prepared(sources, &project, record, make)?;
+    let mut prepared = prepared(sources, &project, record, make, Unreachable::GoesOn)?;
     let (keeper, held) = RecordKeeper::resume(record).map_err(Refusal::Record)?;
     let mut kept = Kept::new(keeper);
     kept.latest = held.clone();
@@ -322,7 +333,7 @@ async fn answer_in<C: Container>(
         behaviours: &behaviours,
         models: &models,
     };
-    let (outcome, engine) = run.tools(container.as_mut(), &mut kept, outcome).await;
+    let (outcome, engine) = run.tools(prepared.as_mut(), &mut kept, outcome).await;
     stopped(kept, outcome, engine)
 }
 
@@ -337,7 +348,7 @@ pub fn check(sources: Sources<'_>) -> Vec<Finding> {
 }
 
 /// [`check`], asking the container `make` makes whether its image is ready.
-// @What would refuse a run found without running it,IMPL_RUNNER_CHECK,impl,[CREQ_RUNNER_CHECKS, CREQ_RUNNER_CHECKS_TOOLS]
+// @What would refuse a run found without running it,IMPL_RUNNER_CHECK,impl,[CREQ_RUNNER_CHECKS, CREQ_RUNNER_CHECKS_TOOLS, CREQ_RUNNER_CHECKS_TOOL_ENVIRONMENT],[DEC_UNREACHABLE_ENGINE_REFUSES_NO_RUN]
 fn check_in<C: Container>(
     sources: Sources<'_>,
     make: impl FnOnce(&Grants, &Path) -> C,
@@ -362,7 +373,7 @@ fn check_in<C: Container>(
                 .into_iter()
                 .map(Finding::Script),
         );
-        match prepared(sources, &project, Path::new(""), make) {
+        match prepared(sources, &project, Path::new(""), make, Unreachable::Refuses) {
             Ok(_) => {}
             Err(Refusal::NoGrants) => findings.push(Finding::NoGrants),
             Err(Refusal::Grants(fault)) => findings.push(Finding::Grants(fault)),
@@ -433,27 +444,52 @@ fn supplied(
         })
 }
 
-/// The container a run's tool steps are performed in, made by `make` from the
+/// Whether a container engine that cannot be reached refuses what is asked.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Unreachable {
+    /// It is reported: a check.
+    Refuses,
+    /// The run goes on, and its first tool step meets it: a start, a resume or
+    /// an answer.
+    GoesOn,
+}
+
+/// The containers a run's tool steps are performed in, and the grants' image
+/// a tool naming none runs in.
+struct Prepared<C> {
+    container: C,
+    image: String,
+}
+
+/// The containers a run's tool steps are performed in, made by `make` from the
 /// grants `sources` names for the run whose record file is `record` - or
 /// `None` for a run whose manifest names no tool and that was given no
 /// grants. Refused for the grants' absence when the manifest names a tool, for
-/// grants that cannot be read, and for every tool they do not provide for.
-// @Grants read and the run's tools provided for before anything else,IMPL_RUNNER_PREPARED,impl,[CREQ_RUNNER_REFUSES_WITHOUT_GRANTS, CREQ_RUNNER_REFUSES_UNGRANTED],[DEC_GRANTS_IN_A_FILE_OF_THEIR_OWN, DEC_IMAGE_BY_DIGEST_NEVER_PULLED]
+/// grants that cannot be read, and for every tool they do not provide for; an
+/// engine out of reach refuses only when `unreachable` says it does.
+// @Grants read and the run's tools provided for before anything else,IMPL_RUNNER_PREPARED,impl,[CREQ_RUNNER_REFUSES_WITHOUT_GRANTS, CREQ_RUNNER_REFUSES_UNGRANTED, CREQ_RUNNER_REFUSES_UNGRANTED_IMAGE],[DEC_GRANTS_IN_A_FILE_OF_THEIR_OWN, DEC_IMAGE_BY_DIGEST_NEVER_PULLED, DEC_GRANTS_LIST_IMAGES, DEC_UNREACHABLE_ENGINE_REFUSES_NO_RUN]
 fn prepared<C: Container>(
     sources: Sources<'_>,
     project: &Project,
     record: &Path,
     make: impl FnOnce(&Grants, &Path) -> C,
-) -> Result<Option<C>, Refusal> {
+    unreachable: Unreachable,
+) -> Result<Option<Prepared<C>>, Refusal> {
     let grants = match sources.grants {
         Some(grants) => read_grants(grants).map_err(Refusal::Grants)?,
         None if project.tools().is_empty() => return Ok(None),
         None => return Err(Refusal::NoGrants),
     };
     let container = make(&grants, record);
-    let faults = ungranted(project, &grants, &container);
+    let mut faults = ungranted(project, &grants, &container);
+    if unreachable == Unreachable::GoesOn {
+        faults.retain(|fault| !matches!(fault, ToolFault::NotReady(NotReady::Engine(_))));
+    }
     if faults.is_empty() {
-        Ok(Some(container))
+        Ok(Some(Prepared {
+            container,
+            image: grants.image().to_owned(),
+        }))
     } else {
         Err(Refusal::Ungranted(faults))
     }
@@ -461,13 +497,16 @@ fn prepared<C: Container>(
 
 /// Every reason `grants` do not provide for `project`'s tools: each tool
 /// whose action they do not allow, each parameter a tool's node type does not
-/// declare that its action takes, and the image not ready in `container`.
-/// Nothing is asked of `container` for a project naming no tool.
+/// declare that its action takes, each tool naming an image they do not list,
+/// and each image the tools run in not ready in `container`, asked once per
+/// image and no more once the engine is out of reach. Nothing is asked of
+/// `container` for a project naming no tool.
 fn ungranted(project: &Project, grants: &Grants, container: &impl Container) -> Vec<ToolFault> {
     if project.tools().is_empty() {
         return Vec::new();
     }
     let mut faults = Vec::new();
+    let mut images: Vec<&str> = Vec::new();
     for tool in project.tools() {
         if !grants.allows(tool.action) {
             faults.push(ToolFault::NotGranted {
@@ -496,9 +535,25 @@ fn ungranted(project: &Project, grants: &Grants, container: &impl Container) -> 
                 });
             }
         }
+        let image = tool.image.as_deref().unwrap_or(grants.image());
+        if !grants.allows_image(image) {
+            faults.push(ToolFault::ImageNotGranted {
+                node_type: tool.node_type.clone(),
+                image: image.to_owned(),
+            });
+        } else if !images.contains(&image) {
+            images.push(image);
+        }
     }
-    if let Err(why) = container.ready() {
-        faults.push(ToolFault::NotReady(why));
+    for image in images {
+        match container.ready(image) {
+            Ok(()) => {}
+            Err(why @ NotReady::Engine(_)) => {
+                faults.push(ToolFault::NotReady(why));
+                break;
+            }
+            Err(why) => faults.push(ToolFault::NotReady(why)),
+        }
     }
     faults
 }
@@ -535,13 +590,14 @@ struct Tooled<'r> {
 impl Tooled<'_> {
     /// `outcome`, or - while it awaits a step of a node type the manifest
     /// names as a tool - where the run stopped once each such step was
-    /// performed in `container` and answered with its text, each record kept.
+    /// performed in its tool's container and image and answered with its
+    /// text, each record kept.
     /// A step the engine failed to perform is handed back as awaited, with the
     /// engine's failure.
-    // @Each awaited tool step performed and answered with its text,IMPL_RUNNER_TOOLS,impl,[CREQ_RUNNER_PERFORMS_TOOLS, CREQ_RUNNER_ENGINE_FAILURE_STOPS],[DEC_TOOL_PERFORMED_BY_THE_RUNNER, DEC_ENGINE_FAILURE_LEAVES_THE_STEP, DEC_ONE_CONTAINER_PER_CALL]
+    // @Each awaited tool step performed in its tool's environment and answered with its text,IMPL_RUNNER_TOOLS,impl,[CREQ_RUNNER_PERFORMS_TOOLS, CREQ_RUNNER_ENGINE_FAILURE_STOPS, CREQ_RUNNER_STEPS_IN_THEIR_ENVIRONMENT],[DEC_TOOL_PERFORMED_BY_THE_RUNNER, DEC_ENGINE_FAILURE_LEAVES_THE_STEP, DEC_ONE_CONTAINER_PER_NAME, DEC_TOOL_NAMES_ITS_ENVIRONMENT]
     async fn tools<C: Container>(
         &self,
-        mut container: Option<&mut C>,
+        mut prepared: Option<&mut Prepared<C>>,
         kept: &mut Kept,
         mut outcome: Result<Outcome, ScriptedRefusal>,
     ) -> (Result<Outcome, ScriptedRefusal>, Option<EngineFailure>) {
@@ -549,13 +605,17 @@ impl Tooled<'_> {
             let Ok(Outcome::Awaiting(activation)) = &outcome else {
                 return (outcome, None);
             };
-            let (Some(action), Some(container)) = (
+            let (Some(tool), Some(Prepared { container, image })) = (
                 self.project.tool(activation.node_type()),
-                container.as_deref_mut(),
+                prepared.as_deref_mut(),
             ) else {
                 return (outcome, None);
             };
-            let text = match perform(action, activation.inputs(), container) {
+            let environment = Environment {
+                container: &tool.container,
+                image: tool.image.as_deref().unwrap_or(image.as_str()),
+            };
+            let text = match perform(tool.action, environment, activation.inputs(), container) {
                 Ok(text) => text,
                 Err(failure) => return (outcome, Some(failure)),
             };
@@ -1115,7 +1175,7 @@ fn endings_handed_back() {
 }
 
 #[cfg(test)]
-use crate::testing::{Asked, IMAGE, StandIn, labelled, needs_docker};
+use crate::testing::{Asked, IMAGE, PYTHON, StandIn, labelled, needs_docker, needs_image};
 #[cfg(test)]
 use agconflo_core::Activation;
 
@@ -1146,7 +1206,10 @@ fn tooled(
     let persons: Vec<String> = persons.iter().map(|p| format!("\"{p}\"")).collect();
     let tools: String = tools
         .iter()
-        .map(|(node_type, action)| format!("{node_type} = \"{action}\"\n"))
+        .map(|(node_type, action)| match action.starts_with('{') {
+            true => format!("{node_type} = {action}\n"),
+            false => format!("{node_type} = \"{action}\"\n"),
+        })
         .collect();
     scratch.write(
         "manifest.toml",
@@ -1163,7 +1226,7 @@ fn tooled(
 fn granting(scratch: &Scratch, actions: &str) -> std::path::PathBuf {
     scratch.write(
         "grants.toml",
-        format!("image = \"{IMAGE}\"\nactions = [{actions}]\n"),
+        format!("image = \"{IMAGE}\"\nimages = [\"{PYTHON}\"]\nactions = [{actions}]\n"),
     )
 }
 
@@ -1816,5 +1879,412 @@ fn tool_steps_end_to_end() {
     );
     assert_eq!(awaited.instance(), "reviewed");
     assert_eq!(input(&awaited, "before"), "exit status 0\nx+a");
+    assert_eq!(labelled(&record), Vec::<String>::new());
+}
+
+#[cfg(test)]
+#[test]
+fn steps_in_their_environment() {
+    let scratch = Scratch::new("steps_in_their_environment");
+    let grants = granting(&scratch, "\"read\", \"run\"");
+    let build = format!("{{ action = \"run\", container = \"build\", image = \"{PYTHON}\" }}");
+    let manifest = tooled(
+        &scratch,
+        TOOL_FLOW,
+        &["review"],
+        &[("fetch", "read"), ("exec", &build)],
+        "",
+    );
+    let stand_in = echoing();
+    awaiting(runtime().block_on(start_in(
+        Sources {
+            manifest: &manifest,
+            models: None,
+            grants: Some(&grants),
+        },
+        &scratch.path("run.toml"),
+        &brief("x"),
+        |_, _| stand_in.clone(),
+    )));
+    assert_eq!(
+        stand_in.environments(),
+        [
+            ("tools".to_owned(), IMAGE.to_owned()),
+            ("build".to_owned(), PYTHON.to_owned())
+        ]
+    );
+
+    // A model's call to a tool is performed in the called tool's environment.
+    let manifest = tooled(
+        &scratch,
+        &asking_flow(1),
+        &["review"],
+        &[("fetch", "{ action = \"read\", container = \"other\" }")],
+        "\n[limits]\nmodel_calls = 4\n",
+    );
+    let stub = Stub::replying(vec![
+        fetching("c1", "notes/one"),
+        ("Read it.".to_owned(), Vec::new()),
+    ]);
+    let models = models(&scratch, "models.toml", &stub);
+    let stand_in = echoing();
+    let stopped = runtime().block_on(start_in(
+        Sources {
+            manifest: &manifest,
+            models: Some(&models),
+            grants: Some(&grants),
+        },
+        &scratch.path("called.toml"),
+        &brief("x"),
+        |_, _| stand_in.clone(),
+    ));
+    assert_eq!(completed(stopped), "Read it.+b");
+    assert_eq!(
+        stand_in.environments(),
+        [("other".to_owned(), IMAGE.to_owned())]
+    );
+}
+
+#[cfg(test)]
+#[test]
+fn refuses_ungranted_image() {
+    let scratch = Scratch::new("refuses_ungranted_image");
+    let grants = granting(&scratch, "\"read\", \"run\"");
+    let record = scratch.path("run.toml");
+    let unlisted = format!("python@sha256:{}", "9".repeat(64));
+    let unlisted_too = format!("python@sha256:{}", "8".repeat(64));
+    let start = |manifest: &std::path::Path, stand_in: StandIn| {
+        runtime().block_on(start_in(
+            Sources {
+                manifest,
+                models: None,
+                grants: Some(&grants),
+            },
+            &record,
+            &brief("x"),
+            |_, _| stand_in,
+        ))
+    };
+
+    let manifest = tooled(
+        &scratch,
+        TOOL_FLOW,
+        &["review"],
+        &[
+            (
+                "fetch",
+                &format!("{{ action = \"read\", container = \"f\", image = \"{unlisted}\" }}"),
+            ),
+            (
+                "exec",
+                &format!("{{ action = \"run\", container = \"e\", image = \"{unlisted_too}\" }}"),
+            ),
+        ],
+        "",
+    );
+    match start(&manifest, echoing()) {
+        Err(Refusal::Ungranted(faults)) => assert_eq!(
+            faults,
+            [
+                ToolFault::ImageNotGranted {
+                    node_type: "fetch".to_owned(),
+                    image: unlisted.clone(),
+                },
+                ToolFault::ImageNotGranted {
+                    node_type: "exec".to_owned(),
+                    image: unlisted_too.clone(),
+                },
+            ]
+        ),
+        other => panic!("expected both images refused, got {other:?}"),
+    }
+    assert!(!record.exists());
+
+    let python = format!("{{ action = \"run\", container = \"py\", image = \"{PYTHON}\" }}");
+    let manifest = tooled(
+        &scratch,
+        TOOL_FLOW,
+        &["review"],
+        &[("fetch", "read"), ("exec", &python)],
+        "",
+    );
+    let absent = crate::NotReady::Absent {
+        image: PYTHON.to_owned(),
+    };
+    let stand_in = echoing().not_ready_for(PYTHON, absent.clone());
+    match start(&manifest, stand_in.clone()) {
+        Err(Refusal::Ungranted(faults)) => assert_eq!(faults, [ToolFault::NotReady(absent)]),
+        other => panic!("expected the absent image refused, got {other:?}"),
+    }
+    assert_eq!(stand_in.images(), [IMAGE.to_owned(), PYTHON.to_owned()]);
+    assert!(!record.exists());
+
+    // The grants' own image, named by its digest, is granted.
+    let own = format!("{{ action = \"run\", container = \"x\", image = \"{IMAGE}\" }}");
+    let manifest = tooled(
+        &scratch,
+        TOOL_FLOW,
+        &["review"],
+        &[("fetch", "read"), ("exec", &own)],
+        "",
+    );
+    awaiting(start(&manifest, echoing()));
+}
+
+#[cfg(test)]
+#[test]
+fn unreachable_engine_not_refused() {
+    let scratch = Scratch::new("unreachable_engine_not_refused");
+    let grants = granting(&scratch, "\"read\", \"run\"");
+    let manifest = tooled(
+        &scratch,
+        TOOL_FLOW,
+        &["review"],
+        &[("fetch", "read"), ("exec", "run")],
+        "",
+    );
+    let sources = Sources {
+        manifest: &manifest,
+        models: None,
+        grants: Some(&grants),
+    };
+    let record = scratch.path("run.toml");
+    let failure = EngineFailure {
+        message: "error during connect".to_owned(),
+    };
+    let unreachable =
+        || StandIn::failing(&failure.message).not_ready(NotReady::Engine(failure.clone()));
+    let left = |stopped: Result<Stopped, Refusal>| match stopped {
+        Ok(Stopped {
+            outcome: Outcome::Awaiting(activation),
+            unkept: None,
+            engine: Some(engine),
+        }) => {
+            assert_eq!(engine, failure);
+            activation.instance().to_owned()
+        }
+        other => panic!("expected the step left for the engine, got {other:?}"),
+    };
+
+    let started = runtime().block_on(start_in(sources, &record, &brief("x"), |_, _| {
+        unreachable()
+    }));
+    assert_eq!(left(started), "fetched");
+
+    let answered = runtime().block_on(answer_in(sources, &record, "fetched", "typed", |_, _| {
+        unreachable()
+    }));
+    assert_eq!(left(answered), "executed");
+
+    let findings = check_in(sources, |_, _| unreachable());
+    assert!(
+        matches!(
+            findings.as_slice(),
+            [Finding::Tool(ToolFault::NotReady(NotReady::Engine(_)))]
+        ),
+        "{findings:?}"
+    );
+}
+
+#[cfg(test)]
+#[test]
+fn check_reports_tool_environment() {
+    let scratch = Scratch::new("check_reports_tool_environment");
+    let grants = granting(&scratch, "\"read\", \"run\"");
+    let unlisted = format!("python@sha256:{}", "9".repeat(64));
+    let checked = |exec: &str, stand_in: StandIn| {
+        let manifest = tooled(
+            &scratch,
+            TOOL_FLOW,
+            &["review"],
+            &[("fetch", "read"), ("exec", exec)],
+            "",
+        );
+        check_in(
+            Sources {
+                manifest: &manifest,
+                models: None,
+                grants: Some(&grants),
+            },
+            |_, _| stand_in,
+        )
+    };
+
+    let stand_in = echoing();
+    let findings = checked(
+        &format!("{{ action = \"run\", container = \"e\", image = \"{unlisted}\" }}"),
+        stand_in.clone(),
+    );
+    assert!(
+        matches!(
+            findings.as_slice(),
+            [Finding::Tool(ToolFault::ImageNotGranted { node_type, image })] if node_type == "exec" && *image == unlisted
+        ),
+        "{findings:?}"
+    );
+
+    let absent = crate::NotReady::Absent {
+        image: PYTHON.to_owned(),
+    };
+    let findings = checked(
+        &format!("{{ action = \"run\", container = \"py\", image = \"{PYTHON}\" }}"),
+        stand_in.clone().not_ready_for(PYTHON, absent.clone()),
+    );
+    assert!(
+        matches!(findings.as_slice(), [Finding::Tool(ToolFault::NotReady(why))] if *why == absent),
+        "{findings:?}"
+    );
+    assert_eq!(steps(&stand_in), []);
+}
+
+/// A project in `scratch` whose entry is followed by each of `steps` - a
+/// command a script names, performed by a tool of its own - and then by
+/// `after`, from the tests' types beside a `pair` joining two notes. Each
+/// step is `(tool, entry, command)`: the tool's node type, its manifest
+/// entry, and the command its script gives. `after` is the instances that
+/// follow, as the workflow document writes them, and `output` the designated
+/// instance.
+#[cfg(test)]
+fn stepping(
+    scratch: &Scratch,
+    steps: &[(&str, &str, &str)],
+    after: &str,
+    output: &str,
+    grants: &str,
+) -> (std::path::PathBuf, std::path::PathBuf) {
+    project(scratch, "add", 5);
+    let mut types = String::from(
+        "[types.pair]\nrequired = { a = \"note\", b = \"note\" }\noutput = \"note\"\n",
+    );
+    let mut flow = format!(
+        "name = \"stepping\"\noutput = \"{output}\"\n\n[instances.first]\nnode_type = \"begin\"\nentry = true\n"
+    );
+    let mut scripts = String::from("begin = \"begin.lua\"\npair = \"pair.lua\"\n");
+    let mut tools = String::new();
+    scratch.write(
+        "pair.lua",
+        "local given, host = ...\nreturn host.compose(host.output, {given.a, given.b}, '|')\n",
+    );
+    for (tool, entry, command) in steps {
+        types.push_str(&format!(
+            "\n[types.{tool}_says]\nrequired = {{ before = \"note\" }}\noutput = \"note\"\n\n[types.{tool}]\nrequired = {{ command = \"note\" }}\noutput = \"note\"\n"
+        ));
+        flow.push_str(&format!(
+            "\n[instances.{tool}_said]\nnode_type = \"{tool}_says\"\nbindings = {{ before = \"first\" }}\n\n[instances.{tool}_done]\nnode_type = \"{tool}\"\nbindings = {{ command = \"{tool}_said\" }}\n"
+        ));
+        scratch.write(
+            &format!("{tool}_says.lua"),
+            format!("local given, host = ...\nreturn host.text(host.output, [==[{command}]==])\n"),
+        );
+        scripts.push_str(&format!("{tool}_says = \"{tool}_says.lua\"\n"));
+        tools.push_str(&format!("{tool} = {entry}\n"));
+    }
+    flow.push_str(after);
+    scratch.write("steps.toml", types);
+    scratch.write("flow.toml", flow);
+    let manifest = scratch.write(
+        "manifest.toml",
+        format!(
+            "workflow = \"flow.toml\"\ntypes = [\"types.toml\", \"steps.toml\"]\nbudget = 20\npersons = [\"review\"]\n\n[scripts]\n{scripts}\n[tools]\n{tools}"
+        ),
+    );
+    let grants = scratch.write("grants.toml", grants);
+    (manifest, grants)
+}
+
+#[cfg(test)]
+#[test]
+fn environments_end_to_end() {
+    needs_docker();
+    needs_image(PYTHON);
+    let scratch = Scratch::new("environments_end_to_end");
+    let python = format!("{{ action = \"run\", container = \"py\", image = \"{PYTHON}\" }}");
+    let (manifest, grants) = stepping(
+        &scratch,
+        &[
+            (
+                "inpy",
+                &python,
+                "python3 -c 'print(2 + 3)'; cd ~ && touch here && echo home",
+            ),
+            (
+                "plain",
+                "\"run\"",
+                "command -v python3 || echo no-python; cd ~ && touch here && echo home",
+            ),
+        ],
+        "\n[instances.both]\nnode_type = \"pair\"\nbindings = { a = \"inpy_done\", b = \"plain_done\" }\n",
+        "both",
+        &format!("image = \"{IMAGE}\"\nimages = [\"{PYTHON}\"]\nactions = [\"run\"]\n"),
+    );
+    let record = scratch.path("run.toml");
+
+    let result = completed(runtime().block_on(start(
+        Sources {
+            manifest: &manifest,
+            models: None,
+            grants: Some(&grants),
+        },
+        &record,
+        &brief("x"),
+    )));
+
+    assert_eq!(
+        result,
+        "exit status 0\n5\nhome\n|exit status 0\nno-python\nhome\n"
+    );
+    assert_eq!(labelled(&record), Vec::<String>::new());
+}
+
+#[cfg(test)]
+#[test]
+fn environment_shared_end_to_end() {
+    needs_docker();
+    let scratch = Scratch::new("environment_shared_end_to_end");
+    let build = "{ action = \"run\", container = \"build\" }";
+    let (manifest, grants) = stepping(
+        &scratch,
+        &[
+            ("make", build, "echo made > /tmp/shared && echo ok"),
+            ("usemade", build, "cat /tmp/shared"),
+            (
+                "peek",
+                "{ action = \"run\", container = \"other\" }",
+                "cat /tmp/shared 2>/dev/null || echo none",
+            ),
+        ],
+        "\n[instances.seen]\nnode_type = \"pair\"\nbindings = { a = \"usemade_done\", b = \"peek_done\" }\n\n[instances.reviewed]\nnode_type = \"review\"\nbindings = { before = \"seen\" }\n",
+        "reviewed",
+        &format!("image = \"{IMAGE}\"\nactions = [\"run\"]\n"),
+    );
+    // make runs before usemade: usemade's command waits on make's output.
+    let flow = std::fs::read_to_string(scratch.path("flow.toml"))
+        .expect("the flow")
+        .replace(
+            "[instances.usemade_said]\nnode_type = \"usemade_says\"\nbindings = { before = \"first\" }",
+            "[instances.usemade_said]\nnode_type = \"usemade_says\"\nbindings = { before = \"make_done\" }",
+        )
+        .replace(
+            "[instances.peek_said]\nnode_type = \"peek_says\"\nbindings = { before = \"first\" }",
+            "[instances.peek_said]\nnode_type = \"peek_says\"\nbindings = { before = \"make_done\" }",
+        );
+    scratch.write("flow.toml", flow);
+    let record = scratch.path("run.toml");
+
+    let awaited = awaiting(runtime().block_on(start(
+        Sources {
+            manifest: &manifest,
+            models: None,
+            grants: Some(&grants),
+        },
+        &record,
+        &brief("x"),
+    )));
+
+    assert_eq!(awaited.instance(), "reviewed");
+    assert_eq!(
+        input(&awaited, "before"),
+        "exit status 0\nmade\n|exit status 0\nnone\n"
+    );
     assert_eq!(labelled(&record), Vec::<String>::new());
 }

@@ -70,13 +70,9 @@ impl Project {
         &self.tools
     }
 
-    /// The action of the tool performing `node_type`, or `None` when no tool
-    /// performs it.
-    pub fn tool(&self, node_type: &str) -> Option<Action> {
-        self.tools
-            .iter()
-            .find(|tool| tool.node_type == node_type)
-            .map(|tool| tool.action)
+    /// The tool performing `node_type`, or `None` when no tool performs it.
+    pub fn tool(&self, node_type: &str) -> Option<&Tool> {
+        self.tools.iter().find(|tool| tool.node_type == node_type)
     }
 
     /// The run's step budget.
@@ -1059,7 +1055,10 @@ fn reads_tools() {
             tool("exec", Action::Run),
         ]
     );
-    assert_eq!(project.tool("save"), Some(Action::Write));
+    assert_eq!(
+        project.tool("save").map(|tool| tool.action),
+        Some(Action::Write)
+    );
     assert_eq!(project.tool("draft"), None);
     assert_eq!(project.persons(), ["review"]);
     // Every instance's type has a person or one script and not both: each
@@ -1186,7 +1185,10 @@ fn reads_tool_environment() {
             ("test", None, "build"),
         ]
     );
-    assert_eq!(project.tool("save"), Some(Action::Write));
+    assert_eq!(
+        project.tool("save").map(|tool| tool.action),
+        Some(Action::Write)
+    );
 }
 
 #[cfg(test)]
