@@ -18,10 +18,10 @@ the container ran with ``--network none --read-only --tmpfs /tmp --cap-drop ALL
 scratch directory mounted as ``/work``.
 
 What was not measured is named here: a build that needs a package registry
-with no network, a local model calling a node a tool performs, and a Docker
-engine installed on Linux itself, with or without root - rootless Docker or
-Podman among them. The first two belong to the live run of the feature rather
-than to its design.
+with no network, and a Docker engine installed on Linux itself, with or
+without root - rootless Docker or Podman among them. A local model calling a
+node a tool performs was left to the live run of the feature, which the last
+measurement below records; its project needed no package.
 
 .. evd:: A container reaches only the folders mounted into it
    :id: EVD_CONTAINER_CONFINES_TO_MOUNTS
@@ -258,3 +258,38 @@ than to its design.
    ``/tmp`` the wrapper writes the output to. The wrapper then wrote "can't
    open /tmp/out" to standard error before the status, and ``docker exec``
    exited 0.
+
+.. evd:: A local model fixes a failing project through its tools, kept to its grant
+   :id: EVD_TOOLS_LIVE_RUN
+   :evd_kind: measurement
+   :observed_on: 2026-09-26
+   :observation: Against qwen3.8-27b-ridge on LM Studio, agconflo ran a model node calling read, write and run tools on a failing shell project in a granted git worktree to completion in 39 s: 6 calls, its 3 tests then passing on the host.
+
+   Taken with the ``agconflo`` binary at ``4a5bc46``, built for debugging,
+   from a scratch directory: a manifest naming ``read_file``, ``write_file``
+   and ``run_command`` as tools, each a node type with a description; a
+   workflow of an entry instance giving a task and one instance of a node
+   type whose script asks the model once, declaring twelve calls of each
+   tool; a model mapping sending its role to ``openai::qwen3.8-27b-ridge`` at
+   LM Studio's endpoint, the one model it had loaded; and grants of the
+   pinned ``alpine`` image, all three actions, a limit of 30 seconds and 8000
+   bytes, no network, and one folder, ``project``, writable, at a git worktree
+   of a scratch repository. Every ``*_API_KEY`` variable was removed from the
+   process's environment. ``check`` found nothing first.
+
+   The project was ``slug.sh``, which only turned spaces into hyphens, and
+   ``test.sh``, of which two of three cases failed. The task, in English,
+   named the folder, the command running the tests, and busybox's ``tr``,
+   ``sed`` and ``awk``. The model read ``project/slug.sh`` and
+   ``project/test.sh`` in one turn, ran the tests, wrote a ``slug.sh`` whose
+   ``sed`` expression was broken, wrote it again mended before running
+   anything, ran the tests, which passed, and answered with a paragraph
+   saying what was wrong and what it changed. The run exited 0 having spent 8
+   of a budget of 60.
+
+   Afterwards, on the host, the tests passed; ``git status`` in the worktree
+   named ``slug.sh`` alone, whose diff was the one line the model wrote; the
+   repository the worktree came from was unchanged; and no container carried
+   the run's label. One run of one model on one small task: it shows the
+   feature working end to end, and says nothing of how often such a model
+   finds its way, or of a task needing the network.
