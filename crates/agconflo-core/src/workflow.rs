@@ -40,6 +40,10 @@ pub struct NodeType {
     /// until the instance produces another.
     // @A standing output declared on the node type,TRACE_WORKFLOW_STANDING,trace,[],[DEC_STANDING_OUTPUTS]
     pub standing: bool,
+    /// Whether a node of this type is a router: its script names the
+    /// instances its run goes on to, and its output is its decision.
+    // @A router declared on the node type,TRACE_WORKFLOW_ROUTES,trace,[],[DEC_ROUTER_DECLARED]
+    pub routes: bool,
 }
 
 /// One parameter of one instance, wired to the output of a named instance: both
@@ -49,8 +53,13 @@ pub struct NodeType {
 pub struct Binding {
     /// The parameter of the consuming instance this binding fills.
     pub parameter: String,
-    /// The instance whose output is wired to it.
+    /// The instance whose output is wired to it, or whose input when `input`
+    /// names one.
     pub source: String,
+    /// The input of that instance the binding carries, when it takes one of a
+    /// router's inputs rather than the instance's output.
+    // @A binding taking a router's input,TRACE_WORKFLOW_ROUTED_INPUT,trace,[],[DEC_ROUTED_INPUT_BOUND_BY_TABLE, DEC_ROUTER_OUTPUT_IS_ITS_DECISION]
+    pub input: Option<String>,
 }
 
 /// One node in a workflow: its name, the type it instantiates, and what is
@@ -105,6 +114,7 @@ pub(crate) fn node_type(name: &str, required: &[(&str, &str)], output: &str) -> 
         globals: Vec::new(),
         output: context_type(output),
         standing: false,
+        routes: false,
     }
 }
 
@@ -119,6 +129,12 @@ impl NodeType {
     /// The same declaration, its output standing.
     pub(crate) fn standing(mut self) -> Self {
         self.standing = true;
+        self
+    }
+
+    /// The same declaration, as a router's.
+    pub(crate) fn routing(mut self) -> Self {
+        self.routes = true;
         self
     }
 
@@ -162,9 +178,24 @@ pub(crate) fn instance(name: &str, node_type: &str, bindings: &[(&str, &str)]) -
             .map(|&(parameter, source)| Binding {
                 parameter: parameter.to_owned(),
                 source: source.to_owned(),
+                input: None,
             })
             .collect(),
         calls: Vec::new(),
+    }
+}
+
+#[cfg(test)]
+impl NodeInstance {
+    /// The same instance, also binding `parameter` to the input `input` of the
+    /// router `router`.
+    pub(crate) fn taking(mut self, parameter: &str, router: &str, input: &str) -> Self {
+        self.bindings.push(Binding {
+            parameter: parameter.to_owned(),
+            source: router.to_owned(),
+            input: Some(input.to_owned()),
+        });
+        self
     }
 }
 

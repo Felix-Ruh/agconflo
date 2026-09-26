@@ -1299,6 +1299,24 @@
           "title": "agconflo-core reader::reads_what_is_written",
           "type": "test_run"
         },
+        "RUN_READER_ROUTED_INPUT_READ": {
+          "executes": [
+            "TEST_READER_ROUTED_INPUT_READ"
+          ],
+          "id": "RUN_READER_ROUTED_INPUT_READ",
+          "test_outcome": "passed",
+          "title": "agconflo-core reader::routed_input_read",
+          "type": "test_run"
+        },
+        "RUN_READER_ROUTES_READ": {
+          "executes": [
+            "TEST_READER_ROUTES_READ"
+          ],
+          "id": "RUN_READER_ROUTES_READ",
+          "test_outcome": "passed",
+          "title": "agconflo-core reader::routes_read",
+          "type": "test_run"
+        },
         "RUN_READER_STANDING_READ": {
           "executes": [
             "TEST_READER_STANDING_READ"
@@ -2953,6 +2971,15 @@
           "id": "RUN_WRITER_REMOVALS_LEAVE_NOTHING_BEHIND",
           "test_outcome": "passed",
           "title": "agconflo-core writer::removals_leave_nothing_behind",
+          "type": "test_run"
+        },
+        "RUN_WRITER_ROUTED_INPUT_WRITTEN": {
+          "executes": [
+            "TEST_WRITER_ROUTED_INPUT_WRITTEN"
+          ],
+          "id": "RUN_WRITER_ROUTED_INPUT_WRITTEN",
+          "test_outcome": "passed",
+          "title": "agconflo-core writer::routed_input_written",
           "type": "test_run"
         },
         "RUN_WRITER_UNCHANGED_DOCUMENT_IS_BYTE_IDENTICAL": {
