@@ -9,9 +9,9 @@ it can change is kept to what the person running the workflow granted, as
 node types are tools and a person says what they may do, what confines them,
 and what a person is told when a tool could not be performed.
 
-Nineteen rest on measurements recorded in ``evidence/tools``. The other nine
-are judgements between the alternatives each names. Four of the twenty-eight
-are superseded by later ones, and say so.
+Twenty-one rest on measurements recorded in ``evidence/tools``. The other nine
+are judgements between the alternatives each names. Four of the thirty are
+superseded by later ones, and say so.
 
 What they do not settle is named here. Nothing below decides a tool reached
 through MCP, a tool of any kind but the three actions, grants that differ from
@@ -637,3 +637,51 @@ worktree.
    pass, hiding the gap rather than closing it. Refusing a writable grant to a
    root person was the other: a refusal no requirement makes, leaving tools
    unusable wherever a person works as root, as in a container.
+
+.. dec:: The certificate authorities a tool may trust are the person's to grant
+   :id: DEC_TRUST_IN_THE_GRANTS
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :supported_by: EVD_CONTAINER_TLS_INTERCEPTED, EVD_UBC_IN_A_CONTAINER
+   :statement: Agconflo shall read from a run's grants file a file of certificate authorities, and have every tool step of the run trust the authorities it holds.
+
+   Where a machine's outgoing TLS is intercepted, a container on it gets out
+   but trusts nothing it reaches (``EVD_CONTAINER_TLS_INTERCEPTED``), and a tool
+   needing the network - ``ubc`` fetching its licence determination among them
+   - fails there however much network it is granted. Given the machine's own
+   bundle it works (``EVD_UBC_IN_A_CONTAINER``).
+
+   Which authorities a machine trusts is a fact about that machine, like the
+   folders on it, so it is the person's to grant, in the grants file, and not
+   the workflow's (``DEC_GRANTS_IN_A_FILE_OF_THEIR_OWN``). Baking the bundle
+   into an image was the alternative: it ties the image to one machine, and a
+   workflow's images are meant to be the same on every machine that runs it.
+   Naming the machine's proxy to the container was the other, and the proxy
+   measured was on the host's loopback, out of the bridge's reach.
+
+   A grants file naming none trusts nothing more, as before: nothing narrows
+   by being left out (``DEC_GRANTS_NARROW_BY_DEFAULT``).
+
+.. dec:: The granted authorities are copied into the container's /tmp and named in SSL_CERT_FILE
+   :id: DEC_TRUST_COPIED_INTO_TMP
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :supported_by: EVD_UBC_IN_A_CONTAINER
+   :statement: Agconflo shall copy the granted certificate authorities into each tool container's /tmp when it is made, and run every step there with SSL_CERT_FILE naming that copy.
+
+   ``ubc`` trusted the bundle named by ``SSL_CERT_FILE`` as it trusted the one
+   at the system path (``EVD_UBC_IN_A_CONTAINER``), so the variable is enough,
+   and it is the convention OpenSSL and the libraries following it read.
+
+   Mounting the file from the host was the alternative, and it would be the
+   one host file in the container that is not a granted folder:
+   ``CREQ_SANDBOX_LOCKED_DOWN`` makes a container with "only the granted folders
+   mounted", which is right for its parent - nothing outside the grant is
+   changed - and so the design goes around it rather than through it. A copy
+   is content, like anything a step writes to ``/tmp``, and mounts nothing.
+
+   The copy is written as the step's user before the container's first step.
+   A step that removes it breaks its own container's TLS and nothing else;
+   the next call makes a new container and a new copy. Tools reading another
+   variable - ``GIT_SSL_CAINFO``, ``REQUESTS_CA_BUNDLE``,
+   ``NODE_EXTRA_CA_CERTS`` - were not measured and are not set.

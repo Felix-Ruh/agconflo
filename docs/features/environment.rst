@@ -16,7 +16,9 @@ what it shares, and the refusal of an environment the person has not granted.
 
 Each requirement was checked by hand against the two questions every body here
 answers: could it be false while its parents hold, and could they hold while it
-is false? Two statements are ``event`` and one ``unwanted``.
+is false? Three statements are ``event`` and one ``unwanted``. The last, that a
+tool step trusts the authorities the person grants, has an architecture of its
+own, ``ARCH_TOOL_TRUST``, since it came after the first three were allocated.
 
 .. feat_req:: A tool's step is performed in the environment its manifest names for it
    :id: FEAT_TOOL_WORKS_IN_ITS_ENVIRONMENT
@@ -116,3 +118,36 @@ is false? Two statements are ``event`` and one ``unwanted``.
      ``DEC_TMP_LIMITED_BY_GRANTS``, ``DEC_STEP_USER_NEVER_ROOT``: the sandbox.
    - ``DEC_GRANTS_LIST_IMAGES``, ``DEC_UNREACHABLE_ENGINE_REFUSES_NO_RUN``: the
      runner.
+
+.. feat_req:: A tool step trusts the certificate authorities the person grants
+   :id: FEAT_TOOL_TRUSTS_GRANTED_AUTHORITIES
+   :derived_from: STKH_TOOL_ENVIRONMENT
+   :ears_pattern: event
+   :verification_method: test
+   :statement: When a person's grants name certificate authorities, Agconflo shall have every tool step of the run trust them.
+
+   The parent has the environment a tool runs in come from what the person
+   grants, and on a machine whose outgoing TLS is intercepted an environment
+   that does not trust the machine's authority is one where no tool reaching
+   the network can work (``EVD_CONTAINER_TLS_INTERCEPTED``).
+
+   It can be false while the parent holds. A host that performs every tool in
+   the environment its workflow names, granted a network it cannot use, meets
+   the parent in its letter and leaves every tool that fetches anything
+   failing - ``ubc`` among them, which is the use a self-hosting workflow puts
+   a tool to first.
+
+   It claims no more than the parent: which authorities is the person's, and
+   a person naming none is given none.
+
+.. feat_arch:: Trusting granted authorities splits between the grants reader and the sandbox
+   :id: ARCH_TOOL_TRUST
+   :realises: FEAT_TOOL_TRUSTS_GRANTED_AUTHORITIES
+   :uses: COMP_GRANTS_READER, COMP_SANDBOX
+   :statement: Agconflo shall allocate trusting the granted certificate authorities to the grants reader and the sandbox.
+
+   The grants reader answers what was granted: the file of authorities, read
+   when the grants are, or the grants refused where it names one that cannot
+   be read. The sandbox answers what a container does with it: a copy made in
+   each container, and every step run trusting it
+   (``DEC_TRUST_IN_THE_GRANTS``, ``DEC_TRUST_COPIED_INTO_TMP``).

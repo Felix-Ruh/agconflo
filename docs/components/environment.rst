@@ -13,6 +13,9 @@ Two requirements of ``components/tools`` are revised in the same change, each
 by its record in ``decisions/changes``: ``CREQ_SANDBOX_STEP_USER`` and
 ``CREQ_RUNNER_REFUSES_UNGRANTED``.
 
+The last three are ``ARCH_TOOL_TRUST``'s, allocated to the grants reader and
+the sandbox.
+
 .. comp_req:: A manifest gives each tool the image and the container its entry names
    :id: CREQ_PROJECT_READS_TOOL_ENVIRONMENT
    :derived_from: FEAT_TOOL_WORKS_IN_ITS_ENVIRONMENT, FEAT_TOOL_ENVIRONMENT_SHARED_BY_NAME
@@ -240,3 +243,56 @@ by its record in ``decisions/changes``: ``CREQ_SANDBOX_STEP_USER`` and
 
    - **A check reporting only the grants' image**, and a tool's own absent
      image found by starting a run.
+
+.. comp_req:: A grants file gives the certificate authorities it names
+   :id: CREQ_GRANTS_READS_TRUST
+   :derived_from: FEAT_TOOL_TRUSTS_GRANTED_AUTHORITIES
+   :allocated_to: COMP_GRANTS_READER
+   :ears_pattern: event
+   :statement: When a grants file names a trust file, Grants reader shall give that file's content, read from its path relative to the grants file's directory.
+
+   ``DEC_TRUST_IN_THE_GRANTS``. The file is read with the grants, so what a
+   run trusts is what the file held when the run was asked for, like every
+   other grant.
+
+   Failure modes:
+
+   - **The path read from the working directory**, and a run started elsewhere
+     trusting another file or none.
+   - **The content altered on the way**, a bundle of many certificates cut to
+     the first.
+
+.. comp_req:: A trust file that cannot be read refuses the grants at its key
+   :id: CREQ_GRANTS_REFUSES_BAD_TRUST
+   :derived_from: FEAT_TOOL_GRANTS_UNREADABLE_REFUSED
+   :allocated_to: COMP_GRANTS_READER
+   :ears_pattern: unwanted
+   :statement: If a grants file names a trust file that is not a readable file, then Grants reader shall refuse it at that key naming the path.
+
+   A grant that cannot be honoured refuses the run before anything runs, as a
+   folder that is not there does.
+
+   Failure modes:
+
+   - **A missing file read as no trust**, and a run that needed it failing
+     later at the first tool reaching the network, far from the cause.
+   - **A directory accepted** as the file.
+
+.. comp_req:: A step runs trusting a copy of the granted authorities
+   :id: CREQ_SANDBOX_TRUSTS_GRANTED
+   :derived_from: FEAT_TOOL_TRUSTS_GRANTED_AUTHORITIES
+   :allocated_to: COMP_SANDBOX
+   :ears_pattern: event
+   :statement: When a step is run under grants that name a trust file, Sandbox shall run it with SSL_CERT_FILE naming a copy of that file's content in its container.
+
+   ``DEC_TRUST_COPIED_INTO_TMP``: the copy is written to ``/tmp`` when the
+   container is made, and nothing is mounted for it, so
+   ``CREQ_SANDBOX_LOCKED_DOWN`` holds as it is.
+
+   Failure modes:
+
+   - **The file mounted from the host**, one host file in the container that
+     is not a granted folder.
+   - **The variable set without the copy**, or the copy made in one container
+     of a run and not in another.
+   - **A step without trust given one**, where the grants name none.
