@@ -30,9 +30,9 @@ the derivation can be audited rather than taken on trust:
 - ``CREQ_READER_FAULT_LOCATED``'s "the column counts bytes" is caught by
   ``TEST_READER_FAULTS_CARRY_THEIR_PLACE``, one of whose documents puts a
   character wider than one byte before the fault on its line.
-- ``CREQ_READER_FAULT_LOCATED``'s "the repetition is placed at the first of the
-  two" is caught by ``TEST_READER_PARAMETER_DECLARED_TWICE_IS_A_FAULT``, which
-  writes the two lists in both orders.
+- ``CREQ_READER_FAULT_LOCATED``'s "an optional list read as nothing" is caught
+  by ``TEST_READER_OPTIONAL_PARAMETERS_REFUSED``, which writes the list both
+  inline and as a header table.
 - ``CREQ_WRITER_KEEPS_UNREAD``'s "a changed value loses the comment beside it" is
   caught by ``TEST_WRITER_UNREAD_KEYS_SURVIVE_A_CHANGE``, whose repointed binding
   carries a comment of its own.
@@ -127,17 +127,17 @@ together.
    happens to be sorted, and a reader built without the parser's
    order-preserving feature is a sorting reader (``EVD_TOML_ORDER_NEEDS_FEATURE``).
 
-.. test_case:: The three declared lists are kept apart
-   :id: TEST_READER_THREE_LISTS_KEPT_APART
+.. test_case:: The declared lists are kept apart
+   :id: TEST_READER_LISTS_KEPT_APART
    :verifies: CREQ_READER_TYPES
    :test_kind: positive
    :coverage: partial
 
-   A type declaring required parameters, optional parameters and requested global
-   types reads each into its own list, and a type declaring none of the three reads
-   as a type with three empty lists and its output.
+   A type declaring parameters and requested global types reads each into its
+   own list, and a type declaring neither reads as a type with two empty lists
+   and its output.
 
-   The three are written in the document in an order other than required, optional,
+   The two are written in the document in an order other than parameters, then
    globals, so that a reader taking them by position rather than by key would put
    each in the wrong list.
 
@@ -178,26 +178,23 @@ together.
    the model's refusal has to come out as a fault in the text with a place, rather
    than as a panic or an error that has lost where it came from.
 
-.. test_case:: A parameter declared in both lists is a fault in the text
-   :id: TEST_READER_PARAMETER_DECLARED_TWICE_IS_A_FAULT
+.. test_case:: A node type declaring optional parameters is a fault in the text
+   :id: TEST_READER_OPTIONAL_PARAMETERS_REFUSED
    :verifies: CREQ_READER_FAULT_LOCATED
    :test_kind: error_path
    :coverage: partial
 
-   A node type document declaring one parameter as both required and optional is
-   refused with the document, the line and column of whichever declaration is
-   written later, and the key naming that list and parameter - once with the
-   required list written first as inline tables, and once with the optional list
-   written first as header tables. With two names in both lists, the one
-   repeating first in the text is the one reported. A document declaring
-   ``input`` as required and ``Input`` as optional reads, as two parameters.
+   A node type document declaring an ``optional`` list is refused with the
+   document, the line and column of the ``optional`` key, and that key - once
+   written inline after the required list, and once as a header table holding
+   nothing, since an empty list is refused as well. The same parameters, all
+   declared required, read - the control.
 
-   The parser cannot refuse the shape, since the two lists are two tables and a
-   name in both is no repeated key, so the reader has to. Both
-   orders, because a reader always pointing at one list is right in exactly one
-   of them. And the names differing in case are the control: comparing them
-   loosely is the tidy-looking way to refuse this, and it refuses two parameters
-   that are really different.
+   Every parameter is required (``DEC_EVERY_INPUT_REQUIRED``), and the reader
+   reads past keys it does not know, so an ``optional`` list it no longer read
+   would drop the parameters it declares without a word
+   (``DEC_OPTIONAL_PARAMETERS_REFUSED``). Catches: an optional list read as
+   nothing; the fault placed anywhere but at the key.
 
 .. test_case:: Any text is read or refused
    :id: TEST_READER_ANY_TEXT_IS_READ_OR_REFUSED

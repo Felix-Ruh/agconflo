@@ -13,10 +13,12 @@ being written. That is the same order the context decisions were migrated in, an
 the same rule applies: re-opening one means superseding it rather than quietly
 disagreeing with it.
 
-The last three were taken by the maintainer on 2026-09-26, and supersede four of
-the first: a workflow is one graph whose edges carry contexts, it repeats part of
-itself only by walking those edges again, and a node type declares no optional
-parameter.
+The three before the last were taken by the maintainer on 2026-09-26, and
+supersede four of the first: a workflow is one graph whose edges carry contexts,
+it repeats part of itself only by walking those edges again, and a node type
+declares no optional parameter. The last follows from the one before it: a node
+type document still declaring optional parameters is refused rather than read
+without them.
 
 None of them rests on a measurement, and none carries evidence. They are
 judgements about a model, and the honest record of a judgement is its reasoning
@@ -224,6 +226,27 @@ and what it turned down.
 
    It also settles what ``DEC_BINDING_IS_AWAITED`` had to argue for: with
    nothing optional, every edge into a node is waited for without an
-   exception to reason about (``DEC_EDGE_GENERATIONS``). The code, the readers
-   and their requirements still hold optional parameters; removing them is a
-   change of its own, and until it lands they follow the superseded decisions.
+   exception to reason about (``DEC_EDGE_GENERATIONS``). Optional parameters
+   were removed from the code, the readers and the requirements' bodies in a
+   change of their own, which also refuses a document still declaring them
+   (``DEC_OPTIONAL_PARAMETERS_REFUSED``).
+
+.. dec:: A node type still declaring optional parameters is refused
+   :id: DEC_OPTIONAL_PARAMETERS_REFUSED
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :statement: Agconflo shall refuse a node type document that declares an optional list on a node type, at that list's key.
+
+   With no optional parameters (``DEC_EVERY_INPUT_REQUIRED``), the ``optional``
+   key means nothing. The topology reader reads past keys it does not know, so
+   that a document keeps what a later version or another tool wrote there, and
+   read that way a type still declaring ``optional = { hint = "note" }`` would
+   lose ``hint`` without a word: the wiring would still check, and the script
+   would meet a name with no value. Refusing the key at its place tells the
+   author which declaration to rewrite, and how.
+
+   Reading an optional list as required parameters was the alternative, and
+   would change what an old document means without its author seeing it:
+   every instance binding none of those parameters would stop starting, for a
+   reason the document no longer shows. Ignoring the key was the other, and is
+   the silent loss above.

@@ -95,9 +95,9 @@ anything else.
      (``EVD_TOML_ORDER_NEEDS_FEATURE``). Nothing downstream can notice: every
      parameter is still there, and every node receives its inputs in the wrong
      order.
-   - **The three lists are confused.** A requested global read as an optional
-     parameter, or an optional one as required, changes what the validator
-     demands of every instance of that type.
+   - **The two lists are confused.** A requested global read as a parameter,
+     or a parameter as a requested global, changes what the validator demands of
+     every instance of that type.
 
    Must read: a type declaring no parameters of any kind, and a type whose
    parameters are written out of alphabetical order - the only kind of order that
@@ -136,21 +136,15 @@ anything else.
      by some other route, are both wrong.
    - **Reading panics instead of refusing.** An ``unwrap`` on a value the document
      did not have ends the process, which reports nothing at all.
-   - **A parameter declared in both lists is read.** The required and optional
-     lists are two tables, so a name in both is no repeated key and the parser
-     passes it. Read as it stands, the validator judges every wire into the
-     parameter by its required declaration and ignores the other without a word
-     - measured, and the reason ``DEC_NAMES_AS_KEYS`` counts it among the names a
-     document cannot hold.
-   - **The repetition is placed at the first of the two.** The parser places a
-     repeated key where it repeats, and a reader always pointing at one list
-     sends the author to the declaration that came first whenever that list was
-     written first.
+   - **An optional list read as nothing.** Every parameter is required
+     (``DEC_EVERY_INPUT_REQUIRED``), and the reader reads past keys it does not
+     know, so a type still declaring ``optional`` would lose those parameters
+     without a word, and its script would find them missing
+     (``DEC_OPTIONAL_PARAMETERS_REFUSED``).
 
    Must refuse, each with its place: text that is not TOML, a value of the wrong
-   type, a key the reader needs that is missing, a name repeated within one
-   document - a parameter declared as both required and optional among them, at
-   whichever of the two is written later - and an empty context type name.
+   type, a key the reader needs that is missing, an ``optional`` list on a node
+   type, at its key, and an empty context type name.
 
 .. comp_req:: Reading resolves no name
    :id: CREQ_READER_NAMES_UNRESOLVED

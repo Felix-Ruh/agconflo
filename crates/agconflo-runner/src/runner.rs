@@ -427,7 +427,6 @@ fn supplied(
                     node_type
                         .required
                         .iter()
-                        .chain(&node_type.optional)
                         .find(|parameter| parameter.name == argument.parameter)
                 })
                 .ok_or_else(|| Refusal::Argument {
@@ -524,7 +523,6 @@ fn ungranted(project: &Project, grants: &Grants, container: &impl Container) -> 
                 node_type
                     .required
                     .iter()
-                    .chain(&node_type.optional)
                     .any(|declared| declared.name == *parameter)
             });
             if !has {
@@ -665,11 +663,11 @@ use agconflo_lua::ScriptFailure;
 #[cfg(test)]
 use proptest::prelude::*;
 
-/// Every node type the tests' workflows use: an entry taking a brief and an
-/// optional extra, and four types taking what came before - one asking a
+/// Every node type the tests' workflows use: an entry taking a brief, and four
+/// types taking what came before - one asking a
 /// model, one adding to it, one a person performs, and one whose script fails.
 #[cfg(test)]
-const TYPES: &str = "[types.begin]\nrequired = { brief = \"note\" }\noptional = { extra = \"other\" }\noutput = \"note\"\n\n[types.ask]\nrequired = { before = \"note\" }\noutput = \"note\"\n\n[types.add]\nrequired = { before = \"note\" }\noutput = \"note\"\n\n[types.review]\nrequired = { before = \"note\" }\noutput = \"note\"\n\n[types.broken]\nrequired = { before = \"note\" }\noutput = \"note\"\n";
+const TYPES: &str = "[types.begin]\nrequired = { brief = \"note\" }\noutput = \"note\"\n\n[types.ask]\nrequired = { before = \"note\" }\noutput = \"note\"\n\n[types.add]\nrequired = { before = \"note\" }\noutput = \"note\"\n\n[types.review]\nrequired = { before = \"note\" }\noutput = \"note\"\n\n[types.broken]\nrequired = { before = \"note\" }\noutput = \"note\"\n";
 
 /// The scripts, by file.
 #[cfg(test)]
@@ -827,6 +825,10 @@ proptest! {
     fn arguments_kept_exactly(wanted in "( |\r\n|\n|[a-z])*", extra in "( |\r\n|\n|[A-Z])*") {
         let scratch = Scratch::new("arguments_kept_exactly");
         let manifest = project(&scratch, "add", 5);
+        scratch.write(
+            "types.toml",
+            TYPES.replace("required = { brief = \"note\" }", "required = { brief = \"note\", extra = \"other\" }"),
+        );
         scratch.write(
             "begin.lua",
             "local given, host = ...\nreturn host.compose(host.output, {given.brief, given.extra}, '|')\n",
@@ -1672,7 +1674,7 @@ fn refuses_ungranted() {
     let all = granting(&scratch, "\"read\", \"run\"");
     scratch.write(
         "tools.toml",
-        format!("{TOOL_TYPES}\n[types.bare]\nrequired = {{ other = \"note\" }}\noutput = \"note\"\n\n[types.loose]\noptional = {{ path = \"note\" }}\noutput = \"note\"\n"),
+        format!("{TOOL_TYPES}\n[types.bare]\nrequired = {{ other = \"note\" }}\noutput = \"note\"\n\n[types.loose]\nrequired = {{ path = \"note\" }}\noutput = \"note\"\n"),
     );
     let text = std::fs::read_to_string(&manifest).expect("the manifest");
     std::fs::write(&manifest, format!("{text}bare = \"read\"\n")).expect("the manifest");
@@ -1696,7 +1698,8 @@ fn refuses_ungranted() {
     );
     assert!(!taken());
 
-    // An optional path is a path: the same manifest starts.
+    // Its path declared, the image the grants name ready: the same manifest
+    // starts.
     let stand_in = echoing();
     awaiting(runtime().block_on(start_in(
         Sources {

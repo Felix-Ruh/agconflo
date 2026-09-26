@@ -21,11 +21,10 @@ Nine failure modes have no case of their own, because each is an interaction
 between requirements or an assertion that belongs inside another case. They are
 named here so the derivation can be audited rather than taken on trust:
 
-- ``CREQ_SCHEDULER_ACTIVATION_CARRIES``'s "an optional parameter bound but
-  omitted from the activation" is asserted by
-  ``TEST_SCHEDULER_BOUND_OPTIONAL_IS_AWAITED``, whose whole point is that the
-  waiting was for something: it checks that the context arrives in the
-  activation and not merely that the instance waited.
+- ``CREQ_SCHEDULER_ACTIVATION_CARRIES``'s "a parameter bound but omitted from
+  the activation" is asserted by ``TEST_SCHEDULER_EVERY_INPUT_IS_AWAITED``,
+  whose whole point is that the waiting was for something: it checks that the
+  context arrives in the activation and not merely that the instance waited.
 - ``CREQ_SCHEDULER_ACTIVATION_CARRIES``'s "parameters sorted by name" is caught
   by ``TEST_SCHEDULER_INPUTS_IN_DECLARED_ORDER``, whose node type declares its
   parameters in an order that is not alphabetical and not the binding order, so
@@ -61,21 +60,22 @@ exactly one ending is asserted inside each ending's case, which checks that the
 other three were not reported, because a standalone property would have no
 single requirement to verify.
 
-.. test_case:: A bound optional parameter is waited for and arrives
-   :id: TEST_SCHEDULER_BOUND_OPTIONAL_IS_AWAITED
+.. test_case:: Every input is waited for and arrives
+   :id: TEST_SCHEDULER_EVERY_INPUT_IS_AWAITED
    :verifies: CREQ_SCHEDULER_READY_WHEN_BOUND
    :test_kind: error_path
    :coverage: partial
 
-   The measured defect (``EVD_RUN_OPTIONAL_BY_ORDER``). A consumer whose node
-   type declares one required and one optional parameter, both bound, with the
-   optional parameter's producer not yet activated: the consumer is not offered.
-   Once that producer has produced, the consumer is offered and its activation
-   carries both contexts.
+   The shape of the measured defect (``EVD_RUN_OPTIONAL_BY_ORDER``), which was
+   found with an optional parameter, kept now that every parameter is required
+   (``DEC_EVERY_INPUT_REQUIRED``). A consumer whose node type declares two
+   parameters, both bound, with the second's producer not yet activated: the
+   consumer is not offered. Once that producer has produced, the consumer is
+   offered and its activation carries both contexts.
 
    The second half is what stops a reader waiting and then discarding. Asserting
    only that the instance waited would pass against a scheduler that waits and
-   then hands over the required parameter alone.
+   then hands over the first parameter alone.
 
 .. test_case:: An instance's inputs do not depend on where it is written
    :id: TEST_SCHEDULER_INPUTS_IGNORE_INSTANCE_ORDER
@@ -89,8 +89,8 @@ single requirement to verify.
 
    This is the property form of the measured defect, and the strongest case in
    the file: the defect was visible only because one line moved. A scheduler
-   that asks readiness of the required parameters alone fails it, because the
-   instance found first differs between permutations.
+   that asks readiness of some of an instance's parameters alone fails it,
+   because the instance found first differs between permutations.
 
    Definitions in which two instances share a name are excluded, and the
    exclusion is a finding rather than a convenience. What has produced is keyed
@@ -99,19 +99,22 @@ single requirement to verify.
    false there. A run never meets the shape, since a shared name is a wiring
    defect and the run refuses to start on it.
 
-.. test_case:: An unbound optional parameter does not hold an instance back
-   :id: TEST_SCHEDULER_UNBOUND_OPTIONAL_IS_READY
+.. test_case:: A parameter left unbound holds its instance back
+   :id: TEST_SCHEDULER_UNBOUND_PARAMETER_NEVER_READY
    :verifies: CREQ_SCHEDULER_READY_WHEN_BOUND
-   :test_kind: positive
+   :test_kind: error_path
    :coverage: partial
 
-   The first half of the requirement's must-pass list. An instance whose node
-   type declares an optional parameter that the definition does not bind is
-   offered as soon as its bound parameters have contexts.
+   An instance whose node type declares two parameters, one bound to an
+   output that has been produced and one bound to nothing: it is never offered.
+   An instance of a type declaring only the first, bound to the same output, is
+   offered - the control.
 
-   The control against over-correcting the case above: a scheduler that waits
-   for every parameter a type declares deadlocks here, and nothing else in this
-   file would notice.
+   Every parameter is required (``DEC_EVERY_INPUT_REQUIRED``), so what a
+   definition leaves unbound is missing rather than absent. Catches: a
+   scheduler that asks readiness of the bindings an instance has rather than of
+   the parameters its type declares, and hands a script an activation missing
+   one of them.
 
 .. test_case:: An entry instance is ready before anything has run
    :id: TEST_SCHEDULER_ENTRY_IS_READY_AT_ONCE
@@ -314,14 +317,11 @@ single requirement to verify.
    :test_kind: positive
    :coverage: partial
 
-   The requirement's must-pass list. One argument per required entry parameter,
-   each of the declared type, starts a run - including the shape measured wrong
+   The requirement's must-pass list. One argument per entry parameter, each of
+   the declared type, starts a run - including the shape measured wrong
    (``EVD_RUN_ENTRY_NAME_SHARED``): two entry instances of node types that each
    declare a parameter called the same thing, for two different context types,
    are two parameters and receive their own arguments.
-
-   An entry instance's unsupplied optional parameter is here too, since refusing
-   it would make a workflow unusable that is not wrong.
 
 .. test_case:: A run stops at the budget rather than one past it
    :id: TEST_RUN_BUDGET_STOPS_AT_THE_LIMIT

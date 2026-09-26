@@ -100,11 +100,11 @@ pub enum FaultKind {
         /// Why the model refuses it.
         reason: InvalidTypeName,
     },
-    /// A node type declares one parameter as both required and optional. The
-    /// two lists are two tables, so the parser sees no repeated key, and the
-    /// place is where the name repeats: whichever declaration is written later.
-    ParameterDeclaredTwice {
-        /// The later declaration, from the top of the document down.
+    /// A node type declares optional parameters, which there are none of: a
+    /// parameter with nothing to carry is required and given an empty context.
+    /// The place is the key declaring them.
+    OptionalParameters {
+        /// The key, from the top of the document down.
         key: Vec<String>,
     },
 }
@@ -136,9 +136,9 @@ impl fmt::Display for FaultKind {
             Self::InvalidContextType { key, reason } => {
                 write!(f, "'{}' is not a context type: {reason}", key.join("."))
             }
-            Self::ParameterDeclaredTwice { key } => write!(
+            Self::OptionalParameters { key } => write!(
                 f,
-                "'{}' is declared as both a required and an optional parameter",
+                "'{}' declares optional parameters, and every parameter is required: declare each under required and bind it an empty context when it has nothing to carry",
                 key.join(".")
             ),
         }
@@ -428,9 +428,8 @@ impl<'t> Reading<'t> {
         let key = ["types", name];
         let declaration = self.table(item, &key)?;
         let output = self.needed(item, declaration, &key, "output")?;
+        self.no_optional(declaration, &key)?;
         let required = self.parameters(declaration, &key, "required")?;
-        let optional = self.parameters(declaration, &key, "optional")?;
-        self.declared_once(declaration, &key, &required, &optional)?;
 
         let description = match declaration.get("description") {
             None => String::new(),
@@ -443,56 +442,21 @@ impl<'t> Reading<'t> {
             name: name.to_owned(),
             description,
             required,
-            optional,
             globals: self.globals(declaration, &key)?,
             output: self.context_type(output, &[&key[..], &["output"]].concat())?,
         })
     }
 
-    /// Nothing, or a fault for a parameter `declaration` lists as both required
-    /// and optional, placed at whichever declaration is written later; with
-    /// several, the one that repeats first in the text. Names are compared
-    /// exactly.
-    // @A parameter declared in both lists refused where it repeats,IMPL_READER_DECLARED_ONCE,impl,[CREQ_READER_FAULT_LOCATED]
-    fn declared_once(
-        &self,
-        declaration: &dyn TableLike,
-        key: &[&str],
-        required: &[Parameter],
-        optional: &[Parameter],
-    ) -> Result<(), ReadFault> {
-        // A key read from a parsed document has a span; a missing one refuses the
-        // document at its start.
-        let written_at = |list: &str, name: &str| {
-            declaration
-                .get(list)
-                .and_then(Item::as_table_like)
-                .and_then(|table| table.get_key_value(name))
-                .and_then(|(written, _)| written.span())
-                .map(|span| span.start)
-        };
-
-        let repeated = optional
-            .iter()
-            .filter(|parameter| required.iter().any(|other| other.name == parameter.name))
-            .map(|parameter| {
-                let as_required = written_at("required", &parameter.name);
-                let as_optional = written_at("optional", &parameter.name);
-                let (list, at) = if as_optional > as_required {
-                    ("optional", as_optional)
-                } else {
-                    ("required", as_required)
-                };
-                (at, list, parameter.name.as_str())
-            })
-            .min_by_key(|&(at, ..)| at);
-
-        match repeated {
+    /// Nothing, or a fault for the `optional` list `declaration` holds, placed
+    /// at its key.
+    // @An optional list refused at its key,IMPL_READER_NO_OPTIONAL,impl,[CREQ_READER_FAULT_LOCATED],[DEC_OPTIONAL_PARAMETERS_REFUSED, DEC_EVERY_INPUT_REQUIRED]
+    fn no_optional(&self, declaration: &dyn TableLike, key: &[&str]) -> Result<(), ReadFault> {
+        match declaration.get_key_value("optional") {
             None => Ok(()),
-            Some((at, list, name)) => Err(self.fault(
-                at.map(|at| at..at),
-                FaultKind::ParameterDeclaredTwice {
-                    key: path(&[key, &[list, name]].concat()),
+            Some((written, _)) => Err(self.fault(
+                written.span(),
+                FaultKind::OptionalParameters {
+                    key: path(&[key, &["optional"]].concat()),
                 },
             )),
         }
@@ -877,7 +841,7 @@ pub(crate) fn catalogue() -> TypeCatalogue {
         "types.toml",
         vec![
             node_type("source", &[], "note"),
-            node_type("sink", &[("input", "note")], "note").with_optional(&[("hint", "note")]),
+            node_type("sink", &[("input", "note")], "note"),
         ],
     )])
     .expect("two distinct types gather")
@@ -940,10 +904,10 @@ proptest! {
 }
 
 #[test]
-fn three_lists_kept_apart() {
-    // Written globals, optional, required - an order other than the model's -
-    // each list declaring its own context types, with keys the model does not
-    // name at the top and on a type.
+fn lists_kept_apart() {
+    // Written globals, then required - an order other than the model's - each
+    // list declaring its own context types, with keys the model does not name
+    // at the top and on a type.
     let text = "\
 [editor]
 zoom = 2
@@ -951,8 +915,7 @@ zoom = 2
 [types.review]
 colour = \"teal\"
 globals = [\"policy\", \"style\"]
-optional = { hint = \"note\" }
-required = { diff = \"diff\", notes = \"summary\" }
+required = { diff = \"diff\", notes = \"summary\", hint = \"note\" }
 output = \"summary\"
 
 [types.bare]
@@ -965,13 +928,12 @@ output = \"note\"
         [
             node_type(
                 "review",
-                &[("diff", "diff"), ("notes", "summary")],
+                &[("diff", "diff"), ("notes", "summary"), ("hint", "note")],
                 "summary"
             )
-            .with_optional(&[("hint", "note")])
             .with_globals(&["policy", "style"]),
-            // Declaring none of the three is a type with three empty lists and
-            // its output, not a fault.
+            // Declaring neither is a type with two empty lists and its output,
+            // not a fault.
             node_type("bare", &[], "note"),
         ]
     );
@@ -1213,8 +1175,7 @@ fn nearly_valid() -> impl Strategy<Value = String> {
     const TYPES: &str = "\
 [types.review]
 globals = [\"policy\"]
-optional = { hint = \"note\" }
-required = { diff = \"diff\" }
+required = { diff = \"diff\", hint = \"note\" }
 output = \"summary\"
 ";
     const PERMISSIVE: Pools = Pools {
@@ -1394,36 +1355,24 @@ node_type = \"differ\"
 }
 
 #[test]
-fn parameter_declared_twice_is_a_fault() {
+fn optional_parameters_refused() {
     let key = |parts: &[&str]| parts.iter().map(|&part| part.to_owned()).collect();
     let cases = [
-        // The required list first, inline: the repetition is in the optional
-        // one, after a parameter declared once.
+        // Inline, after the required list.
         (
-            "required-first.toml",
-            "[types.review]\noutput = \"note\"\nrequired = { input = \"note\" }\noptional = { hint = \"note\", input = \"diff\" }\n",
-            (4, 29),
-            key(&["types", "review", "optional", "input"]),
+            "inline.toml",
+            "[types.review]\noutput = \"note\"\nrequired = { input = \"note\" }\noptional = { hint = \"note\" }\n",
+            (4, 1),
         ),
-        // The optional list first, as header tables: the repetition is in the
-        // required one.
+        // As a header table, and empty: an empty list is still refused.
         (
-            "optional-first.toml",
-            "[types.review]\noutput = \"note\"\n\n[types.review.optional]\ninput = \"diff\"\n\n[types.review.required]\ninput = \"note\"\n",
-            (8, 1),
-            key(&["types", "review", "required", "input"]),
-        ),
-        // Two names in both lists, in opposite orders: a repeats first in the
-        // text, though b comes first in the optional list.
-        (
-            "two-names.toml",
-            "[types.t]\noutput = \"note\"\noptional = { b = \"note\", a = \"note\" }\nrequired = { a = \"note\", b = \"note\" }\n",
-            (4, 14),
-            key(&["types", "t", "required", "a"]),
+            "header.toml",
+            "[types.review]\noutput = \"note\"\n\n[types.review.optional]\n",
+            (4, 15),
         ),
     ];
 
-    for (document, text, (line, column), key) in cases {
+    for (document, text, (line, column)) in cases {
         let fault = read_node_types(document, text).expect_err("it is refused");
         assert_eq!(
             (fault.document(), fault.line(), fault.column(), fault.kind()),
@@ -1431,22 +1380,27 @@ fn parameter_declared_twice_is_a_fault() {
                 document,
                 line,
                 column,
-                &FaultKind::ParameterDeclaredTwice { key }
+                &FaultKind::OptionalParameters {
+                    key: key(&["types", "review", "optional"])
+                }
             ),
             "{fault}"
         );
     }
 
-    // Names differing only in case are two parameters. Comparing them loosely
-    // is the tidy-looking way to refuse the shape above, and it refuses this.
+    // The control: the same parameters, all required, read.
     let read = read_node_types(
-        "cases.toml",
-        "[types.review]\noutput = \"note\"\nrequired = { input = \"note\" }\noptional = { Input = \"note\" }\n",
+        "required.toml",
+        "[types.review]\noutput = \"note\"\nrequired = { input = \"note\", hint = \"note\" }\n",
     )
-    .expect("two parameters read");
+    .expect("every parameter required reads");
     assert_eq!(
         read.node_types(),
-        [node_type("review", &[("input", "note")], "note").with_optional(&[("Input", "note")])]
+        [node_type(
+            "review",
+            &[("input", "note"), ("hint", "note")],
+            "note"
+        )]
     );
 }
 

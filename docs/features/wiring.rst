@@ -57,8 +57,9 @@ nothing about it prevents a run; and a cycle is not a defect at all
    loop-over-what-is-there never visits, and it is the commonest authoring
    mistake there is.
 
-   Optional parameters are deliberately outside it. A node usable with less than
-   everything wired is the reason the declaration has two lists rather than one.
+   Every parameter a type declares is inside it: none is optional
+   (``DEC_EVERY_INPUT_REQUIRED``), and one with nothing to carry is bound to an
+   empty context rather than left unwired.
 
 .. feat_req:: A binding must name something that exists
    :id: FEAT_WIRING_BINDING_RESOLVES
@@ -137,11 +138,11 @@ nothing about it prevents a run; and a cycle is not a defect at all
    (``DEC_DECLARED_PARAMETERS``), or does not.
 
    It can be false while its parent holds, and the way it can is the commonest
-   typo there is. A binding to ``hnit`` on a node whose type declares an optional
-   ``hint`` fills nothing: every required parameter is bound, every source
-   resolves, every wire with a declared type at both ends agrees on it - and the
-   node runs without the context its author wired to it. Nothing crashes, and
-   nothing is refused. A typo in a required parameter is half caught already, as a
+   typo there is. A binding to ``hnit`` beside a bound ``hint`` fills nothing:
+   every parameter is bound, every source resolves, every wire with a declared
+   type at both ends agrees on it - and the node runs without the context its
+   author believes a second wire carries to it. Nothing crashes, and nothing is
+   refused. A typo in a required parameter is half caught already, as a
    parameter left unbound, but that report names the parameter that is missing
    and not the binding that was meant for it.
 
@@ -273,8 +274,8 @@ nothing about it prevents a run; and a cycle is not a defect at all
 
    It is what makes the defect classes exact rather than merely sufficient, and
    it is why the cases that must pass are named in each component requirement's
-   body: an unbound optional parameter, a cycle, a node nothing reaches, a
-   declared global that no binding carries. Each of those is well formed, and
+   body: a cycle, a node nothing reaches, a declared global that no binding
+   carries. Each of those is well formed, and
    each is the kind of thing a validator written to be strict refuses by
    accident.
 
@@ -336,8 +337,9 @@ nothing about it prevents a run; and a cycle is not a defect at all
 
    - ``DEC_TWO_LAYERS``: an instance is checked against its type, which is what
      gives the validator something to check against at all.
-   - ``DEC_DECLARED_PARAMETERS``: the three lists a type declares are what
-     "required", "optional" and "global" mean in a defect message.
+   - ``DEC_EVERY_INPUT_REQUIRED``, superseding ``DEC_DECLARED_PARAMETERS``: the
+     parameters and the globals a type declares are what "parameter" and
+     "global" mean in a defect message, and every parameter is required.
    - ``DEC_BINDING_BY_PORT``: both ends of a binding are names in the definition,
      so every check here is possible without running anything - and a parameter
      binds to exactly one output, which is what makes binding it twice a defect.

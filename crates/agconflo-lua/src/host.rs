@@ -316,8 +316,7 @@ pub(crate) struct Performing {
 /// own, or say how it failed.
 ///
 /// The script is given two arguments, read as `local given, host = ...`: the
-/// activation's inputs under their parameters' names, with an unbound optional
-/// parameter absent rather than empty; and the host functions -
+/// activation's inputs under their parameters' names; and the host functions -
 /// `host.text(type, text)`, `host.compose(type, parts, separator)`,
 /// `host.complete(role, prompt, type)`, `host.decide(role, state, questions,
 /// type)` and `host.output`, the type the output is declared as.
@@ -826,7 +825,7 @@ fn same(a: &Context, b: &Context) -> bool {
 
 /// The offer: for each node type the instance declares a call to, once, a
 /// composition of text contexts of `kind` - its name, its description, and each
-/// parameter's name, required ones first - and the same contexts as the roster
+/// parameter's name in declared order - and the same contexts as the roster
 /// sends them.
 // @The offer made from the declarations,IMPL_HOST_OFFER,impl,[CREQ_HOST_OFFERS_DECLARED],[DEC_TOOLS_OFFERED_AS_CONTEXTS]
 fn offer_for(
@@ -842,10 +841,8 @@ fn offer_for(
         let name = text(&callee.name)?;
         let description = text(&callee.description)?;
         let mut parameters = Vec::new();
-        for (parameter, required) in (callee.required.iter().map(|p| (p, true)))
-            .chain(callee.optional.iter().map(|p| (p, false)))
-        {
-            parameters.push((text(&parameter.name)?, required));
+        for parameter in &callee.required {
+            parameters.push((text(&parameter.name)?, true));
         }
         offered.push(Offered {
             name,
@@ -889,7 +886,6 @@ fn checked(
             let Some(declared) = callee
                 .required
                 .iter()
-                .chain(&callee.optional)
                 .find(|declared| declared.name == *parameter)
             else {
                 return Err(fault(ModelCallFault::UndeclaredParameter {
@@ -1147,32 +1143,6 @@ bindings = { first = "one", second = "two" }
         |_| {},
     ));
     assert_eq!(rendered(ending), "ONE+TWO");
-}
-
-#[cfg(test)]
-#[test]
-fn unbound_optional_is_absent() {
-    let types = r#"
-[types.hinted]
-optional = { hint = "note" }
-output = "note"
-"#;
-    let flow = r#"
-name = "hinted"
-output = "h"
-
-[instances.h]
-node_type = "hinted"
-"#;
-    let behaviours = Behaviours::new().define(
-        "hinted",
-        "hinted.lua",
-        "local given, host = ...\nreturn host.text(host.output, given.hint == nil and 'absent' or 'present')",
-    );
-    assert_eq!(
-        rendered(run_with(&workflow(types, flow), &behaviours, None)),
-        "absent"
-    );
 }
 
 #[cfg(test)]

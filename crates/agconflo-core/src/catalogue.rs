@@ -274,8 +274,7 @@ fn distinct_declarations_held() {
     // Two documents declaring different types, one of them declaring several,
     // and types that no workflow names - there is no workflow here at all.
     let fetch = node_type("fetch", &[], "diff");
-    let review = node_type("review", &[("diff", "diff")], "summary")
-        .with_optional(&[("hint", "note")])
+    let review = node_type("review", &[("diff", "diff"), ("hint", "note")], "summary")
         .with_globals(&["policy"]);
     let publish = node_type("publish", &[("text", "summary")], "note");
 

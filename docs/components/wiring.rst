@@ -60,15 +60,12 @@ requirement whose subject is anything else.
      checked and a parameter with none is never visited, so a workflow missing
      half its wires passes. This is the defect this requirement exists to rule
      out, and it is invisible to every other requirement here.
-   - **An optional parameter with no binding is reported.** Over-blocking, and it
-     makes the second of the two declared lists meaningless.
    - **A declared global type is treated as a parameter.** Globals are read by
      declaration rather than wired, so demanding a binding for one refuses a
      workflow that is correct.
 
-   Must pass unreported: a node whose optional parameters are all unbound, a node
-   with no parameters at all, and an entry node, whose parameters are the
-   workflow's own.
+   Must pass unreported: a node with no parameters at all, and an entry node,
+   whose parameters are the workflow's own.
 
 .. comp_req:: A binding that names nothing is a defect
    :id: CREQ_VALIDATOR_BINDING_RESOLVES
@@ -114,22 +111,18 @@ requirement whose subject is anything else.
      refuses the shape across documents (``CREQ_CATALOGUE_DECLARED_ONCE``), and a
      document cannot hold it, but a definition built by other means can, and the
      validator resolves the name to the first declaration carrying it.
-   - **One parameter declared twice by one node type**, once as required and once
-     as optional. A document cannot hold it - the reader refuses it
-     (``CREQ_READER_FAULT_LOCATED``) - but a definition built by other means can,
-     and the validator reads the parameter as required.
    - **A binding into an entry node.** An entry node's parameters are the
      workflow's own (``DEC_WORKFLOW_SIGNATURE``), so a wire into one gives a
      parameter two sources, the caller and the wire - and a loop closing back onto
      an entry node draws exactly that (``DEC_BACK_EDGES_ALLOWED``). It is checked
      today like any other binding, for its source and its type.
 
-   The first two are about the declarations a definition carries rather than
-   about its wiring, which ``ARCH_WIRING`` keeps out of this feature, and the
-   likely answer to both is a definition holding a catalogue rather than a list
+   The first is about the declarations a definition carries rather than about
+   its wiring, which ``ARCH_WIRING`` keeps out of this feature, and the likely
+   answer to it is a definition holding a catalogue rather than a list
    of declarations - a change to the model that the slice building definitions by
    other means, authoring, is the one to make. Until then the only thing asserted
-   about them is that they do not stop the walk (``CREQ_VALIDATOR_EVERY_DEFECT``).
+   about it is that it does not stop the walk (``CREQ_VALIDATOR_EVERY_DEFECT``).
 
 .. comp_req:: A binding across two context types is a defect
    :id: CREQ_VALIDATOR_TYPES_AGREE
@@ -197,10 +190,9 @@ requirement whose subject is anything else.
    :statement: If a binding names a parameter that the node type of its instance does not declare, then Wiring validator shall report a defect naming that binding.
 
    The other end of a binding from the one ``CREQ_VALIDATOR_BINDING_RESOLVES``
-   resolves. The parameter is looked up in the two lists a type declares
-   parameters in, required and optional (``DEC_DECLARED_PARAMETERS``), and a name
-   in neither is reported with the consuming instance and the parameter as it was
-   written.
+   resolves. The parameter is looked up in the parameters its type declares,
+   every one required (``DEC_EVERY_INPUT_REQUIRED``), and a name not among them
+   is reported with the consuming instance and the parameter as it was written.
 
    Failure modes:
 
@@ -208,9 +200,6 @@ requirement whose subject is anything else.
      starting from the declaration never visits it, and a type check needs a
      declared type it does not have. Measured: this is what the validator did, and
      a typo of an optional parameter passed with nothing reported.
-   - **The lists are searched one short.** A binding to a declared optional
-     parameter reported as undeclared refuses a correct workflow, and makes the
-     second list meaningless.
    - **A requested global counts as a parameter.** Globals are read by declaration
      and never wired, so a binding spelled like one fills nothing.
    - **An instance of a node type that was not supplied is reported.** Its
@@ -222,8 +211,8 @@ requirement whose subject is anything else.
      the second for the next round trip. Its type is a different matter: an
      undeclared parameter has no declared type to compare, so none is compared.
 
-   Must pass unreported: a binding to an optional parameter, on an instance whose
-   required parameters are all bound as well.
+   Must pass unreported: bindings to every parameter an instance's type
+   declares.
 
 .. comp_req:: An output naming no instance is a defect
    :id: CREQ_VALIDATOR_OUTPUT_RESOLVES
@@ -369,8 +358,8 @@ requirement whose subject is anything else.
 
    Failure modes:
 
-   - **A legal shape is refused.** A cycle, a node nothing reaches, an unbound
-     optional parameter, a declared global with no wire, an output bound by
+   - **A legal shape is refused.** A cycle, a node nothing reaches, a declared
+     global with no wire, an output bound by
      several parameters: each is well formed, and each is what a validator
      written to be strict refuses by accident.
    - **The empty definition is refused or accepted for the wrong reason.** A
