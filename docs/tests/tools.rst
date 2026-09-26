@@ -249,6 +249,25 @@ catches it, and where one is caught only in part the case says so.
 
    Catches: the container's own process run as the step's user.
 
+.. test_case:: A step run as root leaves the container running and nothing of its own
+   :id: TEST_SANDBOX_ROOT_STEP_CLEANED_UP
+   :verifies: CREQ_SANDBOX_LOCKED_DOWN
+   :test_kind: error_path
+   :coverage: partial
+
+   A sandbox whose steps run as root, whoever runs the test. A step answers
+   0 and 0 for its user and group, no effective capability, and a refused
+   ``chown``. A step leaves ``sleep 40 &`` and a double fork of ``sleep 50``
+   ignoring TERM and HUP; the next lists the container's processes: two of
+   ``nobody``'s, the first of them process 1, and the rest root's with no
+   sleep among them. A step running ``kill -KILL -1; kill -KILL 1`` is then
+   followed by ``echo alive``, which answers ``alive`` with status 0.
+
+   Catches: the container's own process run as root beside a root step,
+   which the cleanup after each step then kills. Its steps run as root on
+   any host, so continuous integration, whose tests do not run as root,
+   checks what ``DEC_CONTAINER_OWN_USER_APART`` does for a person who is.
+
 .. test_case:: A step runs as the person's user
    :id: TEST_SANDBOX_STEP_USER
    :verifies: CREQ_SANDBOX_STEP_USER
@@ -256,13 +275,16 @@ catches it, and where one is caught only in part the case says so.
    :coverage: partial
 
    A step running ``id -u; id -g`` answers the user and group of the test's
-   own process on Linux and 1000 and 1000 elsewhere, never 0. On Linux a file
-   the step writes into a writable folder belongs on the host to the test's
-   user.
+   own process on Linux, root included, and 1000 and 1000 elsewhere. On Linux
+   a file the step writes into a writable folder belongs on the host to the
+   test's user.
 
-   Catches: root. It checks the property ``CREQ_SANDBOX_STEP_USER`` states
-   through the user ``DEC_STEP_USER_NEVER_ROOT`` picks: the test's own on
-   Linux, which is never root on CI, and 1000 elsewhere.
+   Catches: root, for a person who is not. It checks the property
+   ``CREQ_SANDBOX_STEP_USER`` states through the user
+   ``DEC_STEP_USER_ROOT_INCLUDED`` picks: the test's own on Linux, which is
+   not root on CI, and 1000 elsewhere. Where the tests run as root it also
+   fails when the step cannot write in the folder the test made
+   (``EVD_ROOT_FOLDER_CLOSED_TO_1000``).
 
 .. test_case:: A process's user and group are read from its status file
    :id: TEST_SANDBOX_USER_FROM_STATUS
@@ -312,7 +334,8 @@ catches it, and where one is caught only in part the case says so.
 
    A step running ``sleep 40 &``, a double fork of ``sleep 50`` ignoring TERM
    and HUP, and ``echo ok``. The next step lists the container's processes:
-   none of the step's user remains but the one listing them, and no zombie.
+   the user process 1 runs as has two, no other user's is a sleep, and none
+   is a zombie.
    A third step runs, so the container's own process lived through it.
 
    Catches: a background process left, the container's own process killed by

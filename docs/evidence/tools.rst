@@ -18,8 +18,10 @@ the container ran with ``--network none --read-only --tmpfs /tmp --cap-drop ALL
 scratch directory mounted as ``/work``.
 
 What was not measured is named here: a build that needs a package registry
-with no network, and a Docker engine installed on Linux itself, with or
-without root - rootless Docker or Podman among them. A local model calling a
+with no network, and a Docker engine installed on Linux itself and used
+without root - rootless Docker or Podman among them. The last three below
+were taken on an engine installed on Linux and used by root, and each says
+so. A local model calling a
 node a tool performs was left to the live run of the feature, which the last
 measurement below records; its project needed no package.
 
@@ -378,3 +380,51 @@ measurement below records; its project needed no package.
    repository the worktree came from was unchanged; and no container carried
    the run's label. One run, one small task: it shows two environments
    serving one run, and says nothing of how often a model finds its way.
+
+.. evd:: A step as uid 1000 cannot write in a folder root made, on an engine used by root on Linux
+   :id: EVD_ROOT_FOLDER_CLOSED_TO_1000
+   :evd_kind: measurement
+   :observed_on: 2026-09-26
+   :observation: On a Docker engine installed on Linux and used by root, a step run as uid 1000 in a container locked down as a tool's is could make neither a file nor a folder in a writable mount of a folder root had made with mode 755.
+
+   Docker Engine 29.3.1 on Linux 6.18.44, with cgroup v1 and the overlayfs
+   snapshotter, in a cloud development container whose every process ran as
+   root; the image was the ``alpine`` the tests pin. ``touch w/new`` and
+   ``mkdir -p w/d`` each failed with "Permission denied", exit 1. The tests
+   make their folders as the test's process, with mode 755, and the nine of
+   them that write into a folder granted writable failed the same way there.
+
+.. evd:: A step as root without capabilities reaches what root owns and no more
+   :id: EVD_ROOT_STEP_WITHOUT_CAPABILITIES
+   :evd_kind: measurement
+   :observed_on: 2026-09-26
+   :observation: On the same engine, a step run as uid 0 with no capabilities wrote into a mount of a root-owned folder as root, but could not read a mode 600 file of uid 4242, chown, or write the image, and could set the setuid bit on a file it wrote.
+
+   The container was locked down as a tool's is, its own process run as uid
+   65534 (``EVD_KILL_ALL_AS_ROOT_BESIDE_65534``), and the step ran through
+   ``docker exec -u 0:0``, where ``CapEff`` read ``0000000000000000``. A file
+   and a folder it made were ``0:0`` on the host. ``cat`` of the other user's
+   file gave "Permission denied", ``chown 4242`` of its own file "Operation not
+   permitted", ``touch /etc/x`` "Read-only file system", and ``rm -rf`` in a
+   read-only mount the same. ``cp /bin/busybox w/bb && chmod u+s w/bb``
+   exited 0, and on the host the file was ``-rwsr-xr-x``, root's. Measured in
+   ``alpine`` alone.
+
+.. evd:: A root step's cleanup leaves a container whose own process runs as uid 65534
+   :id: EVD_KILL_ALL_AS_ROOT_BESIDE_65534
+   :evd_kind: measurement
+   :observed_on: 2026-09-26
+   :observation: With --init and the container's own process run as uid 65534, kill -KILL -1 as a root step with no capabilities ended all it had left, double-forked included, left no zombie, and could not signal the container's own processes.
+
+   The same engine, and a container locked down as a tool's is but for
+   ``--user 65534:65534``. After ``sleep 40 &`` and a double fork of ``sleep
+   50`` ignoring TERM and HUP, the cleanup left ``ps`` listing only
+   ``docker-init`` and ``sleep infinity``, both ``nobody``'s, and the
+   listing; ``kill -KILL 1`` and a kill of the ``sleep infinity`` failed with
+   "Operation not permitted", and the container kept running. In the pinned
+   ``python:3.14-slim`` a background sleep was ended the same way and
+   ``/proc`` listed only the container's own processes.
+
+   With the container's own process left as root, the same cleanup ended it:
+   26 tests on that engine then failed at a step after it as the engine's
+   failure, ``docker exec`` exiting 137 or the container no longer running.

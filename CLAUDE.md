@@ -74,6 +74,9 @@ repository asserts that the files contradict.
 
 - The shell rules — POSIX `sh` for the hook and the scripts, `ubc` invoked by path — are in the
   README, under "Prerequisites" and "The commit hook". They apply unchanged.
+- In a Claude Code cloud session, `.claude/hooks/session-start.sh` does the README's setup, starts
+  the Docker daemon, pulls the images the tool tests pin and builds the workspace before the session
+  begins. What it could not do it names on standard error; a local clone skips it.
 - **Exit 126 from a binary is group policy, not a bad download.** `[ -x ]` returns true for a
   blocked binary, so probe by running it — and ask rather than working around a block.
 - Write commit messages through a Bash heredoc. A PowerShell here-string mangles the subject line.
