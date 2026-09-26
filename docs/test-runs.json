@@ -1713,6 +1713,15 @@
           "title": "agconflo-core run::arguments_sharing_an_identifier_are_refused",
           "type": "test_run"
         },
+        "RUN_RUN_ARGUMENT_FIRST_ON_ITS_EDGE": {
+          "executes": [
+            "TEST_RUN_ARGUMENT_FIRST_ON_ITS_EDGE"
+          ],
+          "id": "RUN_RUN_ARGUMENT_FIRST_ON_ITS_EDGE",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::argument_first_on_its_edge",
+          "type": "test_run"
+        },
         "RUN_RUN_ARGUMENT_FOR_NO_PARAMETER_IS_REFUSED": {
           "executes": [
             "TEST_RUN_ARGUMENT_FOR_NO_PARAMETER_IS_REFUSED"
@@ -1731,13 +1740,13 @@
           "title": "agconflo-core run::argument_of_wrong_type_is_refused",
           "type": "test_run"
         },
-        "RUN_RUN_BOUND_PARAMETER_GIVEN_AN_ARGUMENT_IS_REFUSED": {
+        "RUN_RUN_BUDGET_COUNTS_EACH_PASS": {
           "executes": [
-            "TEST_RUN_BOUND_PARAMETER_GIVEN_AN_ARGUMENT_IS_REFUSED"
+            "TEST_RUN_BUDGET_COUNTS_EACH_PASS"
           ],
-          "id": "RUN_RUN_BOUND_PARAMETER_GIVEN_AN_ARGUMENT_IS_REFUSED",
+          "id": "RUN_RUN_BUDGET_COUNTS_EACH_PASS",
           "test_outcome": "passed",
-          "title": "agconflo-core run::bound_parameter_given_an_argument_is_refused",
+          "title": "agconflo-core run::budget_counts_each_pass",
           "type": "test_run"
         },
         "RUN_RUN_BUDGET_STOPS_AT_THE_LIMIT": {
@@ -1936,6 +1945,15 @@
           "id": "RUN_RUN_OUTPUT_OF_DECLARED_TYPE_IS_ACCEPTED",
           "test_outcome": "passed",
           "title": "agconflo-core run::output_of_declared_type_is_accepted",
+          "type": "test_run"
+        },
+        "RUN_RUN_OUTPUT_WALKS_EVERY_EDGE": {
+          "executes": [
+            "TEST_RUN_OUTPUT_WALKS_EVERY_EDGE"
+          ],
+          "id": "RUN_RUN_OUTPUT_WALKS_EVERY_EDGE",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::output_walks_every_edge",
           "type": "test_run"
         },
         "RUN_RUN_PARTS_SHARING_AN_IDENTIFIER_ARE_REFUSED": {
@@ -2334,6 +2352,15 @@
           "title": "agconflo-core scheduler::none_ready_only_when_none",
           "type": "test_run"
         },
+        "RUN_SCHEDULER_OFFERED_AGAIN_ON_SOMETHING_NEW": {
+          "executes": [
+            "TEST_SCHEDULER_OFFERED_AGAIN_ON_SOMETHING_NEW"
+          ],
+          "id": "RUN_SCHEDULER_OFFERED_AGAIN_ON_SOMETHING_NEW",
+          "test_outcome": "passed",
+          "title": "agconflo-core scheduler::offered_again_on_something_new",
+          "type": "test_run"
+        },
         "RUN_SCHEDULER_PARTIAL_INPUTS_STILL_QUIESCENT": {
           "executes": [
             "TEST_SCHEDULER_PARTIAL_INPUTS_STILL_QUIESCENT"
@@ -2350,6 +2377,24 @@
           "id": "RUN_SCHEDULER_PRODUCED_INSTANCE_NOT_OFFERED",
           "test_outcome": "passed",
           "title": "agconflo-core scheduler::produced_instance_not_offered",
+          "type": "test_run"
+        },
+        "RUN_SCHEDULER_STANDING_SERVES_LATER": {
+          "executes": [
+            "TEST_SCHEDULER_STANDING_SERVES_LATER"
+          ],
+          "id": "RUN_SCHEDULER_STANDING_SERVES_LATER",
+          "test_outcome": "passed",
+          "title": "agconflo-core scheduler::standing_serves_later",
+          "type": "test_run"
+        },
+        "RUN_SCHEDULER_TAKES_EARLIEST": {
+          "executes": [
+            "TEST_SCHEDULER_TAKES_EARLIEST"
+          ],
+          "id": "RUN_SCHEDULER_TAKES_EARLIEST",
+          "test_outcome": "passed",
+          "title": "agconflo-core scheduler::takes_earliest",
           "type": "test_run"
         },
         "RUN_SCHEDULER_UNBOUND_PARAMETER_NEVER_READY": {

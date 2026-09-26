@@ -118,9 +118,9 @@ component requirement whose subject is anything else.
    :derived_from: FEAT_RUN_QUIESCENCE_ENDS
    :allocated_to: COMP_RUN_SCHEDULER
    :ears_pattern: unwanted
-   :statement: If every instance of a workflow has either produced an output or lacks a context for a parameter it binds, then Run scheduler shall report that no instance may activate.
+   :statement: If no instance of a workflow can activate, then Run scheduler shall report that no instance may activate.
 
-   Quiescence is reached by asking every instance rather than by inspecting the
+   Changed by ``DEC_CHANGE_SCHEDULER_NONE_READY``. Quiescence is reached by asking every instance rather than by inspecting the
    graph, which is what makes it true of cycles nobody detected and of workflows
    whose arguments were fine. The run decides what to do about it
    (``CREQ_RUN_ENDS_QUIESCENT``); the scheduler only reports the fact.
@@ -131,8 +131,10 @@ component requirement whose subject is anything else.
      workflow that could have produced its result, which is the worst outcome
      available here because the result was reachable.
    - **Never reported, because a produced instance stays offerable.** The run
-     cycles forever over instances that have already run, and the budget becomes
-     the only thing that ends it - a sound run reported as a runaway.
+     cycles forever over instances that have already run on what they were
+     already given, and the budget becomes the only thing that ends it - a sound
+     run reported as a runaway. An instance that has run is offerable again
+     only on something new (``CREQ_SCHEDULER_OFFERS_AGAIN``).
    - **Reported only when no instance has any context at all.** A cycle whose
      instances each hold some of their inputs is then never quiescent.
    - **Asked of the designated instance alone.** That is the run's question, not
@@ -212,9 +214,10 @@ component requirement whose subject is anything else.
    - **An argument of a context type the declaration does not name.** The wiring
      validator refuses this between two instances and cannot see it here, because
      there is no binding to look at.
-   - **An argument for a parameter a binding fills.** Two sources with nothing
-     to order them (``DEC_RUN_REFUSED_UNLESS_EVERY_INPUT_GIVEN``). Taking the
-     argument and ignoring the wire is what the prototype did, silently.
+   - **Two arguments for one parameter**, whether a binding fills it or not,
+     with nothing to order them. An argument for a parameter a binding fills is
+     not a second source but the first context its edge holds
+     (``CREQ_RUN_ARGUMENT_FIRST_ON_ITS_EDGE``).
    - **An argument naming an instance or parameter the workflow does not have.**
      A typo in a parameter name then leaves the real parameter unfilled while the
      caller believes it supplied it.
@@ -243,9 +246,8 @@ component requirement whose subject is anything else.
    - **The outstanding activation counted before it is reported.** The mirror of
      the above, ending a run one activation early and reporting a budget failure
      on a run that was within it.
-   - **Counted per instance rather than per activation.** Indistinguishable while
-     no instance activates twice, and wrong the moment loops exist - which is
-     exactly the point at which the budget starts to matter.
+   - **Counted per instance rather than per activation.** Wrong the moment an
+     instance runs twice - which is exactly when the budget starts to matter.
    - **A budget of nought treated as unbounded.** A run that may activate nothing
      is a legitimate thing to ask for, and reading it as no limit inverts the
      requirement.

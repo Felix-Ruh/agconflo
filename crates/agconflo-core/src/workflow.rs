@@ -116,6 +116,12 @@ impl NodeType {
         self
     }
 
+    /// The same declaration, its output standing.
+    pub(crate) fn standing(mut self) -> Self {
+        self.standing = true;
+        self
+    }
+
     /// The same declaration, also reading `globals` by declaration.
     pub(crate) fn with_globals(mut self, globals: &[&str]) -> Self {
         self.globals = globals.iter().map(|&name| context_type(name)).collect();

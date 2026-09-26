@@ -216,3 +216,30 @@ or keeps, on the commit named. Re-running one later shows what has moved since.
    ``TEST_RUNNER_UNKNOWN_ARGUMENT_REFUSED`` with their runs. Beside them:
    every other requirement of ``COMP_RUNNER``, each the other among them. In
    prose: the marker in ``runner.rs``.
+
+.. evd:: The impact of stating quiescence as its parent does
+   :id: EVD_IMPACT_SCHEDULER_NONE_READY
+   :evd_kind: measurement
+   :observed_on: 2026-09-26
+   :observation: CREQ_SCHEDULER_NONE_READY answers to 2 needs, has 5 below it by link and 5 requirements sharing its component, and is named on 4 lines.
+
+   Run as ``sh scripts/impact.sh CREQ_SCHEDULER_NONE_READY`` on ``041a406``.
+   Above it: ``FEAT_RUN_QUIESCENCE_ENDS`` and ``STKH_STUCK_RUN``. Below it:
+   ``IMPL_SCHEDULER_NONE_READY``, and
+   ``TEST_SCHEDULER_NONE_READY_ONLY_WHEN_NONE`` and
+   ``TEST_SCHEDULER_PARTIAL_INPUTS_STILL_QUIESCENT`` with their runs. Beside
+   it: every other requirement of ``COMP_RUN_SCHEDULER``. In prose: the marker
+   in ``scheduler.rs``, one line of ``components/run`` and two of
+   ``tests/run``.
+
+.. evd:: The impact of repetition's architecture realising one more feature
+   :id: EVD_IMPACT_ARCH_REPETITION
+   :evd_kind: measurement
+   :observed_on: 2026-09-26
+   :observation: ARCH_REPETITION answers to 3 needs, has nothing below it by link, uses components holding 35 requirements, and is named on 1 line.
+
+   Run as ``sh scripts/impact.sh ARCH_REPETITION`` on ``041a406``. Above it:
+   ``FEAT_REPEAT_ON_NEW_CONTEXTS``, ``FEAT_STANDING_SERVES_LATER_PASSES`` and
+   ``STKH_REPETITION``. Beside it: every requirement of
+   ``COMP_TOPOLOGY_READER``, ``COMP_RUN_SCHEDULER`` and ``COMP_WORKFLOW_RUN``.
+   In prose: one line of ``components/repetition``.

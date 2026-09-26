@@ -16,7 +16,9 @@ over the list itself (``DEC_LIST_HANDLED_IN_ONE_NODE``).
 
 Each requirement was checked by hand against the two questions every body here
 answers: could it be false while its parent holds, and could the parent hold
-while it is false? Both statements are ``event``. The feature's architecture
+while it is false? Every statement is ``event``. The last derives from
+``STKH_RUN_FROM_ANY_PARAMETER`` as well: it is how a repetition's first pass is
+given what its later passes are given by the edges. The feature's architecture
 closes the file.
 
 .. feat_req:: A node runs again when every edge into it carries something new
@@ -61,9 +63,32 @@ closes the file.
    something from outside - nearly every useful one - then runs once and
    stops.
 
+.. feat_req:: A context a run is given for a wired parameter comes first
+   :id: FEAT_ARGUMENT_FIRST_ON_ITS_EDGE
+   :derived_from: STKH_RUN_FROM_ANY_PARAMETER, STKH_REPETITION
+   :ears_pattern: event
+   :verification_method: test
+   :statement: When a run is started with a context for a parameter a binding fills, Agconflo shall give that context to the parameter's instance before any context walked along the binding.
+
+   ``STKH_RUN_FROM_ANY_PARAMETER`` lets a run be given a context for any
+   node's parameter, and a parameter a binding fills is one of them. Given a
+   context there, something has to say which comes first, it or what the wire
+   carries; saying nothing refuses one or loses the other.
+   ``STKH_REPETITION`` needs the answer to be "it": a node in a loop reads
+   what comes back round, which cannot come back before the node has run
+   (``DEC_ARGUMENT_FIRST_ON_ITS_EDGE``).
+
+   It can be false while both parents hold. A run could refuse a context for
+   a wired parameter, as it did, and every other parameter could still be
+   given one; the loop would then have no way into its first pass, and would
+   repeat nothing.
+
+   It claims no more than they need: it says which context comes first, not
+   how many passes follow, which the edges decide.
+
 .. feat_arch:: Repetition splits between the topology reader, the run scheduler and the workflow run
    :id: ARCH_REPETITION
-   :realises: FEAT_REPEAT_ON_NEW_CONTEXTS, FEAT_STANDING_SERVES_LATER_PASSES
+   :realises: FEAT_REPEAT_ON_NEW_CONTEXTS, FEAT_STANDING_SERVES_LATER_PASSES, FEAT_ARGUMENT_FIRST_ON_ITS_EDGE
    :uses: COMP_TOPOLOGY_READER, COMP_RUN_SCHEDULER, COMP_WORKFLOW_RUN
    :statement: Agconflo shall allocate repetition to the topology reader, the run scheduler and the workflow run.
 
@@ -73,9 +98,13 @@ closes the file.
      given: the earliest context each edge holds that its instance has not
      taken, or the one that stands.
    - The workflow run answers for the edges: each output walked along every
-     edge out of its instance, as that edge's next context.
+     edge out of its instance, as that edge's next context, and a context it
+     was given for a wired parameter held as that edge's first.
+
+   ``FEAT_ARGUMENT_FIRST_ON_ITS_EDGE`` was added to what it realises by
+   ``DEC_CHANGE_ARCH_REPETITION``.
 
    The decisions it is built against are named here rather than linked:
    ``DEC_EDGE_GENERATIONS``, ``DEC_STANDING_OUTPUTS``,
-   ``DEC_REPETITION_BY_EDGES``, ``DEC_ONCE_RUN_OUTPUTS_STAND`` and
-   ``DEC_RUN_IS_DRIVEN``.
+   ``DEC_REPETITION_BY_EDGES``, ``DEC_ONCE_RUN_OUTPUTS_STAND``,
+   ``DEC_ARGUMENT_FIRST_ON_ITS_EDGE`` and ``DEC_RUN_IS_DRIVEN``.
