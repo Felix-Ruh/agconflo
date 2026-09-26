@@ -348,3 +348,33 @@ measurement below records; its project needed no package.
    -KILL -1`` ended its own wrapper and ``docker exec`` exited 137 with
    nothing on standard error, as in alpine
    (``EVD_REMOVED_CONTAINER_LOOKS_KILLED``).
+
+.. evd:: A local model fixes a failing Python project through a tool of its own image
+   :id: EVD_TOOL_ENVIRONMENT_LIVE_RUN
+   :evd_kind: measurement
+   :observed_on: 2026-09-26
+   :observation: Against qwen3.8-27b-ridge on LM Studio, a run whose run_tests tool named python:3.14-slim and a container of its own fixed a failing Python project in a granted worktree in 11 s, over 5 calls, its 3 tests then passing.
+
+   Taken with the ``agconflo`` binary at ``9eb2b37``, built for debugging,
+   from a scratch directory: the workflow of ``EVD_TOOLS_LIVE_RUN``, with
+   ``read_file`` and ``write_file`` as before and a ``run_tests`` tool
+   naming the Python image by its digest and the container ``py``; grants of
+   the pinned ``alpine`` as their image, the Python image among their
+   images, all three actions, 60 seconds and 8000 bytes, no network, and
+   ``project`` writable at a git worktree. Every ``*_API_KEY`` variable was
+   removed from the process's environment. ``check`` found nothing; with the
+   Python image left out of the grants it named ``run_tests`` and exited 4.
+
+   The project was ``slug.py``, whose ``slug`` only turned spaces into
+   hyphens, and ``test_slug.py``, of whose three ``unittest`` cases two
+   failed. The model read both files in one turn, ran the tests through
+   ``run_tests`` - ``python3`` answered, which the alpine image has not -
+   wrote ``"-".join(title.lower().split())``, ran them again, and answered
+   with a paragraph saying what was wrong. It spent 7 of a budget of 60.
+
+   Afterwards, on the host, the tests passed; ``git status`` in the worktree
+   named ``slug.py`` changed, with the one line the model wrote, and two
+   files of ``__pycache__`` Python wrote beside it, inside the grant; the
+   repository the worktree came from was unchanged; and no container carried
+   the run's label. One run, one small task: it shows two environments
+   serving one run, and says nothing of how often a model finds its way.
