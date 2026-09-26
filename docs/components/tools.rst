@@ -260,12 +260,13 @@ component requirement whose subject is anything else.
    :ears_pattern: event
    :statement: When a container is made for a run, Sandbox shall make it with an init process, no capabilities, no new privileges, a read-only root, only the granted folders mounted and no network unless granted.
 
-   ``DEC_CONTAINER_LOCKED_DOWN`` and ``DEC_GRANTS_NARROW_BY_DEFAULT``. Each
+   ``DEC_CONTAINER_OWN_USER_APART`` and ``DEC_GRANTS_NARROW_BY_DEFAULT``. Each
    folder is mounted at ``/work`` under its name, read-only unless granted
    writable; ``/tmp`` is a writable file system in memory; the container is
    labelled with the run's record file and started from the image by its
-   digest, never pulled. Its own process runs as root with no capabilities,
-   so a step's user cannot reach it.
+   digest, never pulled. Its own process runs with no capabilities as a user
+   no step runs as - root, or 65534 beside a step run as root - so a step's
+   user cannot reach it.
 
    Failure modes:
 
@@ -283,17 +284,15 @@ component requirement whose subject is anything else.
    :statement: When a step is run, Sandbox shall run it as a user whose files the person running the run can change and who can change no file on the host that person could not.
 
    Revised by ``DEC_CHANGE_SANDBOX_STEP_USER``, which named the user rather
-   than what the parent needs of it. ``DEC_STEP_USER_NEVER_ROOT`` says which:
-   on Linux the person's own user and group, read from ``/proc/self/status``,
-   unless that is root; otherwise user and group 1000, whose files root and a
-   Windows user alike can change.
+   than what the parent needs of it. ``DEC_STEP_USER_ROOT_INCLUDED`` says
+   which: on Linux the person's own user and group, read from
+   ``/proc/self/status``, root included; elsewhere user and group 1000, whose
+   files a Windows user can change.
 
    Failure modes:
 
    - **Root, for a person who is not**: a step writes files the person cannot
      delete, and changes what they could not.
-   - **Root, for a person who is**: the cleanup after each step kills the
-     container's own process.
    - **The lines of the status file misread**, and a step run as another
      user.
 

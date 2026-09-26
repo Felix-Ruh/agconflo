@@ -2055,6 +2055,15 @@
           "title": "agconflo-runner sandbox::removed_at_the_end",
           "type": "test_run"
         },
+        "RUN_SANDBOX_ROOT_STEP_CLEANED_UP": {
+          "executes": [
+            "TEST_SANDBOX_ROOT_STEP_CLEANED_UP"
+          ],
+          "id": "RUN_SANDBOX_ROOT_STEP_CLEANED_UP",
+          "test_outcome": "passed",
+          "title": "agconflo-runner sandbox::root_step_cleaned_up",
+          "type": "test_run"
+        },
         "RUN_SANDBOX_STEP_HOME": {
           "executes": [
             "TEST_SANDBOX_STEP_HOME"

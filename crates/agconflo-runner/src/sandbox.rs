@@ -5,8 +5,9 @@
 //! in it, from that step's image, locked down, with each granted folder mounted
 //! under `/work` by its name and a `/tmp` of the grants' size, labelled with
 //! the run's record file and named after the run and itself. Each step runs in
-//! its container through `docker exec` as an unprivileged user whose home is
-//! `/tmp`, and every container is removed when the sandbox is dropped.
+//! its container through `docker exec` with no capabilities, as a user other
+//! than the one the container's own process runs as, with `/tmp` as its home,
+//! and every container is removed when the sandbox is dropped.
 
 use std::fmt;
 use std::io::Write;
@@ -24,6 +25,10 @@ const CONTAINER_LABEL: &str = "agconflo.container";
 
 /// The container name a step runs in when it is asked for with none.
 pub const SHARED: &str = "tools";
+
+/// The user and group a container's own process runs as when its steps run
+/// as root.
+const OWN_USER_BESIDE_ROOT: &str = "65534:65534";
 
 /// The script each step runs in: the command given as `$3`, with any further
 /// arguments as its own, under `timeout` for `$1` seconds, its output and
@@ -170,6 +175,13 @@ impl Sandbox {
         self
     }
 
+    /// The same sandbox, running its steps as `user` and `group`.
+    #[cfg(test)]
+    pub(crate) fn with_user(mut self, user: u32, group: u32) -> Self {
+        self.user = (user, group);
+        self
+    }
+
     /// The first container made for the run, if one has been.
     #[cfg(test)]
     pub(crate) fn container(&self) -> Option<&str> {
@@ -307,7 +319,7 @@ impl Sandbox {
     /// container still runs: whatever the step's user left is killed, and the
     /// step comes to `docker exec`'s status and what was printed. Otherwise it
     /// is the engine's failure.
-    // @A path as an argument and text as input to the wrapped command,IMPL_SANDBOX_STEP,impl,[CREQ_SANDBOX_PATHS_AS_ARGUMENTS, CREQ_SANDBOX_STEP_USER, CREQ_SANDBOX_TIME_LIMIT, CREQ_SANDBOX_NOTHING_LEFT_RUNNING, CREQ_SANDBOX_OUTPUT_LIMIT, CREQ_SANDBOX_ENGINE_FAILURE_APART, CREQ_SANDBOX_STEP_HOME, CREQ_SANDBOX_TELLS_FULL_TMP],[DEC_PATHS_AS_ARGUMENTS, DEC_COMMAND_WRAPPED, DEC_STEP_USER_NEVER_ROOT, DEC_ENGINE_THROUGH_ITS_COMMAND, DEC_KILLED_WRAPPER_TOLD_BY_ITS_CONTAINER, DEC_STEP_HOME_IN_TMP]
+    // @A path as an argument and text as input to the wrapped command,IMPL_SANDBOX_STEP,impl,[CREQ_SANDBOX_PATHS_AS_ARGUMENTS, CREQ_SANDBOX_STEP_USER, CREQ_SANDBOX_TIME_LIMIT, CREQ_SANDBOX_NOTHING_LEFT_RUNNING, CREQ_SANDBOX_OUTPUT_LIMIT, CREQ_SANDBOX_ENGINE_FAILURE_APART, CREQ_SANDBOX_STEP_HOME, CREQ_SANDBOX_TELLS_FULL_TMP],[DEC_PATHS_AS_ARGUMENTS, DEC_COMMAND_WRAPPED, DEC_STEP_USER_ROOT_INCLUDED, DEC_ENGINE_THROUGH_ITS_COMMAND, DEC_KILLED_WRAPPER_TOLD_BY_ITS_CONTAINER, DEC_STEP_HOME_IN_TMP]
     fn step(
         &mut self,
         environment: Environment<'_>,
@@ -382,7 +394,7 @@ impl Sandbox {
     /// The container of `environment`'s name, made from its image first if
     /// it has not been, with every container a killed run left under the same
     /// label removed before the first is made.
-    // @Leftovers removed before each named container is made locked down,IMPL_SANDBOX_MAKE,impl,[CREQ_SANDBOX_LOCKED_DOWN, CREQ_SANDBOX_REMOVES_LEFTOVERS, CREQ_SANDBOX_CONTAINER_PER_NAME, CREQ_SANDBOX_TMP_LIMIT],[DEC_CONTAINER_LOCKED_DOWN, DEC_GRANTS_NARROW_BY_DEFAULT, DEC_LEFTOVER_CONTAINERS_REMOVED, DEC_ONE_CONTAINER_PER_NAME, DEC_PATHS_IN_GRANTED_FOLDERS, DEC_TMP_LIMITED_BY_GRANTS]
+    // @Leftovers removed before each named container is made locked down,IMPL_SANDBOX_MAKE,impl,[CREQ_SANDBOX_LOCKED_DOWN, CREQ_SANDBOX_REMOVES_LEFTOVERS, CREQ_SANDBOX_CONTAINER_PER_NAME, CREQ_SANDBOX_TMP_LIMIT],[DEC_CONTAINER_OWN_USER_APART, DEC_GRANTS_NARROW_BY_DEFAULT, DEC_LEFTOVER_CONTAINERS_REMOVED, DEC_ONE_CONTAINER_PER_NAME, DEC_PATHS_IN_GRANTED_FOLDERS, DEC_TMP_LIMITED_BY_GRANTS]
     fn made(&mut self, environment: Environment<'_>) -> Result<String, EngineFailure> {
         if let Some((_, id)) = self
             .containers
@@ -426,6 +438,10 @@ impl Sandbox {
             "--workdir",
             "/work",
         ];
+        // The container's own process, as a user its steps are not.
+        if self.user.0 == 0 {
+            args.extend(["--user", OWN_USER_BESIDE_ROOT]);
+        }
         for mount in &mounts {
             args.extend(["--mount", mount]);
         }
@@ -558,9 +574,9 @@ fn failure(output: &Output) -> EngineFailure {
 }
 
 /// The user and group a step runs as: on Linux the effective ones of this
-/// process, unless that is root or cannot be read, and elsewhere 1000 and
+/// process, root included, unless they cannot be read, and elsewhere 1000 and
 /// 1000.
-// @The person's user on Linux and never root,IMPL_SANDBOX_STEP_USER,impl,[CREQ_SANDBOX_STEP_USER],[DEC_STEP_USER_NEVER_ROOT, DEC_CONTAINER_LOCKED_DOWN]
+// @The person's user on Linux root included,IMPL_SANDBOX_STEP_USER,impl,[CREQ_SANDBOX_STEP_USER],[DEC_STEP_USER_ROOT_INCLUDED]
 fn step_ids() -> (u32, u32) {
     let own = if cfg!(target_os = "linux") {
         std::fs::read_to_string("/proc/self/status")
@@ -569,10 +585,7 @@ fn step_ids() -> (u32, u32) {
     } else {
         None
     };
-    match own {
-        Some((user, group)) if user != 0 => (user, group),
-        _ => (1000, 1000),
-    }
+    own.unwrap_or((1000, 1000))
 }
 
 /// The effective user and group a process's status file, as Linux writes
@@ -712,6 +725,49 @@ fn own_process_survives() {
 
 #[cfg(test)]
 #[test]
+fn root_step_cleaned_up() {
+    let scratch = Scratch::new("sandbox_root_step_cleaned_up");
+    let mut sandbox = sandbox(&scratch, &[], false, CommandLimits::default()).with_user(0, 0);
+
+    let root = done(sandbox.run(
+        "id -u; id -g; grep CapEff /proc/self/status; chown 4242 /tmp 2>/dev/null || echo refused",
+    ));
+    assert_eq!(
+        root.output, "0\n0\nCapEff:\t0000000000000000\nrefused\n",
+        "{}",
+        root.output
+    );
+
+    let left = done(sandbox.run("sleep 40 & (trap '' TERM HUP; sh -c 'sleep 50 &'); echo ok"));
+    assert_eq!(left.output, "ok\n");
+
+    // The container's own processes, then the listing step's: its wrapper,
+    // its timeout and ps.
+    let listed = done(sandbox.run("ps -o pid,user,args"));
+    let processes: Vec<Vec<&str>> = listed
+        .output
+        .lines()
+        .skip(1)
+        .map(|line| line.split_whitespace().collect())
+        .collect();
+    let own: Vec<&Vec<&str>> = processes.iter().filter(|p| p[1] == "nobody").collect();
+    assert_eq!(own.len(), 2, "{}", listed.output);
+    assert_eq!(own[0][0], "1", "{}", listed.output);
+    assert!(
+        processes
+            .iter()
+            .all(|p| p[1] == "nobody" || (p[1] == "root" && !p.contains(&"sleep"))),
+        "{}",
+        listed.output
+    );
+
+    done(sandbox.run("kill -KILL -1; kill -KILL 1"));
+    let alive = done(sandbox.run("echo alive"));
+    assert_eq!((alive.status, alive.output.as_str()), (0, "alive\n"));
+}
+
+#[cfg(test)]
+#[test]
 fn step_user() {
     let scratch = Scratch::new("sandbox_step_user");
     let mut sandbox = sandbox(&scratch, &[("w", true)], false, CommandLimits::default());
@@ -731,7 +787,6 @@ fn step_user() {
         [1000, 1000]
     };
     assert_eq!(ids, expected);
-    assert!(!ids.contains(&0));
     #[cfg(unix)]
     {
         use std::os::unix::fs::MetadataExt;
@@ -817,26 +872,37 @@ fn nothing_left_running() {
     let left = done(sandbox.run("sleep 40 & (trap '' TERM HUP; sh -c 'sleep 50 &'); echo ok"));
     assert_eq!(left.output, "ok\n");
 
-    // Every process but the container's own is the listing step's: its
-    // wrapper, its timeout and ps.
-    let listed = done(sandbox.run("ps -o user,stat,args"));
+    // Every process but the container's own, its first and the sleep it
+    // runs, is the listing step's: its wrapper, its timeout and ps.
+    let listed = done(sandbox.run("ps -o pid,user,stat,args"));
     let processes: Vec<&str> = listed.output.lines().skip(1).collect();
-    let root = processes
+    let own_user = processes
         .iter()
-        .filter(|line| line.split_whitespace().next() == Some("root"))
-        .count();
-    assert_eq!(root, 2, "{}", listed.output);
+        .find_map(|line| {
+            let mut fields = line.split_whitespace();
+            (fields.next() == Some("1"))
+                .then(|| fields.next())
+                .flatten()
+        })
+        .expect("the container's first process");
+    let user = |line: &str| line.split_whitespace().nth(1) == Some(own_user);
+    assert_eq!(
+        processes.iter().filter(|line| user(line)).count(),
+        2,
+        "{}",
+        listed.output
+    );
     assert!(
         !processes
             .iter()
-            .any(|line| line.split_whitespace().next() != Some("root") && line.contains("sleep")),
+            .any(|line| !user(line) && line.contains("sleep")),
         "{}",
         listed.output
     );
     assert!(
         !processes.iter().any(|line| line
             .split_whitespace()
-            .nth(1)
+            .nth(2)
             .is_some_and(|s| s.contains('Z'))),
         "{}",
         listed.output

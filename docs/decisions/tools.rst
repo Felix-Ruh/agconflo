@@ -9,9 +9,9 @@ it can change is kept to what the person running the workflow granted, as
 node types are tools and a person says what they may do, what confines them,
 and what a person is told when a tool could not be performed.
 
-Seventeen rest on measurements recorded in ``evidence/tools``. The other nine
-are judgements between the alternatives each names. Two of the twenty-six are
-superseded by later ones, and say so.
+Nineteen rest on measurements recorded in ``evidence/tools``. The other nine
+are judgements between the alternatives each names. Four of the twenty-eight
+are superseded by later ones, and say so.
 
 What they do not settle is named here. Nothing below decides a tool reached
 through MCP, a tool of any kind but the three actions, grants that differ from
@@ -208,7 +208,7 @@ worktree.
 
 .. dec:: A tool's container is locked down and its steps run as an unprivileged user
    :id: DEC_CONTAINER_LOCKED_DOWN
-   :dec_status: accepted
+   :dec_status: superseded
    :decided_on: 2026-09-26
    :supported_by: EVD_CONTAINER_CONFINES_TO_MOUNTS, EVD_KILL_ALL_AFTER_A_COMMAND
    :statement: Agconflo shall start a tool's container with an init process, no capabilities, no new privileges and a read-only root, and perform each tool step in it as an unprivileged user.
@@ -494,7 +494,7 @@ worktree.
 
 .. dec:: A tool step runs as the person's user on Linux unless that is root
    :id: DEC_STEP_USER_NEVER_ROOT
-   :dec_status: accepted
+   :dec_status: superseded
    :decided_on: 2026-09-26
    :supported_by: EVD_MOUNT_OWNERSHIP_ON_LINUX, EVD_UID_READABLE_FROM_PROC, EVD_KILL_ALL_AFTER_A_COMMAND
    :supersedes: DEC_STEP_USER_IS_THE_PERSONS
@@ -568,3 +568,72 @@ worktree.
    a run refused at its start only to stop, a minute later on a resume, at the
    same step with the same failure. A check still reports it, since a person
    checking a workflow wants to know.
+
+.. dec:: A tool's container is locked down and its own process runs as a user its steps do not
+   :id: DEC_CONTAINER_OWN_USER_APART
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :supported_by: EVD_CONTAINER_CONFINES_TO_MOUNTS, EVD_KILL_ALL_AFTER_A_COMMAND, EVD_KILL_ALL_AS_ROOT_BESIDE_65534
+   :supersedes: DEC_CONTAINER_LOCKED_DOWN
+   :statement: Agconflo shall start a tool's container with an init process, no capabilities, no new privileges and a read-only root, and run its own process as user and group 65534 when its steps run as root and as root otherwise.
+
+   What ``DEC_CONTAINER_LOCKED_DOWN`` decided stands but for the user a step
+   runs as. Every step still runs with no capabilities, now as the person's
+   own user, which is root for a person who is
+   (``DEC_STEP_USER_ROOT_INCLUDED``). Its reason for an unprivileged step was
+   the cleanup after each step, which kills every process of the step's user
+   (``DEC_COMMAND_WRAPPED``) and must not reach the container's own. What that
+   needs is the two users apart, which a root step does not rule out.
+
+   The container's own process runs as root, as it did, beside a step of any
+   other user, and as 65534, the user Linux names ``nobody``, beside a root
+   step. A root step without capabilities can signal no process of another
+   user, and the cleanup then ended everything the step left and nothing of
+   the container's, in both images the tests use
+   (``EVD_KILL_ALL_AS_ROOT_BESIDE_65534``).
+
+   Running the container's own process as 65534 beside every step was the
+   alternative: one rule where this has two, and a collision with a person
+   whose own user is 65534. Killing only the step's process group was the
+   other, and a process that leaves its group, as ``setsid`` does, would
+   outlive the step.
+
+.. dec:: A tool step runs as the person's user on Linux, root included
+   :id: DEC_STEP_USER_ROOT_INCLUDED
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :supported_by: EVD_MOUNT_OWNERSHIP_ON_LINUX, EVD_UID_READABLE_FROM_PROC, EVD_ROOT_FOLDER_CLOSED_TO_1000, EVD_ROOT_STEP_WITHOUT_CAPABILITIES
+   :supersedes: DEC_STEP_USER_NEVER_ROOT
+   :statement: Agconflo shall perform tool steps on Linux as the user and group of the process running the run, and elsewhere as user and group 1000.
+
+   ``DEC_STEP_USER_NEVER_ROOT`` ran a root person's steps as 1000, and on an
+   engine installed on Linux that closes every folder they grant writable to
+   the step: root made it, with mode 755, and 1000 can make nothing in it
+   (``EVD_ROOT_FOLDER_CLOSED_TO_1000``). The grant says writable and the tool
+   cannot write. Its body held that 1000 serves a root person as it serves
+   anyone off Linux, where a step as 1000 wrote into its mount
+   (``EVD_CONTAINER_CONFINES_TO_MOUNTS``); on Linux it does not.
+
+   As root without the capabilities the container drops
+   (``DEC_CONTAINER_OWN_USER_APART``), a step writes where root owns and what
+   it writes is root's, and it cannot read a file of another user that root
+   reads only by those capabilities (``EVD_ROOT_STEP_WITHOUT_CAPABILITIES``):
+   a user whose files the person can change and who can change nothing they
+   could not, as ``CREQ_SANDBOX_STEP_USER`` asks. The cleanup that kept
+   ``DEC_STEP_USER_IS_THE_PERSONS`` from holding for root is kept from the
+   container by moving the container's own process, not the step.
+
+   A root step can set the setuid bit on a file it writes, which on the host
+   is then a program running as root for whoever may run it
+   (``EVD_ROOT_STEP_WITHOUT_CAPABILITIES``). Any person's step can do the same
+   as that person. ``STKH_TOOLS_CONFINED`` is met against accident, not
+   attack, and allows any change inside a writable grant, so the README tells
+   it rather than the sandbox undoing it: clearing the bit would scan every
+   writable folder after every step, for a change the goal allows.
+
+   Keeping 1000 and having a root person give their folders to it was the
+   alternative. A grant saying writable would work only once the person
+   changed its owner, and the tests would change their own folders' owner to
+   pass, hiding the gap rather than closing it. Refusing a writable grant to a
+   root person was the other: a refusal no requirement makes, leaving tools
+   unusable wherever a person works as root, as in a container.

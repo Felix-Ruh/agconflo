@@ -147,17 +147,18 @@ name; a tool naming an image outside both is refused. Every image is named by it
 id and **never pulled**: pull it yourself, and a run whose image is absent is refused. A path a tool is given names a granted folder and a place in it,
 `project/src/main.c`, and a command runs in `/work`, where each folder sits under its name; an
 absolute path, or one naming a parent folder, is refused. What goes wrong in a tool — a file not
-there, a command exiting 1 — is the step's output, for the model to act on. Each step runs as your
-user on Linux, unless that is root, and as 1000 otherwise, with `/tmp` as its home, under the time
-limit, with everything it started killed after it, and output past the limit keeps its start and its
-end. `/tmp` holds no more than `tmp`, and a step that fills it is told its output may have been
-lost. Each container is named `agconflo-<run>-<name>`, where `docker ps` shows it, and removed
-when the `run`, `resume` or `answer` that made it stops. The container keeps a mistaken command from
-what was not granted; it is no defence against code built to escape one.
+there, a command exiting 1 — is the step's output, for the model to act on. Each step runs with no
+capabilities, as your user on Linux, root included, and as 1000 elsewhere, with `/tmp` as its home,
+under the time limit, with everything it started killed after it, and output past the limit keeps
+its start and its end. `/tmp` holds no more than `tmp`, and a step that fills it is told its output
+may have been lost. Each container is named `agconflo-<run>-<name>`, where `docker ps` shows it, and
+removed when the `run`, `resume` or `answer` that made it stops. The container keeps a mistaken
+command from what was not granted; it is no defence against code built to escape one.
 
 **Grant a git worktree, not your checkout.** Inside a writable folder a tool may change anything,
 mistakes included. `git worktree add ../work -b tool-run` gives it a copy whose every change
-`git diff` shows, and `git worktree remove` discards.
+`git diff` shows, and `git worktree remove` discards. Run as root, what a tool writes is root's, a
+setuid bit it sets included, which `git diff` does not show and `find ../work -perm -4000` does.
 
 A run whose manifest names a tool is refused before anything runs when its grants are missing,
 cannot be read or do not cover a tool, or an image it needs is absent. If Docker cannot be reached,
