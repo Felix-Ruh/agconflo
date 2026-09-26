@@ -49,6 +49,7 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    components/yield
    components/runner
    components/tools
+   components/environment
    tests/context
    tests/wiring
    tests/topology

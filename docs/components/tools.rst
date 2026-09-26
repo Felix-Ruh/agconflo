@@ -280,16 +280,20 @@ component requirement whose subject is anything else.
    :derived_from: FEAT_TOOL_KEPT_TO_ITS_GRANT
    :allocated_to: COMP_SANDBOX
    :ears_pattern: event
-   :statement: When a step is run, Sandbox shall run it on Linux as the user and group the running process has and elsewhere as user and group 1000.
+   :statement: When a step is run, Sandbox shall run it as a user whose files the person running the run can change and who can change no file on the host that person could not.
 
-   ``DEC_STEP_USER_IS_THE_PERSONS``, read from ``/proc/self/status``: a file a
-   step writes is the person's on the host, and a file they could not read
-   the step cannot read either.
+   Revised by ``DEC_CHANGE_SANDBOX_STEP_USER``, which named the user rather
+   than what the parent needs of it. ``DEC_STEP_USER_NEVER_ROOT`` says which:
+   on Linux the person's own user and group, read from ``/proc/self/status``,
+   unless that is root; otherwise user and group 1000, whose files root and a
+   Windows user alike can change.
 
    Failure modes:
 
-   - **Root**: a step writes files the person cannot delete, and reads what
-     they could not.
+   - **Root, for a person who is not**: a step writes files the person cannot
+     delete, and changes what they could not.
+   - **Root, for a person who is**: the cleanup after each step kills the
+     container's own process.
    - **The lines of the status file misread**, and a step run as another
      user.
 
@@ -463,14 +467,17 @@ component requirement whose subject is anything else.
    :derived_from: FEAT_TOOL_UNGRANTED_REFUSED
    :allocated_to: COMP_RUNNER
    :ears_pattern: unwanted
-   :statement: If a tool the manifest names has an action its grants do not allow or lacks a parameter its action takes or the sandbox finds the image not ready, then Runner shall refuse the run before any node runs naming each tool and why.
+   :statement: If a tool the manifest names has an action its grants do not allow or lacks a parameter its action takes or the image is absent or lacks sh or timeout, then Runner shall refuse the run before any node runs naming each tool and why.
 
-   Found before the record file is taken. An engine that cannot be reached
-   finds no image ready, so a run with tools on a machine whose engine is
-   stopped is refused here rather than at its first tool step. A parameter is
-   found when the tool's
-   node type declares it, as required or optional; one declared and left
-   unbound at a step is that step's failure
+   Revised by ``DEC_CHANGE_RUNNER_REFUSES_UNGRANTED``, which read "not ready"
+   as covering an engine that cannot be reached. It does not: such a run goes
+   on, and the first tool step it reaches is left awaiting with the engine's
+   failure (``DEC_UNREACHABLE_ENGINE_REFUSES_NO_RUN``,
+   ``CREQ_RUNNER_ENGINE_FAILURE_STOPS``).
+
+   Found before the record file is taken. A parameter is found when the
+   tool's node type declares it, as required or optional; one declared and
+   left unbound at a step is that step's failure
    (``CREQ_PERFORMER_FAILURE_AS_TEXT``).
 
    Failure modes:
