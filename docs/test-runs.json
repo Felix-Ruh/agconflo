@@ -228,6 +228,15 @@
           "title": "agconflo-cli::command misuse_exits_2",
           "type": "test_run"
         },
+        "RUN_COMMAND_PERSON_ROUTES": {
+          "executes": [
+            "TEST_COMMAND_PERSON_ROUTES"
+          ],
+          "id": "RUN_COMMAND_PERSON_ROUTES",
+          "test_outcome": "passed",
+          "title": "agconflo-cli::command person_routes",
+          "type": "test_run"
+        },
         "RUN_COMMAND_RESULT_ON_STANDARD_OUTPUT": {
           "executes": [
             "TEST_COMMAND_RESULT_ON_STANDARD_OUTPUT"
@@ -1614,6 +1623,15 @@
           "title": "agconflo-runner runner::performs_tool_steps",
           "type": "test_run"
         },
+        "RUN_RUNNER_PERSON_ROUTES": {
+          "executes": [
+            "TEST_RUNNER_PERSON_ROUTES"
+          ],
+          "id": "RUN_RUNNER_PERSON_ROUTES",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::person_routes",
+          "type": "test_run"
+        },
         "RUN_RUNNER_RECORDED_TOOL_STEP_NOT_REPEATED": {
           "executes": [
             "TEST_RUNNER_RECORDED_TOOL_STEP_NOT_REPEATED"
@@ -2640,6 +2658,15 @@
           "title": "agconflo-lua scripted::person_as_callee",
           "type": "test_run"
         },
+        "RUN_SCRIPTED_PERSON_BAD_ROUTE_REFUSED": {
+          "executes": [
+            "TEST_SCRIPTED_PERSON_BAD_ROUTE_REFUSED"
+          ],
+          "id": "RUN_SCRIPTED_PERSON_BAD_ROUTE_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-lua scripted::person_bad_route_refused",
+          "type": "test_run"
+        },
         "RUN_SCRIPTED_PERSON_BETWEEN_MODEL_CALLS": {
           "executes": [
             "TEST_SCRIPTED_PERSON_BETWEEN_MODEL_CALLS"
@@ -2647,6 +2674,15 @@
           "id": "RUN_SCRIPTED_PERSON_BETWEEN_MODEL_CALLS",
           "test_outcome": "passed",
           "title": "agconflo-lua scripted::person_between_model_calls",
+          "type": "test_run"
+        },
+        "RUN_SCRIPTED_PERSON_ROUTES": {
+          "executes": [
+            "TEST_SCRIPTED_PERSON_ROUTES"
+          ],
+          "id": "RUN_SCRIPTED_PERSON_ROUTES",
+          "test_outcome": "passed",
+          "title": "agconflo-lua scripted::person_routes",
           "type": "test_run"
         },
         "RUN_SCRIPTED_PERSON_STEP_HANDED_OVER": {

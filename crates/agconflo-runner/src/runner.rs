@@ -6,7 +6,7 @@ use std::fmt;
 use std::path::Path;
 
 use agconflo_core::{
-    Arguments, Context, IdSource, WiringDefect, WorkflowDefinition, validate_wiring,
+    Activation, Arguments, Context, IdSource, WiringDefect, WorkflowDefinition, validate_wiring,
 };
 use agconflo_lua::{
     BehaviourFault, Outcome, ScriptedRefusal, answer_scripted, resume_scripted, run_scripted,
@@ -54,6 +54,10 @@ pub struct Stopped {
     /// The container engine's failure the awaited tool step was left for, or
     /// `None`.
     pub engine: Option<EngineFailure>,
+    /// For a router's step awaited, every instance an edge out of it enters,
+    /// in the workflow's order, which a person's answer may name; `None`
+    /// otherwise.
+    pub routes: Option<Vec<String>>,
 }
 
 /// Why a run was not started, resumed or answered. Nothing ran for any of them.
@@ -246,7 +250,7 @@ async fn start_in<C: Container>(
         models: &models,
     };
     let (outcome, engine) = run.tools(prepared.as_mut(), &mut kept, outcome).await;
-    stopped(kept, outcome, engine)
+    stopped(project.definition(), kept, outcome, engine)
 }
 
 /// The run whose record `record` holds, resumed against the project `sources`
@@ -284,7 +288,7 @@ async fn resume_in<C: Container>(
         models: &models,
     };
     let (outcome, engine) = run.tools(prepared.as_mut(), &mut kept, outcome).await;
-    stopped(kept, outcome, engine)
+    stopped(project.definition(), kept, outcome, engine)
 }
 
 /// The run whose record `record` holds, continued with `text` as the output of
@@ -296,17 +300,19 @@ pub async fn answer(
     record: &Path,
     instance: &str,
     text: &str,
+    route: Option<&[String]>,
 ) -> Result<Stopped, Refusal> {
-    answer_in(sources, record, instance, text, Sandbox::new).await
+    answer_in(sources, record, instance, text, route, Sandbox::new).await
 }
 
 /// [`answer`], performing tool steps in the container `make` makes.
-// @A person's text answering the record its file holds,IMPL_RUNNER_ANSWER,impl,[CREQ_RUNNER_ANSWERS, CREQ_RUNNER_HANDS_BACK_HOW],[DEC_ANSWER_ONCE_BY_THE_KEEPER, DEC_RUNNER_ON_ONE_THREAD]
+// @A person's text answering the record its file holds,IMPL_RUNNER_ANSWER,impl,[CREQ_RUNNER_ANSWERS, CREQ_RUNNER_ANSWERS_WITH_ROUTE, CREQ_RUNNER_HANDS_BACK_HOW],[DEC_ANSWER_ONCE_BY_THE_KEEPER, DEC_RUNNER_ON_ONE_THREAD]
 async fn answer_in<C: Container>(
     sources: Sources<'_>,
     record: &Path,
     instance: &str,
     text: &str,
+    route: Option<&[String]>,
     make: impl FnOnce(&Grants, &Path) -> C,
 ) -> Result<Stopped, Refusal> {
     let (project, models) = read(sources)?;
@@ -322,6 +328,7 @@ async fn answer_in<C: Container>(
         &held,
         instance,
         text,
+        route,
         project.limits(),
         |record| kept.keep(record),
     )
@@ -333,7 +340,7 @@ async fn answer_in<C: Container>(
         models: &models,
     };
     let (outcome, engine) = run.tools(prepared.as_mut(), &mut kept, outcome).await;
-    stopped(kept, outcome, engine)
+    stopped(project.definition(), kept, outcome, engine)
 }
 
 /// Every reason a run of the project `sources` names would be refused that
@@ -625,6 +632,7 @@ impl Tooled<'_> {
                 &held,
                 &instance,
                 &text,
+                None,
                 self.project.limits(),
                 |record| kept.keep(record),
             )
@@ -637,16 +645,46 @@ impl Tooled<'_> {
 /// How a run stopped, with its record keeper let go, its report beside it,
 /// and the engine's failure an awaited tool step was left for.
 fn stopped(
+    definition: &WorkflowDefinition,
     kept: Kept,
     outcome: Result<Outcome, ScriptedRefusal>,
     engine: Option<EngineFailure>,
 ) -> Result<Stopped, Refusal> {
     let unkept = kept.keeper.release();
     let outcome = outcome.map_err(Refusal::Run)?;
+    let routes = match &outcome {
+        Outcome::Awaiting(activation) => routes_from(definition, activation),
+        Outcome::Ended(_) => None,
+    };
     Ok(Stopped {
         outcome,
         unkept,
         engine,
+        routes,
+    })
+}
+
+/// For a router's own activation, every instance an edge out of it enters, in
+/// the definition's order and each once; `None` for any other activation.
+// @A router's choices handed back with its awaited step,IMPL_RUNNER_TELLS_ROUTES,impl,[CREQ_RUNNER_TELLS_ROUTES],[DEC_PERSON_ROUTE_IN_THE_ANSWER]
+fn routes_from(definition: &WorkflowDefinition, activation: &Activation) -> Option<Vec<String>> {
+    let routes = activation.call().is_none()
+        && definition
+            .node_types
+            .iter()
+            .any(|declared| declared.name == activation.node_type() && declared.routes);
+    routes.then(|| {
+        definition
+            .instances
+            .iter()
+            .filter(|consumer| {
+                consumer
+                    .bindings
+                    .iter()
+                    .any(|binding| binding.source == activation.instance())
+            })
+            .map(|consumer| consumer.name.clone())
+            .collect()
     })
 }
 
@@ -765,6 +803,7 @@ fn completed(stopped: Result<Stopped, Refusal>) -> String {
             outcome: Outcome::Ended(RunEnding::Completed(result)),
             unkept: None,
             engine: None,
+            routes: _,
         }) => result.render().into_owned(),
         other => panic!("expected the run to complete with its record kept, got {other:?}"),
     }
@@ -983,6 +1022,7 @@ fn answers_the_awaited_step() {
             outcome: Outcome::Awaiting(activation),
             unkept: None,
             engine: None,
+            routes: _,
         }) => assert_eq!(activation.instance(), "second"),
         other => panic!("expected the run to await a person, got {other:?}"),
     }
@@ -990,7 +1030,7 @@ fn answers_the_awaited_step() {
 
     let text = "ok\r\nfine\n";
     assert_eq!(
-        completed(runtime().block_on(answer(sources, &record, "second", text))),
+        completed(runtime().block_on(answer(sources, &record, "second", text, None))),
         format!("{text}+c")
     );
     assert_ne!(
@@ -998,7 +1038,7 @@ fn answers_the_awaited_step() {
         awaiting
     );
 
-    match runtime().block_on(answer(sources, &record, "second", text)) {
+    match runtime().block_on(answer(sources, &record, "second", text, None)) {
         Err(Refusal::Run(ScriptedRefusal::NotAwaited { .. })) => {}
         other => panic!("expected a second answer refused, got {other:?}"),
     }
@@ -1020,7 +1060,7 @@ fn answer_elsewhere_leaves_the_file() {
         .expect("the run awaits a person");
     let before = std::fs::read(&record).expect("the record");
 
-    match runtime().block_on(answer(sources, &record, "third", "text")) {
+    match runtime().block_on(answer(sources, &record, "third", "text", None)) {
         Err(Refusal::Run(ScriptedRefusal::NotAwaited { .. })) => {}
         other => panic!("expected the answer refused, got {other:?}"),
     }
@@ -1148,6 +1188,7 @@ fn endings_handed_back() {
             outcome: Outcome::Awaiting(_),
             unkept: None,
             engine: None,
+            routes: _,
         })
     ));
     match run("broken", 5, "fails.toml") {
@@ -1159,6 +1200,7 @@ fn endings_handed_back() {
                 }),
             unkept: None,
             engine: None,
+            routes: _,
         }) => {
             assert_eq!(instance, "second");
             assert!(message.contains("broke here"), "{message}");
@@ -1171,6 +1213,7 @@ fn endings_handed_back() {
             outcome: Outcome::Ended(RunEnding::BudgetExceeded { budget: 1 }),
             unkept: None,
             engine: None,
+            routes: _,
         })
     ));
 
@@ -1188,6 +1231,7 @@ fn endings_handed_back() {
             outcome: Outcome::Ended(RunEnding::Quiescent { waiting }),
             unkept: None,
             engine: None,
+            routes: _,
         }) => assert_eq!(waiting, ["c1", "c2"]),
         other => panic!("expected the run stuck, got {other:?}"),
     }
@@ -1206,6 +1250,7 @@ fn endings_handed_back() {
             outcome: Outcome::Ended(RunEnding::Completed(result)),
             unkept: Some(unkept),
             engine: None,
+            routes: _,
         }) => {
             assert_eq!(result.render(), "x+a+c+c");
             assert_eq!(unkept.holds, 0);
@@ -1217,8 +1262,6 @@ fn endings_handed_back() {
 
 #[cfg(test)]
 use crate::testing::{Asked, IMAGE, PYTHON, StandIn, labelled, needs_docker, needs_image};
-#[cfg(test)]
-use agconflo_core::Activation;
 
 /// The node types a tool performs in the tests' workflows: `fetch` reads a
 /// path, `exec` runs a command.
@@ -1305,6 +1348,7 @@ fn awaiting(stopped: Result<Stopped, Refusal>) -> Activation {
             outcome: Outcome::Awaiting(activation),
             unkept: None,
             engine: None,
+            routes: _,
         }) => activation,
         other => panic!("expected the run to await a step, got {other:?}"),
     }
@@ -1439,7 +1483,7 @@ proptest! {
         let stopped = runtime().block_on(start_in(sources, &scratch.path("run.toml"), &brief("x"), |_, _| stand_in.clone()));
 
         match stopped {
-            Ok(Stopped { outcome: Outcome::Ended(RunEnding::Completed(result)), unkept: None, engine: None }) => {
+            Ok(Stopped { outcome: Outcome::Ended(RunEnding::Completed(result)), unkept: None, engine: None , routes: _ }) => {
                 prop_assert_eq!(result.render(), text);
                 prop_assert_eq!(result.declared_type().as_str(), "note");
             }
@@ -1542,6 +1586,7 @@ fn tool_steps_count_against_budget() {
                 outcome: Outcome::Ended(RunEnding::BudgetExceeded { budget: 5 }),
                 unkept: None,
                 engine: None,
+                routes: _,
             })
         ),
         "{stopped:?}"
@@ -1623,7 +1668,7 @@ fn refuses_without_grants() {
             stand_in.clone()
         })),
         runtime().block_on(resume_in(without, &record, |_, _| stand_in.clone())),
-        runtime().block_on(answer_in(without, &record, "fetched", "t", |_, _| {
+        runtime().block_on(answer_in(without, &record, "fetched", "t", None, |_, _| {
             stand_in.clone()
         })),
     ];
@@ -1787,6 +1832,7 @@ fn engine_failure_leaves_the_step() {
             outcome: Outcome::Awaiting(activation),
             unkept: None,
             engine: Some(EngineFailure { message }),
+            routes: _,
         }) => {
             assert_eq!(activation.instance(), "executed");
             assert_eq!(message, "the engine went away");
@@ -1802,12 +1848,14 @@ fn engine_failure_leaves_the_step() {
     assert_eq!(input(&awaited, "before"), "exit status 0\nran R+c");
 
     let untouched = echoing();
-    let awaited =
-        awaiting(
-            runtime().block_on(answer_in(sources, &copy, "executed", "typed", |_, _| {
-                untouched.clone()
-            })),
-        );
+    let awaited = awaiting(runtime().block_on(answer_in(
+        sources,
+        &copy,
+        "executed",
+        "typed",
+        None,
+        |_, _| untouched.clone(),
+    )));
     assert_eq!(input(&awaited, "before"), "typed+c");
     assert_eq!(steps(&untouched), []);
 }
@@ -2101,6 +2149,7 @@ fn unreachable_engine_not_refused() {
             outcome: Outcome::Awaiting(activation),
             unkept: None,
             engine: Some(engine),
+            routes: _,
         }) => {
             assert_eq!(engine, failure);
             activation.instance().to_owned()
@@ -2113,9 +2162,14 @@ fn unreachable_engine_not_refused() {
     }));
     assert_eq!(left(started), "fetched");
 
-    let answered = runtime().block_on(answer_in(sources, &record, "fetched", "typed", |_, _| {
-        unreachable()
-    }));
+    let answered = runtime().block_on(answer_in(
+        sources,
+        &record,
+        "fetched",
+        "typed",
+        None,
+        |_, _| unreachable(),
+    ));
     assert_eq!(left(answered), "executed");
 
     let findings = check_in(sources, |_, _| unreachable());
@@ -2329,4 +2383,57 @@ fn environment_shared_end_to_end() {
         "exit status 0\nmade\n|exit status 0\nnone\n"
     );
     assert_eq!(labelled(&record), Vec::<String>::new());
+}
+
+#[cfg(test)]
+#[test]
+fn person_routes() {
+    let scratch = Scratch::new("person_routes");
+    let manifest = project(&scratch, "add", 10);
+    // `second` becomes a router a person performs, with `third` and a fourth
+    // instance after it.
+    scratch.write(
+        "types.toml",
+        format!("{TYPES}\n[types.choose]\nrequired = {{ before = \"note\" }}\noutput = \"note\"\nroutes = true\n"),
+    );
+    scratch.write(
+        "flow.toml",
+        "name = \"routed\"\noutput = \"third\"\n\n[instances.first]\nnode_type = \"begin\"\n\n[instances.second]\nnode_type = \"choose\"\nbindings = { before = \"first\" }\n\n[instances.third]\nnode_type = \"add\"\nbindings = { before = \"second\" }\n\n[instances.fourth]\nnode_type = \"add\"\nbindings = { before = \"second\" }\n",
+    );
+    let text = std::fs::read_to_string(&manifest).expect("the manifest");
+    std::fs::write(
+        &manifest,
+        text.replace("persons = [\"review\"]", "persons = [\"choose\"]"),
+    )
+    .expect("the manifest");
+    let sources = Sources {
+        manifest: &manifest,
+        models: None,
+        grants: None,
+    };
+    let record = scratch.path("run.toml");
+
+    // Stopped at the router's step, with the instances it may name.
+    let stopped = runtime()
+        .block_on(start(sources, &record, &brief("x")))
+        .expect("it starts");
+    let Outcome::Awaiting(step) = &stopped.outcome else {
+        panic!("the router's step is awaited: {stopped:?}")
+    };
+    assert_eq!(step.instance(), "second");
+    assert_eq!(
+        stopped.routes,
+        Some(vec!["third".to_owned(), "fourth".to_owned()])
+    );
+
+    // Answered through the record's file with a route, the run goes on where
+    // named.
+    let answered = runtime().block_on(answer(
+        sources,
+        &record,
+        "second",
+        "chosen",
+        Some(&["third".to_owned()]),
+    ));
+    assert_eq!(completed(answered), "chosen+c");
 }

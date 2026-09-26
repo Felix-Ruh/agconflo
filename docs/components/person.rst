@@ -108,3 +108,88 @@ and how an activation is performed.
      person's text goes nowhere, without a word.
    - **Refused without naming what the run awaits.** A caller holding the
      wrong record for the right person cannot tell which record to use.
+
+.. comp_req:: A person's answer to a router's step carries its route
+   :id: CREQ_HOST_TAKES_PERSON_ROUTE
+   :derived_from: FEAT_PERSON_ROUTES
+   :allocated_to: COMP_SCRIPT_HOST
+   :ears_pattern: event
+   :statement: When a person's answer to the router's step a record's run awaits names instances, Script host shall report the answer's text as that step's output with those names as its route.
+
+   ``DEC_PERSON_ROUTE_IN_THE_ANSWER``. The output is made as any person's
+   answer is (``CREQ_HOST_TAKES_PERSON_TEXT``); the names are reported with
+   it in the order given, none meaning nowhere, as a script's are
+   (``CREQ_HOST_ROUTE_NAMED``).
+
+   Failure modes:
+
+   - **The names dropped**, and the router's output refused by the run as
+     unrouted, which ends the run.
+   - **The names reported in another order than given.**
+
+.. comp_req:: A person's answer with a route that does not fit its step is refused
+   :id: CREQ_HOST_REFUSES_BAD_PERSON_ROUTE
+   :derived_from: FEAT_PERSON_ROUTES
+   :allocated_to: COMP_SCRIPT_HOST
+   :ears_pattern: unwanted
+   :statement: If a person's answer gives no route for a router's step or gives one for any other step or names an instance no edge out of the router enters, then Script host shall refuse it having run nothing.
+
+   ``DEC_PERSON_ROUTE_IN_THE_ANSWER``: refused as an answer for another step
+   is (``CREQ_HOST_REFUSES_ANSWER_ELSEWHERE``), so the person answers again.
+   A step that is not a router's own includes a call's activation of a node
+   type that routes: a call's output goes back to its caller alone
+   (``CREQ_RUN_CALL_OUTPUT_TO_CALLER``) and has nowhere to be walked.
+
+   Failure modes:
+
+   - **A missing route read as every edge**, and a branch nobody chose.
+   - **A route on a step that is not a router's own ignored**, and a person
+     believing they chose a branch that is not there.
+   - **A misspelt name failing the run**, where the person could have
+     answered again.
+
+.. comp_req:: The runner carries a person's route with the answer
+   :id: CREQ_RUNNER_ANSWERS_WITH_ROUTE
+   :derived_from: FEAT_PERSON_ROUTES
+   :allocated_to: COMP_RUNNER
+   :ears_pattern: event
+   :statement: When text and a route are given for the step of an instance, Runner shall answer the record its file holds with that text and that route for that instance.
+
+   What ``CREQ_RUNNER_ANSWERS`` does with the text, with the names beside it.
+
+   Failure modes:
+
+   - **The route dropped between the person and the scripted run.**
+
+.. comp_req:: A router's awaited step is handed back with the instances it may name
+   :id: CREQ_RUNNER_TELLS_ROUTES
+   :derived_from: FEAT_PERSON_ROUTES
+   :allocated_to: COMP_RUNNER
+   :ears_pattern: event
+   :statement: When a run stops awaiting a person at a router's step, Runner shall hand back with the step every instance an edge out of that router enters.
+
+   A person cannot name a branch they cannot see, and the names are the
+   workflow's, not the activation's.
+
+   Failure modes:
+
+   - **Nothing handed back**, and the person reading the workflow's document
+     to learn what to type.
+   - **Instances handed back that no edge from the router enters**, which the
+     run refuses when named.
+
+.. comp_req:: The command line reads a person's route and shows a router's choices
+   :id: CREQ_COMMAND_READS_ROUTE
+   :derived_from: FEAT_PERSON_ROUTES
+   :allocated_to: COMP_COMMAND_LINE
+   :ears_pattern: event
+   :statement: When a person answers a step with route names or a run awaits a router's step, Command line shall hand the runner those names with the answer or print the instances it may name with the step.
+
+   ``--route`` once for each instance, and ``--route ""`` for none.
+
+   Failure modes:
+
+   - **An empty name taken as an instance**, and ``--route ""`` refused as a
+     name no edge enters.
+   - **The choices printed to standard error**, where a script reading the
+     step from standard output does not see them.

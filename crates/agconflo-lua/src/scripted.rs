@@ -7,8 +7,8 @@ use std::fmt;
 use std::rc::Rc;
 
 use agconflo_core::{
-    Activation, Arguments, Context, IdSource, NodeType, NothingOutstanding, ResumeRefusal, Run,
-    RunEnding, StartRefusal, Step, WorkflowDefinition,
+    Activation, Arguments, Context, IdSource, NodeType, NothingOutstanding, OutputRefusal,
+    ResumeRefusal, Run, RunEnding, StartRefusal, Step, WorkflowDefinition,
 };
 
 use crate::behaviours::{BehaviourFault, Behaviours};
@@ -39,6 +39,22 @@ pub enum ScriptedRefusal {
         /// it has ended.
         offered: Option<String>,
     },
+    /// A person's answer to a router's step named no instances to go on to.
+    /// Nothing was run and no record handed over.
+    RouteMissing {
+        /// The router.
+        instance: String,
+    },
+    /// A person's answer named instances to go on to for a step that is not a
+    /// router's own. Nothing was run and no record handed over.
+    RouteNotTaken {
+        /// The instance answered.
+        instance: String,
+    },
+    /// A person's answer to a router's step named an instance the run refuses
+    /// as a route, and this is the run's refusal. Nothing was run and no record
+    /// handed over.
+    RouteRefused(OutputRefusal),
 }
 
 impl fmt::Display for ScriptedRefusal {
@@ -60,6 +76,15 @@ impl fmt::Display for ScriptedRefusal {
                     None => f.write_str("; it has ended"),
                 }
             }
+            Self::RouteMissing { instance } => write!(
+                f,
+                "{instance} is a router: name the instances its run goes on to with the answer"
+            ),
+            Self::RouteNotTaken { instance } => write!(
+                f,
+                "{instance} is not a router's step, and takes no instances to go on to"
+            ),
+            Self::RouteRefused(refusal) => refusal.fmt(f),
         }
     }
 }
@@ -173,9 +198,15 @@ pub async fn resume_scripted(
 /// hands its caller a record, as after any output, and runs on to its ending or
 /// to the next step a person performs.
 ///
+/// For a router's step, `route` is the instances the person names for its
+/// run to go on to, none meaning nowhere, and the output is walked into them
+/// as a router's script's would be.
+///
 /// Refused, with nothing run and no record handed over, unless the record's
 /// run next offers an activation of `instance` by a node type a person
-/// performs - asked after everything a resume refuses, and after the scripts.
+/// performs - asked after everything a resume refuses, and after the scripts -
+/// and when `route` is missing for a router's step, given for any other, or
+/// names an instance no edge out of the router enters.
 ///
 /// Answering one record twice gives two runs sharing identifiers, each sound
 /// on its own; keeping to one answer per record is the caller's.
@@ -188,6 +219,7 @@ pub async fn answer_scripted(
     record: &str,
     instance: &str,
     text: &str,
+    route: Option<&[String]>,
     limits: Limits,
     keep: impl FnMut(String),
 ) -> Result<(Outcome, IdSource), ScriptedRefusal> {
@@ -199,11 +231,24 @@ pub async fn answer_scripted(
         roster,
         &mut source,
         limits,
-        Some((instance, text)),
+        Some(Answer {
+            instance,
+            text,
+            route,
+        }),
         keep,
     )
     .await?;
     Ok((outcome, source))
+}
+
+/// A person's answer: the instance whose step it answers, the text, and for a
+/// router's step the instances named.
+#[derive(Clone, Copy)]
+struct Answer<'a> {
+    instance: &'a str,
+    text: &'a str,
+    route: Option<&'a [String]>,
 }
 
 /// Perform `run`'s activations until it ends or reaches a step a person
@@ -211,8 +256,9 @@ pub async fn answer_scripted(
 /// output - and, through [`serve`], after each answer - or refuse it for its
 /// scripts, or for an answer it does not await.
 ///
-/// `answer`, when given, is the instance a person's text was supplied for and
-/// the text, taken as the output of the first activation the run offers.
+/// `answer`, when given, is the instance a person's text was supplied for, the
+/// text, and for a router's step the instances named, taken as the output of
+/// the first activation the run offers.
 // @A record handed over at the start and after each output,IMPL_SCRIPTED_RECORDS,impl,[CREQ_HOST_HANDS_RECORDS],[DEC_RECORD_AFTER_EACH_ANSWER]
 #[allow(clippy::too_many_arguments)]
 async fn drive(
@@ -222,7 +268,7 @@ async fn drive(
     roster: &Roster,
     source: &mut IdSource,
     limits: Limits,
-    answer: Option<(&str, &str)>,
+    answer: Option<Answer<'_>>,
     mut keep: impl FnMut(String),
 ) -> Result<Outcome, ScriptedRefusal> {
     let lent = Lent::new(source);
@@ -232,8 +278,8 @@ async fn drive(
         return Err(ScriptedRefusal::Behaviours(faults));
     }
 
-    if let Some((instance, text)) = answer {
-        let reported = answered(&mut run, behaviours, &lent, instance, text)?;
+    if let Some(answer) = answer {
+        let reported = answered(&mut run, definition, behaviours, &lent, answer)?;
         if let Err(failure) = reported {
             return Ok(Outcome::Ended(fail(run, failure)));
         }
@@ -482,14 +528,19 @@ fn callees_of(definition: &WorkflowDefinition, activation: &Activation) -> Vec<N
 /// The outer error is the refusal. The inner one is the step's failure, when
 /// its output cannot be made or the run refuses it, and ends the run as a
 /// script's failure would.
-// @A person's text taken as the awaited step's output,IMPL_SCRIPTED_ANSWER,impl,[CREQ_HOST_TAKES_PERSON_TEXT, CREQ_HOST_REFUSES_ANSWER_ELSEWHERE]
+// @A person's text taken as the awaited step's output,IMPL_SCRIPTED_ANSWER,impl,[CREQ_HOST_TAKES_PERSON_TEXT, CREQ_HOST_REFUSES_ANSWER_ELSEWHERE, CREQ_HOST_TAKES_PERSON_ROUTE, CREQ_HOST_REFUSES_BAD_PERSON_ROUTE],[DEC_PERSON_ROUTE_IN_THE_ANSWER]
 fn answered(
     run: &mut Run<'_, ScriptFailure>,
+    definition: &WorkflowDefinition,
     behaviours: &Behaviours,
     lent: &Lent<'_>,
-    instance: &str,
-    text: &str,
+    answer: Answer<'_>,
 ) -> Result<Result<(), ScriptFailure>, ScriptedRefusal> {
+    let Answer {
+        instance,
+        text,
+        route,
+    } = answer;
     let refused = |offered: Option<&str>| ScriptedRefusal::NotAwaited {
         answered: instance.to_owned(),
         offered: offered.map(str::to_owned),
@@ -502,15 +553,44 @@ fn answered(
     {
         return Err(refused(Some(activation.instance())));
     }
+    let routes = activation.call().is_none()
+        && definition
+            .node_types
+            .iter()
+            .any(|declared| declared.name == activation.node_type() && declared.routes);
+    match (routes, route) {
+        (true, None) => {
+            return Err(ScriptedRefusal::RouteMissing {
+                instance: instance.to_owned(),
+            });
+        }
+        (false, Some(_)) => {
+            return Err(ScriptedRefusal::RouteNotTaken {
+                instance: instance.to_owned(),
+            });
+        }
+        _ => {}
+    }
 
     let made = Context::text(
         &mut lent.source.borrow_mut(),
         activation.output().clone(),
         text,
     );
-    Ok(match made {
-        Err(exhausted) => Err(ScriptFailure::SourceExhausted(exhausted)),
-        Ok(output) => run.produced(output).map_err(ScriptFailure::OutputRefused),
+    let output = match made {
+        Err(exhausted) => return Ok(Err(ScriptFailure::SourceExhausted(exhausted))),
+        Ok(output) => output,
+    };
+    let reported = match route {
+        None => run.produced(output),
+        Some(route) => run.routed(output, route.to_vec()),
+    };
+    Ok(match reported {
+        Ok(()) => Ok(()),
+        Err(refusal @ OutputRefusal::NoEdgeTo { .. }) => {
+            return Err(ScriptedRefusal::RouteRefused(refusal));
+        }
+        Err(refusal) => Err(ScriptFailure::OutputRefused(refusal)),
     })
 }
 
@@ -1154,6 +1234,7 @@ proptest::proptest! {
             records.last().expect("records were handed over"),
             "second",
             &text,
+            None,
             SMALL,
             |record| after.push(record),
         ));
@@ -1200,6 +1281,7 @@ fn exhausted_source_fails_the_step() {
         &exhausted,
         "second",
         "looks right",
+        None,
         SMALL,
         |_| {},
     ));
@@ -1227,6 +1309,7 @@ fn answer_elsewhere_refused() {
         parked,
         "second",
         "looks right",
+        None,
         SMALL,
         |record| completed.push(record),
     ))
@@ -1248,6 +1331,7 @@ fn answer_elsewhere_refused() {
             record,
             instance,
             "looks right",
+            None,
             SMALL,
             |_| handed += 1,
         ));
@@ -1277,6 +1361,7 @@ fn answer_elsewhere_refused() {
         "not a record",
         "second",
         "looks right",
+        None,
         SMALL,
         |_| {},
     ));
@@ -1294,6 +1379,7 @@ fn answer_elsewhere_refused() {
             parked,
             instance,
             "looks right",
+            None,
             SMALL,
             |_| {},
         ));
@@ -1431,6 +1517,7 @@ output = \"note\"
         parked,
         "second",
         "looks right",
+        None,
         SMALL,
         |_| {},
     ))
@@ -2222,6 +2309,7 @@ fn person_as_callee() {
         records.last().expect("a record to answer from"),
         "asker",
         "the harbour is closed",
+        None,
         CALLING,
         |_| {},
     ))
@@ -2337,10 +2425,10 @@ fn decision_replayed() {
     assert_eq!(sent, 0);
 }
 
+/// The node types of a review loop: a brief given as it is, a drafter, a
+/// reviewer, a router and a finisher.
 #[cfg(test)]
-#[test]
-fn review_loop() {
-    let types = r#"
+const LOOP_TYPES: &str = r#"
 [types.give]
 required = { input = "note" }
 output = "note"
@@ -2362,9 +2450,11 @@ routes = true
 required = { draft = "note" }
 output = "note"
 "#;
-    // The drafter reads the brief and the draft the router sends back, and the
-    // run gives it an empty draft for its first pass.
-    let flow = r#"
+
+/// A review loop: the drafter reads the brief and the draft the router sends
+/// back, and the run gives it an empty draft for its first pass.
+#[cfg(test)]
+const LOOP: &str = r#"
 name = "review"
 output = "finisher"
 
@@ -2387,7 +2477,11 @@ bindings = { draft = "drafter", review = "reviewer" }
 node_type = "finish"
 bindings = { draft = { from = "router", input = "draft" } }
 "#;
-    let definition = workflow(types, flow);
+
+/// The review loop's scripts, the router's among them - sending the draft
+/// back until it has had three passes, then on - unless a person routes it.
+#[cfg(test)]
+fn loop_behaviours(person_routes: bool) -> Behaviours {
     let behaviours = Behaviours::new()
         .define(
             "give",
@@ -2404,17 +2498,27 @@ bindings = { draft = { from = "router", input = "draft" } }
             "review.lua",
             "local given, host = ...\nreturn host.text(host.output, 'reviewed ' .. given.draft:render())",
         )
-        // Sent back until the draft has had three passes, then on.
-        .define(
-            "route",
-            "route.lua",
-            "local given, host = ...\nlocal _, passes = given.draft:render():gsub('%[', '')\nif passes < 3 then host.route({'drafter'}) else host.route({'finisher'}) end\nreturn host.text(host.output, given.review:render())",
-        )
         .define(
             "finish",
             "finish.lua",
             "local given, host = ...\nreturn host.text(host.output, 'final ' .. given.draft:render())",
         );
+    if person_routes {
+        behaviours.person("route")
+    } else {
+        behaviours.define(
+            "route",
+            "route.lua",
+            "local given, host = ...\nlocal _, passes = given.draft:render():gsub('%[', '')\nif passes < 3 then host.route({'drafter'}) else host.route({'finisher'}) end\nreturn host.text(host.output, given.review:render())",
+        )
+    }
+}
+
+/// The review loop started with the brief `B` and an empty first draft, and
+/// every record it handed over.
+#[cfg(test)]
+fn loop_run(behaviours: &Behaviours) -> (Result<Outcome, ScriptedRefusal>, Vec<String>) {
+    let definition = workflow(LOOP_TYPES, LOOP);
     let mut source = IdSource::new();
     let arguments = Arguments::new()
         .supply("brief", "input", note(&mut source, "note", "B"))
@@ -2422,7 +2526,7 @@ bindings = { draft = { from = "router", input = "draft" } }
     let mut records = Vec::new();
     let ended = block(run_scripted(
         &definition,
-        &behaviours,
+        behaviours,
         &offline(),
         arguments,
         &mut source,
@@ -2430,6 +2534,13 @@ bindings = { draft = { from = "router", input = "draft" } }
         SMALL,
         |record| records.push(record),
     ));
+    (ended, records)
+}
+
+#[cfg(test)]
+#[test]
+fn review_loop() {
+    let (ended, records) = loop_run(&loop_behaviours(false));
 
     // The third draft, each pass given the brief and the draft before it.
     assert_eq!(rendered(ended), "final [B][B][B]");
@@ -2438,4 +2549,125 @@ bindings = { draft = { from = "router", input = "draft" } }
     assert_eq!(last.matches("instance = \"drafter\"").count(), 4, "{last}");
     assert_eq!(last.matches("route = [\"drafter\"]").count(), 2, "{last}");
     assert_eq!(last.matches("route = [\"finisher\"]").count(), 1, "{last}");
+}
+
+/// The review loop's record answered for the router with `text` and `route`,
+/// and every record handed over.
+#[cfg(test)]
+fn route_as_person(
+    record: &str,
+    route: Option<&[String]>,
+) -> (Result<(Outcome, IdSource), ScriptedRefusal>, Vec<String>) {
+    let definition = workflow(LOOP_TYPES, LOOP);
+    let mut records = Vec::new();
+    let answered = block(answer_scripted(
+        &definition,
+        &loop_behaviours(true),
+        &offline(),
+        record,
+        "router",
+        "the person's verdict",
+        route,
+        SMALL,
+        |record| records.push(record),
+    ));
+    (answered, records)
+}
+
+#[cfg(test)]
+#[test]
+fn person_routes() {
+    let (ended, mut records) = loop_run(&loop_behaviours(true));
+    let Ok(Outcome::Awaiting(step)) = ended else {
+        panic!("the router's step is handed to a person: {ended:?}")
+    };
+    assert_eq!(step.instance(), "router");
+
+    // Sent back twice, then on: each answer continues the run to the router's
+    // next step, and the last to its ending.
+    let back = ["drafter".to_owned()];
+    let on = ["finisher".to_owned()];
+    for route in [&back[..], &back[..]] {
+        let (answered, handed) = route_as_person(records.last().expect("a record"), Some(route));
+        let Ok((Outcome::Awaiting(step), _)) = answered else {
+            panic!("the router's next step is handed over: {answered:?}")
+        };
+        assert_eq!(step.instance(), "router");
+        records = handed;
+    }
+    let (answered, handed) = route_as_person(records.last().expect("a record"), Some(&on));
+    let (outcome, _) = answered.expect("the last answer is taken");
+    assert_eq!(rendered(Ok(outcome)), "final [B][B][B]");
+    let last = handed.last().expect("records were handed over");
+    assert_eq!(last.matches("route = [\"drafter\"]").count(), 2, "{last}");
+    assert_eq!(last.matches("route = [\"finisher\"]").count(), 1, "{last}");
+}
+
+#[cfg(test)]
+#[test]
+fn person_bad_route_refused() {
+    let (ended, records) = loop_run(&loop_behaviours(true));
+    assert!(matches!(ended, Ok(Outcome::Awaiting(_))), "{ended:?}");
+    let parked = records.last().expect("a record");
+
+    // No route for a router's step, and a name no edge enters: each refused,
+    // with nothing run and no record handed over.
+    let (answered, handed) = route_as_person(parked, None);
+    assert!(
+        matches!(answered, Err(ScriptedRefusal::RouteMissing { ref instance }) if instance == "router"),
+        "{answered:?}"
+    );
+    assert!(handed.is_empty());
+    let (answered, handed) = route_as_person(parked, Some(&["brief".to_owned()]));
+    assert!(
+        matches!(
+            answered,
+            Err(ScriptedRefusal::RouteRefused(OutputRefusal::NoEdgeTo { ref named, .. })) if named == "brief"
+        ),
+        "{answered:?}"
+    );
+    assert!(handed.is_empty());
+
+    // A route for a person's step that is not a router's own - a call's
+    // activation of a node type that routes - is refused; without one, the
+    // same answer is taken.
+    let types = YIELD_TYPES.replace(
+        "required = { query = \"note\" }\noutput = \"note\"\n\n[types.search]",
+        "required = { query = \"note\" }\noutput = \"note\"\nroutes = true\n\n[types.search]",
+    );
+    assert_ne!(types, YIELD_TYPES);
+    let definition = workflow(&types, YIELDING);
+    let behaviours = Behaviours::new()
+        .define("ask", "ask.lua", &asking("What is amber-7?"))
+        .person("lookup");
+    let before = Stub::replying(vec![looking_up("call_7", "amber-7")]);
+    let (outcome, records) = run_keeping(
+        &definition,
+        &behaviours,
+        &roster_at(&before, "openai::m"),
+        CALLING,
+    );
+    assert!(matches!(outcome, Ok(Outcome::Awaiting(_))), "{outcome:?}");
+    let parked = records.last().expect("a record");
+    let answer = |route: Option<&[String]>| {
+        let after = Stub::replying(vec![Reply::text("done")]);
+        block(answer_scripted(
+            &definition,
+            &behaviours,
+            &roster_at(&after, "openai::m"),
+            parked,
+            "asker",
+            "the harbour is closed",
+            route,
+            CALLING,
+            |_| {},
+        ))
+    };
+    let refused = answer(Some(&["asker".to_owned()]));
+    assert!(
+        matches!(refused, Err(ScriptedRefusal::RouteNotTaken { ref instance }) if instance == "asker"),
+        "{refused:?}"
+    );
+    let (outcome, _) = answer(None).expect("no route for a call's step");
+    assert_eq!(rendered(Ok(outcome)), "done");
 }

@@ -943,3 +943,67 @@ fn environment_ungranted_refused() {
     let (status, out, err) = run(&scratch);
     assert_eq!((status, out.as_str()), (0, "exit status 0\n42\n"), "{err}");
 }
+
+#[test]
+fn person_routes() {
+    let scratch = Scratch::new("person_routes");
+    // A router a person performs, with two branches after it.
+    scratch.write(
+        "types.toml",
+        "[types.begin]\nrequired = { brief = \"note\" }\noutput = \"note\"\n\n[types.route]\nrequired = { before = \"note\" }\noutput = \"note\"\nroutes = true\n\n[types.add]\nrequired = { before = \"note\" }\noutput = \"note\"\n",
+    );
+    for (file, text) in SCRIPTS {
+        scratch.write(file, text);
+    }
+    scratch.write(
+        "flow.toml",
+        "name = \"routed\"\noutput = \"a\"\n\n[instances.first]\nnode_type = \"begin\"\n\n[instances.r]\nnode_type = \"route\"\nbindings = { before = \"first\" }\n\n[instances.a]\nnode_type = \"add\"\nbindings = { before = \"r\" }\n\n[instances.b]\nnode_type = \"add\"\nbindings = { before = \"r\" }\n",
+    );
+    scratch.write(
+        "manifest.toml",
+        "workflow = \"flow.toml\"\ntypes = [\"types.toml\"]\nbudget = 10\npersons = [\"route\"]\n\n[scripts]\nbegin = \"begin.lua\"\nadd = \"add.lua\"\n",
+    );
+    let started = |record: &str| {
+        let (status, out, err) = scratch.ran(&[
+            "run",
+            "manifest.toml",
+            "--record",
+            record,
+            "--arg",
+            "first",
+            "brief",
+            "x",
+        ]);
+        assert_eq!(status, 3, "{err}");
+        out
+    };
+    let answered = |record: &str, route: &str| {
+        scratch.ran(&[
+            "answer",
+            "manifest.toml",
+            "--record",
+            record,
+            "--instance",
+            "r",
+            "--text",
+            "ok",
+            "--route",
+            route,
+        ])
+    };
+
+    // The step is printed with the instances it may name, on standard output.
+    let out = started("run.toml");
+    assert!(out.contains("instance: r\n"), "{out}");
+    assert!(out.contains("routes to: a b\n"), "{out}");
+
+    // Named for a, the run goes on to a and completes.
+    let (status, out, err) = answered("run.toml", "a");
+    assert_eq!((status, out.as_str()), (0, "ok+c"), "{err}");
+
+    // `--route ""` names nothing: the run goes nowhere and ends stuck, rather
+    // than refusing an empty name.
+    started("nowhere.toml");
+    let (status, out, err) = answered("nowhere.toml", "");
+    assert_eq!((status, out.as_str()), (7, ""), "{err}");
+}

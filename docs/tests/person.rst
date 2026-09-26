@@ -137,3 +137,59 @@ behaviour supplied by naming a person rather than by a script.
    provider that answers, it makes one call, for the third step, and completes
    with the first answer, the person's text and the second answer in its
    result, whose lineage holds the identifiers the first half recorded.
+
+.. test_case:: A person routes a review loop back twice and then on
+   :id: TEST_SCRIPTED_PERSON_ROUTES
+   :verifies: CREQ_HOST_TAKES_PERSON_ROUTE
+   :test_kind: positive
+   :coverage: full
+
+   The review loop with its router performed by a person: the run stops at the
+   router's step, and each answer naming the drafter continues it to the
+   router's next step; the third, naming the finisher, completes it with the
+   third draft. The last record holds two routes back and one on.
+
+   Catches: the names dropped; the names reported in another order.
+
+.. test_case:: A route that does not fit its step is refused
+   :id: TEST_SCRIPTED_PERSON_BAD_ROUTE_REFUSED
+   :verifies: CREQ_HOST_REFUSES_BAD_PERSON_ROUTE
+   :test_kind: error_path
+   :coverage: full
+
+   At the router's step, an answer with no route and one naming an instance
+   no edge out of the router enters are each refused, and no record is handed
+   over. At a person's step that is a call's activation of a node type that
+   routes, an answer with a route is refused; the same answer without one is
+   taken - the control.
+
+   Catches: a missing route read as every edge; a route on a step that is not
+   a router's own ignored; a misspelt name failing the run.
+
+.. test_case:: The runner carries a route and tells a router's choices
+   :id: TEST_RUNNER_PERSON_ROUTES
+   :verifies: CREQ_RUNNER_ANSWERS_WITH_ROUTE, CREQ_RUNNER_TELLS_ROUTES
+   :test_kind: positive
+   :coverage: full
+
+   A project whose router a person performs: the run stops at the router's
+   step with the instances its edges enter handed back, the drafter and the
+   finisher, and answering through the record's file with a route continues
+   it where named.
+
+   Catches: the route dropped between the person and the scripted run;
+   nothing handed back; instances handed back that no edge enters.
+
+.. test_case:: The command line takes --route and prints a router's choices
+   :id: TEST_COMMAND_PERSON_ROUTES
+   :verifies: CREQ_COMMAND_READS_ROUTE
+   :test_kind: positive
+   :coverage: full
+
+   Run as a person would: a run stopping at a router's step prints the step
+   with the instances it may name on standard output; ``agconflo answer
+   --route drafter`` continues it; ``--route ""`` sends it nowhere, and the
+   run ends quiescent rather than refusing an empty name.
+
+   Catches: an empty name taken as an instance; the choices printed to
+   standard error.

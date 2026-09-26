@@ -149,3 +149,50 @@ feature allocates to them.
    - ``DEC_PERSON_HOLDS_THE_RUN``: nothing else is offered while a person's
      step is outstanding.
    - ``DEC_ANSWER_ONCE_BY_THE_KEEPER``: answering a record once is the caller's.
+
+.. feat_req:: A person performing a router names where its run goes on to
+   :id: FEAT_PERSON_ROUTES
+   :derived_from: STKH_HUMAN_IN_RUN, STKH_ROUTING
+   :ears_pattern: event
+   :verification_method: test
+   :statement: When a person answers a router's step naming instances for its run to go on to, Agconflo shall continue the run walking the router's edges into those instances and no other.
+
+   ``STKH_ROUTING`` lets a node decide which branch a run takes, and
+   ``STKH_HUMAN_IN_RUN`` lets a person supply what a run needs while it is in
+   progress. The decision is often theirs: a review that sends a change back
+   or on is the ordinary case of both. A router's script names the branch
+   (``FEAT_ROUTE_WALKS_CHOSEN_EDGES``); a person performing the router has to
+   be able to as well, or a workflow routing on a person's word has no way to
+   be written.
+
+   It can be false while both parents hold. A person can take part in a run
+   through any node that does not route, and a node can route through a
+   script: each parent is met, and a router a person performs is refused at
+   its answer, which is what the engine did.
+
+   It claims no more than they need: which instances there are to choose is
+   the workflow's, and the same edges and refusals apply to a person's route
+   as to a script's.
+
+.. feat_arch:: A person's route splits between the script host, the runner and the command line
+   :id: ARCH_PERSON_ROUTES
+   :realises: FEAT_PERSON_ROUTES
+   :uses: COMP_SCRIPT_HOST, COMP_RUNNER, COMP_COMMAND_LINE
+   :statement: Agconflo shall allocate a person's route to the script host, the runner and the command line.
+
+   - The script host answers for the answer: taking the names beside the
+     text for a router's step, and refusing an answer whose route is missing,
+     not the step's, or names an instance no edge out of the router enters.
+   - The runner answers for carrying the names from the person to the
+     scripted run, and for telling the person which instances a router's
+     step may name.
+   - The command line answers for reading the names the person types and
+     printing the choices with the awaited step.
+
+   The workflow run needs nothing new: it walks a route and refuses a bad
+   one whoever named it (``CREQ_RUN_WALKS_ROUTED``,
+   ``CREQ_RUN_REFUSES_BAD_ROUTE``).
+
+   The decisions this is built against are named here rather than linked:
+   ``DEC_PERSON_ROUTE_IN_THE_ANSWER``, ``DEC_PERSON_SUPPLIES_TEXT`` and
+   ``DEC_ROUTER_OUTPUT_IS_ITS_DECISION``.
