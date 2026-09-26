@@ -1218,6 +1218,15 @@
           "title": "agconflo-core reader::empty_documents_read",
           "type": "test_run"
         },
+        "RUN_READER_ENTRY_MARK_REFUSED": {
+          "executes": [
+            "TEST_READER_ENTRY_MARK_REFUSED"
+          ],
+          "id": "RUN_READER_ENTRY_MARK_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-core reader::entry_mark_refused",
+          "type": "test_run"
+        },
         "RUN_READER_EVERY_WIRING_DEFECT_READS": {
           "executes": [
             "TEST_READER_EVERY_WIRING_DEFECT_READS"
@@ -1450,6 +1459,15 @@
           "id": "RUN_RUNNER_ARGUMENTS_KEPT_EXACTLY",
           "test_outcome": "passed",
           "title": "agconflo-runner runner::arguments_kept_exactly",
+          "type": "test_run"
+        },
+        "RUN_RUNNER_ARGUMENT_FOR_ANY_INSTANCE_TAKEN": {
+          "executes": [
+            "TEST_RUNNER_ARGUMENT_FOR_ANY_INSTANCE_TAKEN"
+          ],
+          "id": "RUN_RUNNER_ARGUMENT_FOR_ANY_INSTANCE_TAKEN",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::argument_for_any_instance_taken",
           "type": "test_run"
         },
         "RUN_RUNNER_CHECK_REPORTS_TOOLS": {
@@ -1704,6 +1722,15 @@
           "title": "agconflo-core run::argument_of_wrong_type_is_refused",
           "type": "test_run"
         },
+        "RUN_RUN_BOUND_PARAMETER_GIVEN_AN_ARGUMENT_IS_REFUSED": {
+          "executes": [
+            "TEST_RUN_BOUND_PARAMETER_GIVEN_AN_ARGUMENT_IS_REFUSED"
+          ],
+          "id": "RUN_RUN_BOUND_PARAMETER_GIVEN_AN_ARGUMENT_IS_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::bound_parameter_given_an_argument_is_refused",
+          "type": "test_run"
+        },
         "RUN_RUN_BUDGET_STOPS_AT_THE_LIMIT": {
           "executes": [
             "TEST_RUN_BUDGET_STOPS_AT_THE_LIMIT"
@@ -1794,15 +1821,6 @@
           "title": "agconflo-core run::designated_undeclared_output_is_refused",
           "type": "test_run"
         },
-        "RUN_RUN_ENTRY_PARAMETER_ALSO_BOUND_IS_REFUSED": {
-          "executes": [
-            "TEST_RUN_ENTRY_PARAMETER_ALSO_BOUND_IS_REFUSED"
-          ],
-          "id": "RUN_RUN_ENTRY_PARAMETER_ALSO_BOUND_IS_REFUSED",
-          "test_outcome": "passed",
-          "title": "agconflo-core run::entry_parameter_also_bound_is_refused",
-          "type": "test_run"
-        },
         "RUN_RUN_EXCHANGES_HELD_WITH_THEIR_ACTIVATION": {
           "executes": [
             "TEST_RUN_EXCHANGES_HELD_WITH_THEIR_ACTIVATION"
@@ -1837,6 +1855,15 @@
           "id": "RUN_RUN_IDLE_INSTANCE_DOES_NOT_MAKE_IT_STUCK",
           "test_outcome": "passed",
           "title": "agconflo-core run::idle_instance_does_not_make_it_stuck",
+          "type": "test_run"
+        },
+        "RUN_RUN_INPUTS_GIVEN_WHERE_NOTHING_BINDS": {
+          "executes": [
+            "TEST_RUN_INPUTS_GIVEN_WHERE_NOTHING_BINDS"
+          ],
+          "id": "RUN_RUN_INPUTS_GIVEN_WHERE_NOTHING_BINDS",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::inputs_given_where_nothing_binds",
           "type": "test_run"
         },
         "RUN_RUN_LAST_PERMITTED_ACTIVATION_COMPLETES": {
@@ -2244,15 +2271,6 @@
           "title": "agconflo-core scheduler::each_parameter_gets_its_own",
           "type": "test_run"
         },
-        "RUN_SCHEDULER_ENTRY_IS_READY_AT_ONCE": {
-          "executes": [
-            "TEST_SCHEDULER_ENTRY_IS_READY_AT_ONCE"
-          ],
-          "id": "RUN_SCHEDULER_ENTRY_IS_READY_AT_ONCE",
-          "test_outcome": "passed",
-          "title": "agconflo-core scheduler::entry_is_ready_at_once",
-          "type": "test_run"
-        },
         "RUN_SCHEDULER_EVERY_INPUT_IS_AWAITED": {
           "executes": [
             "TEST_SCHEDULER_EVERY_INPUT_IS_AWAITED"
@@ -2287,6 +2305,15 @@
           "id": "RUN_SCHEDULER_INPUTS_IN_DECLARED_ORDER",
           "test_outcome": "passed",
           "title": "agconflo-core scheduler::inputs_in_declared_order",
+          "type": "test_run"
+        },
+        "RUN_SCHEDULER_INPUT_IS_READY_AT_ONCE": {
+          "executes": [
+            "TEST_SCHEDULER_INPUT_IS_READY_AT_ONCE"
+          ],
+          "id": "RUN_SCHEDULER_INPUT_IS_READY_AT_ONCE",
+          "test_outcome": "passed",
+          "title": "agconflo-core scheduler::input_is_ready_at_once",
           "type": "test_run"
         },
         "RUN_SCHEDULER_NONE_READY_ONLY_WHEN_NONE": {
@@ -2658,15 +2685,6 @@
           "title": "agconflo-core wiring::every_broken_wire_is_reported",
           "type": "test_run"
         },
-        "RUN_WIRING_EVERY_UNBOUND_REQUIRED_IS_REPORTED": {
-          "executes": [
-            "TEST_WIRING_EVERY_UNBOUND_REQUIRED_IS_REPORTED"
-          ],
-          "id": "RUN_WIRING_EVERY_UNBOUND_REQUIRED_IS_REPORTED",
-          "test_outcome": "passed",
-          "title": "agconflo-core wiring::every_unbound_required_is_reported",
-          "type": "test_run"
-        },
         "RUN_WIRING_EVERY_UNDECLARED_PARAMETER_IS_REPORTED": {
           "executes": [
             "TEST_WIRING_EVERY_UNDECLARED_PARAMETER_IS_REPORTED"
@@ -2827,15 +2845,6 @@
           "id": "RUN_WIRING_UNPORTABLE_CALL_NAME_IS_REPORTED",
           "test_outcome": "passed",
           "title": "agconflo-core wiring::unportable_call_name_is_reported",
-          "type": "test_run"
-        },
-        "RUN_WIRING_UNWIRED_INSTANCE_IS_REPORTED": {
-          "executes": [
-            "TEST_WIRING_UNWIRED_INSTANCE_IS_REPORTED"
-          ],
-          "id": "RUN_WIRING_UNWIRED_INSTANCE_IS_REPORTED",
-          "test_outcome": "passed",
-          "title": "agconflo-core wiring::unwired_instance_is_reported",
           "type": "test_run"
         },
         "RUN_WIRING_WELL_FORMED_DEFINITIONS_PASS": {

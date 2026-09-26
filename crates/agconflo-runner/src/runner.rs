@@ -31,10 +31,10 @@ pub struct Sources<'a> {
     pub grants: Option<&'a Path>,
 }
 
-/// One argument of a run: the text for one entry instance's parameter.
+/// One argument of a run: the text for one instance's parameter.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Argument {
-    /// The entry instance.
+    /// The instance.
     pub instance: String,
     /// The parameter it fills.
     pub parameter: String,
@@ -64,8 +64,7 @@ pub enum Refusal {
     Project(ProjectFault),
     /// The model mapping cannot be read.
     Models(ModelsFault),
-    /// Text was given for a parameter no entry instance of the workflow
-    /// declares.
+    /// Text was given for a parameter no instance of the workflow declares.
     Argument {
         /// The instance, as given.
         instance: String,
@@ -94,7 +93,7 @@ impl fmt::Display for Refusal {
                 parameter,
             } => write!(
                 f,
-                "no entry instance {instance} of the workflow declares a parameter {parameter}"
+                "no instance {instance} of the workflow declares a parameter {parameter}"
             ),
             Self::Record(refusal) => refusal.fmt(f),
             Self::Run(refusal) => refusal.fmt(f),
@@ -403,8 +402,8 @@ fn environment(name: &str) -> Option<String> {
 }
 
 /// Each argument as a context of the type its parameter declares, issued by
-/// `source`, or a refusal for the first naming no entry instance's parameter.
-// @Each argument made a context of the type its parameter declares,IMPL_RUNNER_ARGUMENTS,impl,[CREQ_RUNNER_ARGUMENTS_AS_TEXT, CREQ_RUNNER_REFUSES_UNKNOWN_ARGUMENT],[DEC_ARGUMENTS_AS_TEXT]
+/// `source`, or a refusal for the first naming no instance's parameter.
+// @Each argument made a context of the type its parameter declares,IMPL_RUNNER_ARGUMENTS,impl,[CREQ_RUNNER_ARGUMENTS_AS_TEXT, CREQ_RUNNER_REFUSES_UNKNOWN_ARGUMENT],[DEC_ARGUMENTS_AS_TEXT_PER_PARAMETER]
 fn supplied(
     definition: &WorkflowDefinition,
     arguments: &[Argument],
@@ -416,7 +415,7 @@ fn supplied(
             let declared = definition
                 .instances
                 .iter()
-                .find(|instance| instance.entry && instance.name == argument.instance)
+                .find(|instance| instance.name == argument.instance)
                 .and_then(|instance| {
                     definition
                         .node_types
@@ -657,13 +656,13 @@ fn stopped(
 #[cfg(test)]
 use crate::testing::{Scratch, Stub};
 #[cfg(test)]
-use agconflo_core::RunEnding;
+use agconflo_core::{RunEnding, SignatureFault, StartRefusal};
 #[cfg(test)]
 use agconflo_lua::ScriptFailure;
 #[cfg(test)]
 use proptest::prelude::*;
 
-/// Every node type the tests' workflows use: an entry taking a brief, and four
+/// Every node type the tests' workflows use: one taking a brief, and four
 /// types taking what came before - one asking a
 /// model, one adding to it, one a person performs, and one whose script fails.
 #[cfg(test)]
@@ -699,7 +698,7 @@ fn project(scratch: &Scratch, middle: &str, budget: usize) -> std::path::PathBuf
     scratch.write(
         "flow.toml",
         format!(
-            "name = \"chain\"\noutput = \"third\"\n\n[instances.first]\nnode_type = \"begin\"\nentry = true\n\n[instances.second]\nnode_type = \"{middle}\"\nbindings = {{ before = \"first\" }}\n\n[instances.third]\nnode_type = \"add\"\nbindings = {{ before = \"second\" }}\n"
+            "name = \"chain\"\noutput = \"third\"\n\n[instances.first]\nnode_type = \"begin\"\n\n[instances.second]\nnode_type = \"{middle}\"\nbindings = {{ before = \"first\" }}\n\n[instances.third]\nnode_type = \"add\"\nbindings = {{ before = \"second\" }}\n"
         ),
     );
     scratch.write(
@@ -722,7 +721,7 @@ fn models(scratch: &Scratch, file: &str, stub: &Stub) -> std::path::PathBuf {
     )
 }
 
-/// The brief `text` for the entry instance.
+/// The brief `text` for the first instance.
 #[cfg(test)]
 fn brief(text: &str) -> Vec<Argument> {
     vec![Argument {
@@ -857,7 +856,7 @@ fn unknown_argument_refused() {
     };
     let record = scratch.path("run.toml");
 
-    for (instance, parameter) in [("ghost", "brief"), ("first", "brif"), ("second", "before")] {
+    for (instance, parameter) in [("ghost", "brief"), ("first", "brif")] {
         let arguments = [Argument {
             instance: instance.to_owned(),
             parameter: parameter.to_owned(),
@@ -873,6 +872,57 @@ fn unknown_argument_refused() {
         assert!(!record.exists());
         assert!(!scratch.path("run.toml.lock").exists());
     }
+
+    // A parameter a binding fills is declared, so the runner makes the
+    // context, and the run refuses it as a second source.
+    let arguments = [
+        brief("x").remove(0),
+        Argument {
+            instance: "second".to_owned(),
+            parameter: "before".to_owned(),
+            text: "x".to_owned(),
+        },
+    ];
+    match runtime().block_on(start(sources, &record, &arguments)) {
+        Err(Refusal::Run(ScriptedRefusal::Start(StartRefusal::Signature(faults)))) => {
+            assert_eq!(
+                faults,
+                [SignatureFault::ParameterAlsoBound {
+                    instance: "second".to_owned(),
+                    parameter: "before".to_owned(),
+                }]
+            );
+        }
+        other => panic!("expected second.before refused as bound, got {other:?}"),
+    }
+    assert!(!record.exists());
+}
+
+#[cfg(test)]
+#[test]
+fn argument_for_any_instance_taken() {
+    let scratch = Scratch::new("argument_for_any_instance_taken");
+    let manifest = project(&scratch, "add", 5);
+    // The middle instance leaves its parameter to the run, as the first does.
+    scratch.write(
+        "flow.toml",
+        "name = \"open\"\noutput = \"third\"\n\n[instances.first]\nnode_type = \"begin\"\n\n[instances.second]\nnode_type = \"add\"\n\n[instances.third]\nnode_type = \"add\"\nbindings = { before = \"second\" }\n",
+    );
+    let mut arguments = brief("unused");
+    arguments.push(Argument {
+        instance: "second".to_owned(),
+        parameter: "before".to_owned(),
+        text: "middle".to_owned(),
+    });
+    let sources = Sources {
+        manifest: &manifest,
+        models: None,
+        grants: None,
+    };
+
+    let stopped = runtime().block_on(start(sources, &scratch.path("run.toml"), &arguments));
+
+    assert_eq!(completed(stopped), "middle+c+c");
 }
 
 #[cfg(test)]
@@ -1014,7 +1064,7 @@ fn check_runs_nothing() {
 
     scratch.write(
         "flow.toml",
-        "name = \"broken\"\noutput = \"third\"\n\n[instances.first]\nnode_type = \"begin\"\nentry = true\n\n[instances.second]\nnode_type = \"add\"\nbindings = { before = \"nobody\" }\n\n[instances.third]\nnode_type = \"add\"\n",
+        "name = \"broken\"\noutput = \"third\"\n\n[instances.first]\nnode_type = \"begin\"\n\n[instances.second]\nnode_type = \"add\"\nbindings = { before = \"nobody\" }\n\n[instances.third]\nnode_type = \"add\"\nbindings = { before = \"gone\" }\n",
     );
     scratch.write("add.lua", "local given, host = ...\nreturn (\n");
     let findings = check(sources);
@@ -1186,10 +1236,10 @@ use agconflo_core::Activation;
 #[cfg(test)]
 const TOOL_TYPES: &str = "[types.fetch]\nrequired = { path = \"note\" }\noutput = \"note\"\n\n[types.exec]\nrequired = { command = \"note\" }\noutput = \"note\"\n";
 
-/// A chain from the entry through `fetch` reading what the entry made, `exec`
+/// A chain from `first` through `fetch` reading what `first` made, `exec`
 /// running what that read, `add`, and a person's review.
 #[cfg(test)]
-const TOOL_FLOW: &str = "name = \"tooled\"\noutput = \"reviewed\"\n\n[instances.first]\nnode_type = \"begin\"\nentry = true\n\n[instances.fetched]\nnode_type = \"fetch\"\nbindings = { path = \"first\" }\n\n[instances.executed]\nnode_type = \"exec\"\nbindings = { command = \"fetched\" }\n\n[instances.joined]\nnode_type = \"add\"\nbindings = { before = \"executed\" }\n\n[instances.reviewed]\nnode_type = \"review\"\nbindings = { before = \"joined\" }\n";
+const TOOL_FLOW: &str = "name = \"tooled\"\noutput = \"reviewed\"\n\n[instances.first]\nnode_type = \"begin\"\n\n[instances.fetched]\nnode_type = \"fetch\"\nbindings = { path = \"first\" }\n\n[instances.executed]\nnode_type = \"exec\"\nbindings = { command = \"fetched\" }\n\n[instances.joined]\nnode_type = \"add\"\nbindings = { before = \"executed\" }\n\n[instances.reviewed]\nnode_type = \"review\"\nbindings = { before = \"joined\" }\n";
 
 /// A project in `scratch` whose workflow is `flow`, with the tests' scripts,
 /// `persons` performing what they name, `tools` naming each tool's node type
@@ -1388,7 +1438,7 @@ proptest! {
         let grants = granting(&scratch, "\"read\"");
         let manifest = tooled(
             &scratch,
-            "name = \"fetching\"\noutput = \"fetched\"\n\n[instances.first]\nnode_type = \"begin\"\nentry = true\n\n[instances.fetched]\nnode_type = \"fetch\"\nbindings = { path = \"first\" }\n",
+            "name = \"fetching\"\noutput = \"fetched\"\n\n[instances.first]\nnode_type = \"begin\"\n\n[instances.fetched]\nnode_type = \"fetch\"\nbindings = { path = \"first\" }\n",
             &["review"],
             &[("fetch", "read")],
             "",
@@ -1442,13 +1492,13 @@ fn recorded_tool_step_not_repeated() {
     assert_eq!(steps(&fresh), []);
 }
 
-/// A workflow of the entry and an asker whose model may call `fetch` `calls`
+/// A workflow of `first` and an asker whose model may call `fetch` `calls`
 /// times, the asker designated.
 #[cfg(test)]
 fn asking_flow(calls: usize) -> String {
     let calls = vec!["\"fetch\""; calls].join(", ");
     format!(
-        "name = \"asking\"\noutput = \"asker\"\n\n[instances.first]\nnode_type = \"begin\"\nentry = true\n\n[instances.asker]\nnode_type = \"ask\"\nbindings = {{ before = \"first\" }}\ncalls = [{calls}]\n"
+        "name = \"asking\"\noutput = \"asker\"\n\n[instances.first]\nnode_type = \"begin\"\n\n[instances.asker]\nnode_type = \"ask\"\nbindings = {{ before = \"first\" }}\ncalls = [{calls}]\n"
     )
 }
 
@@ -1851,7 +1901,7 @@ fn tool_steps_end_to_end() {
     );
     scratch.write(
         "flow.toml",
-        "name = \"end-to-end\"\noutput = \"reviewed\"\n\n[instances.first]\nnode_type = \"begin\"\nentry = true\n\n[instances.named]\nnode_type = \"name\"\nbindings = { before = \"first\" }\n\n[instances.saved]\nnode_type = \"save\"\nbindings = { path = \"named\", text = \"first\" }\n\n[instances.commanded]\nnode_type = \"command\"\nbindings = { before = \"saved\" }\n\n[instances.catted]\nnode_type = \"exec\"\nbindings = { command = \"commanded\" }\n\n[instances.reviewed]\nnode_type = \"review\"\nbindings = { before = \"catted\" }\n",
+        "name = \"end-to-end\"\noutput = \"reviewed\"\n\n[instances.first]\nnode_type = \"begin\"\n\n[instances.named]\nnode_type = \"name\"\nbindings = { before = \"first\" }\n\n[instances.saved]\nnode_type = \"save\"\nbindings = { path = \"named\", text = \"first\" }\n\n[instances.commanded]\nnode_type = \"command\"\nbindings = { before = \"saved\" }\n\n[instances.catted]\nnode_type = \"exec\"\nbindings = { command = \"commanded\" }\n\n[instances.reviewed]\nnode_type = \"review\"\nbindings = { before = \"catted\" }\n",
     );
     let manifest = scratch.write(
         "manifest.toml",
@@ -2140,7 +2190,7 @@ fn check_reports_tool_environment() {
     assert_eq!(steps(&stand_in), []);
 }
 
-/// A project in `scratch` whose entry is followed by each of `steps` - a
+/// A project in `scratch` whose `first` is followed by each of `steps` - a
 /// command a script names, performed by a tool of its own - and then by
 /// `after`, from the tests' types beside a `pair` joining two notes. Each
 /// step is `(tool, entry, command)`: the tool's node type, its manifest
@@ -2160,7 +2210,7 @@ fn stepping(
         "[types.pair]\nrequired = { a = \"note\", b = \"note\" }\noutput = \"note\"\n",
     );
     let mut flow = format!(
-        "name = \"stepping\"\noutput = \"{output}\"\n\n[instances.first]\nnode_type = \"begin\"\nentry = true\n"
+        "name = \"stepping\"\noutput = \"{output}\"\n\n[instances.first]\nnode_type = \"begin\"\n"
     );
     let mut scripts = String::from("begin = \"begin.lua\"\npair = \"pair.lua\"\n");
     let mut tools = String::new();

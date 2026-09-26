@@ -46,7 +46,7 @@ requirement for when authoring lands.
    :statement: Agconflo shall read a workflow definition from one workflow document and the node type documents supplied with it.
 
    The requirement everything else here qualifies. A workflow document holds the
-   instances, their bindings, which of them are entry nodes, and the one output
+   instances, their bindings, and the one output
    the workflow designates; the node type documents hold the declarations those
    instances are checked against (``DEC_TYPES_IN_OWN_DOCUMENTS``). Reading them
    produces the same definition the validator already takes.

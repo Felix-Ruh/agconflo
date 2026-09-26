@@ -57,10 +57,6 @@ pub struct NodeInstance {
     pub name: String,
     /// The node type this is an instance of.
     pub node_type: String,
-    /// Whether this is an entry node, whose parameters are the workflow's own
-    /// rather than wires.
-    // @An entry node as a flag,TRACE_WORKFLOW_ENTRY,trace,[],[DEC_WORKFLOW_SIGNATURE, NOTE_WORKFLOW_SHAPE]
-    pub entry: bool,
     /// The bindings that fill this instance's parameters.
     pub bindings: Vec<Binding>,
     /// The node types a model performing this instance may call, in the order
@@ -124,13 +120,6 @@ impl NodeType {
 
 #[cfg(test)]
 impl NodeInstance {
-    /// The same instance, as an entry node: its parameters are the workflow's
-    /// own rather than wires.
-    pub(crate) fn into_entry(mut self) -> Self {
-        self.entry = true;
-        self
-    }
-
     /// The same instance, also declaring calls to `calls`.
     pub(crate) fn with_calls(mut self, calls: &[&str]) -> Self {
         self.calls = calls.iter().map(|&name| name.to_owned()).collect();
@@ -151,13 +140,12 @@ pub(crate) fn parameters(declared: &[(&str, &str)]) -> Vec<Parameter> {
 }
 
 /// An instance of `node_type`, with `bindings` given as `(parameter, source
-/// instance)` pairs. Not an entry node; a test that wants one sets the flag.
+/// instance)` pairs.
 #[cfg(test)]
 pub(crate) fn instance(name: &str, node_type: &str, bindings: &[(&str, &str)]) -> NodeInstance {
     NodeInstance {
         name: name.to_owned(),
         node_type: node_type.to_owned(),
-        entry: false,
         bindings: bindings
             .iter()
             .map(|&(parameter, source)| Binding {

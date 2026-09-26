@@ -122,12 +122,6 @@ fn write_instance(written: &mut dyn TableLike, instance: &NodeInstance) {
         Value::from(instance.node_type.as_str()),
     );
 
-    // An entry key the document has is kept and set; an absent one is added only
-    // for an entry node, since absent already reads as not one.
-    if instance.entry || written.contains_key("entry") {
-        set_value(written, "entry", Value::from(instance.entry));
-    }
-
     write_bindings(written, &instance.bindings);
     write_calls(written, &instance.calls);
 }
@@ -231,9 +225,6 @@ fn new_instance(instance: &NodeInstance) -> Item {
         "node_type",
         Item::Value(Value::from(instance.node_type.as_str())),
     );
-    if instance.entry {
-        table.insert("entry", Item::Value(Value::from(true)));
-    }
     if !instance.calls.is_empty() {
         table.insert("calls", Item::Value(Value::Array(array(&instance.calls))));
     }
@@ -385,7 +376,7 @@ type ByName = (
     String,
     Vec<String>,
     usize,
-    BTreeMap<String, (String, bool, BTreeMap<String, String>, Vec<String>)>,
+    BTreeMap<String, (String, BTreeMap<String, String>, Vec<String>)>,
 );
 
 #[cfg(test)]
@@ -401,12 +392,7 @@ fn by_name(definition: &WorkflowDefinition) -> ByName {
                 .collect();
             (
                 instance.name.clone(),
-                (
-                    instance.node_type.clone(),
-                    instance.entry,
-                    bindings,
-                    instance.calls.clone(),
-                ),
+                (instance.node_type.clone(), bindings, instance.calls.clone()),
             )
         })
         .collect();
@@ -442,7 +428,6 @@ enum Change {
     Output(usize),
     NoOutput,
     Name(usize),
-    Entry(usize),
 }
 
 #[cfg(test)]
@@ -459,7 +444,6 @@ fn any_change() -> impl Strategy<Value = Change> {
         any::<usize>().prop_map(Change::Output),
         Just(Change::NoOutput),
         any::<usize>().prop_map(Change::Name),
-        any::<usize>().prop_map(Change::Entry),
     ]
 }
 
@@ -538,10 +522,6 @@ fn apply(definition: &mut WorkflowDefinition, change: &Change) {
         Change::Output(output) => definition.designated_outputs = vec![wired_to(output)],
         Change::NoOutput => definition.designated_outputs.clear(),
         Change::Name(name) => definition.name = format!("renamed {}", name % 3),
-        Change::Entry(at) if count > 0 => {
-            let instance = &mut definition.instances[at % count];
-            instance.entry = !instance.entry;
-        }
         _ => {}
     }
 }
@@ -658,7 +638,7 @@ name    = 'review'   # a literal string, spaced out
 output = \"summarise\"
 version = 3
 instances.fetch.node_type = 'source'
-instances.fetch.entry = true
+instances.fetch.colour = 'blue'
 
 
 [editor]
@@ -675,7 +655,7 @@ hint= \"fetch\"
 
 [instances.publish]
 node_type = 'sink'
-entry = false
+folded = false
 bindings = {input='summarise'}
 ";
 

@@ -166,3 +166,53 @@ or keeps, on the commit named. Re-running one later shows what has moved since.
    ``components/environment``, one of ``decisions/changes`` and one of
    ``decisions/tools``. No architecture uses a component it is allocated to
    beyond its own.
+
+.. evd:: The impact of removing the unbound-parameter defect
+   :id: EVD_IMPACT_WIRING_REQUIRED_BOUND
+   :evd_kind: measurement
+   :observed_on: 2026-09-26
+   :observation: FEAT_WIRING_REQUIRED_BOUND answers to 1 need, has 9 below it and 22 beside it, and is named on 1 line. CREQ_VALIDATOR_REQUIRED_BOUND answers to 2, has 7 below it and 12 beside it, and is named on 1 line.
+
+   Run as ``sh scripts/impact.sh FEAT_WIRING_REQUIRED_BOUND`` and
+   ``sh scripts/impact.sh CREQ_VALIDATOR_REQUIRED_BOUND`` on ``f862e04``.
+   Above them: ``STKH_WIRING_CHECKED``. Below: ``CREQ_VALIDATOR_REQUIRED_BOUND``,
+   ``ARCH_WIRING``, ``IMPL_WIRING_REQUIRED_BOUND``, and
+   ``TEST_WIRING_DEGENERATE_DECLARATIONS_PASS``,
+   ``TEST_WIRING_EVERY_UNBOUND_REQUIRED_IS_REPORTED`` and
+   ``TEST_WIRING_UNWIRED_INSTANCE_IS_REPORTED`` with their runs. Beside them:
+   every other requirement of ``COMP_WIRING_VALIDATOR``, and every other
+   feature ``ARCH_WIRING`` realises. In prose: one line of ``features/run``
+   and the marker in ``wiring.rs``.
+
+.. evd:: The impact of stating a run's inputs as what nothing binds
+   :id: EVD_IMPACT_RUN_ENTRY_SOURCE_EXACT
+   :evd_kind: measurement
+   :observed_on: 2026-09-26
+   :observation: FEAT_RUN_ENTRY_SOURCE_EXACT answers to 1 need, has 13 below it and 29 beside it, and is named on no line. CREQ_RUN_REFUSES_UNFILLED_SIGNATURE answers to 2, has 11 below it and 20 beside it, and is named on 1 line.
+
+   Run as ``sh scripts/impact.sh FEAT_RUN_ENTRY_SOURCE_EXACT`` and
+   ``sh scripts/impact.sh CREQ_RUN_REFUSES_UNFILLED_SIGNATURE`` on ``f862e04``.
+   Above them: ``STKH_EXPLICIT_CONTEXT``. Below: the component requirement,
+   ``ARCH_RUN``, ``IMPL_RUN_SIGNATURE``, and
+   ``TEST_RUN_ARGUMENT_FOR_NO_PARAMETER_IS_REFUSED``,
+   ``TEST_RUN_ARGUMENT_OF_WRONG_TYPE_IS_REFUSED``,
+   ``TEST_RUN_ENTRY_PARAMETER_ALSO_BOUND_IS_REFUSED``,
+   ``TEST_RUN_MISSING_ARGUMENT_IS_REFUSED`` and
+   ``TEST_RUN_SIGNATURE_FILLED_EXACTLY_STARTS`` with their runs. Beside them:
+   every other requirement of ``COMP_WORKFLOW_RUN``, and every other feature
+   ``ARCH_RUN`` realises. In prose: the marker in ``run.rs``.
+
+.. evd:: The impact of giving text for any instance's parameter
+   :id: EVD_IMPACT_RUNNER_ARGUMENTS
+   :evd_kind: measurement
+   :observed_on: 2026-09-26
+   :observation: CREQ_RUNNER_ARGUMENTS_AS_TEXT and CREQ_RUNNER_REFUSES_UNKNOWN_ARGUMENT each answer to 2 needs, have 3 below them by link and 15 requirements sharing their component, and are named on 1 line of prose.
+
+   Run as ``sh scripts/impact.sh CREQ_RUNNER_ARGUMENTS_AS_TEXT`` and
+   ``sh scripts/impact.sh CREQ_RUNNER_REFUSES_UNKNOWN_ARGUMENT`` on
+   ``42acfdc``. Above them: ``FEAT_RUNNER_STARTS_FROM_DOCUMENTS`` and
+   ``STKH_RUN_FROM_DOCUMENTS``. Below: ``IMPL_RUNNER_ARGUMENTS``, and
+   ``TEST_RUNNER_ARGUMENTS_KEPT_EXACTLY`` and
+   ``TEST_RUNNER_UNKNOWN_ARGUMENT_REFUSED`` with their runs. Beside them:
+   every other requirement of ``COMP_RUNNER``, each the other among them. In
+   prose: the marker in ``runner.rs``.

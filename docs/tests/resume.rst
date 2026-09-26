@@ -138,7 +138,7 @@ that the record amended.
    :coverage: full
 
    A sound record resumed against a workflow with a wiring defect, and against
-   one whose entry parameter the recorded argument does not fill. Each is
+   one whose parameter nothing binds the recorded argument does not fill. Each is
    refused carrying the refusal a start with the same arguments gives.
 
    Catches: the refusal reported as a divergence; the start's checks skipped.

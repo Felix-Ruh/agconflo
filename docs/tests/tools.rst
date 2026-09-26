@@ -411,7 +411,7 @@ catches it, and where one is caught only in part the case says so.
    :test_kind: positive
    :coverage: full
 
-   Against the stand-in: a workflow whose entry is followed by a ``read``
+   Against the stand-in: a workflow whose first instance is followed by a ``read``
    tool, a ``run`` tool, a script and a person's step. Started, the run
    awaits the person with the script's output built on both tools' answers,
    having asked the stand-in twice. A record awaiting the ``run`` step,

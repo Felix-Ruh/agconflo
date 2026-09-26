@@ -621,7 +621,7 @@ const MORE_TYPES: &str = "[types.polish]\nrequired = { text = \"verdict\" }\nout
 #[cfg(test)]
 fn flow(name: &str) -> String {
     format!(
-        "name = \"{name}\"\noutput = \"polished\"\n\n[instances.drafted]\nnode_type = \"draft\"\nentry = true\n\n[instances.reviewed]\nnode_type = \"review\"\nbindings = {{ draft = \"drafted\" }}\n\n[instances.polished]\nnode_type = \"polish\"\nbindings = {{ text = \"reviewed\" }}\n"
+        "name = \"{name}\"\noutput = \"polished\"\n\n[instances.drafted]\nnode_type = \"draft\"\n\n[instances.reviewed]\nnode_type = \"review\"\nbindings = {{ draft = \"drafted\" }}\n\n[instances.polished]\nnode_type = \"polish\"\nbindings = {{ text = \"reviewed\" }}\n"
     )
 }
 
@@ -1019,7 +1019,7 @@ fn with_tools(scratch: &Scratch, tools: &str, extra: &str) -> std::path::PathBuf
     scratch.write("tools.toml", TOOL_TYPES);
     scratch.write(
         "tool-flow.toml",
-        "name = \"tooled\"\noutput = \"polished\"\n\n[instances.drafted]\nnode_type = \"draft\"\nentry = true\n\n[instances.fetched]\nnode_type = \"fetch\"\nbindings = { path = \"drafted\" }\n\n[instances.saved]\nnode_type = \"save\"\nbindings = { path = \"drafted\", text = \"fetched\" }\n\n[instances.executed]\nnode_type = \"exec\"\nbindings = { command = \"saved\" }\n\n[instances.reviewed]\nnode_type = \"review\"\nbindings = { draft = \"executed\" }\n\n[instances.polished]\nnode_type = \"polish\"\nbindings = { text = \"reviewed\" }\n",
+        "name = \"tooled\"\noutput = \"polished\"\n\n[instances.drafted]\nnode_type = \"draft\"\n\n[instances.fetched]\nnode_type = \"fetch\"\nbindings = { path = \"drafted\" }\n\n[instances.saved]\nnode_type = \"save\"\nbindings = { path = \"drafted\", text = \"fetched\" }\n\n[instances.executed]\nnode_type = \"exec\"\nbindings = { command = \"saved\" }\n\n[instances.reviewed]\nnode_type = \"review\"\nbindings = { draft = \"executed\" }\n\n[instances.polished]\nnode_type = \"polish\"\nbindings = { text = \"reviewed\" }\n",
     );
     scratch.write(
         "manifest.toml",

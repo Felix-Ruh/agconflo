@@ -75,11 +75,13 @@ named by the case that catches it.
 
    A consumer reading a declared-standing output and a changing one, activated
    three times: each is given the standing output, and once its producer
-   produces again, the new one from then on. A consumer reading an entry
-   instance's output, declared standing nowhere, is given it on every pass.
+   produces again, the new one from then on. A consumer reading the output of
+   an instance the run gave every input, declared standing nowhere, is given it
+   on every pass.
 
    Catches: a standing output taken once; the first of a standing node's
-   outputs kept after a second; an entry instance's output taken once.
+   outputs kept after a second; the output of an instance the run gave every
+   input taken once.
 
 .. test_case:: A review loop runs until its router says it is done
    :id: TEST_SCRIPTED_REVIEW_LOOP
@@ -87,7 +89,7 @@ named by the case that catches it.
    :test_kind: positive
    :coverage: partial
 
-   A workflow of an entry giving a brief, a drafter reading the brief and a
+   A workflow of an instance giving the brief the run gave it, a drafter reading the brief and a
    router's input back, a reviewer, and a router sending the draft back to the
    drafter twice and then on to a finisher: the run completes with the third
    draft, the drafter having run three times, each time with the brief and the

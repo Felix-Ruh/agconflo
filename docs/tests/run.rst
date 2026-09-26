@@ -116,15 +116,16 @@ single requirement to verify.
    the parameters its type declares, and hands a script an activation missing
    one of them.
 
-.. test_case:: An entry instance is ready before anything has run
-   :id: TEST_SCHEDULER_ENTRY_IS_READY_AT_ONCE
+.. test_case:: An instance given its inputs is ready before anything has run
+   :id: TEST_SCHEDULER_INPUT_IS_READY_AT_ONCE
    :verifies: CREQ_SCHEDULER_READY_WHEN_BOUND
    :test_kind: positive
    :coverage: partial
 
-   The second half of the must-pass list. An entry instance's parameters come
-   from the run's arguments rather than from wires, so it is offered on the
-   first ask, with no instance having produced anything.
+   The second half of the must-pass list. A parameter nothing binds takes its
+   context from the run's arguments rather than from a wire, so an instance
+   whose every parameter is one is offered on the first ask, with no instance
+   having produced anything.
 
 .. test_case:: An instance bound to a name that resolves to nothing is never ready
    :id: TEST_SCHEDULER_UNRESOLVED_SOURCE_NEVER_READY
@@ -219,7 +220,8 @@ single requirement to verify.
    :coverage: partial
 
    Three instances in a cycle, each of a node type requiring two parameters, one
-   of which is bound to an entry instance that has produced. Every instance
+   of which is bound to an instance given its input by the run, which has
+   produced. Every instance
    holds a context for one parameter and waits for the other.
 
    A reading that reports quiescence only when no instance has any context at
@@ -239,7 +241,7 @@ single requirement to verify.
 
    The refusal is a value of its own kind rather than one of the four endings,
    so a caller can tell a workflow it must fix from a run that happened
-   (``DEC_RUN_REFUSED_BEFORE_IT_STARTS``).
+   (``DEC_RUN_REFUSED_UNLESS_EVERY_INPUT_GIVEN``).
 
 .. test_case:: A refusal carries every defect the validator found
    :id: TEST_RUN_REFUSAL_CARRIES_EVERY_DEFECT
@@ -247,7 +249,7 @@ single requirement to verify.
    :test_kind: error_path
    :coverage: full
 
-   A definition carrying five defects of four classes, two of them on one
+   A definition carrying five defects of five classes, two of them on one
    instance. The refusal carries all five, and they equal what
    ``validate_wiring`` reports for the same definition - compared as a whole
    rather than counted, so a run that forwards the right number of the wrong
@@ -263,7 +265,7 @@ single requirement to verify.
    :test_kind: error_path
    :coverage: partial
 
-   A run started without an argument for a required entry parameter is refused,
+   A run started without an argument for a parameter nothing binds is refused,
    naming that instance and parameter.
 
    The assertion that matters is which answer came back, not that one did:
@@ -277,26 +279,42 @@ single requirement to verify.
    :test_kind: error_path
    :coverage: partial
 
-   An argument whose context type is not the one the entry parameter is declared
-   for is refused, naming the parameter and both types.
+   An argument whose context type is not the one the parameter is declared for
+   is refused, naming the parameter and both types.
 
    No binding exists to compare, so the wiring validator cannot see this and the
    run is the only thing that can.
 
-.. test_case:: An entry parameter that is also bound is refused
-   :id: TEST_RUN_ENTRY_PARAMETER_ALSO_BOUND_IS_REFUSED
+.. test_case:: An argument for a bound parameter is refused
+   :id: TEST_RUN_BOUND_PARAMETER_GIVEN_AN_ARGUMENT_IS_REFUSED
    :verifies: CREQ_RUN_REFUSES_UNFILLED_SIGNATURE
    :test_kind: error_path
    :coverage: partial
 
-   An entry instance carrying a binding for a parameter the run also supplies is
-   refused, naming the parameter with two sources. The definition's wiring is
-   sound and the validator reports nothing, which is what makes this the run's
-   question.
+   An argument for a parameter a binding fills is refused, naming the parameter
+   with two sources. The definition's wiring is sound and the validator reports
+   nothing, which is what makes this the run's question. The control: the same
+   workflow started without that argument starts, the wire being the
+   parameter's one source.
 
-   Asserted in both arrangements, with and without an argument for that
-   parameter, because a reader that silently prefers the argument passes the
-   first and a reader that silently prefers the wire passes the second.
+   Catches: the argument silently preferred over the wire, which is what the
+   prototype did; a bound parameter demanded as an input as well.
+
+.. test_case:: Inputs are given wherever nothing binds a parameter
+   :id: TEST_RUN_INPUTS_GIVEN_WHERE_NOTHING_BINDS
+   :verifies: CREQ_RUN_REFUSES_UNFILLED_SIGNATURE
+   :test_kind: error_path
+   :coverage: partial
+
+   Two instances past the first, each with one parameter wired and one that
+   nothing binds, neither marked in any way. Started with nothing, the run is
+   refused naming both parameters, in the definition's order. Started with a
+   context for each, each instance is given its own beside the output wired to
+   it, and the run completes.
+
+   Catches: inputs read from a mark on the instance rather than from the
+   wiring, which starts this run with nothing and leaves both instances
+   waiting; one missing input named where there are two.
 
 .. test_case:: An argument for a parameter the workflow does not have is refused
    :id: TEST_RUN_ARGUMENT_FOR_NO_PARAMETER_IS_REFUSED
@@ -317,9 +335,9 @@ single requirement to verify.
    :test_kind: positive
    :coverage: partial
 
-   The requirement's must-pass list. One argument per entry parameter, each of
-   the declared type, starts a run - including the shape measured wrong
-   (``EVD_RUN_ENTRY_NAME_SHARED``): two entry instances of node types that each
+   The requirement's must-pass list. One argument per parameter nothing binds,
+   each of the declared type, starts a run - including the shape measured wrong
+   (``EVD_RUN_ENTRY_NAME_SHARED``): two instances of node types that each
    declare a parameter called the same thing, for two different context types,
    are two parameters and receive their own arguments.
 
@@ -406,9 +424,9 @@ single requirement to verify.
    :test_kind: error_path
    :coverage: partial
 
-   A workflow whose entry instance produces and whose remaining instances form a
-   cycle: the ending names the cycle's instances and not the entry instance,
-   which did its work.
+   A workflow whose first instance, given its input by the run, produces and
+   whose remaining instances form a cycle: the ending names the cycle's
+   instances and not the first, which did its work.
 
    Naming everything would point a reader at the whole graph, which is the same
    as naming nothing.
@@ -489,8 +507,8 @@ single requirement to verify.
    :test_kind: property
    :coverage: partial
 
-   For any well-formed definition with a generous budget and every entry
-   parameter supplied, a driven run completes and its result is the context its
+   For any well-formed definition with a generous budget and every parameter
+   nothing binds supplied, a driven run completes and its result is the context its
    designated instance produced.
 
    The counterweight to a file of refusals. Most requirements here say what must
@@ -503,8 +521,8 @@ single requirement to verify.
    :test_kind: error_path
    :coverage: partial
 
-   The measured defect (``EVD_RUN_ACCEPTS_UNDECLARED_OUTPUT``). An entry
-   instance whose node type declares one output type is answered with a context
+   The measured defect (``EVD_RUN_ACCEPTS_UNDECLARED_OUTPUT``). An
+   instance given its input by the run, whose node type declares one output type is answered with a context
    of another. The refusal names that instance, the declared type and the
    reported type, as values, and is told apart from a refusal for a held
    identifier by which it is.
@@ -544,8 +562,8 @@ single requirement to verify.
    :test_kind: error_path
    :coverage: partial
 
-   Half of the measured defect (``EVD_RUN_ACCEPTS_HELD_IDENTIFIER``). An entry
-   instance is answered with the argument it was given, whose type is the
+   Half of the measured defect (``EVD_RUN_ACCEPTS_HELD_IDENTIFIER``). An
+   instance given its input by the run is answered with the argument it was given, whose type is the
    declared output type so that only the identifier is wrong. The refusal names
    the instance and the argument's identifier. Then a part the argument was
    composed from is handed back, and is refused the same way: it is held, though
@@ -646,7 +664,7 @@ single requirement to verify.
    :test_kind: positive
    :coverage: partial
 
-   The same context supplied to two entry instances' parameters, and a second
+   The same context supplied to two instances' parameters, and a second
    context composed of it supplied to a third. The run starts and completes: one
    context under one identifier, however often it is reached.
 

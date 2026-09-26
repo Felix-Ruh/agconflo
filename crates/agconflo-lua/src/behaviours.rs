@@ -227,7 +227,8 @@ fn faults_of(ending: Result<crate::Outcome, ScriptedRefusal>) -> Vec<BehaviourFa
     }
 }
 
-/// Three instances: two of `twin` and one of `lone`, each an entry node.
+/// Three instances: two of `twin` and one of `lone`, each given its input by the
+/// run.
 #[cfg(test)]
 const TWINS_TYPES: &str = "\
 [types.twin]

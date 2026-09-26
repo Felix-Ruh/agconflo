@@ -98,5 +98,5 @@ instance takes from each the earliest it has not taken
      stalling on its second pass.
    - **The first of a standing node's outputs kept after it produced a
      second.**
-   - **An entry instance's output taken once**, it being declared standing
-     nowhere.
+   - **The output of an instance the run gave every input taken once**, it
+     being declared standing nowhere.

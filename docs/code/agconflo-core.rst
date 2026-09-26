@@ -101,12 +101,11 @@ error, since code comes after its requirement; the review report
    rather than handles: a wire to nowhere is a defect to report rather than a
    value nobody can build.
 
-   An entry node is a flag on the instance rather than a list of entry instance
-   names on the definition, or a second kind of binding source. Either of those
-   is one more kind of name that can resolve to nothing, and what a validator
-   owes an unresolved entry name is a question no requirement answers yet. The
-   workflow's typed parameters are the parameters declared by the types its
-   entry instances name, and nothing there can dangle.
+   No instance is marked as where a run begins, and the definition holds no
+   list of inputs, which would be one more kind of name that can resolve to
+   nothing. The workflow's typed parameters are the parameters its bindings
+   leave unfilled, read from what the definition already holds, and nothing
+   there can dangle.
 
 .. code_note:: The range a shared instance name is drawn from in the validator's property
    :id: NOTE_WIRING_GENERATOR_RANGE
@@ -146,7 +145,7 @@ error, since code comes after its requirement; the review report
    A run's arguments and a model's call are built by the caller and checked
    when the run is given them, so each holds every shape it can be given, the
    faulty ones included. Every argument supplied is kept, a second one for the
-   same entry instance and parameter too: a map keyed by the pair would drop
+   same instance and parameter too: a map keyed by the pair would drop
    one without a word, and a parameter given two arguments is exactly the fault
    a run refuses to start on, so it has to survive being built to be reported.
    A call holds whatever a model sent, or what the run refuses of a call could

@@ -127,15 +127,15 @@ impl Drop for Scratch {
 /// A chain: `first` begins, `second` is of `middle`, `third` adds.
 fn chain(middle: &str) -> String {
     format!(
-        "name = \"chain\"\noutput = \"third\"\n\n[instances.first]\nnode_type = \"begin\"\nentry = true\n\n[instances.second]\nnode_type = \"{middle}\"\nbindings = {{ before = \"first\" }}\n\n[instances.third]\nnode_type = \"add\"\nbindings = {{ before = \"second\" }}\n"
+        "name = \"chain\"\noutput = \"third\"\n\n[instances.first]\nnode_type = \"begin\"\n\n[instances.second]\nnode_type = \"{middle}\"\nbindings = {{ before = \"first\" }}\n\n[instances.third]\nnode_type = \"add\"\nbindings = {{ before = \"second\" }}\n"
     )
 }
 
 /// `first` begins, a person reviews it as `second`, and `third` joins the two.
-const PERSON: &str = "name = \"reviewed\"\noutput = \"third\"\n\n[instances.first]\nnode_type = \"begin\"\nentry = true\n\n[instances.second]\nnode_type = \"review\"\nbindings = { before = \"first\" }\n\n[instances.third]\nnode_type = \"join\"\nbindings = { before = \"second\", start = \"first\" }\n";
+const PERSON: &str = "name = \"reviewed\"\noutput = \"third\"\n\n[instances.first]\nnode_type = \"begin\"\n\n[instances.second]\nnode_type = \"review\"\nbindings = { before = \"first\" }\n\n[instances.third]\nnode_type = \"join\"\nbindings = { before = \"second\", start = \"first\" }\n";
 
 /// `first` begins, `second` asks the counting role, `third` the helping one.
-const TWO_MODELS: &str = "name = \"two\"\noutput = \"third\"\n\n[instances.first]\nnode_type = \"begin\"\nentry = true\n\n[instances.second]\nnode_type = \"count\"\nbindings = { before = \"first\" }\n\n[instances.third]\nnode_type = \"ask\"\nbindings = { before = \"second\" }\n";
+const TWO_MODELS: &str = "name = \"two\"\noutput = \"third\"\n\n[instances.first]\nnode_type = \"begin\"\n\n[instances.second]\nnode_type = \"count\"\nbindings = { before = \"first\" }\n\n[instances.third]\nnode_type = \"ask\"\nbindings = { before = \"second\" }\n";
 
 /// Two instances each waiting on the other.
 const CYCLE: &str = "name = \"cycle\"\noutput = \"c1\"\n\n[instances.c1]\nnode_type = \"add\"\nbindings = { before = \"c2\" }\n\n[instances.c2]\nnode_type = \"add\"\nbindings = { before = \"c1\" }\n";
@@ -624,7 +624,7 @@ fn labelled(record: &std::path::Path) -> Vec<String> {
         .collect()
 }
 
-/// The node types of a tool workflow: `say`, an entry giving its brief as it
+/// The node types of a tool workflow: `say`, giving the brief it is given as it
 /// is; `fetch`, reading a path; and `exec`, running a command.
 const TOOL_TYPES: &str = "[types.say]\nrequired = { brief = \"note\" }\noutput = \"note\"\n\n[types.fetch]\nrequired = { path = \"note\" }\noutput = \"note\"\n\n[types.exec]\nrequired = { command = \"note\" }\noutput = \"note\"\n";
 
@@ -657,14 +657,14 @@ impl Scratch {
 
 /// `first` says its brief, `ran` runs it as a command, and `ran` is the
 /// result.
-const RUN_BRIEF: &str = "name = \"ran\"\noutput = \"ran\"\n\n[instances.first]\nnode_type = \"say\"\nentry = true\n\n[instances.ran]\nnode_type = \"exec\"\nbindings = { command = \"first\" }\n";
+const RUN_BRIEF: &str = "name = \"ran\"\noutput = \"ran\"\n\n[instances.first]\nnode_type = \"say\"\n\n[instances.ran]\nnode_type = \"exec\"\nbindings = { command = \"first\" }\n";
 
 #[test]
 fn grants_handed_on() {
     needs_docker();
     let scratch = Scratch::new("grants_handed_on");
     scratch.tool_project(
-        "name = \"fetched\"\noutput = \"third\"\n\n[instances.first]\nnode_type = \"say\"\nentry = true\n\n[instances.fetched]\nnode_type = \"fetch\"\nbindings = { path = \"first\" }\n\n[instances.second]\nnode_type = \"review\"\nbindings = { before = \"fetched\" }\n\n[instances.third]\nnode_type = \"join\"\nbindings = { before = \"second\", start = \"fetched\" }\n",
+        "name = \"fetched\"\noutput = \"third\"\n\n[instances.first]\nnode_type = \"say\"\n\n[instances.fetched]\nnode_type = \"fetch\"\nbindings = { path = \"first\" }\n\n[instances.second]\nnode_type = \"review\"\nbindings = { before = \"fetched\" }\n\n[instances.third]\nnode_type = \"join\"\nbindings = { before = \"second\", start = \"fetched\" }\n",
         "fetch = \"read\"\n",
         "\"read\"",
         "\n[folders.notes]\npath = \"notes\"\n",

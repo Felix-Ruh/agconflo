@@ -13,13 +13,10 @@ weight than it did there: a strict reader and a regenerating writer are both the
 natural first implementation, each refuses or drops something legitimate, and no
 case derived from the failure modes alone would notice.
 
-Nine failure modes have no case named after them, because the shape that catches
+Eight failure modes have no case named after them, because the shape that catches
 each is part of a broader case under the same requirement. They are named here so
 the derivation can be audited rather than taken on trust:
 
-- ``CREQ_READER_WORKFLOW``'s "an absent entry key is read as an entry node" is
-  caught by ``TEST_READER_READS_WHAT_IS_WRITTEN``, whose generator writes the
-  entry key absent, present and true, and present and false.
 - ``CREQ_READER_FAULT_LOCATED``'s "reading panics instead of refusing" is caught by
   ``TEST_READER_ANY_TEXT_IS_READ_OR_REFUSED``, since no table of inputs reaches the
   shape a panic hides in.
@@ -32,7 +29,8 @@ the derivation can be audited rather than taken on trust:
   character wider than one byte before the fault on its line.
 - ``CREQ_READER_FAULT_LOCATED``'s "an optional list read as nothing" is caught
   by ``TEST_READER_OPTIONAL_PARAMETERS_REFUSED``, which writes the list both
-  inline and as a header table.
+  inline and as a header table, and "an entry mark read past" by
+  ``TEST_READER_ENTRY_MARK_REFUSED``, which writes it both ways too.
 - ``CREQ_WRITER_KEEPS_UNREAD``'s "a changed value loses the comment beside it" is
   caught by ``TEST_WRITER_UNREAD_KEYS_SURVIVE_A_CHANGE``, whose repointed binding
   carries a comment of its own.
@@ -62,15 +60,9 @@ together.
    :coverage: partial
 
    For any workflow the test writes as a document - a name, instances each with a
-   type and bindings, an entry key on some of them and an output or none - reading
-   it with a catalogue gives a definition with exactly that name, those instances,
-   those bindings, those entry nodes and that output, and with the catalogue's
-   declarations as its node types.
-
-   The generator must write the entry key absent, present and true, and present
-   and false, since a reader defaulting an absent key to true reads every instance
-   as an entry node and nothing else here would see it: the validator exempts an
-   entry node's parameters, so the resulting definition passes validation.
+   type and bindings, and an output or none - reading it with a catalogue gives a
+   definition with exactly that name, those instances, those bindings and that
+   output, and with the catalogue's declarations as its node types.
 
 .. test_case:: An absent output reads as no output
    :id: TEST_READER_ABSENT_OUTPUT_IS_NO_OUTPUT
@@ -177,6 +169,24 @@ together.
    refuses it (``CREQ_VALUE_DECLARED_TYPE``). The case is the join between the two:
    the model's refusal has to come out as a fault in the text with a place, rather
    than as a panic or an error that has lost where it came from.
+
+.. test_case:: An instance marked as an entry is a fault in the text
+   :id: TEST_READER_ENTRY_MARK_REFUSED
+   :verifies: CREQ_READER_FAULT_LOCATED
+   :test_kind: error_path
+   :coverage: partial
+
+   A workflow document whose instance holds an ``entry`` key is refused with
+   the document, the line and column of that key, and the key - once as
+   ``entry = false`` under the instance's header after its node type, and
+   once as ``entry = true`` inline before it, since the key is refused
+   whatever it holds. The same instance unmarked reads - the control.
+
+   There are no entry instances (``DEC_SIGNATURE_IS_WHAT_NOTHING_BINDS``), and
+   the reader reads past keys it does not know, so a mark it no longer read
+   would stay in the document saying something untrue
+   (``DEC_ENTRY_MARK_REFUSED``). Catches: an entry mark read past; the fault
+   placed anywhere but at the key; ``entry = false`` read as harmless.
 
 .. test_case:: A node type declaring optional parameters is a fault in the text
    :id: TEST_READER_OPTIONAL_PARAMETERS_REFUSED

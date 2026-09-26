@@ -1207,7 +1207,7 @@ fn note(source: &mut IdSource, text: &str) -> Context {
     Context::text(source, context_type("note"), text).expect("a fresh source issues")
 }
 
-/// A chain of `count` instances: `n0` an entry taking `input`, each later one
+/// A chain of `count` instances: `n0` taking `input` from the run, each later one
 /// bound to the one before, the last designated. Every type is `note`.
 #[cfg(test)]
 fn chain(count: usize) -> WorkflowDefinition {
@@ -1215,9 +1215,7 @@ fn chain(count: usize) -> WorkflowDefinition {
         node_type("Src", &[("input", "note")], "note"),
         node_type("Step", &[("input", "note")], "note"),
     ];
-    let mut first = instance("n0", "Src", &[]);
-    first.entry = true;
-    let mut instances = vec![first];
+    let mut instances = vec![instance("n0", "Src", &[])];
     for step in 1..count {
         instances.push(instance(
             &format!("n{step}"),
@@ -1289,17 +1287,20 @@ fn drive(
     }
 }
 
-/// The arguments filling every required parameter of every entry instance.
+/// The arguments filling every parameter nothing binds.
 #[cfg(test)]
 fn filled(workflow: &WorkflowDefinition, source: &mut IdSource) -> Arguments {
     let mut arguments = Arguments::new();
-    for node in workflow.instances.iter().filter(|node| node.entry) {
+    for node in &workflow.instances {
         let declared = workflow
             .node_types
             .iter()
             .find(|declared| declared.name == node.node_type)
             .expect("a well-formed definition declares every type it names");
         for parameter in &declared.required {
+            if node.bindings.iter().any(|b| b.parameter == parameter.name) {
+                continue;
+            }
             let supplied = Context::text(source, parameter.context_type.clone(), "x")
                 .expect("a fresh source issues");
             arguments = arguments.supply(&node.name, &parameter.name, supplied);
@@ -1515,9 +1516,7 @@ proptest! {
         let everything = Context::compose(&mut source, context_type("note"), made.iter(), &separator)
             .expect("a fresh source issues");
 
-        let mut entry = instance("only", "Take", &[]);
-        entry.entry = true;
-        let workflow = definition(vec![node_type("Take", &[("input", "note")], "note")], vec![entry], &["only"]);
+        let workflow = definition(vec![node_type("Take", &[("input", "note")], "note")], vec![instance("only", "Take", &[])], &["only"]);
         let run = Run::<()>::start(&workflow, Arguments::new().supply("only", "input", everything.clone()), 1)
             .expect("starts");
         let (mut resumed, _) = Run::<()>::resume(&workflow, &run.record(&source)).expect("resumes");
@@ -1560,11 +1559,9 @@ fn deep_composition_kept() {
             .expect("a fresh source issues");
     }
     let source = IdSource::resumed_at(Some(DEPTH + 1));
-    let mut entry = instance("only", "Take", &[]);
-    entry.entry = true;
     let workflow = definition(
         vec![node_type("Take", &[("input", "note")], "note")],
-        vec![entry],
+        vec![instance("only", "Take", &[])],
         &["only"],
     );
     let run = Run::<()>::start(
@@ -1639,14 +1636,12 @@ fn diverged_record_refused() {
             node_type("Src", &[("input", "note")], "note"),
             node_type("Step", &[("input", "note")], "note"),
         ];
-        let mut all = [
+        let all = [
             instance("x", "Src", &[]),
             instance("y", "Src", &[]),
             instance("s", "Step", &[("input", source)]),
             instance("t", "Step", &[("input", "s")]),
         ];
-        all[0].entry = true;
-        all[1].entry = true;
         let instances = order
             .iter()
             .map(|name| {
@@ -1782,7 +1777,7 @@ fn start_refusal_carried() {
         started.map(ResumeRefusal::Start)
     );
 
-    // An entry parameter the recorded argument does not fill.
+    // A parameter nothing binds that the recorded argument does not fill.
     let mut renamed = chain(3);
     renamed.node_types[0].required[0].name = "prompt".to_owned();
     let started = Run::<()>::start(&renamed, argument(), 5).err();

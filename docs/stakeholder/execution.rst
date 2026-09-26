@@ -41,12 +41,31 @@ where.
 
    Without it every reusable sequence has to be copied, and the copies drift.
 
-   Three consequences follow and none is optional: a workflow needs a declared
-   signature, so its entry nodes are a typed parameter list and exactly one
-   terminal output is designated; the sub-workflow must not become an opaque box,
+   Three consequences follow and none is optional: a workflow needs a
+   signature - the typed parameters nothing in it binds, and exactly one
+   designated output; the sub-workflow must not become an opaque box,
    so its internal activations appear in the run log scoped under the invoking
    one, or composition silently destroys the guarantee it was added to serve; and
    recursion becomes possible, for which the step budget below is the valve.
+
+.. stkh_req:: A run starts from contexts given for any node
+   :id: STKH_RUN_FROM_ANY_PARAMETER
+   :stakeholder: user
+   :statement: Agconflo shall let a run start from contexts given for the parameters of any of a workflow's nodes.
+
+   Everything a node is given is a context, and what a run is started with is
+   no different: contexts, each for one parameter of one node. No node is
+   marked as where a run begins. A workflow is invoked by giving each
+   parameter nothing in it binds its context, and whichever nodes then hold
+   everything they need are the ones that run first.
+
+   This settles where it meets ``STKH_WIRING_CHECKED``, as the maintainer
+   decided on 2026-09-26. A parameter nothing binds is not a broken wire: it
+   is one of the workflow's inputs, and the workflow is not invalid for having
+   it. Leaving one without its context is the invocation's fault, and it is
+   refused when the run starts - still before any node runs. A forgotten
+   binding therefore shows as an input nobody gave rather than as a defect of
+   the graph, which is the cost of not marking inputs.
 
 .. stkh_req:: A run survives an interruption
    :id: STKH_RESUMABLE_RUN

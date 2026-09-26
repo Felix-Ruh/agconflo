@@ -92,7 +92,6 @@ fn check_instance(
         return;
     };
 
-    check_required_bound(instance, declaration, defects);
     check_bindings(
         instance,
         declaration,
@@ -101,33 +100,6 @@ fn check_instance(
         shared,
         defects,
     );
-}
-
-/// Every parameter the declaration requires carries a binding, walked over the
-/// declaration rather than the bindings. Optional parameters, declared globals
-/// and an entry node's parameters need none.
-// @Every required parameter carries a binding,IMPL_WIRING_REQUIRED_BOUND,impl,[CREQ_VALIDATOR_REQUIRED_BOUND],[DEC_EVERY_INPUT_REQUIRED, DEC_WORKFLOW_SIGNATURE]
-fn check_required_bound(
-    instance: &NodeInstance,
-    declaration: &NodeType,
-    defects: &mut Vec<WiringDefect>,
-) {
-    if instance.entry {
-        return;
-    }
-
-    for parameter in &declaration.required {
-        let bound = instance
-            .bindings
-            .iter()
-            .any(|binding| binding.parameter == parameter.name);
-        if !bound {
-            defects.push(WiringDefect::RequiredParameterUnbound {
-                instance: instance.name.clone(),
-                parameter: parameter.name.clone(),
-            });
-        }
-    }
 }
 
 /// Every binding fills a parameter its instance's type declares, and names an
@@ -287,7 +259,7 @@ pub(crate) fn portable(name: &str) -> bool {
 
 /// The definition designates exactly one output: counted rather than tested for
 /// absence, and checked in the walk with everything else.
-// @Exactly one designated output,IMPL_WIRING_SIGNATURE,impl,[CREQ_VALIDATOR_ONE_OUTPUT],[DEC_WORKFLOW_SIGNATURE]
+// @Exactly one designated output,IMPL_WIRING_SIGNATURE,impl,[CREQ_VALIDATOR_ONE_OUTPUT],[DEC_SIGNATURE_IS_WHAT_NOTHING_BINDS]
 fn check_signature(definition: &WorkflowDefinition, defects: &mut Vec<WiringDefect>) {
     let designated = definition.designated_outputs.len();
     if designated != 1 {
@@ -341,14 +313,13 @@ pub(crate) fn any_definition() -> impl Strategy<Value = WorkflowDefinition> {
     const CALLS: [&str; 4] = ["t0", "t2", "t9", "a.b"];
 
     let declarations = vec((0..=2usize, 0..=1usize, 0..2usize), 1..=3);
-    // Per node: its type, whether it is an entry node, its bindings, whether a
+    // Per node: its type, its bindings, whether a
     // parameter may be bound more than once, and an earlier node whose name it
     // takes - an index at or past its own position keeps a name of its own.
     // @The range a shared name is drawn from,TRACE_WIRING_GENERATOR_RANGE,trace,[],[NOTE_WIRING_GENERATOR_RANGE]
     let nodes = vec(
         (
             0..4usize,
-            any::<bool>(),
             vec((0..3usize, 0..5usize), 0..=3),
             any::<bool>(),
             0..10usize,
@@ -377,7 +348,7 @@ pub(crate) fn any_definition() -> impl Strategy<Value = WorkflowDefinition> {
         // A node taking an earlier node's name shares it, with that node and
         // with any other that took it too.
         let mut names: Vec<String> = Vec::new();
-        for (node, &(_, _, _, _, earlier, _)) in nodes.iter().enumerate() {
+        for (node, &(_, _, _, earlier, _)) in nodes.iter().enumerate() {
             let name = if earlier < node {
                 names[earlier].clone()
             } else {
@@ -389,7 +360,7 @@ pub(crate) fn any_definition() -> impl Strategy<Value = WorkflowDefinition> {
         let instances: Vec<NodeInstance> = nodes
             .iter()
             .zip(&names)
-            .map(|((declared, entry, bindings, repeats, _, calls), name)| {
+            .map(|((declared, bindings, repeats, _, calls), name)| {
                 // A type index past the declarations names a type nobody
                 // supplied; a source index past the instances names a node the
                 // definition does not carry, and so may one naming a node whose
@@ -417,8 +388,7 @@ pub(crate) fn any_definition() -> impl Strategy<Value = WorkflowDefinition> {
                     .map(|(parameter, source)| (*parameter, source.as_str()))
                     .collect();
                 let calls: Vec<&str> = calls.iter().map(|&call| CALLS[call]).collect();
-                let built = instance(name, &declared, &bound).with_calls(&calls);
-                if *entry { built.into_entry() } else { built }
+                instance(name, &declared, &bound).with_calls(&calls)
             })
             .collect();
 
@@ -444,15 +414,6 @@ fn signature_defect(designated: usize) -> WiringDefect {
     WiringDefect::SignatureOutputs {
         definition: DEFINITION_NAME.to_owned(),
         designated,
-    }
-}
-
-/// An unbound required parameter, as the report names it.
-#[cfg(test)]
-fn unbound(instance: &str, parameter: &str) -> WiringDefect {
-    WiringDefect::RequiredParameterUnbound {
-        instance: instance.to_owned(),
-        parameter: parameter.to_owned(),
     }
 }
 
@@ -516,47 +477,6 @@ fn bound_twice(instance: &str, parameter: &str) -> WiringDefect {
 
 #[cfg(test)]
 proptest! {
-    /// Each instance is of a type of its own, declaring required parameters and
-    /// requested globals together; the first instance is given no bindings. The expected report is worked out from the masks.
-    #[test]
-    fn every_unbound_required_is_reported(
-        shapes in vec((1..=3usize, 0..=2usize, any::<u8>()), 1..=4)
-    ) {
-        let mut node_types = Vec::new();
-        let mut instances = Vec::new();
-        let mut expected = Vec::new();
-
-        for (node, &(required, globals, mask)) in shapes.iter().enumerate() {
-            let name = format!("n{node}");
-            let declared_type = format!("t{node}");
-            let required_names: Vec<String> = (0..required).map(|p| format!("r{p}")).collect();
-            let global_names: Vec<String> = (0..globals).map(|g| format!("g{g}")).collect();
-
-            let declared: Vec<(&str, &str)> =
-                required_names.iter().map(|p| (p.as_str(), "note")).collect();
-            let read: Vec<&str> = global_names.iter().map(String::as_str).collect();
-            node_types.push(node_type(&declared_type, &declared, "note").with_globals(&read));
-
-            // The first instance carries no bindings at all; every other binds
-            // the subset its mask picks, always to a name that resolves.
-            let mask = if node == 0 { 0 } else { mask };
-            let mut bindings = Vec::new();
-            for (bit, parameter) in required_names.iter().enumerate() {
-                if mask & (1u8 << bit) != 0 {
-                    bindings.push((parameter.as_str(), "n0"));
-                } else {
-                    expected.push(unbound(&name, parameter));
-                }
-            }
-            instances.push(instance(&name, &declared_type, &bindings));
-        }
-
-        let designated = [instances[0].name.clone()];
-        let designated: Vec<&str> = designated.iter().map(String::as_str).collect();
-        let report = validate_wiring(&definition(node_types, instances, &designated));
-        prop_assert_eq!(report, expected);
-    }
-
     /// One name the definition does not carry, bound by several parameters of
     /// several consumers. Each is its own wire to repoint.
     #[test]
@@ -704,8 +624,9 @@ proptest! {
     }
 
     /// The control: generated sound definitions, each holding a cycle of two
-    /// nodes, a pair no entry node reaches, an unbound global, an output bound by several parameters, and an entry node
-    /// whose required parameter is the workflow's own, are reported clean.
+    /// nodes, a pair nothing reaches, an unbound global, an output bound by
+    /// several parameters, and an instance whose parameter nothing binds, are
+    /// reported clean.
     #[test]
     fn well_formed_definitions_pass(workflow in well_formed_definition()) {
         prop_assert_eq!(validate_wiring(&workflow), Vec::new());
@@ -728,9 +649,9 @@ pub(crate) fn well_formed_definition() -> impl Strategy<Value = WorkflowDefiniti
         let mut instances = vec![
             instance("seed", "seed_note", &[]),
             instance("seed_diff", "seed_diff", &[]),
-            // An entry node: its required parameter is the workflow's own.
-            instance("entry", "pass_note", &[]).into_entry(),
-            // A cycle of two, which no entry node reaches. Both are legal.
+            // A parameter nothing binds, which is the workflow's own.
+            instance("given", "pass_note", &[]),
+            // A cycle of two, which nothing reaches. Both are legal.
             instance("loop_a", "pass_note", &[("input", "loop_b")]),
             instance("loop_b", "pass_note", &[("input", "loop_a")]),
             // One output bound by several parameters.
@@ -762,9 +683,9 @@ fn all_four_classes_reported() {
     ];
     let instances = vec![
         instance("a", "differ", &[]),
-        // Two defects on one instance: an unbound required parameter and a wire
-        // whose ends disagree.
-        instance("b", "pair", &[("left", "a")]),
+        // Two defects on one instance: a binding to a parameter its type does
+        // not declare and a wire whose ends disagree.
+        instance("b", "pair", &[("left", "a"), ("centre", "a")]),
         instance("c", "sink", &[("input", "ghost")]),
     ];
     // And no designated output, so a validator refusing the definition for its
@@ -774,8 +695,8 @@ fn all_four_classes_reported() {
     assert_eq!(
         validate_wiring(&broken),
         vec![
-            unbound("b", "right"),
             disagreement("b", "left", "note", "diff"),
+            undeclared("b", "centre"),
             unresolved("c", "input", "ghost"),
             signature_defect(0),
         ]
@@ -865,44 +786,20 @@ fn agreeing_wires_pass() {
 }
 
 #[test]
-fn unwired_instance_is_reported() {
-    let types = vec![
-        node_type("pair", &[("left", "note"), ("right", "note")], "note"),
-        node_type("source", &[], "note"),
-    ];
-    let instances = vec![
-        instance("a", "source", &[]),
-        instance("b", "pair", &[]),
-        instance("c", "pair", &[("left", "a")]),
-    ];
-    let report = validate_wiring(&definition(types, instances, &["a"]));
-
-    // One defect per parameter, and c's own unbound parameter in the same
-    // report.
-    assert_eq!(
-        report,
-        vec![
-            unbound("b", "left"),
-            unbound("b", "right"),
-            unbound("c", "right"),
-        ]
-    );
-}
-
-#[test]
 fn degenerate_declarations_pass() {
     let types = vec![
         // A global that no binding carries.
         node_type("lenient", &[], "note").with_globals(&["policy"]),
         // A type declaring no parameters at all.
         node_type("bare", &[], "note"),
-        // Required parameters, supplied by the workflow rather than by wires.
-        node_type("entry", &[("argument", "note")], "note"),
+        // Parameters nothing binds, which the run is given when it starts.
+        node_type("taking", &[("first", "note"), ("second", "note")], "note"),
     ];
     let instances = vec![
         instance("a", "lenient", &[]),
         instance("b", "bare", &[]),
-        instance("c", "entry", &[]).into_entry(),
+        instance("c", "taking", &[]),
+        instance("d", "taking", &[("first", "b")]),
     ];
 
     assert_eq!(
@@ -919,7 +816,7 @@ fn binding_to_missing_instance_is_reported() {
         &["b"],
     );
 
-    // The parameter is bound, so no unbound-parameter defect is reported for it.
+    // Nothing but the wire to nowhere is reported.
     assert_eq!(
         validate_wiring(&broken),
         vec![unresolved("b", "input", "renamed")]
@@ -934,7 +831,7 @@ fn instance_of_missing_type_is_reported() {
         instance("a", "not-supplied", &[("whatever", "ghost")]),
         // Fed by it: its producer has no declared output type at all.
         instance("b", "sink", &[("input", "a")]),
-        instance("c", "sink", &[]),
+        instance("c", "sink", &[("input", "gone")]),
     ];
     let report = validate_wiring(&definition(types, instances, &["b"]));
 
@@ -947,7 +844,7 @@ fn instance_of_missing_type_is_reported() {
                 instance: "a".to_owned(),
                 unresolved: "not-supplied".to_owned(),
             },
-            unbound("c", "input"),
+            unresolved("c", "input", "gone"),
         ]
     );
 }
@@ -1003,7 +900,7 @@ fn signature_without_one_output_is_reported() {
 
 #[test]
 fn legal_signatures_pass() {
-    // A workflow with no entry parameters at all, which is legal.
+    // A workflow whose every parameter is bound, which is legal.
     let closed = definition(
         vec![node_type("source", &[], "note")],
         vec![instance("a", "source", &[])],
@@ -1047,7 +944,7 @@ fn undeclared_parameter_is_reported() {
             "lenient",
             &[("input", "a"), ("hnit", "z"), ("policy", "z")],
         ),
-        // A typo of the required parameter, which leaves it unbound.
+        // A typo of the required parameter.
         instance("c", "lenient", &[("inptu", "z")]),
         // An undeclared parameter wired from an instance that is not there.
         instance("d", "lenient", &[("input", "a"), ("stray", "ghost")]),
@@ -1059,7 +956,6 @@ fn undeclared_parameter_is_reported() {
         vec![
             undeclared("b", "hnit"),
             undeclared("b", "policy"),
-            unbound("c", "input"),
             undeclared("c", "inptu"),
             undeclared("d", "stray"),
             unresolved("d", "stray", "ghost"),
@@ -1113,10 +1009,10 @@ fn output_naming_nothing_is_reported() {
 
 #[test]
 fn resolving_outputs_pass() {
-    // An output naming an entry node.
+    // An output naming an instance with a parameter nothing binds.
     let entered = definition(
         vec![node_type("pass", &[("input", "note")], "note")],
-        vec![instance("start", "pass", &[]).into_entry()],
+        vec![instance("start", "pass", &[])],
         &["start"],
     );
     assert_eq!(validate_wiring(&entered), Vec::new());
@@ -1144,9 +1040,9 @@ fn shared_instance_name_is_reported() {
         node_type("sink", &[("input", "note")], "note"),
     ];
     // Four instances named a, of the types given: two producing different
-    // context types, one with a required parameter unbound, one of a type
+    // context types, one with a required parameter nothing binds, one of a type
     // nobody supplied. Then a wire from a into a parameter declared for one of
-    // those types, the output designating a, and c, whose own unbound parameter
+    // those types, the output designating a, and c, whose own wire to nowhere
     // shows the walk goes on.
     let sharing = |copies: [&str; 4]| {
         let mut instances: Vec<NodeInstance> = copies
@@ -1154,7 +1050,7 @@ fn shared_instance_name_is_reported() {
             .map(|&node_type| instance("a", node_type, &[]))
             .collect();
         instances.push(instance("b", "sink", &[("input", "a")]));
-        instances.push(instance("c", "sink", &[]));
+        instances.push(instance("c", "sink", &[("input", "gone")]));
         definition(types.clone(), instances, &["a"])
     };
 
@@ -1162,11 +1058,11 @@ fn shared_instance_name_is_reported() {
     // first in each.
     for copies in [
         ["differ", "source", "sink", "not-supplied"],
-        ["sink", "not-supplied", "source", "differ"],
+        ["not-supplied", "sink", "source", "differ"],
     ] {
         assert_eq!(
             validate_wiring(&sharing(copies)),
-            vec![shared("a"), unbound("c", "input")],
+            vec![shared("a"), unresolved("c", "input", "gone")],
             "with the instances named a in the order {copies:?}"
         );
     }
@@ -1271,19 +1167,17 @@ fn name_defects_reported_together() {
         instance("a", "source", &[]),
         instance("a", "source", &[]),
         instance("s", "source", &[]),
-        // On one instance: its parameter unbound, and a name it does not
-        // declare bound twice.
+        // On one instance: a name it does not declare, bound twice.
         instance("b", "lenient", &[("hnit", "s"), ("hnit", "s")]),
     ];
     // And an output naming no instance.
     let broken = definition(types, instances, &["nowhere"]);
 
-    // Three defects for b, and the shared name and the output after them.
+    // The shared name, then two defects for b, then the output.
     assert_eq!(
         validate_wiring(&broken),
         vec![
             shared("a"),
-            unbound("b", "input"),
             undeclared("b", "hnit"),
             bound_twice("b", "hnit"),
             unresolved_output("nowhere"),

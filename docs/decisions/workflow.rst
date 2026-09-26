@@ -146,7 +146,7 @@ and what it turned down.
 
 .. dec:: A workflow has a signature
    :id: DEC_WORKFLOW_SIGNATURE
-   :dec_status: accepted
+   :dec_status: superseded
    :decided_on: 2026-08-14
    :statement: Agconflo shall give a workflow a signature of typed entry parameters and exactly one designated output.
 
@@ -163,6 +163,32 @@ and what it turned down.
    A workflow with no designated output, or with more than one, is therefore
    invalid rather than merely unusual, and that is a check on the definition
    rather than on a run.
+
+.. dec:: A workflow's signature is what nothing in it binds
+   :id: DEC_SIGNATURE_IS_WHAT_NOTHING_BINDS
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :supersedes: DEC_WORKFLOW_SIGNATURE
+   :statement: Agconflo shall take a workflow's signature to be the typed parameters of its nodes that nothing binds and exactly one designated output.
+
+   A caller can only wire to something whose shape is known, and a workflow's
+   shape is still a node type's: typed parameters and one output
+   (``DEC_WORKFLOW_SIGNATURE``). What changes is where the parameters come
+   from. They were the parameters of instances marked as entries; they are
+   now every parameter the graph leaves unbound, read from the wiring rather
+   than declared beside it (``STKH_RUN_FROM_ANY_PARAMETER``). Each is a pair
+   of an instance and a parameter (``DEC_ARGUMENTS_PER_PARAMETER``).
+
+   Marking inputs, on the instance or on the parameter, was the alternative.
+   It catches a forgotten binding as a defect of the graph, where reading the
+   signature from the wiring catches it only when a run starts
+   (``DEC_RUN_REFUSED_UNLESS_EVERY_INPUT_GIVEN``). The maintainer chose the
+   reading for being the more general: a workflow can then be entered at
+   whichever of its nodes the wiring leaves open, and a flag has to be kept in
+   step with every change to the wiring.
+
+   The designated output is unchanged, and so is its check: a workflow with no
+   designated output, or with more than one, is invalid.
 
 .. dec:: A workflow repeats part of itself by walking its edges again
    :id: DEC_REPETITION_BY_EDGES
@@ -197,8 +223,9 @@ and what it turned down.
    one. A node runs when its edges hold what it needs (``DEC_EDGE_GENERATIONS``),
    and that is the whole of when.
 
-   The four cases each need no graph of their own. An entry node is marked as
-   one. An ordering between nodes that act on the world is an edge: the node
+   The four cases each need no graph of their own. An entry node is an
+   instance with parameters nothing binds, which the run is given
+   (``DEC_SIGNATURE_IS_WHAT_NOTHING_BINDS``). An ordering between nodes that act on the world is an edge: the node
    that must come second is given the first one's output. A back edge is an
    edge walked again (``DEC_REPETITION_BY_EDGES``). And a router gates a branch
    by which edges it walks.
@@ -251,6 +278,27 @@ and what it turned down.
    every instance binding none of those parameters would stop starting, for a
    reason the document no longer shows. Ignoring the key was the other, and is
    the silent loss above.
+
+.. dec:: An instance still marked as an entry is refused
+   :id: DEC_ENTRY_MARK_REFUSED
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :statement: Agconflo shall refuse a workflow document that marks an instance as an entry, at the key marking it.
+
+   With a run's inputs the parameters nothing binds, on any instance
+   (``DEC_SIGNATURE_IS_WHAT_NOTHING_BINDS``), the ``entry`` key means
+   nothing. Read past, as keys the reader does not know are, it would do no
+   harm to a run - an entry instance's parameters were unbound, and are
+   inputs still - but it would tell every reader of the document that the
+   other instances cannot be given theirs, and the writer keeps keys it does
+   not read, so it would never leave the document. Refusing it at its place
+   says which line to delete and why, as ``DEC_OPTIONAL_PARAMETERS_REFUSED``
+   does for the key that went before it.
+
+   Reading past it was the alternative, and is the stale mark above. Reading
+   ``entry = false`` differently from ``entry = true`` was not one: the key
+   is refused whatever it holds, since either value states something that is
+   no longer a property of an instance.
 
 .. dec:: A list is handled item by item inside one node
    :id: DEC_LIST_HANDLED_IN_ONE_NODE

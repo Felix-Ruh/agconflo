@@ -14,7 +14,7 @@ anything else.
    :crate: agconflo-core
 
    Turns one document's text into what it describes: a workflow document into the
-   instances, bindings, entry nodes and output of a definition, and a node type
+   instances, bindings and output of a definition, and a node type
    document into the declarations it holds. It draws the line between a fault in
    the text, which it refuses with a location, and a fault in the workflow, which
    it lets through for the validator.
@@ -52,7 +52,7 @@ anything else.
    :statement: Topology reader shall read a workflow document and a type catalogue into one workflow definition.
 
    The document gives the definition its name, its instances - each with the type
-   it names, whether it is an entry node, and its bindings keyed by parameter - and
+   it names and its bindings keyed by parameter - and
    the one output it designates, if any. The catalogue gives it the node types its
    instances are checked against, all of them, whether or not an instance names
    them.
@@ -67,10 +67,6 @@ anything else.
      list in the definition, and the validator's to report. Reading it as a
      refusal reports the signature alone, and reading it as the last instance, or
      the only one, designates an output the author never named.
-   - **An absent entry key is read as an entry node.** An instance is an entry
-     node only where the document says so. Defaulting the other way exempts every
-     instance's required parameters from being bound, and the validator then
-     passes a workflow that is not wired at all.
 
    Must read: a document with no bindings anywhere, a document with no instances,
    and a document whose instances carry keys the model does not name.
@@ -141,6 +137,10 @@ anything else.
      know, so a type still declaring ``optional`` would lose those parameters
      without a word, and its script would find them missing
      (``DEC_OPTIONAL_PARAMETERS_REFUSED``).
+   - **An entry mark read past.** No instance is an entry
+     (``DEC_SIGNATURE_IS_WHAT_NOTHING_BINDS``), so a document still marking one
+     says something untrue, and the writer would keep it there
+     (``DEC_ENTRY_MARK_REFUSED``).
 
    Must refuse, each with its place: text that is not TOML, a value of the wrong
    type, a key the reader needs that is missing, an ``optional`` list on a node

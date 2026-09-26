@@ -17,8 +17,8 @@ requirement whose subject is anything else.
    :crate: agconflo-core
 
    The walk that compares one workflow definition against the node types it names,
-   and collects what it finds. Every defect class belongs here: a parameter the
-   definition never binds, a name that resolves to nothing, a name that resolves
+   and collects what it finds. Every defect class belongs here: a name that
+   resolves to nothing, a name that resolves
    to more than one thing, a type that disagrees across a wire, and a signature
    that does not designate exactly one output.
 
@@ -40,32 +40,6 @@ requirement whose subject is anything else.
 
    Its requirements are true or false of a single defect taken alone, which is
    what separates it from the validator that produced it.
-
-.. comp_req:: A required parameter with no binding is a defect
-   :id: CREQ_VALIDATOR_REQUIRED_BOUND
-   :derived_from: FEAT_WIRING_REQUIRED_BOUND
-   :allocated_to: COMP_WIRING_VALIDATOR
-   :ears_pattern: unwanted
-   :statement: If a node instance leaves a required parameter unbound, then Wiring validator shall report a defect naming that parameter.
-
-   The declaration says what the node cannot run without
-   (``DEC_DECLARED_PARAMETERS``), and this compares the bindings a definition
-   carries against it. The comparison runs over the declaration rather than over
-   the bindings, which is the whole of the difference between finding this defect
-   and never seeing it.
-
-   Failure modes:
-
-   - **The walk iterates over the bindings.** Every binding present is then
-     checked and a parameter with none is never visited, so a workflow missing
-     half its wires passes. This is the defect this requirement exists to rule
-     out, and it is invisible to every other requirement here.
-   - **A declared global type is treated as a parameter.** Globals are read by
-     declaration rather than wired, so demanding a binding for one refuses a
-     workflow that is correct.
-
-   Must pass unreported: a node with no parameters at all, and an entry node,
-   whose parameters are the workflow's own.
 
 .. comp_req:: A binding that names nothing is a defect
    :id: CREQ_VALIDATOR_BINDING_RESOLVES
@@ -111,13 +85,13 @@ requirement whose subject is anything else.
      refuses the shape across documents (``CREQ_CATALOGUE_DECLARED_ONCE``), and a
      document cannot hold it, but a definition built by other means can, and the
      validator resolves the name to the first declaration carrying it.
-   - **A binding into an entry node.** An entry node's parameters are the
-     workflow's own (``DEC_WORKFLOW_SIGNATURE``), so a wire into one gives a
-     parameter two sources, the caller and the wire - and a loop closing back onto
-     an entry node draws exactly that (``DEC_BACK_EDGES_ALLOWED``). It is checked
-     today like any other binding, for its source and its type.
 
-   The first is about the declarations a definition carries rather than about
+   A second was a binding into an entry node, and it is closed: there are no
+   entry nodes (``STKH_RUN_FROM_ANY_PARAMETER``), and a context given for a
+   parameter a binding fills is a fault of the invocation, which the run
+   refuses (``DEC_RUN_REFUSED_UNLESS_EVERY_INPUT_GIVEN``).
+
+   The one left is about the declarations a definition carries rather than about
    its wiring, which ``ARCH_WIRING`` keeps out of this feature, and the likely
    answer to it is a definition holding a catalogue rather than a list
    of declarations - a change to the model that the slice building definitions by
@@ -148,8 +122,8 @@ requirement whose subject is anything else.
      The missing type is already reported, and a second defect about the same
      wire sends the author to change a type that is not wrong.
    - **The check is skipped because something else about the wire was reported.**
-     An instance with an unbound required parameter still declares types on the
-     parameters that are bound, so a walk that moves on after an instance's first
+     An instance with a binding to an undeclared parameter still declares types
+     on the parameters that are bound, so a walk that moves on after an instance's first
      defect hides every disagreement below it. The author then fixes one defect
      and discovers the next, which is what reporting everything together exists
      to prevent.
@@ -166,7 +140,7 @@ requirement whose subject is anything else.
    :statement: If a definition designates no output or designates more than one, then Wiring validator shall report a defect naming that definition.
 
    A workflow is wired into another workflow through its signature
-   (``DEC_WORKFLOW_SIGNATURE``), so a definition that declares no result, or
+   (``DEC_SIGNATURE_IS_WHAT_NOTHING_BINDS``), so a definition that declares no result, or
    several, cannot be composed and is malformed on its own terms.
 
    Failure modes:
@@ -178,7 +152,8 @@ requirement whose subject is anything else.
    - **A terminal node is picked when none is designated.** The workflow then has
      a result decided by the engine, which changes silently when a node is added.
 
-   Must pass unreported: a workflow with no entry parameters, which is legal, and
+   Must pass unreported: a workflow whose every parameter is bound, which is
+   legal, and
    a designated output whose node also feeds other nodes, which does not make it
    less terminal.
 
@@ -248,7 +223,8 @@ requirement whose subject is anything else.
      (``CREQ_VALIDATOR_INSTANCE_NAMED_ONCE``), and reporting it here as well sends
      the author to create an instance that already exists twice.
 
-   Must pass unreported: an output naming an entry node, and one naming an
+   Must pass unreported: an output naming an instance with a parameter nothing
+   binds, and one naming an
    instance whose name is not its node type's.
 
 .. comp_req:: A name several instances share is a defect
@@ -274,7 +250,8 @@ requirement whose subject is anything else.
      the first instance's output type, so the verdict turned on which was written
      first.
    - **Each instance is checked as if the name were its own.** Measured: two
-     instances of one type, both unbound, reported one defect twice word for word,
+     instances of one type, both without bindings, reported one defect twice word
+     for word,
      and two wired to different missing sources reported two defects at one place
      - both of them what ``CREQ_VALIDATOR_EVERY_DEFECT`` rules out.
    - **The name is reported once per instance.** Three instances sharing it are
@@ -340,10 +317,9 @@ requirement whose subject is anything else.
      or an unwrap on a missing type ends the run with a panic rather than a
      report, which is the same failure wearing different clothes.
 
-   Must pass: a definition with a defect of each of the four classes first
-   written reports all of them, each once; and so does one carrying each of the
-   four classes about names beside an unbound parameter, on the same instance as
-   two of them.
+   Must pass: a definition with a defect of each of four classes reports all of
+   them, each once; and so does one carrying the classes about names together,
+   two of them on one instance.
 
 .. comp_req:: A workflow without defects is accepted
    :id: CREQ_VALIDATOR_ACCEPTS_WELL_FORMED
@@ -380,7 +356,7 @@ requirement whose subject is anything else.
    the place be readable without reading the prose.
 
    The place is the node instance and the parameter for a defect about a wire -
-   a parameter unbound, bound twice or undeclared, or a binding that resolves to
+   a parameter bound twice or undeclared, or a binding that resolves to
    nothing or disagrees on its type; the instance alone for a defect about an
    instance, which is one of a node type the definition does not carry and whose
    parameter list is therefore unknowable, or a name several instances share, the

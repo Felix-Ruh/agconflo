@@ -320,25 +320,41 @@ catches it.
    :coverage: full
 
    For any text with LF and CRLF line endings, and leading and trailing
-   spaces, given as arguments for two parameters of an entry instance, each
-   of its own type, the entry node's script
+   spaces, given as arguments for two parameters of the first instance, each
+   of its own type, that node's script
    returns what it was given, and the run completes with the rendering of
    exactly that text and with each input's declared type.
 
    Catches: the text trimmed; every argument given one type.
 
-.. test_case:: An argument for no entry parameter is refused before the run
+.. test_case:: An argument for no declared parameter is refused before the run
    :id: TEST_RUNNER_UNKNOWN_ARGUMENT_REFUSED
    :verifies: CREQ_RUNNER_REFUSES_UNKNOWN_ARGUMENT
    :test_kind: error_path
    :coverage: full
 
-   Arguments for an instance the workflow does not have, for a parameter the
-   entry instance does not declare, and for a parameter of an instance that
-   is not an entry. Each is refused naming the instance and the parameter as
-   given, no script runs, and no record file is made.
+   Arguments for an instance the workflow does not have, and for a parameter
+   the instance does not declare. Each is refused naming the instance and the
+   parameter as given, no script runs, and no record file is made. The
+   control: an argument for a parameter the instance declares and a binding
+   fills is made a context, and refused by the run as a second source, with
+   no record file made either.
 
-   Catches: the argument dropped; a made-up type given.
+   Catches: the argument dropped; a made-up type given; the run's question
+   answered by the runner.
+
+.. test_case:: An argument is taken for whichever instance declares its parameter
+   :id: TEST_RUNNER_ARGUMENT_FOR_ANY_INSTANCE_TAKEN
+   :verifies: CREQ_RUNNER_ARGUMENTS_AS_TEXT
+   :test_kind: positive
+   :coverage: partial
+
+   A workflow whose first and middle instances each leave their parameter to
+   the run, neither marked in any way: given text for both, the run completes
+   with the middle instance's text carried through the last.
+
+   Catches: text taken only for an instance marked as an entry, or only for
+   the first instance of the workflow.
 
 .. test_case:: An interrupted run is resumed from its file
    :id: TEST_RUNNER_RESUMES_AN_INTERRUPTED_RUN

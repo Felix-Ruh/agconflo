@@ -144,7 +144,7 @@ arguments other than text are given.
 
 .. dec:: A run's arguments are given as text
    :id: DEC_ARGUMENTS_AS_TEXT
-   :dec_status: accepted
+   :dec_status: superseded
    :decided_on: 2026-09-25
    :statement: Agconflo shall take each argument of a run a person asks for as text for one entry instance's parameter, and make it a context of the type that parameter declares.
 
@@ -155,6 +155,25 @@ arguments other than text are given.
 
    A composition as an argument was the alternative, and it needs a way to
    write down parts and identifiers that nothing yet asks for. It stays open.
+
+.. dec:: A run's arguments are given as text for any instance's parameter
+   :id: DEC_ARGUMENTS_AS_TEXT_PER_PARAMETER
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :supersedes: DEC_ARGUMENTS_AS_TEXT
+   :statement: Agconflo shall take each argument of a run a person asks for as text for one instance's parameter, and make it a context of the type that parameter declares.
+
+   What ``DEC_ARGUMENTS_AS_TEXT`` decided stands, for any instance rather than
+   for entry instances, which there are none of any more
+   (``STKH_RUN_FROM_ANY_PARAMETER``). A person has text to give, it is kept
+   exactly as given, from the command line or from a file, and the context
+   made of it is of the type the parameter declares.
+
+   The runner looks only for the declaration, which it needs to make the
+   context. Whether a declared parameter is one the run takes - nothing binds
+   it, and nothing else is given for it - is the run's question, and the run
+   refuses the rest before any node runs
+   (``DEC_RUN_REFUSED_UNLESS_EVERY_INPUT_GIVEN``).
 
 .. dec:: A record file is replaced by renaming a new file over it
    :id: DEC_RECORD_REPLACED_BY_RENAME
