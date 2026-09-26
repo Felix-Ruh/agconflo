@@ -76,9 +76,10 @@ component requirement whose subject is anything else.
      naming nothing cannot arrive, so an instance bound to it is never ready.
      Treating an unresolvable name as absent and therefore ignorable would offer
      the instance with a parameter missing.
-   - **An instance offered again after producing.** No instance activates twice
-     (``DEC_ACTIVATION_ONCE_PER_RUN``), and an instance that has produced has a
-     context for everything it binds, so this is the shape that loops forever.
+   - **An instance offered again with nothing new.** An instance that has
+     produced still has a context for everything it binds, so offering it on
+     that alone is the shape that loops forever; it runs again only on
+     something new (``CREQ_SCHEDULER_OFFERS_AGAIN``).
 
    Must pass unoffered and unreported: an entry instance, which is ready from
    the start.

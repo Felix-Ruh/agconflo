@@ -3,16 +3,19 @@ Decisions about a model choosing a route
 ========================================
 
 How a node's script asks a model to choose, what reaches the model, what
-comes back, and where the choice may be asked for. They are written for
+comes back, and where the choice may be asked for; then how a router takes
+the branch it chose. The first eight are written for
 ``FEAT_ROUTE_CHOSEN_BY_MODEL`` against the measurements in
-``evidence/routing``.
+``evidence/routing``, the last four for ``FEAT_ROUTE_WALKS_CHOSEN_EDGES`` and
+``FEAT_ROUTE_RECORDED`` on the model ``DEC_ONE_GRAPH`` recorded.
 
 Five rest on those measurements, or on those ``decisions/models`` rested on.
-The other three are judgements between the alternatives each names. One supersedes a decision in ``decisions/models``.
+The other seven are judgements between the alternatives each names. One
+supersedes a decision in ``decisions/models``.
 
-What they do not settle is named here: how a router takes the branch it
-chose, which is the routing mechanism ``DEC_ONE_GRAPH`` describes; and the
-score and yes-or-no questions the decisions model also answers.
+What they do not settle is named here: the score and yes-or-no questions the
+decisions model also answers, and a stuck run's report telling an instance on
+a branch not taken from one that cannot proceed.
 
 .. dec:: A decision is a model call, recorded as an exchange offering nothing
    :id: DEC_DECISION_IS_A_MODEL_CALL
@@ -145,3 +148,60 @@ score and yes-or-no questions the decisions model also answers.
    (``EVD_DECISIONS_MODEL_SHAPE``). A router given an option nobody asked
    takes a branch that does not exist, and one given nothing branches on an
    absent value; either is a failure the script cannot see from the answer.
+
+.. dec:: A node type routes by declaring it
+   :id: DEC_ROUTER_DECLARED
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :statement: Agconflo shall treat a node type as a router only when its declaration says routes = true, and let only a router's script name the instances its run goes on to.
+
+   Declared in the node type, a router is known before anything runs: the
+   validator can check what is bound to its inputs, and a rendering of the
+   graph can draw its edges as the branches they are. Letting any node's
+   script route was the alternative, and leaves every edge in a workflow
+   possibly not walked, which nothing but a run could tell.
+
+   Nothing makes a router a type Agconflo ships (``STKH_NO_PRIVILEGED_TYPES``):
+   any workflow's node type declares it.
+
+.. dec:: A router's one output is its decision, and its inputs go on by name
+   :id: DEC_ROUTER_OUTPUT_IS_ITS_DECISION
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :statement: Agconflo shall take a router's output as its decision, and walk along each of its edges either that output or the one of its inputs the edge names.
+
+   ``STKH_ONE_OUTPUT`` keeps deciding apart from producing, and one output is
+   one context with one identity. A router's output is therefore the context
+   its decision is held in - a decisions model's answer, or text its script
+   wrote - and not new content for what comes after. What the branch needs is
+   what the router was given: a draft sent back to be revised is the draft,
+   not a copy of it. So an edge out of a router carries its output, bound as
+   any output is, or one of its inputs, bound by name
+   (``DEC_ROUTED_INPUT_BOUND_BY_TABLE``).
+
+   Bundling its inputs into one composed output was the alternative, and
+   hands each consumer a list to take apart by position.
+
+.. dec:: A binding takes a router's input by naming the router and the input in a table
+   :id: DEC_ROUTED_INPUT_BOUND_BY_TABLE
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :statement: Agconflo shall read a binding written as a table of from and input as the edge carrying the named input of the named router, and a binding written as a name as the edge carrying that instance's output.
+
+   ``draft = { from = "router", input = "draft" }`` rather than
+   ``draft = "router.draft"``: an instance's name may hold a dot, so a dotted
+   name cannot tell an instance called ``router.draft`` from the input
+   ``draft`` of ``router``. Refusing dots in instance names was the other way,
+   and would refuse workflows that are sound today for a syntax.
+
+.. dec:: A router's naming is held in the record beside its output
+   :id: DEC_ROUTE_RECORDED
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :statement: Agconflo shall write the instances a router's activation named beside that activation's output in the run's record, and resume a run walking the recorded names.
+
+   Resuming takes a finished activation's output from the record
+   (``CREQ_RECORD_CONTINUES_THE_RUN``) and runs no script again, so which
+   edges a router walked has to be there too. Beside its output, in the same
+   entry, because the two are one act of the router's and a record holding
+   one without the other is not a record of it.

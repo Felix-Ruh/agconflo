@@ -16,9 +16,10 @@ disagreeing with it.
 The three before the last were taken by the maintainer on 2026-09-26, and
 supersede four of the first: a workflow is one graph whose edges carry contexts,
 it repeats part of itself only by walking those edges again, and a node type
-declares no optional parameter. The last follows from the one before it: a node
-type document still declaring optional parameters is refused rather than read
-without them.
+declares no optional parameter. The one after them follows from the last of
+those: a node type document still declaring optional parameters is refused
+rather than read without them. The last was the maintainer's too: a list is
+handled item by item inside one node.
 
 None of them rests on a measurement, and none carries evidence. They are
 judgements about a model, and the honest record of a judgement is its reasoning
@@ -250,3 +251,25 @@ and what it turned down.
    every instance binding none of those parameters would stop starting, for a
    reason the document no longer shows. Ignoring the key was the other, and is
    the silent loss above.
+
+.. dec:: A list is handled item by item inside one node
+   :id: DEC_LIST_HANDLED_IN_ONE_NODE
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :statement: Agconflo shall have a node handle each item of a list it is given within its own activation, with no edge that walks a list's items as passes of their own.
+
+   Taken by the maintainer, when a workflow's research step had to look into
+   each of several decisions apart and a later step needed all the results.
+   A node given the list loops over it in its script, asking a model once per
+   item with that item and whatever else it needs, and its one output is the
+   list of results. The record keeps each call's window and answer, so a run
+   interrupted part way resumes without asking any item again
+   (``DEC_RECORD_AFTER_EACH_ANSWER``), and a call is sent exactly the contexts
+   its script composed for it (``FEAT_MODEL_WINDOW_IS_THE_PROMPT``).
+
+   An edge walking each item as a pass of its own, and one gathering the
+   passes back into a list, was the alternative: the items would be nodes a
+   router could send apart, at the cost of two new kinds of edge and of
+   pairing each gathered item with the list it came from. It is left until an
+   item needs a route of its own. What it costs now is that one activation
+   spends the call limit for every item.

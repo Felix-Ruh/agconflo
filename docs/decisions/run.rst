@@ -25,7 +25,10 @@ The last two were taken by the maintainer on 2026-09-26, when a node became able
 to run more than once: how a run pairs the contexts on a node's edges pass by
 pass, and which contexts stay the same for every pass. They supersede the first
 decision below, which said no instance ran twice, and the one that waited for
-every bound parameter whether required or optional.
+every bound parameter whether required or optional. The two after them follow
+from the first of those, and were taken while specifying it: a node runs again
+only on something new, and an instance that cannot run again leaves its output
+standing.
 
 What this slice does not settle is as load-bearing as what it does, so it is
 named here rather than left to be inferred. Nothing below decides whether node
@@ -408,3 +411,31 @@ to leave every one of them open.
    A standing context also keeps its identity pass after pass, which is what
    the prefix store needs to find it again at the head of the next call
    (``DEC_PREFIX_STORE``).
+
+.. dec:: A node runs again only when one of its edges holds something new
+   :id: DEC_RUN_AGAIN_ON_SOMETHING_NEW
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :statement: Agconflo shall activate an instance that has run again only when at least one edge into it holds a context the instance has not taken, and an instance with no edge into it once.
+
+   ``DEC_EDGE_GENERATIONS`` activates an instance once every edge into it
+   holds its next unprocessed context, and a standing output is one no edge
+   ever runs out of (``DEC_STANDING_OUTPUTS``). An instance whose every input
+   stands, or that has no input at all, would then run for ever on the same
+   contexts, each run spending the budget to say again what it said. Requiring
+   one input to be new ends that, and needs no declaration: an instance whose
+   inputs have not moved on has nothing new to answer.
+
+.. dec:: An instance that cannot run again leaves its output standing
+   :id: DEC_ONCE_RUN_OUTPUTS_STAND
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :statement: Agconflo shall hold the output of an instance with no edge into it that does not stand for every later activation reading it, as if its node type declared it standing.
+
+   Such an instance runs once (``DEC_RUN_AGAIN_ON_SOMETHING_NEW``): an entry
+   given the run's arguments, or a node reading nothing. Whatever reads its
+   output inside a repetition needs it on every pass, and it will never
+   produce another, so an edge from it that ran out after one pass would stop
+   the repetition it feeds on its second round. Declaring every such node type
+   standing was the alternative, and is a declaration every workflow would
+   need and none would mean otherwise.
