@@ -293,3 +293,58 @@ measurement below records; its project needed no package.
    the run's label. One run of one model on one small task: it shows the
    feature working end to end, and says nothing of how often such a model
    finds its way, or of a task needing the network.
+
+.. evd:: A step's user has no home it can write unless it is given one
+   :id: EVD_STEP_HOME_NOT_WRITABLE
+   :evd_kind: measurement
+   :observed_on: 2026-09-26
+   :observation: Run as uid 1000, which neither image's passwd names, a step in alpine and in python:3.14-slim had HOME set to / and could not write there; given HOME=/tmp, the shell's home and Python's were /tmp and writable.
+
+   Each container was locked down as a tool's is, read-only root and a
+   writable ``/tmp`` included. ``cd ~ && touch here`` failed with
+   "Read-only file system" in both images. With ``docker exec -e HOME=/tmp``
+   the same command succeeded, and in the Python image ``Path.home()`` gave
+   ``/tmp`` and a ``.cache`` folder could be made under it. No build tool was
+   run: which of them write to the home directory was not measured here.
+
+.. evd:: A full /tmp loses a step's output, and the next step's
+   :id: EVD_FULL_TMP_LOSES_OUTPUT
+   :evd_kind: measurement
+   :observed_on: 2026-09-26
+   :observation: With /tmp limited to 1 MiB, a command filling it and then printing came back through the wrapper with status 1 and no output at all, and the next command's output was lost too while /tmp stayed full, with status 0 and no word of it.
+
+   The container was alpine's, locked down, with ``--tmpfs
+   /tmp:mode=1777,size=1m``; the wrapper was the sandbox's own, which writes a
+   step's output to a file in ``/tmp`` before cutting it. The first command
+   wrote 2 MB to ``/tmp/big`` and then echoed a word; the second echoed a
+   word and removed the file; the third, with ``/tmp`` free again, echoed the
+   word and it came back. Neither the command's own error nor the wrapper's
+   reached standard error: only the status did.
+
+.. evd:: A container name in use refuses a new container until the old one is removed
+   :id: EVD_CONTAINER_NAME_IN_USE
+   :evd_kind: measurement
+   :observed_on: 2026-09-26
+   :observation: docker run --name exited 125 with a conflict naming the container already holding the name, and the same run succeeded once the containers carrying the first one's label had been removed.
+
+   The first container was left running under the name and a label; the
+   second run gave "Conflict. The container name ... is already in use by
+   container ..." on standard error. ``docker rm -f`` of every container the
+   label filter listed freed the name.
+
+.. evd:: The wrapper behaves the same under dash and GNU coreutils
+   :id: EVD_WRAPPER_UNDER_DASH
+   :evd_kind: measurement
+   :observed_on: 2026-09-26
+   :observation: In python:3.14-slim, whose sh is dash and whose timeout is GNU coreutils 9.7, the wrapper gave 3 with both streams, 137 after 2.28 s with what was printed first, 992 bytes named cut from 1092, and left only the container's own processes.
+
+   The container was locked down as a tool's is, with ``--init`` and ``sleep
+   infinity`` as root; each command ran through the sandbox's own wrapper as
+   uid 1000 under a limit of 2 seconds and 100 bytes. The commands were an
+   exit 3 writing a line to each stream, ``echo started; sleep 30; echo
+   never``, ``seq 1 300``, and a background sleep beside a double fork
+   ignoring TERM and HUP; afterwards ``/proc`` listed only ``docker-init``,
+   ``sleep infinity`` and the listing, all root's. A command running ``kill
+   -KILL -1`` ended its own wrapper and ``docker exec`` exited 137 with
+   nothing on standard error, as in alpine
+   (``EVD_REMOVED_CONTAINER_LOOKS_KILLED``).
