@@ -256,7 +256,8 @@ catches it, and where one is caught only in part the case says so.
    :coverage: partial
 
    A step running ``id -u; id -g`` answers the user and group of the test's
-   own process on Linux and 1000 and 1000 elsewhere, never 0. On Linux a file
+   own process on Linux unless that is root, and 1000 and 1000 otherwise,
+   never 0. On Linux a file
    the step writes into a writable folder belongs on the host to the test's
    user.
 

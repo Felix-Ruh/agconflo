@@ -723,12 +723,16 @@ fn step_user() {
         .map(|id| id.parse().expect("an id"))
         .collect();
 
-    let expected = if cfg!(target_os = "linux") {
+    // The test's own ids on Linux, unless it runs as root; 1000 otherwise.
+    let own = if cfg!(target_os = "linux") {
         let status = std::fs::read_to_string("/proc/self/status").expect("the status file");
-        let (user, group) = ids_from_status(&status).expect("the ids");
-        [user, group]
+        ids_from_status(&status)
     } else {
-        [1000, 1000]
+        None
+    };
+    let expected = match own {
+        Some((user, group)) if user != 0 => [user, group],
+        _ => [1000, 1000],
     };
     assert_eq!(ids, expected);
     assert!(!ids.contains(&0));
