@@ -3,8 +3,9 @@ Running a workflow
 ==================
 
 What happens when a workflow actually runs: what it can be made of, what it may
-integrate with, the ways a run is allowed to end, and what a person needs to
-run one. Several of these constrain each other, or a goal in
+integrate with, which way a run goes through the graph and how often it goes
+round, the ways a run is allowed to end, and what a person needs to run one.
+Several of these constrain each other, or a goal in
 ``stakeholder/context``, and the bodies say where.
 
 .. stkh_req:: The provider is not baked in
@@ -71,6 +72,87 @@ run one. Several of these constrain each other, or a goal in
    checks is perfectly possible, which is what this requirement rules out. The
    value is that a wiring mistake costs a rejection rather than half of an
    expensive run.
+
+.. stkh_req:: A node chooses which branch a run takes
+   :id: STKH_ROUTING
+   :stakeholder: user
+   :statement: Agconflo shall let a node decide which of the branches after it a run takes.
+
+   A graph in which every edge is taken cannot express a decision. Whether a
+   check passed or a review approved is known inside the run and nowhere else,
+   and if nothing in the workflow may follow from it, the choice moves outside
+   the workflow - into whatever hosts the run, where no run log can say why the
+   run went the way it did (``STKH_PROVENANCE``).
+
+   The choice is the node's because the node is the only party holding what it
+   is made of. Which way a run should go is a judgement about the context the
+   node was given; the engine is handed contexts to carry rather than to
+   interpret, and the wiring was written before any context existed.
+
+   It says nothing about how a branch is declared or how a decision travels - a
+   parameter, a condition on an edge, an explicit control edge - and nothing
+   about a node choosing a branch that is not one of the ones after it, since
+   which branches follow a node is the definition's to say. The model already
+   has a place for what a binding cannot express, a router gating one branch
+   over another among them (``DEC_IMPLIED_CONTROL_EDGES``), and keeps a
+   context's route apart from when a node runs
+   (``DEC_ROUTING_SEPARATE_FROM_CONTROL``); which shape carries a decision is
+   that decision's to settle, and may change without this goal moving.
+
+   It constrains the stuck-run report below, the way the human-in-the-run
+   requirement does. A branch the run did not take leaves instances that never
+   activated, and a run that went another way is not a run that can make no
+   further progress.
+
+   It is separate from ``STKH_ONE_OUTPUT`` because either can hold without the
+   other: every node can produce exactly one thing in a graph where no edge is
+   ever gated, and a node could choose among branches in a model whose nodes
+   produce several things. ``STKH_REPETITION`` below leans on this one, because
+   deciding whether a repeated part runs once more is a branch decision like any
+   other.
+
+.. stkh_req:: A workflow repeats part of itself
+   :id: STKH_REPETITION
+   :stakeholder: user
+   :statement: Agconflo shall let a workflow repeat part of itself until a node decides it is done.
+
+   Some work is not known to be finished until it has been tried. A step that
+   runs a test, a generator that emits until what it produced parses, a review
+   that comes back with another round of comments - each is part of the workflow
+   that has to happen again. A workflow that cannot say so leaves the repetition
+   to whatever hosts the run, where the run's own record does not reach it
+   (``STKH_PROVENANCE``).
+
+   The decision that ends the repetition is a node's, which is where
+   ``STKH_ROUTING`` above is met again: whether the repeated part runs once more
+   or the run carries on is one of the branches after that node. The node is
+   what holds the context the decision rests on, and what it decides from is
+   deliberately not this goal's to say - a count reached, a test that passed, a
+   person's answer, something only that pass produced are all its own business.
+
+   It says nothing about how a repeated part is expressed either. A scope naming
+   the part, a region the run re-enters and a cycle drawn in the graph are
+   different mechanisms for the same goal, and which one carries it is a
+   decision's to make.
+
+   The model is half-prepared for this, and the half that is missing is written
+   down as such. A cycle is a legal workflow already
+   (``DEC_BACK_EDGES_ALLOWED``), and a back edge closing a loop is one of the
+   control edges kept for what a binding cannot express
+   (``DEC_IMPLIED_CONTROL_EDGES``); a run, though, activates each node instance
+   at most once (``DEC_ACTIVATION_ONCE_PER_RUN``), which that decision records
+   as a boundary rather than an ambition. This goal is what a run able to go
+   round a cycle has to meet, and how one pass's contexts are told from
+   another's is left to the decision that will have to move for it.
+
+   It is separate from ``STKH_STEP_BUDGET`` below because either can hold
+   without the other: a straight run of nodes that never repeats anything can
+   exceed any budget, and a workflow can repeat with nothing counting what it
+   does at all. Where both hold, the count is activations as it always was,
+   since a second pass through a node is an activation like the first. A run
+   going round is also making progress while it goes, so the stuck-run report is
+   for a repeated part that can no longer decide anything rather than for one
+   that keeps deciding.
 
 .. stkh_req:: A runaway run is stopped
    :id: STKH_STEP_BUDGET
