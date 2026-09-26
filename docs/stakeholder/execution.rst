@@ -88,16 +88,13 @@ where.
    The node decides because the choice is made from contexts, and a node is
    what is given contexts (``STKH_EXPLICIT_CONTEXT``). Deciding is a step of
    its own, apart from producing content: ``STKH_ONE_OUTPUT`` keeps the two
-   apart as what makes a router a router and a transform a transform, so the
-   deciding node's one output is its decision.
+   apart as what makes a router a router and a transform a transform, so a
+   router passes on the contexts it was given rather than making new ones.
 
-   It names no mechanism. Explicit control edges gated by the decision are
-   what ``DEC_IMPLIED_CONTROL_EDGES`` reserves for "a router gating one branch
-   over another", and none can be represented yet
-   (``DEC_ACTIVATION_ONCE_PER_RUN``). Nor does it say what makes the decision:
-   a script, a model or a person each performs a node. And a router is not a
-   type Agconflo ships, but a node type any workflow declares
-   (``STKH_NO_PRIVILEGED_TYPES``).
+   It names no mechanism: how a branch is taken is a decision's to say. Nor
+   does it say what makes the decision: a script, a model or a person each
+   performs a node. And a router is not a type Agconflo ships, but a node
+   type any workflow declares (``STKH_NO_PRIVILEGED_TYPES``).
 
    A run already completes whatever instances have not run
    (``DEC_COMPLETION_IS_DESIGNATED_OUTPUT``), so a branch not taken leaves
@@ -111,7 +108,7 @@ where.
    :statement: Agconflo shall let a workflow repeat part of itself until a node decides it is done.
 
    Retrying a step until a test passes is an ordinary pipeline
-   (``DEC_BACK_EDGES_ALLOWED``), and so are drafting, reviewing and drafting
+   (``DEC_REPETITION_BY_EDGES``), and so are drafting, reviewing and drafting
    again, or fixing and building until the build passes. Without this the
    repetition happens inside one node - a model's own calls within one
    activation - or outside the run, and the workflow no longer shows the
@@ -122,12 +119,8 @@ where.
    node deciding on a count. It is separate from that goal because routing
    holds without it: branches that never return are useful on their own.
 
-   It names no mechanism. A back edge is legal to write today
-   (``DEC_BACK_EDGES_ALLOWED``), and the loop scope that decision records as
-   a fallback remains one. Nor does it say how one pass's contexts are kept
-   apart from the next's: each activation's contexts are already new
-   (``DEC_IDENTITY_PER_ACTIVATION``), and tagging them by pass is what
-   ``DEC_ACTIVATION_ONCE_PER_RUN`` defers until an instance can run twice.
+   It names no mechanism: how a part of a workflow is repeated, and how one
+   pass's contexts are kept apart from the next's, are decisions' to say.
 
    It does not bound itself. A repetition whose node never decides it is done
    is what the step budget below stops.

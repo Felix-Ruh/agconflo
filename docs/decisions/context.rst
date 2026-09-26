@@ -115,3 +115,27 @@ re-opening one means superseding it rather than quietly disagreeing with it.
    implied by it. Identifiers being fresh per activation does not rule out a
    content hash sitting beside them - the two could coexist, and are meant to. This
    is the decision that says the hash is not there yet.
+
+.. dec:: Contexts sent together before are sent first again, in the same order
+   :id: DEC_PREFIX_STORE
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :statement: Agconflo shall keep for each model within a run every list of contexts a call to it has sent, and send a later call's order-free contexts led by the longest such list they contain, recording the order sent.
+
+   A provider's prompt cache matches an exact prefix of bytes
+   (``DEC_COMPOSITION_BY_REFERENCE``), so a call that repeats the head of an
+   earlier one pays for the new part alone. If contexts A and C were sent
+   together before, a later call given A, B and C sends A, C, B, and its head
+   is the earlier request's. A context is found again by its identity, which
+   within one run is what makes two contexts the same
+   (``DEC_NO_CONTENT_ADDRESSING``); across runs that would need content
+   addresses, which do not exist yet. Standing outputs keep their identity
+   from pass to pass, so a repeated node's calls share their head
+   (``DEC_STANDING_OUTPUTS``).
+
+   Only contexts a node type declares order-free are moved. Order is meaning
+   (``FEAT_CONTEXT_PARTS``), and an instruction that has to come first stays
+   first. The call still sends exactly the contexts it is made with
+   (``FEAT_MODEL_WINDOW_IS_THE_PROMPT``); what changes is their order, and the
+   record keeps the order actually sent. The store is per model because a
+   provider's cache is.

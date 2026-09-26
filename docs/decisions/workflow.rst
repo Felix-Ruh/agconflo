@@ -13,6 +13,11 @@ being written. That is the same order the context decisions were migrated in, an
 the same rule applies: re-opening one means superseding it rather than quietly
 disagreeing with it.
 
+The last three were taken by the maintainer on 2026-09-26, and supersede four of
+the first: a workflow is one graph whose edges carry contexts, it repeats part of
+itself only by walking those edges again, and a node type declares no optional
+parameter.
+
 None of them rests on a measurement, and none carries evidence. They are
 judgements about a model, and the honest record of a judgement is its reasoning
 and what it turned down.
@@ -38,7 +43,7 @@ and what it turned down.
 
 .. dec:: A node type declares what it consumes
    :id: DEC_DECLARED_PARAMETERS
-   :dec_status: accepted
+   :dec_status: superseded
    :decided_on: 2026-08-14
    :statement: Agconflo shall have every node type declare the parameters it requires, the parameters it accepts and the global context types it reads.
 
@@ -78,7 +83,7 @@ and what it turned down.
 
 .. dec:: A binding is also a control edge
    :id: DEC_IMPLIED_CONTROL_EDGES
-   :dec_status: accepted
+   :dec_status: superseded
    :decided_on: 2026-08-14
    :statement: Agconflo shall treat a binding into a node as a control edge into that node.
 
@@ -99,7 +104,7 @@ and what it turned down.
 
 .. dec:: Routing a context is not scheduling a node
    :id: DEC_ROUTING_SEPARATE_FROM_CONTROL
-   :dec_status: accepted
+   :dec_status: superseded
    :decided_on: 2026-08-14
    :statement: Agconflo shall route a context independently of the order in which nodes run.
 
@@ -116,7 +121,7 @@ and what it turned down.
 
 .. dec:: A cycle is a legal workflow
    :id: DEC_BACK_EDGES_ALLOWED
-   :dec_status: accepted
+   :dec_status: superseded
    :decided_on: 2026-08-14
    :statement: Agconflo shall accept a workflow whose edges form a cycle.
 
@@ -155,3 +160,70 @@ and what it turned down.
    A workflow with no designated output, or with more than one, is therefore
    invalid rather than merely unusual, and that is a check on the definition
    rather than on a run.
+
+.. dec:: A workflow repeats part of itself by walking its edges again
+   :id: DEC_REPETITION_BY_EDGES
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :supersedes: DEC_BACK_EDGES_ALLOWED
+   :statement: Agconflo shall accept a workflow whose edges form a cycle and repeat part of a workflow only by walking its edges again, with no loop construct.
+
+   What ``DEC_BACK_EDGES_ALLOWED`` decided stands: retrying a step until a test
+   passes is an ordinary pipeline, a cycle is legal, and reachability is asked
+   from the entry nodes. What it kept as a fallback does not: there is no loop,
+   no scope, and no iteration counter. An edge pointing back to a node that has
+   run is an edge like any other, and walking it again is all repetition is.
+   The counter a loop scope would have owned is the generation each edge keeps
+   (``DEC_EDGE_GENERATIONS``).
+
+   Drawn, such a workflow shows its data flow and nothing else: every edge is a
+   context's path. The maintainer chose it over the loop scope for the reason
+   the superseded decision gave for not taking one: a scope constrains where a
+   loop may be drawn, and these graphs are wired rather than nested.
+
+.. dec:: A workflow is one graph of edges carrying contexts, and a router routes along them
+   :id: DEC_ONE_GRAPH
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :supersedes: DEC_IMPLIED_CONTROL_EDGES, DEC_ROUTING_SEPARATE_FROM_CONTROL
+   :statement: Agconflo shall keep a workflow as one graph whose edges carry contexts, and route a run by the edges a router walks the contexts it was given along, with no separate graph of control edges.
+
+   ``DEC_IMPLIED_CONTROL_EDGES`` kept explicit control edges for four cases and
+   ``DEC_ROUTING_SEPARATE_FROM_CONTROL`` kept the path a context takes apart
+   from the order nodes run in: two graphs over one definition. There is now
+   one. A node runs when its edges hold what it needs (``DEC_EDGE_GENERATIONS``),
+   and that is the whole of when.
+
+   The four cases each need no graph of their own. An entry node is marked as
+   one. An ordering between nodes that act on the world is an edge: the node
+   that must come second is given the first one's output. A back edge is an
+   edge walked again (``DEC_REPETITION_BY_EDGES``). And a router gates a branch
+   by which edges it walks.
+
+   A router creates no content. Its script decides which of the edges after it
+   to walk, and the contexts walked along them are the ones it was given,
+   unchanged, so a routed context's provenance is its producer's
+   (``STKH_ONE_OUTPUT``: deciding where something goes is apart from producing
+   it). A branch no router walks receives no generation, and its nodes do not
+   run; a run already completes whatever instances have not
+   (``DEC_COMPLETION_IS_DESIGNATED_OUTPUT``).
+
+.. dec:: Every parameter a node type declares is required, and an empty one is an empty context
+   :id: DEC_EVERY_INPUT_REQUIRED
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :supersedes: DEC_DECLARED_PARAMETERS, DEC_BINDING_IS_AWAITED
+   :statement: Agconflo shall have every node type declare the parameters it requires and the global context types it reads and no optional parameter, a parameter with nothing to carry being given an empty context.
+
+   What ``DEC_DECLARED_PARAMETERS`` decided stands but for its middle list: each
+   parameter is typed and ordered, and requested global types stay the one
+   sanctioned way to read what was not wired. Optional parameters go. Every
+   context a node type names is one it needs, and a producer with nothing to
+   say gives an empty context - the text ``""`` - which is explicit and
+   recorded, where an unbound parameter said nothing either way.
+
+   It also settles what ``DEC_BINDING_IS_AWAITED`` had to argue for: with
+   nothing optional, every edge into a node is waited for without an
+   exception to reason about (``DEC_EDGE_GENERATIONS``). The code, the readers
+   and their requirements still hold optional parameters; removing them is a
+   change of its own, and until it lands they follow the superseded decisions.

@@ -21,6 +21,12 @@ contradicts a declaration, once it has been shown to accept two kinds of them
 without a word. The tenth, last in the file, was taken the same day on two more
 such measurements: where a run's identifiers are kept unambiguous.
 
+The last two were taken by the maintainer on 2026-09-26, when a node became able
+to run more than once: how a run pairs the contexts on a node's edges pass by
+pass, and which contexts stay the same for every pass. They supersede the first
+decision below, which said no instance ran twice, and the one that waited for
+every bound parameter whether required or optional.
+
 What this slice does not settle is as load-bearing as what it does, so it is
 named here rather than left to be inferred. Nothing below decides whether node
 behaviour is eventually asynchronous, whether the engine acquires a runtime, how
@@ -68,7 +74,7 @@ to leave every one of them open.
 
 .. dec:: A bound parameter is waited for
    :id: DEC_BINDING_IS_AWAITED
-   :dec_status: accepted
+   :dec_status: superseded
    :decided_on: 2026-09-22
    :supported_by: EVD_RUN_OPTIONAL_BY_ORDER
    :statement: Agconflo shall wait for every parameter an instance binds before activating that instance, whether the parameter is declared required or optional.
@@ -242,7 +248,7 @@ to leave every one of them open.
 
 .. dec:: An instance activates at most once in a run
    :id: DEC_ACTIVATION_ONCE_PER_RUN
-   :dec_status: accepted
+   :dec_status: superseded
    :decided_on: 2026-09-22
    :statement: Agconflo shall activate each node instance at most once in a run.
 
@@ -347,3 +353,58 @@ to leave every one of them open.
    is the sanctioned shape (``DEC_COMPOSITION_BY_REFERENCE``). A different
    context under a held identifier is what is refused, and telling the two
    apart needs the value's identity, because by identifier they are the same.
+
+.. dec:: Every edge numbers the contexts walked along it, and a node takes the lowest of each
+   :id: DEC_EDGE_GENERATIONS
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :supersedes: DEC_ACTIVATION_ONCE_PER_RUN, DEC_BINDING_IS_AWAITED
+   :statement: Agconflo shall number the contexts walked along each edge into an instance from 0 and activate the instance once every edge into it holds its next unprocessed generation, taking the lowest unprocessed generation from each.
+
+   An edge may be walked more than once: a router can send contexts back along
+   an edge to a node that has run (``DEC_REPETITION_BY_EDGES``). Each walk adds
+   the next generation on that edge - 0, then 1 - and each edge into a node is a
+   queue of its own. A node that has not run waits for generation 0 on every
+   edge into it, however many later generations one edge already holds, and
+   every later activation takes the next generation of each. So pass ``n`` of a
+   node is given the ``n``-th context of each of its edges, and nothing else.
+
+   This is the tagging ``DEC_ACTIVATION_ONCE_PER_RUN`` deferred until an
+   instance could activate twice: without it a join pairs one pass's context
+   with another's, "a well-formed wrong answer". Generations are what make the
+   pairing exact, and ``DEC_IDENTITY_PER_ACTIVATION`` still gives each context
+   its own identifier; the generation is where on its edge it was walked, not
+   what it is.
+
+   Every edge is waited for, as ``DEC_BINDING_IS_AWAITED`` had it for every
+   bound parameter, and for the reason that decision measured
+   (``EVD_RUN_OPTIONAL_BY_ORDER``): what a node is given must not depend on the
+   order anything is written in. There are no optional parameters any more to
+   distinguish (``DEC_EVERY_INPUT_REQUIRED``).
+
+   A pass is given no history. What earlier passes produced reaches a later one
+   only by being wired to it, like any other context. The code still activates
+   each instance once; it follows the superseded decisions until the repetition
+   feature is built.
+
+.. dec:: A node type declares an output standing, which serves every later generation
+   :id: DEC_STANDING_OUTPUTS
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :statement: Agconflo shall let a node type declare its output standing in its definition, so that each edge carrying it holds that context for every later generation until the node produces another.
+
+   Some contexts do not change from one pass to the next: the brief of a task,
+   a set of rules, an example. Walking them along an edge again for every pass
+   would mean running their node again to produce the same thing. A standing
+   output is walked once and then serves every generation from there on, until
+   its node runs again and produces a new one, which serves from its own
+   generation onward.
+
+   It is fixed where the node type is defined, before any run, and never
+   decided while one runs: whether a context stands is part of what the node
+   is, as its parameters are, so a workflow's definition says everything about
+   how its contexts are paired (``DEC_EDGE_GENERATIONS``).
+
+   A standing context also keeps its identity pass after pass, which is what
+   the prefix store needs to find it again at the head of the next call
+   (``DEC_PREFIX_STORE``).
