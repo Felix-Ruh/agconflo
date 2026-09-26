@@ -3,9 +3,9 @@ Running a workflow
 ==================
 
 What happens when a workflow actually runs: what it can be made of, what it may
-integrate with, the ways a run is allowed to end, and what a person needs to
-run one. Several of these constrain each other, or a goal in
-``stakeholder/context``, and the bodies say where.
+integrate with, how a run's path is chosen and repeated, the ways a run is
+allowed to end, and what a person needs to run one. Several of these constrain
+each other, or a goal in ``stakeholder/context``, and the bodies say where.
 
 .. stkh_req:: The provider is not baked in
    :id: STKH_PROVIDER_CHOICE
@@ -71,6 +71,74 @@ run one. Several of these constrain each other, or a goal in
    checks is perfectly possible, which is what this requirement rules out. The
    value is that a wiring mistake costs a rejection rather than half of an
    expensive run.
+
+.. stkh_req:: A node decides the branch a run takes
+   :id: STKH_NODE_ROUTING
+   :stakeholder: user
+   :statement: Agconflo shall let a node decide which of the branches after it a run takes.
+
+   A run has to be able to choose among the branches that follow a node. The
+   explicit control edges kept for what a binding cannot express include exactly
+   this one - a router gating one branch over another
+   (``DEC_IMPLIED_CONTROL_EDGES``) - and today the choice cannot be made: a
+   router decides about outgoing control edges that no definition carries yet,
+   so no instance is skipped by a decision (``DEC_ACTIVATION_ONCE_PER_RUN``),
+   and the run feature names "no routers" among what its first slice leaves out
+   (``FEAT_RUN_*``).
+
+   What it deliberately does not say is how the choice is made. A router node
+   type, a condition on an edge, a tag on an activation and a representation of
+   a branch are all mechanisms, and ``DEC_ACTIVATION_ONCE_PER_RUN`` leaves that
+   mechanism open rather than guessed at. It is not the routing of a context,
+   which carries a value past nodes without saying which of them run
+   (``DEC_ROUTING_SEPARATE_FROM_CONTROL``), and it leaves the authoring rule
+   that a node has one output as it stands (``STKH_ONE_OUTPUT``).
+
+   It can hold without repetition below, and repetition can hold without it: a
+   run could choose a branch and never loop, or loop without choosing between
+   branches. It is independent of the budget that stops a runaway
+   (``STKH_STEP_BUDGET``), which is about a run doing too much rather than about
+   which branch it takes; of the report for a run that can make no progress
+   (``STKH_STUCK_RUN``); and of the check that refuses invalid wiring before
+   anything runs (``STKH_WIRING_CHECKED``), which is a question about a
+   definition rather than a decision a run makes.
+
+.. stkh_req:: A workflow repeats part of itself until a node decides it is done
+   :id: STKH_WORKFLOW_REPETITION
+   :stakeholder: user
+   :statement: Agconflo shall let a workflow repeat part of itself until a node decides it is done.
+
+   Retrying a step until a test passes is ordinary pipeline behaviour rather
+   than a special case, and expressing it outside the workflow puts it where the
+   run's record does not reach (``DEC_BACK_EDGES_ALLOWED``). A back edge closing
+   a loop is one of the explicit control edges kept for what a binding cannot
+   express (``DEC_IMPLIED_CONTROL_EDGES``). Today such a cycle is legal to write
+   and cannot be run: with no explicit control edges every instance in it waits
+   for the one before it, so the run is quiescent from the start
+   (``DEC_ACTIVATION_ONCE_PER_RUN``; ``FEAT_RUN_*``). A second pass is only well
+   formed because identity belongs to the activation, so a join cannot pair the
+   second iteration's context with the first's (``DEC_IDENTITY_PER_ACTIVATION``).
+
+   What it deliberately does not say is how the repetition is built. It does not
+   require an explicit loop construct or scope, which was the recorded fallback
+   and was not taken (``DEC_BACK_EDGES_ALLOWED``). It does not prescribe
+   activation or epoch tagging, or how an iteration is counted, which
+   ``DEC_ACTIVATION_ONCE_PER_RUN`` leaves open. It does not set the bound at
+   which repetition stops, which is the budget's (``STKH_STEP_BUDGET``); it does
+   not put a loop inside a single node, which is what a model yielding within
+   its activation is for (``STKH_MODEL_YIELDS``); and it redefines neither how
+   the budget is counted (``DEC_BUDGET_COUNTS_ACTIVATIONS``) nor what completes
+   a run (``DEC_COMPLETION_IS_DESIGNATED_OUTPUT``).
+
+   It can hold without routing above, and routing can hold without it. Beside
+   the budget (``STKH_STEP_BUDGET``) it is the goal that lets a workflow repeat
+   itself, while the budget stops the repetition that never ends. A run
+   repeating while it awaits an external decision stays live rather than
+   deadlocked, which is what the stuck-run report already says
+   (``STKH_STUCK_RUN``). A cycle is legal wiring rather than something the
+   pre-run check refuses (``STKH_WIRING_CHECKED``; ``DEC_BACK_EDGES_ALLOWED``).
+   Recursion through a workflow invoked as a node is already the budget's to
+   catch (``STKH_WORKFLOW_AS_NODE``), so no separate mechanism is wanted for it.
 
 .. stkh_req:: A runaway run is stopped
    :id: STKH_STEP_BUDGET
