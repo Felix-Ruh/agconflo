@@ -19,7 +19,7 @@ scratch directory mounted as ``/work``.
 
 What was not measured is named here: a build that needs a package registry
 with no network, and a Docker engine installed on Linux itself and used
-without root - rootless Docker or Podman among them. The last seven below
+without root - rootless Docker or Podman among them. The last eight below
 were taken on an engine installed on Linux and used by root, in a cloud
 development container whose outgoing TLS is intercepted, and each says so. A
 local model calling a node a tool performs was left to the live run of the
@@ -501,3 +501,31 @@ feature, which ``EVD_TOOLS_LIVE_RUN`` records; its project needed no package.
    the local path rather than the GitHub repository was refused whatever was
    trusted, and a run after a passing one passed without the file, answered
    from that cache.
+
+.. evd:: A workflow's tool runs ubc through agconflo once the grants name the host's authorities
+   :id: EVD_UBC_THROUGH_AGCONFLO
+   :evd_kind: measurement
+   :observed_on: 2026-09-26
+   :observation: Through agconflo at bbc6f2c, a DeepSeek model ran ubc check and a Cypher query in a tool container in 6 s, "No errors found." and 27 goals; with the grants' trust line removed, both answered "Not determined to be an open source project".
+
+   Taken with the ``agconflo`` binary built for debugging, from a scratch
+   directory, as ``EVD_TOOLS_LIVE_RUN`` was: a manifest naming one tool,
+   ``run_ubc``, running commands in the image of ``EVD_UBC_IN_A_CONTAINER``
+   in a container of its own; a workflow of an entry instance giving a task
+   and one instance whose script asks the model once, declaring four calls
+   of the tool; ``deepseek/deepseek-v4.1-flash`` through OpenRouter, allowed
+   by the maintainer for testing, its key given to that one process; and
+   grants of the network, the ``run`` action, a limit of 120 seconds, and
+   one folder, ``repo``, writable, at a fresh clone of this repository whose
+   ``origin`` names it on GitHub. ``trust`` named the host's bundle. ``check``
+   found nothing first.
+
+   The task named the two commands. The model called the tool twice in one
+   turn, with each command as written, and answered with what each printed:
+   the check's "No errors found." over 74 files, and the query's one row,
+   27. The run exited 0; no container carried its label afterwards.
+
+   The control was the same run with the clone's ``docs/.ub_cache``, which
+   the first run had written, removed, and the grants without ``trust``: it
+   exited 0 too, the model reporting both commands answering "Not determined
+   to be an open source project" after "No license provided or found".
