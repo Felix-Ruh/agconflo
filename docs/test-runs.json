@@ -156,6 +156,15 @@
           "title": "agconflo-cli::command commands_reach_the_runner",
           "type": "test_run"
         },
+        "RUN_COMMAND_ENGINE_FAILURE_TOLD": {
+          "executes": [
+            "TEST_COMMAND_ENGINE_FAILURE_TOLD"
+          ],
+          "id": "RUN_COMMAND_ENGINE_FAILURE_TOLD",
+          "test_outcome": "passed",
+          "title": "agconflo-cli::command engine_failure_told",
+          "type": "test_run"
+        },
         "RUN_COMMAND_EXIT_STATUS_PER_ENDING": {
           "executes": [
             "TEST_COMMAND_EXIT_STATUS_PER_ENDING"
@@ -174,6 +183,15 @@
           "title": "agconflo-cli::command failure_on_standard_error",
           "type": "test_run"
         },
+        "RUN_COMMAND_GRANTS_HANDED_ON": {
+          "executes": [
+            "TEST_COMMAND_GRANTS_HANDED_ON"
+          ],
+          "id": "RUN_COMMAND_GRANTS_HANDED_ON",
+          "test_outcome": "passed",
+          "title": "agconflo-cli::command grants_handed_on",
+          "type": "test_run"
+        },
         "RUN_COMMAND_HELD_RECORD_REFUSED": {
           "executes": [
             "TEST_COMMAND_HELD_RECORD_REFUSED"
@@ -181,6 +199,15 @@
           "id": "RUN_COMMAND_HELD_RECORD_REFUSED",
           "test_outcome": "passed",
           "title": "agconflo-cli::command held_record_refused",
+          "type": "test_run"
+        },
+        "RUN_COMMAND_KILLED_TOOL_STEP_PERFORMED_ALONE": {
+          "executes": [
+            "TEST_COMMAND_KILLED_TOOL_STEP_PERFORMED_ALONE"
+          ],
+          "id": "RUN_COMMAND_KILLED_TOOL_STEP_PERFORMED_ALONE",
+          "test_outcome": "passed",
+          "title": "agconflo-cli::command killed_tool_step_performed_alone",
           "type": "test_run"
         },
         "RUN_COMMAND_MISUSE_EXITS_2": {
@@ -208,6 +235,15 @@
           "id": "RUN_COMMAND_RESUMED_AFTER_A_KILL",
           "test_outcome": "passed",
           "title": "agconflo-cli::command resumed_after_a_kill",
+          "type": "test_run"
+        },
+        "RUN_COMMAND_TOOL_KEPT_TO_ITS_GRANT": {
+          "executes": [
+            "TEST_COMMAND_TOOL_KEPT_TO_ITS_GRANT"
+          ],
+          "id": "RUN_COMMAND_TOOL_KEPT_TO_ITS_GRANT",
+          "test_outcome": "passed",
+          "title": "agconflo-cli::command tool_kept_to_its_grant",
           "type": "test_run"
         },
         "RUN_COMMAND_UNKEPT_RECORD_TOLD": {
