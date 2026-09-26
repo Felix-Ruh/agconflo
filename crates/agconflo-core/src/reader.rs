@@ -162,12 +162,14 @@ impl std::error::Error for ReadFault {}
 /// The node types `text` declares, read from a document its caller calls
 /// `document`.
 ///
-/// Each type is a table under `types`, keyed by its name, holding up to three
-/// tables and an array - `required` and `optional`, each keying a parameter's
-/// context type by the parameter's name, and `globals`, the context types read
-/// by declaration - and `output`, the one context type it produces, and may hold
-/// a `description`. Only `output` is needed; an absent list is an empty one, an
-/// absent description is empty, and a document without `types` declares none.
+/// Each type is a table under `types`, keyed by its name, holding `required`,
+/// a table keying a parameter's context type by the parameter's name,
+/// `globals`, an array of the context types read by declaration, and `output`,
+/// the one context type it produces; it may hold a `description` and
+/// `standing`, whether its output stands. Only `output` is needed; an absent
+/// list is an empty one, an absent description is empty, an absent `standing`
+/// is false, and a document without `types` declares none. An `optional` list
+/// is refused at its key.
 /// Parameters come back in the order they are written, in whichever TOML form.
 // @A node type document read in the order it is written,IMPL_READER_TYPES,impl,[CREQ_READER_TYPES],[DEC_NAMES_AS_KEYS, DEC_TYPES_IN_OWN_DOCUMENTS]
 pub fn read_node_types(document: &str, text: &str) -> Result<NodeTypeDocument, ReadFault> {
@@ -460,6 +462,24 @@ impl<'t> Reading<'t> {
             required,
             globals: self.globals(declaration, &key)?,
             output: self.context_type(output, &[&key[..], &["output"]].concat())?,
+            standing: self.standing(declaration, &key)?,
+        })
+    }
+
+    /// Whether `declaration` says its output stands: its `standing` key, which
+    /// has to be a boolean, or false when it has none.
+    // @Whether an output stands read from its type,IMPL_READER_STANDING,impl,[CREQ_READER_READS_STANDING],[DEC_STANDING_OUTPUTS]
+    fn standing(&self, declaration: &dyn TableLike, key: &[&str]) -> Result<bool, ReadFault> {
+        let Some(item) = declaration.get("standing") else {
+            return Ok(false);
+        };
+        item.as_bool().ok_or_else(|| {
+            self.wrong_type(
+                item.span(),
+                &[key, &["standing"]].concat(),
+                "boolean",
+                item.type_name(),
+            )
         })
     }
 
@@ -1396,6 +1416,44 @@ fn entry_mark_refused() {
     )
     .expect("an unmarked instance reads");
     assert_eq!(definition.instances.len(), 1);
+}
+
+#[test]
+fn standing_read() {
+    let text = "[types.brief]\noutput = \"note\"\nstanding = true\n\n[types.draft]\noutput = \"note\"\nstanding = false\n\n[types.review]\noutput = \"note\"\n";
+    let read = read_node_types("types.toml", text).expect("it reads");
+    let standing: Vec<(&str, bool)> = read
+        .node_types()
+        .iter()
+        .map(|declared| (declared.name.as_str(), declared.standing))
+        .collect();
+    assert_eq!(
+        standing,
+        [("brief", true), ("draft", false), ("review", false)]
+    );
+
+    // A value that is not a boolean is refused where it is written.
+    let fault = read_node_types(
+        "wrong.toml",
+        "[types.brief]\noutput = \"note\"\nstanding = \"yes\"\n",
+    )
+    .expect_err("a string is not a boolean");
+    assert_eq!(
+        (fault.line(), fault.column(), fault.kind()),
+        (
+            3,
+            12,
+            &FaultKind::WrongType {
+                key: vec![
+                    "types".to_owned(),
+                    "brief".to_owned(),
+                    "standing".to_owned()
+                ],
+                expected: "boolean",
+                found: "string",
+            }
+        )
+    );
 }
 
 #[test]

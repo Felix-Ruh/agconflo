@@ -1299,6 +1299,15 @@
           "title": "agconflo-core reader::reads_what_is_written",
           "type": "test_run"
         },
+        "RUN_READER_STANDING_READ": {
+          "executes": [
+            "TEST_READER_STANDING_READ"
+          ],
+          "id": "RUN_READER_STANDING_READ",
+          "test_outcome": "passed",
+          "title": "agconflo-core reader::standing_read",
+          "type": "test_run"
+        },
         "RUN_READER_UNNAMED_KEYS_ARE_READ": {
           "executes": [
             "TEST_READER_UNNAMED_KEYS_ARE_READ"
