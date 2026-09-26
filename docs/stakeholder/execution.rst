@@ -227,3 +227,30 @@ run one. Several of these constrain each other, or a goal in
    type alike, one Agconflo ships included, and ``STKH_RUN_FROM_DOCUMENTS``
    says who that person is - the one running the workflow, not a program they
    wrote.
+
+.. stkh_req:: A tool runs in the environment its workflow names
+   :id: STKH_TOOL_ENVIRONMENT
+   :stakeholder: user
+   :statement: Agconflo shall let a workflow name the environment each of its tools runs in, from what the person running it grants.
+
+   Tools differ in what they need to do their work. A node that builds a Rust
+   project needs a Rust toolchain, one that runs a project's tests needs its
+   interpreter, and one that reads a file needs neither. With one environment
+   for every tool of a run, each tool carries everything any of them needs,
+   or some of them cannot work at all. And a build and the tests of what it
+   built may need to share what the build left, while a third tool should
+   see none of it, even where the three use the same environment.
+
+   The workflow names the environment because it knows what its tools do,
+   and a workflow handed to someone else says what its tools need in its own
+   documents (``STKH_RUN_FROM_DOCUMENTS``). What a tool may touch stays the
+   person's to grant (``STKH_TOOLS_CONFINED``), and so does which
+   environments a run may use at all: the workflow asks, the person grants.
+
+   It names no mechanism. What an environment is - an image, a container
+   shared by name - is for the decisions below it to say.
+
+   It is separate from ``STKH_TOOLS_AS_NODES`` and ``STKH_TOOLS_CONFINED``
+   because both can hold without it: tools wrapped in nodes and kept to their
+   grant can all run in the one environment the person chose, which is where
+   the first slice of tools left them.
