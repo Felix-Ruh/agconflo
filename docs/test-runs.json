@@ -408,6 +408,15 @@
           "title": "agconflo-runner grants::paths_from_the_file",
           "type": "test_run"
         },
+        "RUN_GRANTS_READS_IMAGES": {
+          "executes": [
+            "TEST_GRANTS_READS_IMAGES"
+          ],
+          "id": "RUN_GRANTS_READS_IMAGES",
+          "test_outcome": "passed",
+          "title": "agconflo-runner grants::reads_images",
+          "type": "test_run"
+        },
         "RUN_GRANTS_READS_WHAT_IT_NAMES": {
           "executes": [
             "TEST_GRANTS_READS_WHAT_IT_NAMES"
@@ -417,6 +426,15 @@
           "title": "agconflo-runner grants::reads_what_it_names",
           "type": "test_run"
         },
+        "RUN_GRANTS_TAGGED_IMAGES_REFUSED": {
+          "executes": [
+            "TEST_GRANTS_TAGGED_IMAGES_REFUSED"
+          ],
+          "id": "RUN_GRANTS_TAGGED_IMAGES_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner grants::tagged_images_refused",
+          "type": "test_run"
+        },
         "RUN_GRANTS_TAGGED_IMAGE_REFUSED": {
           "executes": [
             "TEST_GRANTS_TAGGED_IMAGE_REFUSED"
@@ -424,6 +442,15 @@
           "id": "RUN_GRANTS_TAGGED_IMAGE_REFUSED",
           "test_outcome": "passed",
           "title": "agconflo-runner grants::tagged_image_refused",
+          "type": "test_run"
+        },
+        "RUN_GRANTS_TMP_LIMIT_READ": {
+          "executes": [
+            "TEST_GRANTS_TMP_LIMIT_READ"
+          ],
+          "id": "RUN_GRANTS_TMP_LIMIT_READ",
+          "test_outcome": "passed",
+          "title": "agconflo-runner grants::tmp_limit_read",
           "type": "test_run"
         },
         "RUN_GRANTS_UNREADABLE_REFUSED": {
@@ -921,6 +948,15 @@
           "title": "agconflo-runner performer::text_kept_exactly",
           "type": "test_run"
         },
+        "RUN_PROJECT_ENVIRONMENT_FAULTS_REFUSED": {
+          "executes": [
+            "TEST_PROJECT_ENVIRONMENT_FAULTS_REFUSED"
+          ],
+          "id": "RUN_PROJECT_ENVIRONMENT_FAULTS_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner project::environment_faults_refused",
+          "type": "test_run"
+        },
         "RUN_PROJECT_FAULTS_CARRY_THEIR_PLACE": {
           "executes": [
             "TEST_PROJECT_FAULTS_CARRY_THEIR_PLACE"
@@ -973,6 +1009,15 @@
           "id": "RUN_PROJECT_READS_TOOLS",
           "test_outcome": "passed",
           "title": "agconflo-runner project::reads_tools",
+          "type": "test_run"
+        },
+        "RUN_PROJECT_READS_TOOL_ENVIRONMENT": {
+          "executes": [
+            "TEST_PROJECT_READS_TOOL_ENVIRONMENT"
+          ],
+          "id": "RUN_PROJECT_READS_TOOL_ENVIRONMENT",
+          "test_outcome": "passed",
+          "title": "agconflo-runner project::reads_tool_environment",
           "type": "test_run"
         },
         "RUN_PROJECT_READS_WHAT_IT_NAMES": {

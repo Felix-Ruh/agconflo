@@ -14,6 +14,7 @@
 //!
 //! [tools]                           # node types a tool performs, and how
 //! fetch = "read"                    # read, write or run
+//! test = { action = "run", image = "python@sha256:...", container = "py" }
 //!
 //! [limits]                          # each optional
 //! instructions = 10000000
@@ -31,7 +32,7 @@ use agconflo_core::{
 };
 use agconflo_lua::{Behaviours, Limits};
 
-use crate::grants::Action;
+use crate::grants::{Action, pinned};
 use crate::text::{FileFault, KeyFault, Place, Toml, path, read_text};
 
 /// Everything a manifest names, read: the workflow with every node type its
@@ -108,14 +109,22 @@ impl Project {
     }
 }
 
-/// One tool: the node type it performs and its action.
+/// One tool: the node type it performs, its action, the image it names and
+/// the container it runs in.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Tool {
     /// The node type it performs.
     pub node_type: String,
     /// What it does.
     pub action: Action,
+    /// The image it names, or `None` for the grants' image.
+    pub image: Option<String>,
+    /// The container it runs in, shared with every tool naming the same.
+    pub container: String,
 }
+
+/// The container a tool naming none runs in.
+pub const SHARED_CONTAINER: &str = "tools";
 
 /// One script: the node type it performs, its file as the manifest writes it,
 /// and its text as the file holds it.
@@ -157,6 +166,37 @@ pub enum ProjectFault {
         /// The action, as the manifest names it.
         action: String,
     },
+    /// The manifest gives a tool an image named by neither a digest nor an
+    /// image id.
+    Image {
+        /// Where the image is named.
+        place: Place,
+        /// The tool's node type.
+        node_type: String,
+        /// The image, as the manifest names it.
+        image: String,
+    },
+    /// The manifest gives a tool a container name that is not lower-case
+    /// letters, digits, `_`, `.` and `-`, beginning with a letter or a digit.
+    Container {
+        /// Where the container is named.
+        place: Place,
+        /// The tool's node type.
+        node_type: String,
+        /// The container, as the manifest names it.
+        container: String,
+    },
+    /// The manifest gives two tools one container and different images.
+    TwoImages {
+        /// Where the second tool's node type is named.
+        place: Place,
+        /// The second tool's node type.
+        node_type: String,
+        /// The first tool's node type.
+        first: String,
+        /// The container they share.
+        container: String,
+    },
     /// The manifest names one node type as performed in two ways.
     PerformedTwice {
         /// Where the node type is named the second way.
@@ -185,6 +225,31 @@ impl fmt::Display for ProjectFault {
             } => write!(
                 f,
                 "{place}: the tool {node_type} names {action}, which is not an action; the actions are read, write and run"
+            ),
+            Self::Image {
+                place,
+                node_type,
+                image,
+            } => write!(
+                f,
+                "{place}: the tool {node_type} names the image {image}, which is named by neither a digest nor an image id"
+            ),
+            Self::Container {
+                place,
+                node_type,
+                container,
+            } => write!(
+                f,
+                "{place}: the tool {node_type} names the container {container:?}; a container name is lower-case letters, digits, _, . and -, beginning with a letter or a digit"
+            ),
+            Self::TwoImages {
+                place,
+                node_type,
+                first,
+                container,
+            } => write!(
+                f,
+                "{place}: the tool {node_type} runs in the container {container} with another image than the tool {first}; a container has one image, so name a container of its own for it"
             ),
             Self::PerformedTwice {
                 place,
@@ -266,7 +331,7 @@ fn tools(manifest: &Manifest) -> Result<Vec<Tool>, ProjectFault> {
             manifest
                 .tools
                 .iter()
-                .map(|(node_type, _, place)| (node_type, place, "a tool")),
+                .map(|tool| (&tool.node_type, &tool.named, "a tool")),
         );
     for (node_type, place, way) in named {
         match performed
@@ -286,21 +351,95 @@ fn tools(manifest: &Manifest) -> Result<Vec<Tool>, ProjectFault> {
         }
     }
 
-    manifest
+    let tools = manifest
         .tools
         .iter()
-        .map(|(node_type, action, place)| {
-            let action = Action::named(action).ok_or_else(|| ProjectFault::Action {
-                place: place.clone(),
-                node_type: node_type.clone(),
-                action: action.clone(),
+        .map(|written| {
+            let action = Action::named(&written.action).ok_or_else(|| ProjectFault::Action {
+                place: written.named.clone(),
+                node_type: written.node_type.clone(),
+                action: written.action.clone(),
             })?;
             Ok(Tool {
-                node_type: node_type.clone(),
+                node_type: written.node_type.clone(),
                 action,
+                image: written.image.as_ref().map(|(image, _)| image.clone()),
+                container: written
+                    .container
+                    .as_ref()
+                    .map_or(SHARED_CONTAINER, |(container, _)| container)
+                    .to_owned(),
             })
         })
-        .collect()
+        .collect::<Result<Vec<_>, ProjectFault>>()?;
+    environments(manifest, &tools)?;
+    Ok(tools)
+}
+
+/// Nothing, or the first tool whose environment the manifest names wrongly:
+/// an image not pinned, a container name malformed, or a container another
+/// tool gave another image, compared as written.
+// @Each tool's image pinned and container well named and one image to a container,IMPL_PROJECT_TOOL_ENVIRONMENT,impl,[CREQ_PROJECT_READS_TOOL_ENVIRONMENT, CREQ_PROJECT_REFUSES_ENVIRONMENT_FAULTS],[DEC_TOOL_NAMES_ITS_ENVIRONMENT, DEC_ONE_CONTAINER_PER_NAME, DEC_IMAGE_BY_DIGEST_NEVER_PULLED]
+fn environments(manifest: &Manifest, tools: &[Tool]) -> Result<(), ProjectFault> {
+    let mut containers: Vec<(&str, Option<&str>, &str)> = Vec::new();
+    for (written, tool) in manifest.tools.iter().zip(tools) {
+        if let Some((image, place)) = &written.image
+            && !pinned(image)
+        {
+            return Err(ProjectFault::Image {
+                place: place.clone(),
+                node_type: tool.node_type.clone(),
+                image: image.clone(),
+            });
+        }
+        if let Some((container, place)) = &written.container
+            && !well_named(container)
+        {
+            return Err(ProjectFault::Container {
+                place: place.clone(),
+                node_type: tool.node_type.clone(),
+                container: container.clone(),
+            });
+        }
+        let image = tool.image.as_deref();
+        match containers
+            .iter()
+            .find(|(container, _, _)| *container == tool.container)
+        {
+            Some((_, first_image, first)) if *first_image != image => {
+                return Err(ProjectFault::TwoImages {
+                    place: written.named.clone(),
+                    node_type: tool.node_type.clone(),
+                    first: (*first).to_owned(),
+                    container: tool.container.clone(),
+                });
+            }
+            Some(_) => {}
+            None => containers.push((&tool.container, image, &tool.node_type)),
+        }
+    }
+    Ok(())
+}
+
+/// Whether `container` is lower-case letters, digits, `_`, `.` and `-`,
+/// beginning with a letter or a digit.
+fn well_named(container: &str) -> bool {
+    let mut characters = container.chars();
+    characters
+        .next()
+        .is_some_and(|first| first.is_ascii_lowercase() || first.is_ascii_digit())
+        && characters
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '_' | '.' | '-'))
+}
+
+/// A tool as a manifest writes it: its node type and where it is named, its
+/// action, and the image and container it names with where each is named.
+struct WrittenTool {
+    node_type: String,
+    named: Place,
+    action: String,
+    image: Option<(String, Place)>,
+    container: Option<(String, Place)>,
 }
 
 /// A manifest's values, with its paths as it writes them, and where it names
@@ -313,7 +452,7 @@ struct Manifest {
     persons: Vec<String>,
     named_scripts: Vec<(String, Place)>,
     named_persons: Vec<(String, Place)>,
-    tools: Vec<(String, String, Place)>,
+    tools: Vec<WrittenTool>,
     limits: Limits,
 }
 
@@ -374,12 +513,7 @@ impl Manifest {
         if let Some(item) = root.get("tools") {
             let table = toml.table(item, &key("tools"))?;
             for (node_type, item) in table.iter() {
-                let action = toml.string(item, &path(&key("tools"), node_type))?;
-                tools.push((
-                    node_type.to_owned(),
-                    action.to_owned(),
-                    key_place(&toml, table, node_type),
-                ));
+                tools.push(written_tool(&toml, table, node_type, item)?);
             }
         }
 
@@ -413,6 +547,57 @@ impl Manifest {
             limits,
         })
     }
+}
+
+/// The tool `node_type`, whose entry of `table` is `item`: its action as a
+/// string, or a table of its action, image and container.
+fn written_tool(
+    toml: &Toml<'_>,
+    table: &dyn toml_edit::TableLike,
+    node_type: &str,
+    item: &toml_edit::Item,
+) -> Result<WrittenTool, (Place, KeyFault)> {
+    let key = path(&["tools".to_owned()], node_type);
+    let named = key_place(toml, table, node_type);
+    if let Some(action) = item.as_str() {
+        return Ok(WrittenTool {
+            node_type: node_type.to_owned(),
+            named,
+            action: action.to_owned(),
+            image: None,
+            container: None,
+        });
+    }
+    let entry = toml.table(item, &key).map_err(|(place, _)| {
+        (
+            place,
+            KeyFault::WrongKind {
+                key: key.clone(),
+                expected: "an action or a table",
+                found: crate::text::article(item.type_name()),
+            },
+        )
+    })?;
+    toml.only(entry, &key, &["action", "image", "container"])?;
+    let action = toml
+        .string(toml.needed(entry, &key, "action")?, &path(&key, "action"))?
+        .to_owned();
+    let optional = |name: &str| -> Result<Option<(String, Place)>, (Place, KeyFault)> {
+        entry
+            .get(name)
+            .map(|item| {
+                let text = toml.string(item, &path(&key, name))?;
+                Ok((text.to_owned(), toml.place(item.span())))
+            })
+            .transpose()
+    };
+    Ok(WrittenTool {
+        node_type: node_type.to_owned(),
+        named,
+        action,
+        image: optional("image")?,
+        container: optional("container")?,
+    })
 }
 
 /// Where the key `name` of `table` is written.
@@ -863,6 +1048,8 @@ fn reads_tools() {
     let tool = |node_type: &str, action| Tool {
         node_type: node_type.to_owned(),
         action,
+        image: None,
+        container: SHARED_CONTAINER.to_owned(),
     };
     assert_eq!(
         project.tools(),
@@ -957,4 +1144,139 @@ fn tool_faults_refused() {
 
     // Each fault removed, the same manifest reads.
     read_project(&with_tools(&scratch, tools, "")).expect("the project reads");
+}
+
+#[cfg(test)]
+#[test]
+fn reads_tool_environment() {
+    let scratch = Scratch::new("reads_tool_environment");
+    let python = format!("python@sha256:{}", "a".repeat(64));
+    let manifest = with_tools(
+        &scratch,
+        &format!(
+            "fetch = \"read\"\nsave = {{ action = \"write\" }}\nexec = {{ action = \"run\", image = \"{python}\", container = \"py\" }}\nbuild = {{ action = \"run\", container = \"build\" }}\ntest = {{ action = \"read\", container = \"build\" }}\n"
+        ),
+        "",
+    );
+    scratch.write(
+        "tools.toml",
+        format!("{TOOL_TYPES}\n[types.build]\nrequired = {{ command = \"note\" }}\noutput = \"note\"\n\n[types.test]\nrequired = {{ path = \"note\" }}\noutput = \"note\"\n"),
+    );
+
+    let project = read_project(&manifest).expect("the project reads");
+
+    let environment: Vec<_> = project
+        .tools()
+        .iter()
+        .map(|tool| {
+            (
+                tool.node_type.as_str(),
+                tool.image.as_deref(),
+                tool.container.as_str(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        environment,
+        [
+            ("fetch", None, "tools"),
+            ("save", None, "tools"),
+            ("exec", Some(python.as_str()), "py"),
+            ("build", None, "build"),
+            ("test", None, "build"),
+        ]
+    );
+    assert_eq!(project.tool("save"), Some(Action::Write));
+}
+
+#[cfg(test)]
+#[test]
+fn environment_faults_refused() {
+    let scratch = Scratch::new("environment_faults_refused");
+    let python = format!("python@sha256:{}", "a".repeat(64));
+    let other = format!("python@sha256:{}", "b".repeat(64));
+    let base = "fetch = \"read\"\nsave = \"write\"\n";
+    let refused = |exec: &str| {
+        let manifest = with_tools(&scratch, &format!("{base}exec = {exec}\n"), "");
+        read_project(&manifest)
+    };
+
+    match refused("{ action = \"run\", image = \"python:3\" }") {
+        Err(ProjectFault::Image {
+            node_type, image, ..
+        }) => {
+            assert_eq!((node_type.as_str(), image.as_str()), ("exec", "python:3"));
+        }
+        other => panic!("expected the tagged image refused, got {other:?}"),
+    }
+    for name in ["Build", "a b", "-x", ".x", "a/b", ""] {
+        match refused(&format!("{{ action = \"run\", container = \"{name}\" }}")) {
+            Err(ProjectFault::Container {
+                node_type,
+                container,
+                ..
+            }) => {
+                assert_eq!((node_type.as_str(), container.as_str()), ("exec", name));
+            }
+            other => panic!("expected the container {name:?} refused, got {other:?}"),
+        }
+    }
+
+    let shared = |fetch: &str, exec: &str| {
+        let manifest = with_tools(
+            &scratch,
+            &format!("fetch = {fetch}\nsave = \"write\"\nexec = {exec}\n"),
+            "",
+        );
+        read_project(&manifest)
+    };
+    for (fetch, exec, shared_by) in [
+        // An image and no container, beside a tool naming neither: both in
+        // the shared container.
+        (
+            "\"read\"".to_owned(),
+            format!("{{ action = \"run\", image = \"{python}\" }}"),
+            SHARED_CONTAINER,
+        ),
+        (
+            format!("{{ action = \"read\", container = \"build\", image = \"{python}\" }}"),
+            format!("{{ action = \"run\", container = \"build\", image = \"{other}\" }}"),
+            "build",
+        ),
+        (
+            format!("{{ action = \"read\", container = \"build\", image = \"{python}\" }}"),
+            "{ action = \"run\", container = \"build\" }".to_owned(),
+            "build",
+        ),
+    ] {
+        match shared(&fetch, &exec) {
+            Err(ProjectFault::TwoImages {
+                node_type,
+                first,
+                container,
+                place,
+            }) => {
+                assert_eq!(
+                    (node_type.as_str(), first.as_str(), container.as_str()),
+                    ("exec", "fetch", shared_by)
+                );
+                let line = std::fs::read_to_string(scratch.path("manifest.toml"))
+                    .expect("the manifest")
+                    .lines()
+                    .position(|line| line.starts_with("exec ="))
+                    .expect("the line");
+                assert_eq!(place.line, line + 1);
+            }
+            other => panic!("expected two images in one container refused, got {other:?}"),
+        }
+    }
+
+    // The controls: a well-formed name, and two tools of one image in one
+    // container.
+    refused("{ action = \"run\", container = \"b.u_i-l0\" }").expect("the name is read");
+    shared(
+        &format!("{{ action = \"read\", container = \"build\", image = \"{python}\" }}"),
+        &format!("{{ action = \"run\", container = \"build\", image = \"{python}\" }}"),
+    )
+    .expect("one image in one container is read");
 }

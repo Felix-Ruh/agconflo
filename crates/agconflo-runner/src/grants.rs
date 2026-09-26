@@ -4,6 +4,7 @@
 //!
 //! ```toml
 //! image = "alpine@sha256:..."          # by digest, or an image id
+//! images = ["python@sha256:..."]       # others a tool may name, if any
 //! network = true                       # no network unless true
 //! actions = ["read", "write", "run"]   # none unless named
 //!
@@ -14,6 +15,7 @@
 //! [limits]                             # each optional
 //! seconds = 60                         # the time a command may run
 //! output = 16384                       # the bytes a step gives back
+//! tmp = 268435456                      # the bytes /tmp holds
 //! ```
 
 use std::fmt;
@@ -79,15 +81,18 @@ pub struct CommandLimits {
     pub seconds: u32,
     /// The bytes of output a step gives back.
     pub output: usize,
+    /// The bytes a container's `/tmp` holds.
+    pub tmp: u64,
 }
 
 impl Default for CommandLimits {
-    /// 60 seconds and 16384 bytes.
-    // @Limits of 60 seconds and 16384 bytes unless given,IMPL_GRANTS_DEFAULT_LIMITS,impl,[CREQ_GRANTS_READS],[DEC_GRANTS_IN_A_FILE_OF_THEIR_OWN]
+    /// 60 seconds, 16384 bytes of output and 268435456 of `/tmp`.
+    // @Limits of 60 seconds and 16384 bytes and a /tmp of 256 MiB unless given,IMPL_GRANTS_DEFAULT_LIMITS,impl,[CREQ_GRANTS_READS, CREQ_GRANTS_READS_TMP_LIMIT],[DEC_GRANTS_IN_A_FILE_OF_THEIR_OWN, DEC_TMP_LIMITED_BY_GRANTS]
     fn default() -> Self {
         Self {
             seconds: 60,
             output: 16384,
+            tmp: 268_435_456,
         }
     }
 }
@@ -97,6 +102,7 @@ impl Default for CommandLimits {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Grants {
     image: String,
+    images: Vec<String>,
     folders: Vec<Folder>,
     network: bool,
     actions: Vec<Action>,
@@ -104,9 +110,19 @@ pub struct Grants {
 }
 
 impl Grants {
-    /// The image, as the file names it.
+    /// The image, as the file names it: the one a tool naming none runs in.
     pub fn image(&self) -> &str {
         &self.image
+    }
+
+    /// The other images a tool may name, in the order the file names them.
+    pub fn images(&self) -> &[String] {
+        &self.images
+    }
+
+    /// Whether a tool may run in `image`: the image, or one of the images.
+    pub fn allows_image(&self, image: &str) -> bool {
+        self.image == image || self.images.iter().any(|allowed| allowed == image)
     }
 
     /// The folders, in the order the file names them.
@@ -244,7 +260,7 @@ pub fn read_grants(grants: &Path) -> Result<Grants, GrantsFault> {
     toml.only(
         root,
         top,
-        &["image", "network", "actions", "folders", "limits"],
+        &["image", "images", "network", "actions", "folders", "limits"],
     )
     .map_err(at)?;
     let key = |name: &str| path(top, name);
@@ -257,6 +273,11 @@ pub fn read_grants(grants: &Path) -> Result<Grants, GrantsFault> {
             image: image.to_owned(),
         });
     }
+
+    let images = match root.get("images") {
+        Some(item) => images(&toml, item, &key("images"))?,
+        None => Vec::new(),
+    };
 
     let network = match root.get("network") {
         Some(item) => toml.boolean(item, &key("network")).map_err(at)?,
@@ -293,7 +314,7 @@ pub fn read_grants(grants: &Path) -> Result<Grants, GrantsFault> {
     if let Some(item) = root.get("limits") {
         let under = key("limits");
         let table = toml.table(item, &under).map_err(at)?;
-        toml.only(table, &under, &["seconds", "output"])
+        toml.only(table, &under, &["seconds", "output", "tmp"])
             .map_err(at)?;
         if let Some(item) = table.get("seconds") {
             limits.seconds =
@@ -303,10 +324,14 @@ pub fn read_grants(grants: &Path) -> Result<Grants, GrantsFault> {
             limits.output =
                 at_least_one(&toml, item, &path(&under, "output"), usize::MAX as u64)? as usize;
         }
+        if let Some(item) = table.get("tmp") {
+            limits.tmp = at_least_one(&toml, item, &path(&under, "tmp"), i64::MAX as u64)?;
+        }
     }
 
     Ok(Grants {
         image: image.to_owned(),
+        images,
         folders,
         network,
         actions,
@@ -367,6 +392,29 @@ fn folder(
     }
 }
 
+/// The images `item`, under `key`, names, each pinned, or refused at the
+/// first that is not.
+// @Each image a tool may name read and every one pinned,IMPL_GRANTS_IMAGES,impl,[CREQ_GRANTS_READS_IMAGES, CREQ_GRANTS_REFUSES_TAGGED_IMAGES],[DEC_GRANTS_LIST_IMAGES, DEC_IMAGE_BY_DIGEST_NEVER_PULLED]
+fn images(
+    toml: &Toml<'_>,
+    item: &toml_edit::Item,
+    key: &[String],
+) -> Result<Vec<String>, GrantsFault> {
+    let named = toml
+        .strings(item, key)
+        .map_err(|(place, fault)| GrantsFault::Grants { place, fault })?;
+    let values = item.as_array().into_iter().flatten();
+    for (image, value) in named.iter().zip(values) {
+        if !pinned(image) {
+            return Err(GrantsFault::Image {
+                place: toml.place(value.span()),
+                image: image.clone(),
+            });
+        }
+    }
+    Ok(named)
+}
+
 /// Whether `name` is one plain part of a path: not empty, not `.` or `..`,
 /// and holding no separator and no control character.
 fn plain(name: &str) -> bool {
@@ -382,7 +430,7 @@ fn plain(name: &str) -> bool {
 /// lowercase hexadecimal digits - or by an image id - `sha256:` and the same.
 /// A name may not begin with `-`, hold `@`, a space or a control character.
 // @An image named by a digest or an image id and nothing else,IMPL_GRANTS_IMAGE,impl,[CREQ_GRANTS_REFUSES_TAGGED_IMAGE],[DEC_IMAGE_BY_DIGEST_NEVER_PULLED]
-fn pinned(image: &str) -> bool {
+pub(crate) fn pinned(image: &str) -> bool {
     let digest = |digits: &str| {
         digits.len() == 64
             && digits
@@ -485,6 +533,7 @@ fn reads_what_it_names() {
         CommandLimits {
             seconds: 5,
             output: 100,
+            tmp: 268_435_456,
         }
     );
 }
@@ -515,6 +564,7 @@ fn narrow_by_default() {
         CommandLimits {
             seconds: 60,
             output: 16384,
+            tmp: 268_435_456,
         }
     );
 }
@@ -729,4 +779,82 @@ fn bad_folder_refused() {
     ))
     .expect("a plain name read");
     assert_eq!(grants.folders()[0].name, "src-2");
+}
+
+#[cfg(test)]
+#[test]
+fn reads_images() {
+    let scratch = Scratch::new("grants_reads_images");
+    let python = format!("python@sha256:{}", "a".repeat(64));
+    let other = format!("sha256:{}", "b".repeat(64));
+    let grants = read_grants(&scratch.write(
+        "grants.toml",
+        format!("image = \"{IMAGE}\"\nimages = [\"{python}\", \"{other}\"]\n"),
+    ))
+    .expect("the grants read");
+
+    assert_eq!(grants.image(), IMAGE);
+    assert_eq!(grants.images(), [python.clone(), other.clone()]);
+    for image in [IMAGE, python.as_str(), other.as_str()] {
+        assert!(grants.allows_image(image), "{image}");
+    }
+    assert!(!grants.allows_image(&format!("python@sha256:{}", "c".repeat(64))));
+
+    let grants = read_grants(&scratch.write("grants.toml", format!("image = \"{IMAGE}\"\n")))
+        .expect("the grants read");
+    assert_eq!(grants.images(), [] as [String; 0]);
+    assert!(grants.allows_image(IMAGE));
+    assert!(!grants.allows_image(&python));
+}
+
+#[cfg(test)]
+#[test]
+fn tagged_images_refused() {
+    let scratch = Scratch::new("grants_tagged_images_refused");
+    let pinned = format!("python@sha256:{}", "a".repeat(64));
+    for (images, column) in [
+        (
+            format!("[\"{pinned}\", \"python:3\"]"),
+            11 + pinned.len() + 4,
+        ),
+        ("[\"python:3\"]".to_owned(), 11),
+    ] {
+        match refused(
+            &scratch,
+            &format!("image = \"{IMAGE}\"\nimages = {images}\n"),
+        ) {
+            GrantsFault::Image { place, image } => {
+                assert_eq!(image, "python:3");
+                assert_eq!((place.line, place.column), (2, column), "{images}");
+            }
+            other => panic!("expected python:3 refused, got {other:?}"),
+        }
+    }
+
+    read_grants(&scratch.write(
+        "grants.toml",
+        format!("image = \"{IMAGE}\"\nimages = [\"{pinned}\"]\n"),
+    ))
+    .expect("pinned images read");
+}
+
+#[cfg(test)]
+#[test]
+fn tmp_limit_read() {
+    let scratch = Scratch::new("grants_tmp_limit_read");
+    let limits = |extra: &str| {
+        read_grants(&scratch.write("grants.toml", format!("image = \"{IMAGE}\"\n{extra}")))
+            .map(|grants| grants.limits().tmp)
+    };
+
+    assert_eq!(limits("[limits]\ntmp = 1048576\n"), Ok(1_048_576));
+    assert_eq!(limits(""), Ok(268_435_456));
+    assert_eq!(limits("[limits]\nseconds = 5\n"), Ok(268_435_456));
+    match limits("[limits]\ntmp = 0\n") {
+        Err(GrantsFault::Grants {
+            fault: KeyFault::WrongKind { key, .. },
+            ..
+        }) => assert_eq!(key, ["limits", "tmp"]),
+        other => panic!("expected a /tmp of 0 refused, got {other:?}"),
+    }
 }

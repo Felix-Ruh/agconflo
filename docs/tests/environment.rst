@@ -60,10 +60,10 @@ image each step was asked in. No case reaches the network or a provider.
    :coverage: full
 
    A ``[tools]`` table with one tool as a string, one as a table naming only
-   its action, one naming an image, and two naming a container ``build``,
-   one with an image. What is read gives the first two no image and the
-   container ``tools``, the third its image and ``tools``, and the last two
-   ``build`` with their images.
+   its action, one naming an image and the container ``py``, and two naming
+   the container ``build`` and no image. What is read gives the first two no
+   image and the container ``tools``, the third its image and ``py``, and the
+   last two no image and ``build``.
 
    Catches: an entry written as a string refused, a tool naming no container
    given one of its own.
@@ -77,7 +77,8 @@ image each step was asked in. No case reaches the network or a provider.
    Each refused at the tool: an image ``python:3``; containers named
    ``Build``, ``a b``, ``-x``, ``.x``, ``a/b`` and the empty name; two tools
    naming ``build`` with two different images; one naming ``build`` with an
-   image and another naming it with none. ``b.u_i-l0`` is read, and two
+   image and another naming it with none; and one naming an image and no
+   container beside one naming neither, the two then sharing ``tools``. ``b.u_i-l0`` is read, and two
    tools naming ``build`` with one image are - the controls.
 
    Catches: a tagged image accepted, a container name the engine refuses
