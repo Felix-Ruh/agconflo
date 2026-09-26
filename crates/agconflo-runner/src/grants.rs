@@ -7,6 +7,7 @@
 //! images = ["python@sha256:..."]       # others a tool may name, if any
 //! network = true                       # no network unless true
 //! actions = ["read", "write", "run"]   # none unless named
+//! trust = "certs/ca.pem"               # certificates a step trusts, if any
 //!
 //! [folders.project]                    # mounted at /work/project
 //! path = "../project"                  # from this file's directory
@@ -106,6 +107,7 @@ pub struct Grants {
     folders: Vec<Folder>,
     network: bool,
     actions: Vec<Action>,
+    trust: Option<String>,
     limits: CommandLimits,
 }
 
@@ -143,6 +145,12 @@ impl Grants {
     /// Whether `action` is allowed.
     pub fn allows(&self, action: Action) -> bool {
         self.actions.contains(&action)
+    }
+
+    /// The content of the trust file, if the file names one: the
+    /// certificate authorities a step trusts.
+    pub fn trust(&self) -> Option<&str> {
+        self.trust.as_deref()
     }
 
     /// The limits every step's command runs under.
@@ -208,6 +216,15 @@ pub enum GrantsFault {
         /// Why it is refused.
         fault: FolderFault,
     },
+    /// The trust file is not a file that can be read.
+    Trust {
+        /// Where the trust file is named.
+        place: Place,
+        /// The path, as the file writes it.
+        path: String,
+        /// Why it cannot be read.
+        message: String,
+    },
 }
 
 impl fmt::Display for GrantsFault {
@@ -237,6 +254,14 @@ impl fmt::Display for GrantsFault {
                     "{place}: the folder {name} is granted {path}, which is not a directory"
                 ),
             },
+            Self::Trust {
+                place,
+                path,
+                message,
+            } => write!(
+                f,
+                "{place}: the trust file {path} cannot be read: {message}"
+            ),
         }
     }
 }
@@ -260,7 +285,9 @@ pub fn read_grants(grants: &Path) -> Result<Grants, GrantsFault> {
     toml.only(
         root,
         top,
-        &["image", "images", "network", "actions", "folders", "limits"],
+        &[
+            "image", "images", "network", "actions", "folders", "trust", "limits",
+        ],
     )
     .map_err(at)?;
     let key = |name: &str| path(top, name);
@@ -310,6 +337,11 @@ pub fn read_grants(grants: &Path) -> Result<Grants, GrantsFault> {
         }
     }
 
+    let trust = match root.get("trust") {
+        Some(item) => Some(trust(&toml, directory, item, &key("trust"))?),
+        None => None,
+    };
+
     let mut limits = CommandLimits::default();
     if let Some(item) = root.get("limits") {
         let under = key("limits");
@@ -335,8 +367,34 @@ pub fn read_grants(grants: &Path) -> Result<Grants, GrantsFault> {
         folders,
         network,
         actions,
+        trust,
         limits,
     })
+}
+
+/// The content of the trust file `item`, under `key`, names, read from
+/// `directory` - or refused at that key.
+// @A trust file read from the grants file's directory or refused at its key,IMPL_GRANTS_TRUST,impl,[CREQ_GRANTS_READS_TRUST, CREQ_GRANTS_REFUSES_BAD_TRUST],[DEC_TRUST_IN_THE_GRANTS]
+fn trust(
+    toml: &Toml<'_>,
+    directory: &Path,
+    item: &toml_edit::Item,
+    key: &[String],
+) -> Result<String, GrantsFault> {
+    let written = toml
+        .string(item, key)
+        .map_err(|(place, fault)| GrantsFault::Grants { place, fault })?;
+    let joined = directory.join(written);
+    let refused = |message: String| GrantsFault::Trust {
+        place: toml.place(item.span()),
+        path: written.to_owned(),
+        message,
+    };
+    match std::fs::metadata(&joined) {
+        Ok(metadata) if !metadata.is_file() => Err(refused("it is not a file".to_owned())),
+        Ok(_) => std::fs::read_to_string(&joined).map_err(|error| refused(error.to_string())),
+        Err(error) => Err(refused(error.to_string())),
+    }
 }
 
 /// The folder `name`, whose key is at `named`, read from `item` under `under`,
@@ -779,6 +837,65 @@ fn bad_folder_refused() {
     ))
     .expect("a plain name read");
     assert_eq!(grants.folders()[0].name, "src-2");
+}
+
+#[cfg(test)]
+#[test]
+fn trust_read() {
+    let scratch = Scratch::new("grants_trust_read");
+    let pem = "-----BEGIN CERTIFICATE-----\nMIIBone\n-----END CERTIFICATE-----\n-----BEGIN CERTIFICATE-----\r\nMIIBtwo\r\n-----END CERTIFICATE-----\n";
+    scratch.write("certs/ca.pem", pem);
+    let grants = scratch.write(
+        "grants.toml",
+        format!("image = \"{IMAGE}\"\ntrust = \"certs/ca.pem\"\n"),
+    );
+    assert_ne!(
+        std::env::current_dir().expect("a working directory"),
+        scratch.path("")
+    );
+
+    let grants = read_grants(&grants).expect("the grants read");
+    assert_eq!(grants.trust(), Some(pem));
+
+    let grants = read_grants(&scratch.write("grants.toml", format!("image = \"{IMAGE}\"\n")))
+        .expect("the grants read");
+    assert_eq!(grants.trust(), None);
+}
+
+#[cfg(test)]
+#[test]
+fn trust_refused() {
+    let scratch = Scratch::new("grants_trust_refused");
+    scratch.write("certs/ca.pem", "");
+
+    for written in ["nowhere.pem", "certs"] {
+        match refused(
+            &scratch,
+            &format!("image = \"{IMAGE}\"\ntrust = \"{written}\"\n"),
+        ) {
+            GrantsFault::Trust {
+                place,
+                path,
+                message,
+            } => {
+                assert_eq!((place.line, place.column), (2, 9));
+                assert_eq!(path, written);
+                assert!(!message.is_empty());
+            }
+            other => panic!("expected {written} refused as the trust file, got {other:?}"),
+        }
+    }
+
+    match refused(&scratch, &format!("image = \"{IMAGE}\"\ntrust = 1\n")) {
+        GrantsFault::Grants {
+            place,
+            fault: KeyFault::WrongKind { key, .. },
+        } => {
+            assert_eq!(place.line, 2);
+            assert_eq!(key, ["trust"]);
+        }
+        other => panic!("expected a number refused as the trust file, got {other:?}"),
+    }
 }
 
 #[cfg(test)]

@@ -131,6 +131,7 @@ image = "alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabe
 images = ["python@sha256:cea0e6040540fb2b965b6e7fb5ffa00871e632eef63719f0ea54bca189ce14a6"]
 actions = ["read", "write", "run"]   # none unless named
 network = false                      # the default
+trust = "ca.pem"                     # certificates a step trusts, if any
 
 [folders.project]                    # mounted at /work/project
 path = "../work"                     # from this file's directory
@@ -155,10 +156,19 @@ may have been lost. Each container is named `agconflo-<run>-<name>`, where `dock
 removed when the `run`, `resume` or `answer` that made it stops. The container keeps a mistaken
 command from what was not granted; it is no defence against code built to escape one.
 
+A network where outgoing TLS is intercepted, as a proxy with its own certificate authority does,
+refuses a container's connections unless it trusts that authority. `trust` names a file of
+certificates, read from the grants file's directory, and a file that cannot be read refuses the
+grants. Its content is copied into each container's `/tmp` before the container's first step, and
+every step is told of the copy through `SSL_CERT_FILE`, which `ubc` was measured reading; nothing is
+mounted for it.
+
 **Grant a git worktree, not your checkout.** Inside a writable folder a tool may change anything,
 mistakes included. `git worktree add ../work -b tool-run` gives it a copy whose every change
 `git diff` shows, and `git worktree remove` discards. Run as root, what a tool writes is root's, a
 setuid bit it sets included, which `git diff` does not show and `find ../work -perm -4000` does.
+A tool that runs `ubc` needs a clone instead, `git clone . ../work`: ubc refused a worktree in a
+container even with the git directory it names mounted.
 
 A run whose manifest names a tool is refused before anything runs when its grants are missing,
 cannot be read or do not cover a tool, or an image it needs is absent. If Docker cannot be reached,

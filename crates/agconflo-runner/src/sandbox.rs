@@ -7,7 +7,10 @@
 //! the run's record file and named after the run and itself. Each step runs in
 //! its container through `docker exec` with no capabilities, as a user other
 //! than the one the container's own process runs as, with `/tmp` as its home,
-//! and every container is removed when the sandbox is dropped.
+//! and every container is removed when the sandbox is dropped. When the grants
+//! name a trust file, its content is copied into each container's `/tmp`
+//! before the container's first step, and every step is told of it through
+//! `SSL_CERT_FILE`.
 
 use std::fmt;
 use std::io::Write;
@@ -29,6 +32,9 @@ pub const SHARED: &str = "tools";
 /// The user and group a container's own process runs as when its steps run
 /// as root.
 const OWN_USER_BESIDE_ROOT: &str = "65534:65534";
+
+/// Where the copy of the grants' trust file is written in each container.
+const TRUST: &str = "/tmp/.agconflo-trust.pem";
 
 /// The script each step runs in: the command given as `$3`, with any further
 /// arguments as its own, under `timeout` for `$1` seconds, its output and
@@ -141,6 +147,7 @@ pub struct Sandbox {
     image: String,
     folders: Vec<Folder>,
     network: bool,
+    trust: Option<String>,
     limits: CommandLimits,
     label: String,
     run: String,
@@ -158,6 +165,7 @@ impl Sandbox {
             image: grants.image().to_owned(),
             folders: grants.folders().to_vec(),
             network: grants.network(),
+            trust: grants.trust().map(str::to_owned),
             limits: grants.limits(),
             label: label(record),
             run: run_id(record),
@@ -319,7 +327,7 @@ impl Sandbox {
     /// container still runs: whatever the step's user left is killed, and the
     /// step comes to `docker exec`'s status and what was printed. Otherwise it
     /// is the engine's failure.
-    // @A path as an argument and text as input to the wrapped command,IMPL_SANDBOX_STEP,impl,[CREQ_SANDBOX_PATHS_AS_ARGUMENTS, CREQ_SANDBOX_STEP_USER, CREQ_SANDBOX_TIME_LIMIT, CREQ_SANDBOX_NOTHING_LEFT_RUNNING, CREQ_SANDBOX_OUTPUT_LIMIT, CREQ_SANDBOX_ENGINE_FAILURE_APART, CREQ_SANDBOX_STEP_HOME, CREQ_SANDBOX_TELLS_FULL_TMP],[DEC_PATHS_AS_ARGUMENTS, DEC_COMMAND_WRAPPED, DEC_STEP_USER_ROOT_INCLUDED, DEC_ENGINE_THROUGH_ITS_COMMAND, DEC_KILLED_WRAPPER_TOLD_BY_ITS_CONTAINER, DEC_STEP_HOME_IN_TMP]
+    // @A path as an argument and text as input to the wrapped command,IMPL_SANDBOX_STEP,impl,[CREQ_SANDBOX_PATHS_AS_ARGUMENTS, CREQ_SANDBOX_STEP_USER, CREQ_SANDBOX_TIME_LIMIT, CREQ_SANDBOX_NOTHING_LEFT_RUNNING, CREQ_SANDBOX_OUTPUT_LIMIT, CREQ_SANDBOX_ENGINE_FAILURE_APART, CREQ_SANDBOX_STEP_HOME, CREQ_SANDBOX_TELLS_FULL_TMP, CREQ_SANDBOX_TRUSTS_GRANTED],[DEC_PATHS_AS_ARGUMENTS, DEC_COMMAND_WRAPPED, DEC_STEP_USER_ROOT_INCLUDED, DEC_ENGINE_THROUGH_ITS_COMMAND, DEC_KILLED_WRAPPER_TOLD_BY_ITS_CONTAINER, DEC_STEP_HOME_IN_TMP, DEC_TRUST_COPIED_INTO_TMP]
     fn step(
         &mut self,
         environment: Environment<'_>,
@@ -331,24 +339,14 @@ impl Sandbox {
         let user = format!("{}:{}", self.user.0, self.user.1);
         let seconds = self.limits.seconds.to_string();
         let output = self.limits.output.to_string();
-        let mut args = vec![
-            "exec",
-            "-i",
-            "-u",
-            &user,
-            "-e",
-            "HOME=/tmp",
-            "-w",
-            "/work",
-            &container,
-            "sh",
-            "-c",
-            WRAPPER,
-            "wrapper",
-            &seconds,
-            &output,
-            script,
-        ];
+        let mut args = vec!["exec", "-i", "-u", &user, "-e", "HOME=/tmp"];
+        let trust = format!("SSL_CERT_FILE={TRUST}");
+        if self.trust.is_some() {
+            args.extend(["-e", &trust]);
+        }
+        args.extend([
+            "-w", "/work", &container, "sh", "-c", WRAPPER, "wrapper", &seconds, &output, script,
+        ]);
         args.extend(argument);
         let done = self.docker(&args, input)?;
 
@@ -451,9 +449,33 @@ impl Sandbox {
             return Err(failure(&made));
         }
         let id = String::from_utf8_lossy(&made.stdout).trim().to_owned();
+        if let Err(failed) = self.trusted(&id) {
+            let _ = self.docker(&["rm", "-f", &id], b"");
+            return Err(failed);
+        }
         self.containers
             .push((environment.container.to_owned(), id.clone()));
         Ok(id)
+    }
+
+    /// Nothing, when the grants name no trust file; otherwise its content
+    /// written to the container `id`'s `/tmp` as the step's user, or the
+    /// engine's failure to.
+    // @The trust file's content copied into the container's /tmp,IMPL_SANDBOX_TRUST,impl,[CREQ_SANDBOX_TRUSTS_GRANTED],[DEC_TRUST_COPIED_INTO_TMP]
+    fn trusted(&self, id: &str) -> Result<(), EngineFailure> {
+        let Some(trust) = &self.trust else {
+            return Ok(());
+        };
+        let user = format!("{}:{}", self.user.0, self.user.1);
+        let script = format!("cat > {TRUST}");
+        let copied = self.docker(
+            &["exec", "-i", "-u", &user, id, "sh", "-c", &script],
+            trust.as_bytes(),
+        )?;
+        if !copied.status.success() {
+            return Err(failure(&copied));
+        }
+        Ok(())
     }
 
     /// Every container carrying the run's label removed.
@@ -1331,4 +1353,49 @@ fn each_image_ready() {
         "reference=python",
     ]);
     assert!(!String::from_utf8_lossy(&listed.stdout).contains(&"0".repeat(64)));
+}
+
+#[cfg(test)]
+#[test]
+fn trust_given() {
+    let scratch = Scratch::new("sandbox_trust_given");
+    needs_docker();
+    let pem = "-----BEGIN CERTIFICATE-----\nMIIBone\n-----END CERTIFICATE-----\n";
+    scratch.write("ca.pem", pem);
+    std::fs::create_dir_all(scratch.path("w")).expect("the folder");
+    let granted = crate::grants::read_grants(&scratch.write(
+        "grants.toml",
+        format!(
+            "image = \"{IMAGE}\"\nactions = [\"run\"]\ntrust = \"ca.pem\"\n\n[folders.w]\npath = \"w\"\n"
+        ),
+    ))
+    .expect("the grants");
+    let mut trusted = Sandbox::new(&granted, &scratch.path("run.toml"));
+
+    let print = "printf '%s\\n' \"$SSL_CERT_FILE\" && cat -- \"$SSL_CERT_FILE\"";
+    for container in [SHARED, "other"] {
+        let environment = Environment {
+            container,
+            image: IMAGE,
+        };
+        let printed = done(trusted.run_in(environment, print));
+        assert_eq!(printed.status, 0, "{}", printed.output);
+        let (path, content) = printed.output.split_once('\n').expect("a path");
+        assert!(path.starts_with("/tmp/"), "{path}");
+        assert_eq!(content, pem);
+
+        let id = trusted.container_named(container).expect("a container");
+        let mounts = docker(&[
+            "inspect",
+            "--format",
+            "{{range .Mounts}}{{.Destination}} {{end}}",
+            id,
+        ]);
+        assert_eq!(String::from_utf8_lossy(&mounts.stdout).trim(), "/work/w");
+    }
+    drop(trusted);
+
+    let mut sandbox = sandbox(&scratch, &[], false, CommandLimits::default());
+    let printed = done(sandbox.run("echo \"${SSL_CERT_FILE-unset}\""));
+    assert_eq!(printed.output, "unset\n");
 }
