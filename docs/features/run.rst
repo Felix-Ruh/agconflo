@@ -11,8 +11,9 @@ and each is written against the decisions in
 What a run does not do here is what keeps the feature a slice rather than the
 engine. It performs no activation itself - the caller does, under
 ``DEC_RUN_IS_DRIVEN`` - so nothing here reaches a provider, a script or a file.
-No instance activates twice (``DEC_ACTIVATION_ONCE_PER_RUN``), so there are no
-loops, no routers and no activation tagging. A run reads no global context, and
+This slice activated no instance twice (``DEC_ACTIVATION_ONCE_PER_RUN``), so it
+had no loops, no routers and no activation tagging; ``features/repetition``
+and ``features/routing`` add them, superseding that decision. A run reads no global context, and
 nothing is persisted.
 
 Each requirement was checked by hand against the question no rule can ask: could
@@ -375,8 +376,9 @@ and names the components they are divided between, which are defined in
      which it can keep exactly because every activation passes through it.
    - ``DEC_COMPLETION_IS_DESIGNATED_OUTPUT``: completion and quiescence are both
      questions about the designated output rather than about the graph.
-   - ``DEC_ACTIVATION_ONCE_PER_RUN``: no instance activates twice, so the
-     scheduler needs no activation tag and the run needs no epoch.
+   - ``DEC_ACTIVATION_ONCE_PER_RUN``, since superseded by
+     ``DEC_EDGE_GENERATIONS``: no instance activated twice, so the scheduler
+     needed no activation tag and the run no epoch.
    - ``DEC_REFUSED_OUTPUT_OUTSTANDING``: an output the run refuses leaves its
      activation outstanding, so the four endings stay closed and the caller
      answers again or reports a failure of its own.
