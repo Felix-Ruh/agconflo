@@ -2640,6 +2640,15 @@
           "title": "agconflo-lua scripted::person_as_callee",
           "type": "test_run"
         },
+        "RUN_SCRIPTED_PERSON_BAD_ROUTE_REFUSED": {
+          "executes": [
+            "TEST_SCRIPTED_PERSON_BAD_ROUTE_REFUSED"
+          ],
+          "id": "RUN_SCRIPTED_PERSON_BAD_ROUTE_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-lua scripted::person_bad_route_refused",
+          "type": "test_run"
+        },
         "RUN_SCRIPTED_PERSON_BETWEEN_MODEL_CALLS": {
           "executes": [
             "TEST_SCRIPTED_PERSON_BETWEEN_MODEL_CALLS"
@@ -2647,6 +2656,15 @@
           "id": "RUN_SCRIPTED_PERSON_BETWEEN_MODEL_CALLS",
           "test_outcome": "passed",
           "title": "agconflo-lua scripted::person_between_model_calls",
+          "type": "test_run"
+        },
+        "RUN_SCRIPTED_PERSON_ROUTES": {
+          "executes": [
+            "TEST_SCRIPTED_PERSON_ROUTES"
+          ],
+          "id": "RUN_SCRIPTED_PERSON_ROUTES",
+          "test_outcome": "passed",
+          "title": "agconflo-lua scripted::person_routes",
           "type": "test_run"
         },
         "RUN_SCRIPTED_PERSON_STEP_HANDED_OVER": {

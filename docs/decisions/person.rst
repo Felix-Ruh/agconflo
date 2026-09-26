@@ -164,3 +164,23 @@ it is an activation, and ``DEC_BUDGET_COUNTS_ACTIVATIONS`` counts those.
    Resuming one record twice was already possible before a person took part,
    and gives the same two runs. What a person adds is a reason to do it by
    accident: a second person answering a question already answered.
+
+.. dec:: A person routes a router's step by naming instances with the answer
+   :id: DEC_PERSON_ROUTE_IN_THE_ANSWER
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :statement: Agconflo shall take the instances a person's answer to a router's step names as that router's route, given beside the answer's text, and refuse an answer that names none for a router's step or names some for any other.
+
+   A router's output is its decision and the instances it names are where
+   the run goes (``DEC_ROUTER_OUTPUT_IS_ITS_DECISION``); a person performing
+   the router gives both, as a script does through ``host.route``. The text
+   stays the output, so what ``DEC_PERSON_SUPPLIES_TEXT`` decided holds, and
+   the names travel beside it: on the command line, ``--route`` once for each
+   instance, and ``--route ""`` for none.
+
+   Reading the route out of the text was the alternative, and is the branch
+   read out of prose that ``FEAT_ROUTE_CHOSEN_BY_MODEL`` exists to end. A
+   menu to choose from was the other, and makes an answer something a script
+   cannot give. A name the run refuses - one no edge out of the router enters
+   - refuses the answer rather than failing the run, as an answer for a step
+   the run does not await is refused: a typo costs an answer, not the run.
