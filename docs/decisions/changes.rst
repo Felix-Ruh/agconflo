@@ -837,3 +837,81 @@ that changed them show through, and are revised here.
      unchanged, and the command line's help text drops the word.
    - Text, the marker in ``runner.rs``: now following
      ``DEC_ARGUMENTS_AS_TEXT_PER_PARAMETER``.
+
+.. dec:: Revised: quiescence is that nothing can activate, not that everything has run
+   :id: DEC_CHANGE_SCHEDULER_NONE_READY
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :supported_by: EVD_IMPACT_SCHEDULER_NONE_READY
+   :statement: Agconflo's requirements project shall state CREQ_SCHEDULER_NONE_READY as its parent states quiescence because it named the once-per-run mechanism as the only way an instance cannot activate.
+
+   Amends ``CREQ_SCHEDULER_NONE_READY``.
+
+   Before: "If every instance of a workflow has either produced an output or
+   lacks a context for a parameter it binds, then Run scheduler shall report
+   that no instance may activate." After: "If no instance of a workflow can
+   activate, then Run scheduler shall report that no instance may activate."
+
+   Raised by the repetition feature, whose ``CREQ_SCHEDULER_OFFERS_AGAIN``
+   offers an instance that has produced when an edge into it holds something
+   new: under the old statement that instance meets "has produced" and the
+   scheduler would be obliged to report quiescence while offering it.
+
+   Justification: it is wrong against its own parent. ``FEAT_RUN_QUIESCENCE_ENDS``
+   ends a run when "no node instance of a run can activate", and
+   ``STKH_STUCK_RUN`` above it reports a run in which no node can make
+   progress. Neither says why an instance cannot activate; the requirement
+   named the two reasons of its day - it has run, which
+   ``DEC_ACTIVATION_ONCE_PER_RUN`` made final, or it lacks an input - as the
+   only ones, the shape ``EVD_AMENDMENTS_CAME_SIDEWAYS`` found behind most
+   changes. That decision is superseded (``DEC_EDGE_GENERATIONS``), and the
+   parent could hold while the old statement is false. The new one is the
+   parent's own word asked of the scheduler, and would read the same had
+   repetition never been proposed; which instances can activate is what the
+   scheduler's other requirements say.
+
+   Verdicts on the impact analysis (``EVD_IMPACT_SCHEDULER_NONE_READY``):
+
+   - Up, ``FEAT_RUN_QUIESCENCE_ENDS`` and ``STKH_STUCK_RUN``: unchanged.
+   - Down, ``IMPL_SCHEDULER_NONE_READY``: unchanged, asking every instance
+     whether it can activate. ``TEST_SCHEDULER_NONE_READY_ONLY_WHEN_NONE``:
+     unchanged, the scheduler reporting none exactly when it offers none,
+     over the same generated definitions.
+     ``TEST_SCHEDULER_PARTIAL_INPUTS_STILL_QUIESCENT``: unchanged, a cycle
+     whose instances each wait for one input. Both runs pass.
+   - Sideways, the other five requirements of ``COMP_RUN_SCHEDULER``:
+     unaffected; ``CREQ_SCHEDULER_OFFERS_AGAIN`` is the one the old wording
+     contradicted, and now agrees with it.
+   - Text, the marker in ``scheduler.rs`` and the lines of
+     ``components/run`` and ``tests/run`` naming it: unchanged, each about
+     quiescence being the scheduler's answer rather than about its mechanism.
+
+.. dec:: Revised: repetition's architecture also realises a context coming first on its edge
+   :id: DEC_CHANGE_ARCH_REPETITION
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :supported_by: EVD_IMPACT_ARCH_REPETITION
+   :statement: Agconflo's requirements project shall have ARCH_REPETITION realise FEAT_ARGUMENT_FIRST_ON_ITS_EDGE because the components it already uses answer for that feature.
+
+   Amends ``ARCH_REPETITION``'s links: it realises
+   ``FEAT_ARGUMENT_FIRST_ON_ITS_EDGE`` beside the two features it realised.
+   Its statement is unchanged.
+
+   Raised by the new feature, which needs an architecture, and needs nothing
+   beyond the workflow run that already answers for the edges here.
+
+   Justification: the architecture answers to the features it realises, and
+   this adds one without changing what it says of the others. A new
+   architecture using only the workflow run was the alternative, and would
+   put what an edge holds first and what it holds after in two places.
+
+   Verdicts on the impact analysis (``EVD_IMPACT_ARCH_REPETITION``):
+
+   - Up, ``FEAT_REPEAT_ON_NEW_CONTEXTS``, ``FEAT_STANDING_SERVES_LATER_PASSES``
+     and ``STKH_REPETITION``: unchanged; ``FEAT_ARGUMENT_FIRST_ON_ITS_EDGE``
+     and ``STKH_RUN_FROM_ANY_PARAMETER`` added above it.
+   - Down: nothing links to it.
+   - Sideways, the 35 requirements of the three components it uses:
+     unaffected; ``CREQ_RUN_ARGUMENT_FIRST_ON_ITS_EDGE`` is added to the
+     workflow run's.
+   - Text, the line of ``components/repetition`` naming it: unchanged.

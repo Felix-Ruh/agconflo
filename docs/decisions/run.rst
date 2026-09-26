@@ -213,8 +213,34 @@ to leave every one of them open.
    forgotten binding reaches no validator, and this refusal is the first thing
    to name it - before any node runs, as ``STKH_WIRING_CHECKED`` asks.
 
-   A context given to a parameter a binding fills is refused too, as it was:
-   the argument and the wire are two sources with nothing to order them.
+   A context given to a parameter a binding fills is not a second source:
+   it is the first context that edge holds, and the wire's come after it
+   (``DEC_ARGUMENT_FIRST_ON_ITS_EDGE``). Two given for one parameter are
+   refused, whether a binding fills it or not.
+
+.. dec:: A context given for a bound parameter is the first its edge holds
+   :id: DEC_ARGUMENT_FIRST_ON_ITS_EDGE
+   :dec_status: accepted
+   :decided_on: 2026-09-26
+   :statement: Agconflo shall hold a context a run is given for a parameter a binding fills as the first context that edge holds, before any context walked along the binding.
+
+   A run may be given a context for any node's parameter
+   (``STKH_RUN_FROM_ANY_PARAMETER``), and one a binding fills is how a
+   repetition starts: a drafter reading the draft its router sends back has
+   nothing on that edge before the router has run, which needs the drafter
+   to have run first. Given an empty draft, the first pass has what it needs,
+   and each pass after takes what the router walked (``DEC_EDGE_GENERATIONS``).
+
+   Its place is fixed, not the order things happened in: it is generation 0
+   of that edge even when the binding's source produced before the instance
+   ran, so what a pass is given does not depend on the order of the
+   definition's instances.
+
+   A key on the binding naming an instance to take the first context from was
+   the alternative the planning started with, and needs a node whose only
+   work is to produce an empty context, and a second name on a binding that
+   ``DEC_BINDING_BY_PORT`` gives one. The maintainer chose the run's context,
+   which every parameter can already be given.
 
 .. dec:: A started run ends in exactly one way
    :id: DEC_RUN_ENDS_ONE_WAY
@@ -427,9 +453,7 @@ to leave every one of them open.
    distinguish (``DEC_EVERY_INPUT_REQUIRED``).
 
    A pass is given no history. What earlier passes produced reaches a later one
-   only by being wired to it, like any other context. The code still activates
-   each instance once; it follows the superseded decisions until the repetition
-   feature is built.
+   only by being wired to it, like any other context.
 
 .. dec:: A node type declares an output standing, which serves every later generation
    :id: DEC_STANDING_OUTPUTS

@@ -36,11 +36,6 @@ named here so the derivation can be audited rather than taken on trust:
 - ``CREQ_SCHEDULER_NONE_READY``'s "asked of the designated instance alone" is
   the run's question rather than the scheduler's, and is caught by
   ``TEST_RUN_IDLE_INSTANCE_DOES_NOT_MAKE_IT_STUCK``.
-- ``CREQ_RUN_STOPS_AT_BUDGET``'s "counted per instance rather than per
-  activation" cannot be distinguished while no instance activates twice
-  (``DEC_ACTIVATION_ONCE_PER_RUN``). It is recorded as untestable here rather
-  than given a case that would pass against both readings, and it becomes
-  testable in the same change that makes a loop runnable.
 - ``CREQ_RUN_ENDS_ON_FAILURE``'s "the failure rendered into a message" is
   asserted by every error-path case in this file, each of which matches on the
   ending as a value rather than on its text.
@@ -285,21 +280,6 @@ single requirement to verify.
    No binding exists to compare, so the wiring validator cannot see this and the
    run is the only thing that can.
 
-.. test_case:: An argument for a bound parameter is refused
-   :id: TEST_RUN_BOUND_PARAMETER_GIVEN_AN_ARGUMENT_IS_REFUSED
-   :verifies: CREQ_RUN_REFUSES_UNFILLED_SIGNATURE
-   :test_kind: error_path
-   :coverage: partial
-
-   An argument for a parameter a binding fills is refused, naming the parameter
-   with two sources. The definition's wiring is sound and the validator reports
-   nothing, which is what makes this the run's question. The control: the same
-   workflow started without that argument starts, the wire being the
-   parameter's one source.
-
-   Catches: the argument silently preferred over the wire, which is what the
-   prototype did; a bound parameter demanded as an input as well.
-
 .. test_case:: Inputs are given wherever nothing binds a parameter
    :id: TEST_RUN_INPUTS_GIVEN_WHERE_NOTHING_BINDS
    :verifies: CREQ_RUN_REFUSES_UNFILLED_SIGNATURE
@@ -354,6 +334,20 @@ single requirement to verify.
    run that checks after offering ends with the same outcome having spent three,
    which for an LLM node is one unbudgeted call on every run that hits the
    limit.
+
+.. test_case:: The budget counts every pass of an instance
+   :id: TEST_RUN_BUDGET_COUNTS_EACH_PASS
+   :verifies: CREQ_RUN_STOPS_AT_BUDGET
+   :test_kind: error_path
+   :coverage: partial
+
+   One instance reading its own output, given its first context by the run,
+   under a budget of five: it is activated five times, each given the output
+   of the pass before, and the run ends reporting the budget.
+
+   Catches ``CREQ_RUN_STOPS_AT_BUDGET``'s "counted per instance rather than
+   per activation", which could not be told apart while no instance ran twice:
+   counted per instance, this run stops after one activation, or never.
 
 .. test_case:: A budget of nothing activates nothing
    :id: TEST_RUN_ZERO_BUDGET_ACTIVATES_NOTHING

@@ -66,6 +66,22 @@ that the record amended.
 
    Catches: the outstanding activation charged again.
 
+.. test_case:: A run resumed partway through a repetition goes on from its pass
+   :id: TEST_RECORD_RESUMES_MID_REPETITION
+   :verifies: CREQ_RECORD_CONTINUES_THE_RUN
+   :test_kind: error_path
+   :coverage: partial
+
+   An instance reading its own output, given its first context, recorded after
+   two passes and resumed: the third pass is offered, given the second's
+   output. The same record saying the second pass was given the run's context
+   again is refused as diverged at that output.
+
+   Nothing of where each edge stands is written in a record; the run holds it
+   again by replaying the outputs in order (``DEC_RESUME_REPLAYS_CALLS``).
+   Catches: a resumed run taking each edge from its start, which offers the
+   first pass again; a record claiming an edge was taken twice accepted.
+
 .. test_case:: A resumed context is the context recorded
    :id: TEST_RECORD_CONTEXTS_KEPT
    :verifies: CREQ_RECORD_KEEPS_CONTEXTS

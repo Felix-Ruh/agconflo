@@ -7,7 +7,7 @@ use std::fmt;
 use std::marker::PhantomData;
 
 use crate::defect::WiringDefect;
-use crate::scheduler::{Activation, Produced, next_activation};
+use crate::scheduler::{Activation, Edges, next_activation};
 use crate::workflow::{NodeType, WorkflowDefinition};
 use crate::{Context, ContextId, ContextType, validate_wiring};
 
@@ -132,14 +132,6 @@ pub enum SignatureFault {
         /// The context type the argument actually carries.
         supplied: ContextType,
     },
-    /// An argument for a parameter a binding fills, which would give it two
-    /// sources.
-    ParameterAlsoBound {
-        /// The instance whose parameter is both supplied and wired.
-        instance: String,
-        /// The parameter with two sources.
-        parameter: String,
-    },
     /// A parameter given more than one argument.
     ParameterSuppliedTwice {
         /// The instance whose parameter was supplied twice.
@@ -180,13 +172,6 @@ impl fmt::Display for SignatureFault {
                 expected.as_str(),
                 supplied.as_str()
             ),
-            Self::ParameterAlsoBound {
-                instance,
-                parameter,
-            } => write!(
-                f,
-                "{instance}.{parameter} was given an argument and is also wired"
-            ),
             Self::ParameterSuppliedTwice {
                 instance,
                 parameter,
@@ -205,10 +190,11 @@ impl fmt::Display for SignatureFault {
 impl std::error::Error for SignatureFault {}
 
 /// Every way the arguments fail to fill the parameters nothing binds exactly
-/// once each, every parameter and every argument looked at: in the
+/// once each, or give a bound parameter more than one context or one of
+/// another type, every parameter and every argument looked at: in the
 /// definition's order, then the arguments that matched nothing in the order
 /// supplied.
-// @A run whose inputs are not each given does not start,IMPL_RUN_SIGNATURE,impl,[CREQ_RUN_REFUSES_UNFILLED_SIGNATURE],[DEC_SIGNATURE_IS_WHAT_NOTHING_BINDS]
+// @A run whose inputs are not each given does not start,IMPL_RUN_SIGNATURE,impl,[CREQ_RUN_REFUSES_UNFILLED_SIGNATURE],[DEC_SIGNATURE_IS_WHAT_NOTHING_BINDS, DEC_ARGUMENT_FIRST_ON_ITS_EDGE]
 fn signature_faults(definition: &WorkflowDefinition, arguments: &Arguments) -> Vec<SignatureFault> {
     let mut faults = Vec::new();
     let mut matched: Vec<(&str, &str)> = Vec::new();
@@ -225,18 +211,7 @@ fn signature_faults(definition: &WorkflowDefinition, arguments: &Arguments) -> V
         for parameter in &declared.required {
             matched.push((&node.name, &parameter.name));
             let supplied = arguments.count_for(&node.name, &parameter.name);
-
-            // A wire is the parameter's source, and an argument would be a
-            // second one.
-            if node.bindings.iter().any(|b| b.parameter == parameter.name) {
-                if supplied > 0 {
-                    faults.push(SignatureFault::ParameterAlsoBound {
-                        instance: node.name.clone(),
-                        parameter: parameter.name.clone(),
-                    });
-                }
-                continue;
-            }
+            let bound = node.bindings.iter().any(|b| b.parameter == parameter.name);
 
             if supplied > 1 {
                 faults.push(SignatureFault::ParameterSuppliedTwice {
@@ -256,6 +231,8 @@ fn signature_faults(definition: &WorkflowDefinition, arguments: &Arguments) -> V
                     });
                 }
                 Some(_) => {}
+                // A wire fills it, and an argument would only have come first.
+                None if bound => {}
                 None => faults.push(SignatureFault::ParameterUnfilled {
                     instance: node.name.clone(),
                     parameter: parameter.name.clone(),
@@ -821,7 +798,9 @@ pub(crate) enum Event {
 pub struct Run<'a, F> {
     definition: &'a WorkflowDefinition,
     arguments: Arguments,
-    produced: Produced,
+    /// What has been walked along each edge, and how far each instance has
+    /// taken it.
+    edges: Edges,
     /// Every context the run holds - its arguments, the outputs it has
     /// accepted, and everything any of them was composed from - each under its
     /// identifier.
@@ -847,7 +826,7 @@ impl<F> fmt::Debug for Run<'_, F> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Run")
             .field("definition", &self.definition.name)
-            .field("produced", &self.produced.len())
+            .field("edges", &self.edges)
             .field(
                 "outstanding",
                 &self
@@ -886,8 +865,8 @@ impl<'a, F> Run<'a, F> {
 
         Ok(Self {
             definition,
+            edges: Edges::new(definition, &arguments),
             arguments,
-            produced: Produced::new(),
             held,
             log: Vec::new(),
             settled_exchanges: Vec::new(),
@@ -928,7 +907,7 @@ impl<'a, F> Run<'a, F> {
             return Step::Activate(called);
         }
 
-        match next_activation(self.definition, &self.arguments, &self.produced) {
+        match next_activation(self.definition, &self.arguments, &self.edges) {
             Some(activation) => {
                 self.outstanding = Some(InProgress::new(activation.clone()));
                 self.activations += 1;
@@ -1006,8 +985,8 @@ impl<'a, F> Run<'a, F> {
         self.held.extend(done.contexts);
         self.held.extend(brought);
         if done.activation.call().is_none() {
-            self.produced
-                .insert(done.activation.instance().to_owned(), context.clone());
+            self.edges
+                .produced(self.definition, &done.activation, &context);
         }
         self.log.push(Event::Output {
             activation: done.activation,
@@ -1106,6 +1085,7 @@ impl<'a, F> Run<'a, F> {
             call: Some(call.id),
             inputs,
             output: declared.output.clone(),
+            taken: Vec::new(),
         };
 
         let Some(mut caller) = self.outstanding.take() else {
@@ -1163,19 +1143,32 @@ impl<'a, F> Run<'a, F> {
 
     /// The output accepted for the call `id` the outstanding activation made, or
     /// `None` when it made no such call or its output has not been accepted.
+    /// A call an earlier activation of the same instance made is not this
+    /// one's, whatever it was named.
+    // @A called output asked of its own activation alone,IMPL_RUN_CALLED,impl,[CREQ_RUN_CALL_OUTPUT_TO_CALLER]
     pub fn called(&self, id: &str) -> Option<&Context> {
         let caller = self.outstanding()?;
         if caller.call().is_some() {
             return None;
         }
-        self.log.iter().rev().find_map(|event| match event {
-            Event::Output { activation, output }
-                if activation.instance() == caller.instance() && activation.call() == Some(id) =>
-            {
-                Some(output)
-            }
-            _ => None,
-        })
+        // Back through the log as far as the instance's previous output of its
+        // own, which ended its previous activation.
+        self.log
+            .iter()
+            .rev()
+            .take_while(|event| {
+                !matches!(event, Event::Output { activation, .. }
+                    if activation.instance() == caller.instance() && activation.call().is_none())
+            })
+            .find_map(|event| match event {
+                Event::Output { activation, output }
+                    if activation.instance() == caller.instance()
+                        && activation.call() == Some(id) =>
+                {
+                    Some(output)
+                }
+                _ => None,
+            })
     }
 
     /// Every set of contexts an identifier is checked against: the run's own,
@@ -1216,7 +1209,7 @@ impl<'a, F> Run<'a, F> {
     // @Completion is the designated output alone,TRACE_RUN_RESULT,trace,[],[DEC_COMPLETION_IS_DESIGNATED_OUTPUT]
     fn result(&self) -> Option<Context> {
         let designated = self.definition.designated_outputs.first()?;
-        self.produced.get(designated).cloned()
+        self.edges.latest(designated).cloned()
     }
 
     /// Every instance that has produced nothing, in the order the definition
@@ -1225,7 +1218,7 @@ impl<'a, F> Run<'a, F> {
         self.definition
             .instances
             .iter()
-            .filter(|node| !self.produced.contains_key(&node.name))
+            .filter(|node| !self.edges.has_run(&node.name))
             .map(|node| node.name.clone())
             .collect()
     }
@@ -1689,7 +1682,7 @@ fn argument_of_wrong_type_is_refused() {
 
 #[cfg(test)]
 #[test]
-fn bound_parameter_given_an_argument_is_refused() {
+fn argument_first_on_its_edge() {
     let mut source = IdSource::new();
     let types = vec![
         node_type("Src", &[], "note"),
@@ -1698,24 +1691,166 @@ fn bound_parameter_given_an_argument_is_refused() {
     let instances = vec![
         instance("a", "Src", &[]),
         instance("e", "Take", &[("seed", "a")]),
+        instance("sink", "Take", &[("seed", "e")]),
     ];
-    let workflow = definition(types, instances, &["e"]);
+    let workflow = definition(types, instances, &["sink"]);
     assert!(validate_wiring(&workflow).is_empty());
 
-    // An argument for the wired parameter is a second source.
-    let with_argument = Arguments::new().supply("e", "seed", ctx(&mut source, "note"));
-    let refusal = Run::<Infallible>::start(&workflow, with_argument, 10)
-        .expect_err("a parameter with two sources is refused");
+    // Given a context for the wired parameter, e takes it first, and then what
+    // a walked along the wire - though a produced before e ran at all.
+    let first = ctx(&mut source, "note");
+    let first_id = first.id();
+    let arguments = Arguments::new().supply("e", "seed", first);
+    let mut run = Run::<Infallible>::start(&workflow, arguments, 10).expect("one context for e");
+    let mut given = Vec::new();
+    let mut outputs = HashMap::new();
+    loop {
+        match run.step() {
+            Step::Activate(activation) => {
+                let produced = ctx(&mut source, "note");
+                given.push((
+                    activation.instance().to_owned(),
+                    activation
+                        .inputs()
+                        .iter()
+                        .map(|(_, c)| c.id())
+                        .collect::<Vec<_>>(),
+                ));
+                outputs
+                    .entry(activation.instance().to_owned())
+                    .or_insert_with(Vec::new)
+                    .push(produced.id());
+                run.produced(produced).expect("of the declared type");
+            }
+            Step::Ended(ending) => {
+                assert!(matches!(ending, RunEnding::Completed(_)), "{ending:?}");
+                break;
+            }
+        }
+    }
+    assert_eq!(
+        given,
+        vec![
+            ("a".to_owned(), vec![]),
+            ("e".to_owned(), vec![first_id]),
+            ("e".to_owned(), vec![outputs["a"][0]]),
+            ("sink".to_owned(), vec![outputs["e"][0]]),
+        ]
+    );
+
+    // Two contexts for it are refused, as for any parameter.
+    let twice = Arguments::new()
+        .supply("e", "seed", ctx(&mut source, "note"))
+        .supply("e", "seed", ctx(&mut source, "note"));
+    let refusal = Run::<Infallible>::start(&workflow, twice, 10).expect_err("two for one");
     assert_eq!(
         signature(refusal),
-        vec![SignatureFault::ParameterAlsoBound {
+        vec![SignatureFault::ParameterSuppliedTwice {
             instance: "e".to_owned(),
             parameter: "seed".to_owned(),
         }]
     );
+}
 
-    // The control: the wire alone is its one source, and the run starts.
-    assert!(Run::<Infallible>::start(&workflow, Arguments::new(), 10).is_ok());
+/// Drive a run of `workflow` to its ending, each activation producing a fresh
+/// context: the ending, and each activation's instance with the identifiers it
+/// was given and the one it produced, in order.
+#[cfg(test)]
+#[allow(clippy::type_complexity)]
+fn passes(
+    workflow: &WorkflowDefinition,
+    arguments: Arguments,
+    budget: usize,
+    source: &mut IdSource,
+) -> (
+    RunEnding<Infallible>,
+    Vec<(String, Vec<ContextId>, ContextId)>,
+) {
+    let mut run = Run::<Infallible>::start(workflow, arguments, budget).expect("it starts");
+    let mut passes = Vec::new();
+    loop {
+        match run.step() {
+            Step::Activate(activation) => {
+                let produced = ctx(source, activation.output().as_str());
+                passes.push((
+                    activation.instance().to_owned(),
+                    activation.inputs().iter().map(|(_, c)| c.id()).collect(),
+                    produced.id(),
+                ));
+                run.produced(produced).expect("of the declared type");
+            }
+            Step::Ended(ending) => return (ending, passes),
+        }
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn output_walks_every_edge() {
+    let mut source = IdSource::new();
+    let types = vec![
+        node_type("Src", &[], "note"),
+        node_type("Take", &[("seed", "note")], "note"),
+    ];
+    // p is given a context first and then q's output, and comes before its
+    // two consumers, so it produces twice before either runs. The designated
+    // instance reads only itself and never runs.
+    let instances = vec![
+        instance("q", "Src", &[]),
+        instance("p", "Take", &[("seed", "q")]),
+        instance("c1", "Take", &[("seed", "p")]),
+        instance("c2", "Take", &[("seed", "p")]),
+        instance("never", "Take", &[("seed", "never")]),
+    ];
+    let workflow = definition(types, instances, &["never"]);
+    let arguments = Arguments::new().supply("p", "seed", ctx(&mut source, "note"));
+
+    let (ending, passes) = passes(&workflow, arguments, 20, &mut source);
+    assert!(matches!(ending, RunEnding::Quiescent { .. }), "{ending:?}");
+    let of = |name: &str| -> Vec<(Vec<ContextId>, ContextId)> {
+        passes
+            .iter()
+            .filter(|(instance, _, _)| instance == name)
+            .map(|(_, given, made)| (given.clone(), *made))
+            .collect()
+    };
+    let made: Vec<ContextId> = of("p").iter().map(|(_, made)| *made).collect();
+    assert_eq!(made.len(), 2);
+    let names: Vec<&str> = passes.iter().map(|(name, _, _)| name.as_str()).collect();
+    assert_eq!(names, ["q", "p", "p", "c1", "c1", "c2", "c2"]);
+
+    // Each consumer is given the first output, then the second.
+    for consumer in ["c1", "c2"] {
+        let given: Vec<Vec<ContextId>> = of(consumer).into_iter().map(|(given, _)| given).collect();
+        assert_eq!(given, [vec![made[0]], vec![made[1]]], "{consumer}");
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn budget_counts_each_pass() {
+    let mut source = IdSource::new();
+    // One instance reading its own output, given its first context: it runs
+    // again on every output, until the budget stops it.
+    let types = vec![node_type("Take", &[("seed", "note")], "note")];
+    let instances = vec![
+        instance("x", "Take", &[("seed", "x")]),
+        instance("never", "Take", &[("seed", "never")]),
+    ];
+    let workflow = definition(types, instances, &["never"]);
+    let arguments = Arguments::new().supply("x", "seed", ctx(&mut source, "note"));
+
+    let (ending, passes) = passes(&workflow, arguments, 5, &mut source);
+    assert!(
+        matches!(ending, RunEnding::BudgetExceeded { budget: 5 }),
+        "{ending:?}"
+    );
+    // Five activations of one instance, each given the one before's output.
+    assert_eq!(passes.len(), 5);
+    for pair in passes.windows(2) {
+        assert_eq!(pair[0].0, "x");
+        assert_eq!(pair[1].1, [pair[0].2]);
+    }
 }
 
 #[cfg(test)]
@@ -2803,6 +2938,51 @@ fn call_output_goes_back_to_the_caller() {
         Step::Ended(RunEnding::Completed(result)) => assert!(result.is(&answer)),
         other => panic!("the asker's own output completes the run: {other:?}"),
     }
+}
+
+#[cfg(test)]
+#[test]
+fn called_output_from_its_own_pass() {
+    let mut source = IdSource::new();
+    // An asker reading its own output, given its first context: every pass is
+    // another activation of one instance, whose model names its calls alike.
+    let types = vec![
+        node_type("ask", &[("seed", "note")], "note"),
+        node_type("lookup", &[("query", "note"), ("scope", "note")], "note"),
+        node_type("pass", &[("input", "note")], "note"),
+    ];
+    let instances = vec![
+        instance("asker", "ask", &[("seed", "asker")]).with_calls(&["lookup"]),
+        instance("never", "pass", &[("input", "never")]),
+    ];
+    let workflow = definition(types, instances, &["never"]);
+    let arguments = Arguments::new().supply("asker", "seed", ctx(&mut source, "note"));
+    let mut run = Run::<Infallible>::start(&workflow, arguments, 10).expect("sound");
+
+    // The first pass calls, is answered, and produces.
+    offered(&mut run);
+    let (call, _, _) = lookup_call(&mut source, "call_1");
+    run.call(call).expect("declared");
+    offered(&mut run);
+    let found = ctx(&mut source, "note");
+    run.produced(found.clone()).expect("lookup's output");
+    assert!(run.called("call_1").is_some_and(|output| output.is(&found)));
+    run.produced(ctx(&mut source, "note"))
+        .expect("the first pass's own");
+
+    // The second pass has made no call yet: the first pass's answer to a call
+    // of the same name is not its.
+    let second = offered(&mut run);
+    assert_eq!((second.instance(), second.call()), ("asker", None));
+    assert!(run.called("call_1").is_none());
+
+    // Once it makes that call and is answered, it is given its own answer.
+    let (call, _, _) = lookup_call(&mut source, "call_1");
+    run.call(call).expect("declared");
+    offered(&mut run);
+    let again = ctx(&mut source, "note");
+    run.produced(again.clone()).expect("lookup's output");
+    assert!(run.called("call_1").is_some_and(|output| output.is(&again)));
 }
 
 #[cfg(test)]

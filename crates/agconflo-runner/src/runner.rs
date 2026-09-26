@@ -656,7 +656,7 @@ fn stopped(
 #[cfg(test)]
 use crate::testing::{Scratch, Stub};
 #[cfg(test)]
-use agconflo_core::{RunEnding, SignatureFault, StartRefusal};
+use agconflo_core::RunEnding;
 #[cfg(test)]
 use agconflo_lua::ScriptFailure;
 #[cfg(test)]
@@ -873,29 +873,18 @@ fn unknown_argument_refused() {
         assert!(!scratch.path("run.toml.lock").exists());
     }
 
-    // A parameter a binding fills is declared, so the runner makes the
-    // context, and the run refuses it as a second source.
+    // The control: a parameter a binding fills is declared, so the runner
+    // makes the context, and the run takes it before what the wire carries.
     let arguments = [
         brief("x").remove(0),
         Argument {
             instance: "second".to_owned(),
             parameter: "before".to_owned(),
-            text: "x".to_owned(),
+            text: "given".to_owned(),
         },
     ];
-    match runtime().block_on(start(sources, &record, &arguments)) {
-        Err(Refusal::Run(ScriptedRefusal::Start(StartRefusal::Signature(faults)))) => {
-            assert_eq!(
-                faults,
-                [SignatureFault::ParameterAlsoBound {
-                    instance: "second".to_owned(),
-                    parameter: "before".to_owned(),
-                }]
-            );
-        }
-        other => panic!("expected second.before refused as bound, got {other:?}"),
-    }
-    assert!(!record.exists());
+    let stopped = runtime().block_on(start(sources, &scratch.path("bound.toml"), &arguments));
+    assert_eq!(completed(stopped), "given+c+c");
 }
 
 #[cfg(test)]

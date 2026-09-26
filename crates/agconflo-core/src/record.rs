@@ -1757,6 +1757,57 @@ fn diverged_record_refused() {
     }
 }
 
+#[test]
+fn resumes_mid_repetition() {
+    // One instance reading its own output, given its first context: each pass
+    // is given the output of the one before.
+    let workflow = definition(
+        vec![node_type("Take", &[("seed", "note")], "note")],
+        vec![
+            instance("x", "Take", &[("seed", "x")]),
+            instance("never", "Take", &[("seed", "never")]),
+        ],
+        &["never"],
+    );
+    let mut source = IdSource::new();
+    let first = note(&mut source, "first");
+    let arguments = Arguments::new().supply("x", "seed", first.clone());
+    let mut run = Run::<()>::start(&workflow, arguments, 10).expect("starts");
+    let mut outputs = Vec::new();
+    for _ in 0..2 {
+        let Step::Activate(activation) = run.step() else {
+            panic!("offered")
+        };
+        let output = answer(&mut source, &activation);
+        outputs.push(output.clone());
+        run.produced(output).expect("accepted");
+    }
+    let record = run.record(&source);
+
+    // Resumed, the third pass is offered with the second's output: the edge's
+    // place is rebuilt from the record, not started again.
+    let (mut resumed, _) = Run::<()>::resume(&workflow, &record).expect("it resumes");
+    let Step::Activate(third) = resumed.step() else {
+        panic!("the third pass is offered")
+    };
+    assert_eq!(third.instance(), "x");
+    assert_eq!(third.inputs()[0].1.id(), outputs[1].id());
+
+    // A record saying the second pass was given the run's context again, as
+    // taking the edge from its start would, is refused at that output.
+    let at = format!("seed = \"{}\"", outputs[0].id().value());
+    assert_eq!(record.matches(&at).count(), 1, "{record}");
+    let altered = record.replace(&at, &format!("seed = \"{}\"", first.id().value()));
+    match Run::<()>::resume(&workflow, &altered) {
+        Err(ResumeRefusal::Diverged {
+            output: 1,
+            instance,
+            divergence: Divergence::InputsDiffer { .. },
+        }) => assert_eq!(instance, "x"),
+        other => panic!("expected the second output refused, got {other:?}"),
+    }
+}
+
 #[cfg(test)]
 #[test]
 fn start_refusal_carried() {

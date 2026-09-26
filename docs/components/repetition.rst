@@ -100,3 +100,25 @@ instance takes from each the earliest it has not taken
      second.**
    - **The output of an instance the run gave every input taken once**, it
      being declared standing nowhere.
+
+.. comp_req:: A context a run is given for a wired parameter is its edge's first
+   :id: CREQ_RUN_ARGUMENT_FIRST_ON_ITS_EDGE
+   :derived_from: FEAT_ARGUMENT_FIRST_ON_ITS_EDGE
+   :allocated_to: COMP_WORKFLOW_RUN
+   :ears_pattern: event
+   :statement: When a run is started with a context for a parameter a binding fills, Workflow run shall hold that context as the first that edge holds, before any context walked along it.
+
+   ``DEC_ARGUMENT_FIRST_ON_ITS_EDGE``. It is generation 0 of the edge, and
+   the binding's contexts are 1 onward, whenever they are walked. Two
+   contexts given for one parameter are refused as they are for any
+   (``CREQ_RUN_REFUSES_UNFILLED_SIGNATURE``).
+
+   Failure modes:
+
+   - **The context refused as a second source**, which is what the run did,
+     and a loop given no way into its first pass.
+   - **The context placed after what was walked first**, and what a pass is
+     given turned on whether the binding's source happened to run before the
+     instance.
+   - **The context given for every pass**, as a parameter nothing binds is,
+     and the wire's contexts never taken.

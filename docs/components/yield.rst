@@ -152,6 +152,11 @@ The run
      is refused, and the run cannot go on.
    - **The output not held.** A later output composing it is refused for an
      identifier the run does not hold, and the record loses it.
+   - **Given back to a later activation of the same instance.** An instance
+     runs again when the edges into it carry something new
+     (``CREQ_SCHEDULER_OFFERS_AGAIN``), and a provider may name its calls alike
+     each time; the output of an earlier pass's call is not the calling
+     activation's, and a resumed pass answered with it asks nothing it should.
 
 .. comp_req:: A call its instance does not declare is refused
    :id: CREQ_RUN_REFUSES_UNDECLARED_CALL

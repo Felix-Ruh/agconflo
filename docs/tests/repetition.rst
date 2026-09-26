@@ -83,6 +83,20 @@ named by the case that catches it.
    outputs kept after a second; the output of an instance the run gave every
    input taken once.
 
+.. test_case:: A context given for a wired parameter comes before what the wire carries
+   :id: TEST_RUN_ARGUMENT_FIRST_ON_ITS_EDGE
+   :verifies: CREQ_RUN_ARGUMENT_FIRST_ON_ITS_EDGE
+   :test_kind: positive
+   :coverage: full
+
+   An instance given a context for its wired parameter, whose binding's source
+   comes before it in the definition and produces before it runs: its first
+   activation is given the context the run was given, and its second the
+   source's output. Two contexts for that parameter are refused naming it.
+
+   Catches: the context refused as a second source; the context placed after
+   what was walked first; the context given for every pass.
+
 .. test_case:: A review loop runs until its router says it is done
    :id: TEST_SCRIPTED_REVIEW_LOOP
    :verifies: FEAT_REPEAT_ON_NEW_CONTEXTS
