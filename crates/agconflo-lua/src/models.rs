@@ -17,7 +17,7 @@ use genai::chat::{
 /// credentials they carry are decided when it is built, and the roster reads no
 /// credentials itself. Models are named as `genai` names them - `openai::gpt-...`,
 /// `claude-...`.
-// @A mapping from role to model,IMPL_MODELS_ROSTER,impl,[CREQ_ROSTER_ROLE_TO_MODEL],[DEC_MODELS_BY_ROLE, DEC_MODELS_THROUGH_GENAI]
+// @A mapping from role to model,IMPL_MODELS_ROSTER,impl,[CREQ_ROSTER_ROLE_TO_MODEL],[DEC_MODELS_BY_ROLE, DEC_DECISIONS_THROUGH_THEIR_ENDPOINT]
 #[derive(Clone, Debug)]
 pub struct Roster {
     client: Client,

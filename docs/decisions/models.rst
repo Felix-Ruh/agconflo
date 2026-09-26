@@ -8,10 +8,12 @@ behaviour is ever asynchronous; these settle both for the Lua host, and neither
 reaches into the core.
 
 Six rest on measurements recorded in ``evidence/models``, the last taken while
-implementing. Two are judgements,
-and say so: where the code lives, and that a script names a role rather than a
-model. The second is argued from ``STKH_PROVIDER_CHOICE`` itself, which is the
-strongest footing a judgement can have and still not a measurement.
+implementing. The first is superseded by
+``DEC_DECISIONS_THROUGH_THEIR_ENDPOINT``, which keeps it for chat models and
+adds decisions models beside them. Two are judgements, and say so: where the
+code lives, and that a script names a role rather than a model. The second
+is argued from ``STKH_PROVIDER_CHOICE`` itself, which is the strongest footing
+a judgement can have and still not a measurement.
 
 What they do not settle is named here. Nothing below decides whether a call
 carries a system prompt or several messages, whether a script may use tools,
@@ -21,7 +23,7 @@ not exist yet.
 
 .. dec:: A model is reached through genai
    :id: DEC_MODELS_THROUGH_GENAI
-   :dec_status: accepted
+   :dec_status: superseded
    :decided_on: 2026-09-23
    :supported_by: EVD_GENAI_TWO_FORMATS_EXACT, EVD_GENAI_ERROR_STATUS, EVD_GENAI_BUILD_COST
    :statement: Agconflo shall reach language models through genai.

@@ -148,7 +148,8 @@ and names the components they are divided between, which are defined in
 
    The decisions this is built against are named here rather than linked:
 
-   - ``DEC_MODELS_THROUGH_GENAI``: the roster calls through ``genai``.
+   - ``DEC_DECISIONS_THROUGH_THEIR_ENDPOINT``: the roster calls chat models
+     through ``genai``, superseding ``DEC_MODELS_THROUGH_GENAI``.
    - ``DEC_MODELS_IN_LUA_CRATE``: both live in ``agconflo-lua``.
    - ``DEC_MODELS_BY_ROLE``: a script names a role; the caller's roster maps it.
    - ``DEC_BEHAVIOUR_ASYNC``: a call is awaited, so the host runs scripts
