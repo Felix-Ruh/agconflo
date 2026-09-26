@@ -156,6 +156,15 @@
           "title": "agconflo-cli::command commands_reach_the_runner",
           "type": "test_run"
         },
+        "RUN_COMMAND_ENGINE_FAILURE_TOLD": {
+          "executes": [
+            "TEST_COMMAND_ENGINE_FAILURE_TOLD"
+          ],
+          "id": "RUN_COMMAND_ENGINE_FAILURE_TOLD",
+          "test_outcome": "passed",
+          "title": "agconflo-cli::command engine_failure_told",
+          "type": "test_run"
+        },
         "RUN_COMMAND_EXIT_STATUS_PER_ENDING": {
           "executes": [
             "TEST_COMMAND_EXIT_STATUS_PER_ENDING"
@@ -174,6 +183,15 @@
           "title": "agconflo-cli::command failure_on_standard_error",
           "type": "test_run"
         },
+        "RUN_COMMAND_GRANTS_HANDED_ON": {
+          "executes": [
+            "TEST_COMMAND_GRANTS_HANDED_ON"
+          ],
+          "id": "RUN_COMMAND_GRANTS_HANDED_ON",
+          "test_outcome": "passed",
+          "title": "agconflo-cli::command grants_handed_on",
+          "type": "test_run"
+        },
         "RUN_COMMAND_HELD_RECORD_REFUSED": {
           "executes": [
             "TEST_COMMAND_HELD_RECORD_REFUSED"
@@ -181,6 +199,15 @@
           "id": "RUN_COMMAND_HELD_RECORD_REFUSED",
           "test_outcome": "passed",
           "title": "agconflo-cli::command held_record_refused",
+          "type": "test_run"
+        },
+        "RUN_COMMAND_KILLED_TOOL_STEP_PERFORMED_ALONE": {
+          "executes": [
+            "TEST_COMMAND_KILLED_TOOL_STEP_PERFORMED_ALONE"
+          ],
+          "id": "RUN_COMMAND_KILLED_TOOL_STEP_PERFORMED_ALONE",
+          "test_outcome": "passed",
+          "title": "agconflo-cli::command killed_tool_step_performed_alone",
           "type": "test_run"
         },
         "RUN_COMMAND_MISUSE_EXITS_2": {
@@ -208,6 +235,15 @@
           "id": "RUN_COMMAND_RESUMED_AFTER_A_KILL",
           "test_outcome": "passed",
           "title": "agconflo-cli::command resumed_after_a_kill",
+          "type": "test_run"
+        },
+        "RUN_COMMAND_TOOL_KEPT_TO_ITS_GRANT": {
+          "executes": [
+            "TEST_COMMAND_TOOL_KEPT_TO_ITS_GRANT"
+          ],
+          "id": "RUN_COMMAND_TOOL_KEPT_TO_ITS_GRANT",
+          "test_outcome": "passed",
+          "title": "agconflo-cli::command tool_kept_to_its_grant",
           "type": "test_run"
         },
         "RUN_COMMAND_UNKEPT_RECORD_TOLD": {
@@ -343,6 +379,60 @@
           "id": "RUN_DEFECT_SIGNATURE_NAMES_THE_DEFINITION",
           "test_outcome": "passed",
           "title": "agconflo-core defect::signature_names_the_definition",
+          "type": "test_run"
+        },
+        "RUN_GRANTS_BAD_FOLDER_REFUSED": {
+          "executes": [
+            "TEST_GRANTS_BAD_FOLDER_REFUSED"
+          ],
+          "id": "RUN_GRANTS_BAD_FOLDER_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner grants::bad_folder_refused",
+          "type": "test_run"
+        },
+        "RUN_GRANTS_NARROW_BY_DEFAULT": {
+          "executes": [
+            "TEST_GRANTS_NARROW_BY_DEFAULT"
+          ],
+          "id": "RUN_GRANTS_NARROW_BY_DEFAULT",
+          "test_outcome": "passed",
+          "title": "agconflo-runner grants::narrow_by_default",
+          "type": "test_run"
+        },
+        "RUN_GRANTS_PATHS_FROM_THE_FILE": {
+          "executes": [
+            "TEST_GRANTS_PATHS_FROM_THE_FILE"
+          ],
+          "id": "RUN_GRANTS_PATHS_FROM_THE_FILE",
+          "test_outcome": "passed",
+          "title": "agconflo-runner grants::paths_from_the_file",
+          "type": "test_run"
+        },
+        "RUN_GRANTS_READS_WHAT_IT_NAMES": {
+          "executes": [
+            "TEST_GRANTS_READS_WHAT_IT_NAMES"
+          ],
+          "id": "RUN_GRANTS_READS_WHAT_IT_NAMES",
+          "test_outcome": "passed",
+          "title": "agconflo-runner grants::reads_what_it_names",
+          "type": "test_run"
+        },
+        "RUN_GRANTS_TAGGED_IMAGE_REFUSED": {
+          "executes": [
+            "TEST_GRANTS_TAGGED_IMAGE_REFUSED"
+          ],
+          "id": "RUN_GRANTS_TAGGED_IMAGE_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner grants::tagged_image_refused",
+          "type": "test_run"
+        },
+        "RUN_GRANTS_UNREADABLE_REFUSED": {
+          "executes": [
+            "TEST_GRANTS_UNREADABLE_REFUSED"
+          ],
+          "id": "RUN_GRANTS_UNREADABLE_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner grants::unreadable_refused",
           "type": "test_run"
         },
         "RUN_HOST_EACH_TYPE_RUNS_ITS_OWN_SCRIPT": {
@@ -786,6 +876,51 @@
           "title": "agconflo-runner model_map::unset_variable_refused",
           "type": "test_run"
         },
+        "RUN_PERFORMER_ACTIONS_PERFORMED": {
+          "executes": [
+            "TEST_PERFORMER_ACTIONS_PERFORMED"
+          ],
+          "id": "RUN_PERFORMER_ACTIONS_PERFORMED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner performer::actions_performed",
+          "type": "test_run"
+        },
+        "RUN_PERFORMER_ENGINE_FAILURE_PASSED": {
+          "executes": [
+            "TEST_PERFORMER_ENGINE_FAILURE_PASSED"
+          ],
+          "id": "RUN_PERFORMER_ENGINE_FAILURE_PASSED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner performer::engine_failure_passed",
+          "type": "test_run"
+        },
+        "RUN_PERFORMER_FAILURE_ANSWERED_AS_TEXT": {
+          "executes": [
+            "TEST_PERFORMER_FAILURE_ANSWERED_AS_TEXT"
+          ],
+          "id": "RUN_PERFORMER_FAILURE_ANSWERED_AS_TEXT",
+          "test_outcome": "passed",
+          "title": "agconflo-runner performer::failure_answered_as_text",
+          "type": "test_run"
+        },
+        "RUN_PERFORMER_PATH_REFUSED": {
+          "executes": [
+            "TEST_PERFORMER_PATH_REFUSED"
+          ],
+          "id": "RUN_PERFORMER_PATH_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner performer::path_refused",
+          "type": "test_run"
+        },
+        "RUN_PERFORMER_TEXT_KEPT_EXACTLY": {
+          "executes": [
+            "TEST_PERFORMER_TEXT_KEPT_EXACTLY"
+          ],
+          "id": "RUN_PERFORMER_TEXT_KEPT_EXACTLY",
+          "test_outcome": "passed",
+          "title": "agconflo-runner performer::text_kept_exactly",
+          "type": "test_run"
+        },
         "RUN_PROJECT_FAULTS_CARRY_THEIR_PLACE": {
           "executes": [
             "TEST_PROJECT_FAULTS_CARRY_THEIR_PLACE"
@@ -831,6 +966,15 @@
           "title": "agconflo-runner project::paths_from_the_manifest",
           "type": "test_run"
         },
+        "RUN_PROJECT_READS_TOOLS": {
+          "executes": [
+            "TEST_PROJECT_READS_TOOLS"
+          ],
+          "id": "RUN_PROJECT_READS_TOOLS",
+          "test_outcome": "passed",
+          "title": "agconflo-runner project::reads_tools",
+          "type": "test_run"
+        },
         "RUN_PROJECT_READS_WHAT_IT_NAMES": {
           "executes": [
             "TEST_PROJECT_READS_WHAT_IT_NAMES"
@@ -847,6 +991,15 @@
           "id": "RUN_PROJECT_SCRIPTS_KEPT_EXACTLY",
           "test_outcome": "passed",
           "title": "agconflo-runner project::scripts_kept_exactly",
+          "type": "test_run"
+        },
+        "RUN_PROJECT_TOOL_FAULTS_REFUSED": {
+          "executes": [
+            "TEST_PROJECT_TOOL_FAULTS_REFUSED"
+          ],
+          "id": "RUN_PROJECT_TOOL_FAULTS_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner project::tool_faults_refused",
           "type": "test_run"
         },
         "RUN_PROJECT_UNDECODABLE_FILE_REFUSED": {
@@ -1146,6 +1299,15 @@
           "title": "agconflo-runner runner::arguments_kept_exactly",
           "type": "test_run"
         },
+        "RUN_RUNNER_CHECK_REPORTS_TOOLS": {
+          "executes": [
+            "TEST_RUNNER_CHECK_REPORTS_TOOLS"
+          ],
+          "id": "RUN_RUNNER_CHECK_REPORTS_TOOLS",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::check_reports_tools",
+          "type": "test_run"
+        },
         "RUN_RUNNER_CHECK_RUNS_NOTHING": {
           "executes": [
             "TEST_RUNNER_CHECK_RUNS_NOTHING"
@@ -1164,6 +1326,42 @@
           "title": "agconflo-runner runner::endings_handed_back",
           "type": "test_run"
         },
+        "RUN_RUNNER_ENGINE_FAILURE_LEAVES_THE_STEP": {
+          "executes": [
+            "TEST_RUNNER_ENGINE_FAILURE_LEAVES_THE_STEP"
+          ],
+          "id": "RUN_RUNNER_ENGINE_FAILURE_LEAVES_THE_STEP",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::engine_failure_leaves_the_step",
+          "type": "test_run"
+        },
+        "RUN_RUNNER_MODEL_CALLS_A_TOOL": {
+          "executes": [
+            "TEST_RUNNER_MODEL_CALLS_A_TOOL"
+          ],
+          "id": "RUN_RUNNER_MODEL_CALLS_A_TOOL",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::model_calls_a_tool",
+          "type": "test_run"
+        },
+        "RUN_RUNNER_PERFORMS_TOOL_STEPS": {
+          "executes": [
+            "TEST_RUNNER_PERFORMS_TOOL_STEPS"
+          ],
+          "id": "RUN_RUNNER_PERFORMS_TOOL_STEPS",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::performs_tool_steps",
+          "type": "test_run"
+        },
+        "RUN_RUNNER_RECORDED_TOOL_STEP_NOT_REPEATED": {
+          "executes": [
+            "TEST_RUNNER_RECORDED_TOOL_STEP_NOT_REPEATED"
+          ],
+          "id": "RUN_RUNNER_RECORDED_TOOL_STEP_NOT_REPEATED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::recorded_tool_step_not_repeated",
+          "type": "test_run"
+        },
         "RUN_RUNNER_REFUSED_START_TAKES_NOTHING": {
           "executes": [
             "TEST_RUNNER_REFUSED_START_TAKES_NOTHING"
@@ -1171,6 +1369,24 @@
           "id": "RUN_RUNNER_REFUSED_START_TAKES_NOTHING",
           "test_outcome": "passed",
           "title": "agconflo-runner runner::refused_start_takes_nothing",
+          "type": "test_run"
+        },
+        "RUN_RUNNER_REFUSES_UNGRANTED": {
+          "executes": [
+            "TEST_RUNNER_REFUSES_UNGRANTED"
+          ],
+          "id": "RUN_RUNNER_REFUSES_UNGRANTED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::refuses_ungranted",
+          "type": "test_run"
+        },
+        "RUN_RUNNER_REFUSES_WITHOUT_GRANTS": {
+          "executes": [
+            "TEST_RUNNER_REFUSES_WITHOUT_GRANTS"
+          ],
+          "id": "RUN_RUNNER_REFUSES_WITHOUT_GRANTS",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::refuses_without_grants",
           "type": "test_run"
         },
         "RUN_RUNNER_RESUMES_AN_INTERRUPTED_RUN": {
@@ -1189,6 +1405,33 @@
           "id": "RUN_RUNNER_RUNS_TO_COMPLETION",
           "test_outcome": "passed",
           "title": "agconflo-runner runner::runs_to_completion",
+          "type": "test_run"
+        },
+        "RUN_RUNNER_TOOL_STEPS_COUNT_AGAINST_BUDGET": {
+          "executes": [
+            "TEST_RUNNER_TOOL_STEPS_COUNT_AGAINST_BUDGET"
+          ],
+          "id": "RUN_RUNNER_TOOL_STEPS_COUNT_AGAINST_BUDGET",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::tool_steps_count_against_budget",
+          "type": "test_run"
+        },
+        "RUN_RUNNER_TOOL_STEPS_END_TO_END": {
+          "executes": [
+            "TEST_RUNNER_TOOL_STEPS_END_TO_END"
+          ],
+          "id": "RUN_RUNNER_TOOL_STEPS_END_TO_END",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::tool_steps_end_to_end",
+          "type": "test_run"
+        },
+        "RUN_RUNNER_TOOL_TEXT_IS_THE_OUTPUT": {
+          "executes": [
+            "TEST_RUNNER_TOOL_TEXT_IS_THE_OUTPUT"
+          ],
+          "id": "RUN_RUNNER_TOOL_TEXT_IS_THE_OUTPUT",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::tool_text_is_the_output",
           "type": "test_run"
         },
         "RUN_RUNNER_UNKNOWN_ARGUMENT_REFUSED": {
@@ -1594,6 +1837,114 @@
           "id": "RUN_RUN_ZERO_BUDGET_ACTIVATES_NOTHING",
           "test_outcome": "passed",
           "title": "agconflo-core run::zero_budget_activates_nothing",
+          "type": "test_run"
+        },
+        "RUN_SANDBOX_CONFINED_TO_GRANTS": {
+          "executes": [
+            "TEST_SANDBOX_CONFINED_TO_GRANTS"
+          ],
+          "id": "RUN_SANDBOX_CONFINED_TO_GRANTS",
+          "test_outcome": "passed",
+          "title": "agconflo-runner sandbox::confined_to_grants",
+          "type": "test_run"
+        },
+        "RUN_SANDBOX_ENGINE_FAILURE_APART": {
+          "executes": [
+            "TEST_SANDBOX_ENGINE_FAILURE_APART"
+          ],
+          "id": "RUN_SANDBOX_ENGINE_FAILURE_APART",
+          "test_outcome": "passed",
+          "title": "agconflo-runner sandbox::engine_failure_apart",
+          "type": "test_run"
+        },
+        "RUN_SANDBOX_IMAGE_NOT_READY": {
+          "executes": [
+            "TEST_SANDBOX_IMAGE_NOT_READY"
+          ],
+          "id": "RUN_SANDBOX_IMAGE_NOT_READY",
+          "test_outcome": "passed",
+          "title": "agconflo-runner sandbox::image_not_ready",
+          "type": "test_run"
+        },
+        "RUN_SANDBOX_LEFTOVERS_REMOVED": {
+          "executes": [
+            "TEST_SANDBOX_LEFTOVERS_REMOVED"
+          ],
+          "id": "RUN_SANDBOX_LEFTOVERS_REMOVED",
+          "test_outcome": "passed",
+          "title": "agconflo-runner sandbox::leftovers_removed",
+          "type": "test_run"
+        },
+        "RUN_SANDBOX_NOTHING_LEFT_RUNNING": {
+          "executes": [
+            "TEST_SANDBOX_NOTHING_LEFT_RUNNING"
+          ],
+          "id": "RUN_SANDBOX_NOTHING_LEFT_RUNNING",
+          "test_outcome": "passed",
+          "title": "agconflo-runner sandbox::nothing_left_running",
+          "type": "test_run"
+        },
+        "RUN_SANDBOX_OUTPUT_KEEPS_BOTH_ENDS": {
+          "executes": [
+            "TEST_SANDBOX_OUTPUT_KEEPS_BOTH_ENDS"
+          ],
+          "id": "RUN_SANDBOX_OUTPUT_KEEPS_BOTH_ENDS",
+          "test_outcome": "passed",
+          "title": "agconflo-runner sandbox::output_keeps_both_ends",
+          "type": "test_run"
+        },
+        "RUN_SANDBOX_OWN_PROCESS_SURVIVES": {
+          "executes": [
+            "TEST_SANDBOX_OWN_PROCESS_SURVIVES"
+          ],
+          "id": "RUN_SANDBOX_OWN_PROCESS_SURVIVES",
+          "test_outcome": "passed",
+          "title": "agconflo-runner sandbox::own_process_survives",
+          "type": "test_run"
+        },
+        "RUN_SANDBOX_PATHS_AND_TEXT_NOT_SHELL": {
+          "executes": [
+            "TEST_SANDBOX_PATHS_AND_TEXT_NOT_SHELL"
+          ],
+          "id": "RUN_SANDBOX_PATHS_AND_TEXT_NOT_SHELL",
+          "test_outcome": "passed",
+          "title": "agconflo-runner sandbox::paths_and_text_not_shell",
+          "type": "test_run"
+        },
+        "RUN_SANDBOX_REMOVED_AT_THE_END": {
+          "executes": [
+            "TEST_SANDBOX_REMOVED_AT_THE_END"
+          ],
+          "id": "RUN_SANDBOX_REMOVED_AT_THE_END",
+          "test_outcome": "passed",
+          "title": "agconflo-runner sandbox::removed_at_the_end",
+          "type": "test_run"
+        },
+        "RUN_SANDBOX_STEP_USER": {
+          "executes": [
+            "TEST_SANDBOX_STEP_USER"
+          ],
+          "id": "RUN_SANDBOX_STEP_USER",
+          "test_outcome": "passed",
+          "title": "agconflo-runner sandbox::step_user",
+          "type": "test_run"
+        },
+        "RUN_SANDBOX_TIME_LIMIT": {
+          "executes": [
+            "TEST_SANDBOX_TIME_LIMIT"
+          ],
+          "id": "RUN_SANDBOX_TIME_LIMIT",
+          "test_outcome": "passed",
+          "title": "agconflo-runner sandbox::time_limit",
+          "type": "test_run"
+        },
+        "RUN_SANDBOX_USER_FROM_STATUS": {
+          "executes": [
+            "TEST_SANDBOX_USER_FROM_STATUS"
+          ],
+          "id": "RUN_SANDBOX_USER_FROM_STATUS",
+          "test_outcome": "passed",
+          "title": "agconflo-runner sandbox::user_from_status",
           "type": "test_run"
         },
         "RUN_SCHEDULER_ACTIVATION_IS_EXACTLY_ITS_BINDINGS": {

@@ -6,6 +6,10 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{Arc, Mutex};
 
+/// The image the tests' containers are made from, by its digest.
+pub(crate) const IMAGE: &str =
+    "alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6";
+
 /// A directory for one test's files, emptied when it is made and removed when
 /// it is dropped.
 pub(crate) struct Scratch {
@@ -44,6 +48,71 @@ impl Scratch {
     }
 }
 
+/// Docker's engine reached and the test image present, or a panic naming
+/// which is missing and how to mend it.
+pub(crate) fn needs_docker() {
+    let version = Command::new("docker")
+        .args(["version", "--format", "{{.Server.Version}}"])
+        .output();
+    match version {
+        Ok(version) if version.status.success() => {}
+        Ok(version) => panic!(
+            "this test needs Docker, and its engine was not reached: {}",
+            String::from_utf8_lossy(&version.stderr).trim()
+        ),
+        Err(error) => panic!("this test needs Docker, and docker could not be run: {error}"),
+    }
+    let image = docker(&["image", "inspect", "--format", "{{.Id}}", IMAGE]);
+    assert!(
+        image.status.success(),
+        "this test needs the image {IMAGE}; pull it with: docker pull {IMAGE}"
+    );
+}
+
+/// `docker` run with `args`, and what it gave back.
+pub(crate) fn docker(args: &[&str]) -> std::process::Output {
+    Command::new("docker")
+        .args(args)
+        .output()
+        .expect("docker could be run")
+}
+
+/// Every container labelled with the record file `record`, by its full id.
+pub(crate) fn labelled(record: &Path) -> Vec<String> {
+    let filter = format!(
+        "label={}={}",
+        crate::sandbox::LABEL,
+        crate::sandbox::label(record)
+    );
+    let listed = docker(&["ps", "-aq", "--no-trunc", "--filter", &filter]);
+    String::from_utf8_lossy(&listed.stdout)
+        .split_whitespace()
+        .map(str::to_owned)
+        .collect()
+}
+
+/// Grants of the test image written to `scratch`: each of `folders` made
+/// there and granted by its name, writable or not, the network if `network`,
+/// every action, and `limits`.
+pub(crate) fn grants(
+    scratch: &Scratch,
+    folders: &[(&str, bool)],
+    network: bool,
+    limits: crate::grants::CommandLimits,
+) -> crate::grants::Grants {
+    let mut text = format!(
+        "image = \"{IMAGE}\"\nnetwork = {network}\nactions = [\"read\", \"write\", \"run\"]\n\n[limits]\nseconds = {}\noutput = {}\n",
+        limits.seconds, limits.output
+    );
+    for (name, writable) in folders {
+        std::fs::create_dir_all(scratch.path(name)).expect("the folder");
+        text.push_str(&format!(
+            "\n[folders.{name}]\npath = \"{name}\"\nwritable = {writable}\n"
+        ));
+    }
+    crate::grants::read_grants(&scratch.write("grants.toml", text)).expect("the grants")
+}
+
 /// `command` with every variable named `*_API_KEY` removed from the
 /// environment it will run in.
 pub(crate) fn without_keys(command: &mut Command) -> &mut Command {
@@ -77,13 +146,17 @@ pub(crate) struct Request {
 /// sent to, and recording every request.
 pub(crate) struct Stub {
     pub(crate) base: String,
-    seen: Arc<Mutex<Vec<Request>>>,
+    seen: Arc<Mutex<Vec<(Request, String)>>>,
 }
+
+/// A model's call in a stub's reply: its identifier, the node type it calls,
+/// and its arguments as JSON text.
+pub(crate) type Call = (String, String, String);
 
 impl Stub {
     /// A stub answering every request with `answer`.
     pub(crate) fn answering(answer: &str) -> Self {
-        Self::serving(Some(answer.to_owned()))
+        Self::serving(Some(vec![(answer.to_owned(), Vec::new())]))
     }
 
     /// A stub holding every request open without a word: a provider a run can
@@ -92,7 +165,15 @@ impl Stub {
         Self::serving(None)
     }
 
-    fn serving(answer: Option<String>) -> Self {
+    /// A stub answering its n-th request with the n-th of `replies` - a text
+    /// and the calls it makes - and every request past the last with the last,
+    /// in OpenAI's format.
+    pub(crate) fn replying(replies: Vec<(String, Vec<Call>)>) -> Self {
+        assert!(!replies.is_empty(), "a stub replies with something");
+        Self::serving(Some(replies))
+    }
+
+    fn serving(replies: Option<Vec<(String, Vec<Call>)>>) -> Self {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("a loopback port");
         let base = format!("http://{}/v1/", listener.local_addr().expect("an address"));
         let seen = Arc::new(Mutex::new(Vec::new()));
@@ -105,11 +186,16 @@ impl Stub {
                 };
                 let request = request(&head, &body);
                 let anthropic = request.path.ends_with("/messages");
-                recorded.lock().expect("the log").push(request);
-                let Some(answer) = &answer else {
+                let index = {
+                    let mut log = recorded.lock().expect("the log");
+                    log.push((request, body));
+                    log.len() - 1
+                };
+                let Some(replies) = &replies else {
                     held.push(connection);
                     continue;
                 };
+                let (answer, calls) = &replies[index.min(replies.len() - 1)];
                 let reply = if anthropic {
                     serde_json::json!({
                         "id": "m", "type": "message", "role": "assistant", "model": "stub",
@@ -117,10 +203,20 @@ impl Stub {
                         "usage": {"input_tokens": 1, "output_tokens": 1}
                     })
                 } else {
+                    let mut message = serde_json::json!({"role": "assistant", "content": answer});
+                    if !calls.is_empty() {
+                        message["tool_calls"] = calls
+                            .iter()
+                            .map(|(id, name, arguments)| {
+                                serde_json::json!({"id": id, "type": "function",
+                                                   "function": {"name": name, "arguments": arguments}})
+                            })
+                            .collect();
+                    }
+                    let finish = if calls.is_empty() { "stop" } else { "tool_calls" };
                     serde_json::json!({
                         "id": "c", "object": "chat.completion", "created": 0, "model": "stub",
-                        "choices": [{"index": 0, "finish_reason": "stop",
-                                     "message": {"role": "assistant", "content": answer}}],
+                        "choices": [{"index": 0, "finish_reason": finish, "message": message}],
                         "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}
                     })
                 }
@@ -137,7 +233,14 @@ impl Stub {
 
     /// Every request received so far.
     pub(crate) fn requests(&self) -> Vec<Request> {
-        self.seen.lock().expect("the log").clone()
+        let log = self.seen.lock().expect("the log");
+        log.iter().map(|(request, _)| request.clone()).collect()
+    }
+
+    /// The body of every request received so far.
+    pub(crate) fn bodies(&self) -> Vec<String> {
+        let log = self.seen.lock().expect("the log");
+        log.iter().map(|(_, body)| body.clone()).collect()
     }
 }
 
@@ -203,4 +306,107 @@ fn read_request(connection: &mut std::net::TcpStream) -> Option<(String, String)
     }
     let body = String::from_utf8_lossy(&received[head_end + 4..head_end + 4 + length]).to_string();
     Some((head, body))
+}
+
+/// One thing a stand-in for the sandbox was asked.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum Asked {
+    /// Whether the image is ready.
+    Ready,
+    /// A read of this path.
+    Read(String),
+    /// A write of this text to this path.
+    Write(String, String),
+    /// A run of this command.
+    Run(String),
+}
+
+/// What a stand-in answers a step it is asked for with.
+type Answer = Box<dyn FnMut(&Asked) -> Result<crate::Done, crate::EngineFailure>>;
+
+/// A stand-in for the sandbox: it answers each step as it was told to, finds
+/// the image ready unless told otherwise, and records everything it was
+/// asked. Its clones share what they answer with and what they were asked.
+#[derive(Clone)]
+pub(crate) struct StandIn {
+    inner: std::rc::Rc<std::cell::RefCell<Inner>>,
+}
+
+struct Inner {
+    answer: Answer,
+    ready: Result<(), crate::NotReady>,
+    asked: Vec<Asked>,
+}
+
+impl StandIn {
+    /// A stand-in answering every step with `answer`.
+    pub(crate) fn with(
+        answer: impl FnMut(&Asked) -> Result<crate::Done, crate::EngineFailure> + 'static,
+    ) -> Self {
+        Self {
+            inner: std::rc::Rc::new(std::cell::RefCell::new(Inner {
+                answer: Box::new(answer),
+                ready: Ok(()),
+                asked: Vec::new(),
+            })),
+        }
+    }
+
+    /// A stand-in answering every step with status 0 and `output`.
+    pub(crate) fn answering(output: &str) -> Self {
+        let output = output.to_owned();
+        Self::with(move |_| {
+            Ok(crate::Done {
+                status: 0,
+                output: output.clone(),
+            })
+        })
+    }
+
+    /// A stand-in answering every step with the engine's failure, `message`.
+    pub(crate) fn failing(message: &str) -> Self {
+        let message = message.to_owned();
+        Self::with(move |_| {
+            Err(crate::EngineFailure {
+                message: message.clone(),
+            })
+        })
+    }
+
+    /// The same stand-in, finding the image not ready for `why`.
+    pub(crate) fn not_ready(self, why: crate::NotReady) -> Self {
+        self.inner.borrow_mut().ready = Err(why);
+        self
+    }
+
+    /// Everything asked so far, in order.
+    pub(crate) fn asked(&self) -> Vec<Asked> {
+        self.inner.borrow().asked.clone()
+    }
+
+    fn step(&mut self, asked: Asked) -> Result<crate::Done, crate::EngineFailure> {
+        let mut inner = self.inner.borrow_mut();
+        inner.asked.push(asked.clone());
+        (inner.answer)(&asked)
+    }
+}
+
+impl crate::performer::Container for StandIn {
+    fn ready(&self) -> Result<(), crate::NotReady> {
+        let mut inner = self.inner.borrow_mut();
+        inner.asked.push(Asked::Ready);
+        inner.ready.clone()
+    }
+
+    fn read(&mut self, path: &str) -> Result<crate::Done, crate::EngineFailure> {
+        self.step(Asked::Read(path.to_owned()))
+    }
+
+    fn write(&mut self, path: &str, text: &str) -> Result<crate::Done, crate::EngineFailure> {
+        self.step(Asked::Write(path.to_owned(), text.to_owned()))
+    }
+
+    fn run(&mut self, command: &str) -> Result<crate::Done, crate::EngineFailure> {
+        self.step(Asked::Run(command.to_owned()))
+    }
 }

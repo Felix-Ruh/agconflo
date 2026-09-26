@@ -16,8 +16,9 @@ where did every byte come from?"* has an exact answer.
 ## Status
 
 **Pre-alpha. Nodes run as scripts, call models or wait for a person, a model can call another node
-type, a run survives an interruption, and a person runs a workflow from its documents with the
-`agconflo` command** — no loops, and no tools outside the engine yet. What exists is the
+type, a run survives an interruption, a person runs a workflow from its documents with the
+`agconflo` command, and a node type can be a tool — reading a file, writing one, running a
+command — kept in a container to what that person granted** — no loops, and no MCP yet. What exists is the
 development process around it and the first slices of code through it: a requirements project
 under `docs/` with a validated metamodel behind it, a commit gate, continuous integration, three
 library crates and a command.
@@ -50,7 +51,8 @@ becomes the step's output.
 `agconflo-runner` is the caller a person does not have to write. It reads a manifest naming a
 workflow's documents and scripts, and a model mapping naming the model each role is played by,
 and starts, resumes, answers or checks a run from them, keeping its record in a file that one run
-at a time holds. `agconflo-cli` is its command line, `agconflo`, described below. Each crate is
+at a time holds. A node type the manifest names as a tool it performs itself, in a locked-down
+container holding only the folders a grants file allows. `agconflo-cli` is its command line, `agconflo`, described below. Each crate is
 traced from its requirements to the code and back from the tests that check it.
 
 Expect the public API to change without warning. Breaking changes, yes; force-pushes to `main`, no —
@@ -99,6 +101,61 @@ step a run awaits, is all that goes to standard output. The exit status says how
 5 a node failed, 6 the budget ran out, 7 no node can make further progress, and 8 the record could
 not be kept, whatever else happened.
 
+### Tools
+
+A node type can be a **tool**: it reads a file, writes one, or runs a command, in a Docker container
+holding only what the person running the workflow granted. The manifest says which node types are
+tools and what each does, beside its scripts and persons. Each action takes parameters of fixed
+names, which the node type declares: `read` takes `path`, `write` takes `path` and `text`, and
+`run` takes `command`. A model calls a tool as it calls any node type its instance declares.
+
+```toml
+[tools]
+read_file = "read"
+write_file = "write"
+run_command = "run"
+```
+
+What the tools may do is the person's to say, in a **grants file** of its own, given with `--grants`
+to every command, `check` included:
+
+```toml
+image = "alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6"
+actions = ["read", "write", "run"]   # none unless named
+network = false                      # the default
+
+[folders.project]                    # mounted at /work/project
+path = "../work"                     # from this file's directory
+writable = true                      # read-only unless true
+
+[limits]                             # each optional
+seconds = 60                         # the time a command may run
+output = 16384                       # the bytes a step gives back
+```
+
+The image is named by its digest or an image id and **never pulled**: pull it yourself, and a run
+whose image is absent is refused. A path a tool is given names a granted folder and a place in it,
+`project/src/main.c`, and a command runs in `/work`, where each folder sits under its name; an
+absolute path, or one naming a parent folder, is refused. What goes wrong in a tool — a file not
+there, a command exiting 1 — is the step's output, for the model to act on. Each step runs as your
+user on Linux, unless that is root, and as 1000 otherwise, under the time limit, with everything it started killed after
+it, and output past the limit keeps its start and its end. One container serves each `run`,
+`resume` or `answer`, and is removed when it stops. The container keeps a mistaken command from
+what was not granted; it is no defence against code built to escape one.
+
+**Grant a git worktree, not your checkout.** Inside a writable folder a tool may change anything,
+mistakes included. `git worktree add ../work -b tool-run` gives it a copy whose every change
+`git diff` shows, and `git worktree remove` discards.
+
+A run whose manifest names a tool is refused before anything runs when its grants are missing,
+cannot be read or do not cover a tool, or its image is not ready. If Docker fails while a step is
+performed, the run stops awaiting that step, exit status 3, with the reason on standard error; once
+Docker is back, `agconflo resume` performs the step again, or `agconflo answer` supplies its output.
+
+```
+agconflo run manifest.toml --record run.toml --models models.toml --grants grants.toml --arg-file given brief task.txt
+```
+
 ## Planned shape
 
 - **Rust**, as a Cargo workspace. `agconflo-core` is a normal Rust crate with a deliberately strict
@@ -125,6 +182,8 @@ not be kept, whatever else happened.
   so the right ones are installed on first use. `agconflo-lua` builds Lua from its C source, so it
   needs the C compiler Rust's own toolchain already relies on — the MSVC build tools on Windows —
   and no Lua installed anywhere.
+- **Docker**, running, for the tests of a tool's container, with the image they pin present:
+  `docker pull alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6`. Those tests fail, naming what is missing, rather than skip.
 
 The documentation toolchain is [ubCode](https://ubcode.useblocks.com/) (`ubc`) and nothing else — no
 Python, no Sphinx, no Java. The tests run under [cargo-nextest](https://nexte.st/), because it writes

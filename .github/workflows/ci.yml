@@ -83,6 +83,13 @@ jobs:
         if: steps.probe.outputs.empty == 'false'
         run: cargo clippy --workspace --all-targets -- -D warnings
 
+      # The image the tool tests make their containers from, by the digest
+      # crates/agconflo-runner/src/testing.rs pins. A step of its own, since
+      # nothing the tests run ever pulls an image (DEC_TESTS_NEED_DOCKER).
+      - name: Pull the tool tests' image
+        if: steps.probe.outputs.empty == 'false'
+        run: docker pull alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+
       # Not cached, for the reason the ubc download below is not: the script's
       # SHA-256 check is the point, and a cache hit would skip it.
       - name: Install the pinned nextest

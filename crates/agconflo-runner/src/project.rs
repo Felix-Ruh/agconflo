@@ -12,6 +12,9 @@
 //! [scripts]                         # the script for each other node type
 //! draft = "draft.lua"
 //!
+//! [tools]                           # node types a tool performs, and how
+//! fetch = "read"                    # read, write or run
+//!
 //! [limits]                          # each optional
 //! instructions = 10000000
 //! memory = 67108864
@@ -28,16 +31,18 @@ use agconflo_core::{
 };
 use agconflo_lua::{Behaviours, Limits};
 
+use crate::grants::Action;
 use crate::text::{FileFault, KeyFault, Place, Toml, path, read_text};
 
 /// Everything a manifest names, read: the workflow with every node type its
 /// documents declare, the scripts, the node types a person performs, the
-/// budget and the limits.
+/// tools, the budget and the limits.
 #[derive(Clone, Debug)]
 pub struct Project {
     definition: WorkflowDefinition,
     scripts: Vec<Script>,
     persons: Vec<String>,
+    tools: Vec<Tool>,
     budget: usize,
     limits: Limits,
 }
@@ -58,6 +63,21 @@ impl Project {
         &self.persons
     }
 
+    /// The node types a tool performs, each with its action, in the order the
+    /// manifest lists them.
+    pub fn tools(&self) -> &[Tool] {
+        &self.tools
+    }
+
+    /// The action of the tool performing `node_type`, or `None` when no tool
+    /// performs it.
+    pub fn tool(&self, node_type: &str) -> Option<Action> {
+        self.tools
+            .iter()
+            .find(|tool| tool.node_type == node_type)
+            .map(|tool| tool.action)
+    }
+
     /// The run's step budget.
     pub fn budget(&self) -> usize {
         self.budget
@@ -69,7 +89,9 @@ impl Project {
     }
 
     /// What performs each node type: its script, named by the file it came
-    /// from, or a person.
+    /// from, or a person. A tool's node type is given as a person's: the
+    /// scripted run hands each of its steps back.
+    // @A tool's steps handed back as a person's,IMPL_PROJECT_TOOLS_AS_PERSONS,impl,[CREQ_PROJECT_READS_TOOLS],[DEC_TOOL_PERFORMED_BY_THE_RUNNER]
     pub fn behaviours(&self) -> Behaviours {
         let scripted = self
             .scripts
@@ -77,10 +99,22 @@ impl Project {
             .fold(Behaviours::new(), |behaviours, script| {
                 behaviours.define(&script.node_type, &script.file, &script.text)
             });
-        self.persons.iter().fold(scripted, |behaviours, node_type| {
-            behaviours.person(node_type)
-        })
+        self.persons
+            .iter()
+            .chain(self.tools.iter().map(|tool| &tool.node_type))
+            .fold(scripted, |behaviours, node_type| {
+                behaviours.person(node_type)
+            })
     }
+}
+
+/// One tool: the node type it performs and its action.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Tool {
+    /// The node type it performs.
+    pub node_type: String,
+    /// What it does.
+    pub action: Action,
 }
 
 /// One script: the node type it performs, its file as the manifest writes it,
@@ -114,6 +148,27 @@ pub enum ProjectFault {
     Document(ReadFault),
     /// Node type documents declare one name more than once.
     RepeatedTypes(RepeatedTypes),
+    /// The manifest names a tool with an action there is none of.
+    Action {
+        /// Where the tool's node type is named.
+        place: Place,
+        /// The node type.
+        node_type: String,
+        /// The action, as the manifest names it.
+        action: String,
+    },
+    /// The manifest names one node type as performed in two ways.
+    PerformedTwice {
+        /// Where the node type is named the second way.
+        place: Place,
+        /// The node type.
+        node_type: String,
+        /// What it is named as performed by first: a script, a person or a
+        /// tool.
+        first: &'static str,
+        /// What it is named as performed by second.
+        second: &'static str,
+    },
 }
 
 impl fmt::Display for ProjectFault {
@@ -123,6 +178,23 @@ impl fmt::Display for ProjectFault {
             Self::Manifest { place, fault } => write!(f, "{place}: {fault}"),
             Self::Document(fault) => fault.fmt(f),
             Self::RepeatedTypes(repeated) => repeated.fmt(f),
+            Self::Action {
+                place,
+                node_type,
+                action,
+            } => write!(
+                f,
+                "{place}: the tool {node_type} names {action}, which is not an action; the actions are read, write and run"
+            ),
+            Self::PerformedTwice {
+                place,
+                node_type,
+                first,
+                second,
+            } => write!(
+                f,
+                "{place}: {node_type} is named as performed by {first} and by {second}; a node type is performed one way"
+            ),
         }
     }
 }
@@ -138,6 +210,7 @@ pub fn read_project(manifest: &Path) -> Result<Project, ProjectFault> {
     let text = read_text(manifest, &named).map_err(ProjectFault::File)?;
     let written = Manifest::read(&named, &text)
         .map_err(|(place, fault)| ProjectFault::Manifest { place, fault })?;
+    let tools = tools(&written)?;
     let directory = manifest.parent().unwrap_or(Path::new(""));
     let beside = |file: &str| read_text(&directory.join(file), file).map_err(ProjectFault::File);
 
@@ -167,18 +240,80 @@ pub fn read_project(manifest: &Path) -> Result<Project, ProjectFault> {
         definition,
         scripts,
         persons: written.persons,
+        tools,
         budget: written.budget,
         limits: written.limits,
     })
 }
 
-/// A manifest's values, with its paths as it writes them.
+/// Each tool the manifest names, or the first refused: a node type named as
+/// performed by more than one of a script, a person and a tool, then a tool
+/// naming an action there is none of.
+// @Each node type performed one way and each tool by an action,IMPL_PROJECT_TOOLS,impl,[CREQ_PROJECT_READS_TOOLS, CREQ_PROJECT_REFUSES_TOOL_FAULTS],[DEC_TOOLS_NAMED_IN_THE_MANIFEST, DEC_THREE_TOOL_ACTIONS]
+fn tools(manifest: &Manifest) -> Result<Vec<Tool>, ProjectFault> {
+    let mut performed: Vec<(&str, &'static str)> = Vec::new();
+    let named = manifest
+        .named_scripts
+        .iter()
+        .map(|(node_type, place)| (node_type, place, "a script"))
+        .chain(
+            manifest
+                .named_persons
+                .iter()
+                .map(|(node_type, place)| (node_type, place, "a person")),
+        )
+        .chain(
+            manifest
+                .tools
+                .iter()
+                .map(|(node_type, _, place)| (node_type, place, "a tool")),
+        );
+    for (node_type, place, way) in named {
+        match performed
+            .iter()
+            .find(|(named, _)| *named == node_type.as_str())
+        {
+            Some((_, first)) if *first != way => {
+                return Err(ProjectFault::PerformedTwice {
+                    place: place.clone(),
+                    node_type: node_type.clone(),
+                    first,
+                    second: way,
+                });
+            }
+            Some(_) => {}
+            None => performed.push((node_type, way)),
+        }
+    }
+
+    manifest
+        .tools
+        .iter()
+        .map(|(node_type, action, place)| {
+            let action = Action::named(action).ok_or_else(|| ProjectFault::Action {
+                place: place.clone(),
+                node_type: node_type.clone(),
+                action: action.clone(),
+            })?;
+            Ok(Tool {
+                node_type: node_type.clone(),
+                action,
+            })
+        })
+        .collect()
+}
+
+/// A manifest's values, with its paths as it writes them, and where it names
+/// each node type a script, a person or a tool performs.
 struct Manifest {
     workflow: String,
     types: Vec<String>,
     budget: usize,
     scripts: Vec<(String, String)>,
     persons: Vec<String>,
+    named_scripts: Vec<(String, Place)>,
+    named_persons: Vec<(String, Place)>,
+    tools: Vec<(String, String, Place)>,
     limits: Limits,
 }
 
@@ -193,7 +328,7 @@ impl Manifest {
             root,
             top,
             &[
-                "workflow", "types", "budget", "persons", "scripts", "limits",
+                "workflow", "types", "budget", "persons", "scripts", "tools", "limits",
             ],
         )?;
 
@@ -210,17 +345,41 @@ impl Manifest {
             Some(item) => toml.strings(item, &key("types"))?,
             None => Vec::new(),
         };
-        let persons = match root.get("persons") {
-            Some(item) => toml.strings(item, &key("persons"))?,
-            None => Vec::new(),
+        let (persons, named_persons) = match root.get("persons") {
+            Some(item) => {
+                let persons = toml.strings(item, &key("persons"))?;
+                let places = item
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .map(|value| toml.place(value.span()));
+                let named = persons.iter().cloned().zip(places).collect();
+                (persons, named)
+            }
+            None => (Vec::new(), Vec::new()),
         };
 
         let mut scripts = Vec::new();
+        let mut named_scripts = Vec::new();
         if let Some(item) = root.get("scripts") {
             let table = toml.table(item, &key("scripts"))?;
             for (node_type, item) in table.iter() {
                 let file = toml.string(item, &path(&key("scripts"), node_type))?;
                 scripts.push((node_type.to_owned(), file.to_owned()));
+                named_scripts.push((node_type.to_owned(), key_place(&toml, table, node_type)));
+            }
+        }
+
+        let mut tools = Vec::new();
+        if let Some(item) = root.get("tools") {
+            let table = toml.table(item, &key("tools"))?;
+            for (node_type, item) in table.iter() {
+                let action = toml.string(item, &path(&key("tools"), node_type))?;
+                tools.push((
+                    node_type.to_owned(),
+                    action.to_owned(),
+                    key_place(&toml, table, node_type),
+                ));
             }
         }
 
@@ -248,9 +407,17 @@ impl Manifest {
             budget: budget as usize,
             scripts,
             persons,
+            named_scripts,
+            named_persons,
+            tools,
             limits,
         })
     }
+}
+
+/// Where the key `name` of `table` is written.
+fn key_place(toml: &Toml<'_>, table: &dyn toml_edit::TableLike, name: &str) -> Place {
+    toml.place(table.get_key_value(name).and_then(|(key, _)| key.span()))
 }
 
 // --- tests -------------------------------------------------------------------
@@ -654,4 +821,140 @@ fn missing_or_mistyped_key_refused() {
             other => panic!("expected a value of the wrong kind, got {other:?}"),
         }
     }
+}
+
+/// Three node types a tool performs: one taking a path, one a path and a text,
+/// one a command.
+#[cfg(test)]
+const TOOL_TYPES: &str = "[types.fetch]\nrequired = { path = \"note\" }\noutput = \"note\"\n\n[types.save]\nrequired = { path = \"note\", text = \"note\" }\noutput = \"note\"\n\n[types.exec]\nrequired = { command = \"note\" }\noutput = \"note\"\n";
+
+/// A manifest naming a workflow in which each tool's node type has an
+/// instance, between the script's first step and the person's review, with
+/// `tools` as its tools table and `extra` after its scripts. Every file it
+/// names written beside it.
+#[cfg(test)]
+fn with_tools(scratch: &Scratch, tools: &str, extra: &str) -> std::path::PathBuf {
+    written(scratch, "");
+    scratch.write("tools.toml", TOOL_TYPES);
+    scratch.write(
+        "tool-flow.toml",
+        "name = \"tooled\"\noutput = \"polished\"\n\n[instances.drafted]\nnode_type = \"draft\"\nentry = true\n\n[instances.fetched]\nnode_type = \"fetch\"\nbindings = { path = \"drafted\" }\n\n[instances.saved]\nnode_type = \"save\"\nbindings = { path = \"drafted\", text = \"fetched\" }\n\n[instances.executed]\nnode_type = \"exec\"\nbindings = { command = \"saved\" }\n\n[instances.reviewed]\nnode_type = \"review\"\nbindings = { draft = \"executed\" }\n\n[instances.polished]\nnode_type = \"polish\"\nbindings = { text = \"reviewed\" }\n",
+    );
+    scratch.write(
+        "manifest.toml",
+        format!(
+            "workflow = \"tool-flow.toml\"\ntypes = [\"types.toml\", \"more/types.toml\", \"tools.toml\"]\nbudget = 9\npersons = [\"review\"]\n\n[scripts]\ndraft = \"draft.lua\"\npolish = \"polish.lua\"\n{extra}\n[tools]\n{tools}"
+        ),
+    )
+}
+
+#[cfg(test)]
+#[test]
+fn reads_tools() {
+    let scratch = Scratch::new("reads_tools");
+    let manifest = with_tools(
+        &scratch,
+        "fetch = \"read\"\nsave = \"write\"\nexec = \"run\"\n",
+        "",
+    );
+
+    let project = read_project(&manifest).expect("the project reads");
+
+    let tool = |node_type: &str, action| Tool {
+        node_type: node_type.to_owned(),
+        action,
+    };
+    assert_eq!(
+        project.tools(),
+        [
+            tool("fetch", Action::Read),
+            tool("save", Action::Write),
+            tool("exec", Action::Run),
+        ]
+    );
+    assert_eq!(project.tool("save"), Some(Action::Write));
+    assert_eq!(project.tool("draft"), None);
+    assert_eq!(project.persons(), ["review"]);
+    // Every instance's type has a person or one script and not both: each
+    // tool's type is a person's, and none of them has a script.
+    assert_eq!(project.behaviours().faults(project.definition()), []);
+}
+
+#[cfg(test)]
+#[test]
+fn tool_faults_refused() {
+    let scratch = Scratch::new("tool_faults_refused");
+    let tools = "fetch = \"read\"\nsave = \"write\"\nexec = \"run\"\n";
+    let manifest_line = |manifest: &std::path::Path, text: &str| {
+        let written = std::fs::read_to_string(manifest).expect("the manifest");
+        let line = written
+            .lines()
+            .position(|line| line.starts_with(text))
+            .expect("the line");
+        line + 1
+    };
+
+    let manifest = with_tools(
+        &scratch,
+        "fetch = \"read\"\nsave = \"write\"\nexec = \"rum\"\n",
+        "",
+    );
+    match read_project(&manifest) {
+        Err(ProjectFault::Action {
+            place,
+            node_type,
+            action,
+        }) => {
+            assert_eq!((node_type.as_str(), action.as_str()), ("exec", "rum"));
+            assert_eq!(
+                (place.line, place.column),
+                (manifest_line(&manifest, "exec ="), 1)
+            );
+        }
+        other => panic!("expected the action refused, got {other:?}"),
+    }
+
+    for (tools, extra, node_type, first, second, at) in [
+        (
+            format!("{tools}draft = \"read\"\n"),
+            "",
+            "draft",
+            "a script",
+            "a tool",
+            "draft = \"read\"",
+        ),
+        (
+            format!("{tools}review = \"run\"\n"),
+            "",
+            "review",
+            "a person",
+            "a tool",
+            "review =",
+        ),
+        (
+            tools.to_owned(),
+            "review = \"polish.lua\"\n",
+            "review",
+            "a script",
+            "a person",
+            "persons =",
+        ),
+    ] {
+        let manifest = with_tools(&scratch, &tools, extra);
+        match read_project(&manifest) {
+            Err(ProjectFault::PerformedTwice {
+                place,
+                node_type: named,
+                first: was,
+                second: also,
+            }) => {
+                assert_eq!((named.as_str(), was, also), (node_type, first, second));
+                assert_eq!(place.line, manifest_line(&manifest, at));
+            }
+            other => panic!("expected {node_type} refused as {first} and {second}, got {other:?}"),
+        }
+    }
+
+    // Each fault removed, the same manifest reads.
+    read_project(&with_tools(&scratch, tools, "")).expect("the project reads");
 }

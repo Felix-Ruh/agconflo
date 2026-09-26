@@ -14,7 +14,7 @@ use std::process::ExitCode;
 
 use agconflo_core::{Activation, RunEnding};
 use agconflo_lua::Outcome;
-use agconflo_runner::{Argument, Sources, Stopped};
+use agconflo_runner::{Argument, Finding, Refusal, Sources, Stopped};
 use clap::{Args, Parser, Subcommand};
 
 /// Checks, runs, resumes and answers a workflow from the documents that
@@ -36,6 +36,9 @@ enum Command {
         /// The model mapping, for a workflow whose scripts call models.
         #[arg(long)]
         models: Option<PathBuf>,
+        /// The grants file, for a workflow whose manifest names tools.
+        #[arg(long)]
+        grants: Option<PathBuf>,
     },
     /// Starts a new run, keeping its record in a file that must not exist yet.
     Run {
@@ -76,6 +79,9 @@ struct Files {
     /// The model mapping, for a workflow whose scripts call models.
     #[arg(long)]
     models: Option<PathBuf>,
+    /// The grants file, for a workflow whose manifest names tools.
+    #[arg(long)]
+    grants: Option<PathBuf>,
 }
 
 impl Files {
@@ -83,6 +89,7 @@ impl Files {
         Sources {
             manifest: &self.manifest,
             models: self.models.as_deref(),
+            grants: self.grants.as_deref(),
         }
     }
 }
@@ -127,13 +134,18 @@ const STUCK: u8 = 7;
 const NOT_KEPT: u8 = 8;
 
 /// `command` asked of the runner, reported, and the status to exit with.
-// @Each command asked of the runner with what was typed,IMPL_MAIN_COMMANDS,impl,[CREQ_COMMAND_READS_THE_COMMAND],[DEC_COMMAND_LINE_THROUGH_CLAP, DEC_RUNNER_ON_ONE_THREAD]
+// @Each command asked of the runner with what was typed,IMPL_MAIN_COMMANDS,impl,[CREQ_COMMAND_READS_THE_COMMAND, CREQ_COMMAND_READS_GRANTS],[DEC_COMMAND_LINE_THROUGH_CLAP, DEC_RUNNER_ON_ONE_THREAD, DEC_GRANTS_IN_A_FILE_OF_THEIR_OWN]
 async fn perform(command: Command) -> u8 {
     let stopped = match command {
-        Command::Check { manifest, models } => {
+        Command::Check {
+            manifest,
+            models,
+            grants,
+        } => {
             return checked(Sources {
                 manifest: &manifest,
                 models: models.as_deref(),
+                grants: grants.as_deref(),
             });
         }
         Command::Run {
@@ -165,6 +177,7 @@ async fn perform(command: Command) -> u8 {
     };
     match stopped {
         Ok(stopped) => report(&stopped),
+        Err(refusal @ Refusal::NoGrants) => refused(&format!("{refusal}; name it with --grants")),
         Err(refusal) => refused(&refusal.to_string()),
     }
 }
@@ -198,7 +211,10 @@ fn read(path: &Path) -> Result<String, String> {
 fn checked(sources: Sources<'_>) -> u8 {
     let findings = agconflo_runner::check(sources);
     for finding in &findings {
-        eprintln!("agconflo: {finding}");
+        match finding {
+            Finding::NoGrants => eprintln!("agconflo: {finding}; name it with --grants"),
+            _ => eprintln!("agconflo: {finding}"),
+        }
     }
     if findings.is_empty() {
         eprintln!("agconflo: nothing found that would refuse a run");
@@ -215,17 +231,25 @@ fn refused(message: &str) -> u8 {
 }
 
 /// How a run stopped reported - its result or the step it awaits on standard
-/// output, anything else on standard error - and the status for it.
-// @The result or the awaited step alone on standard output,IMPL_MAIN_REPORT,impl,[CREQ_COMMAND_RESULT_ON_STDOUT, CREQ_COMMAND_FAILURE_ON_STDERR, CREQ_COMMAND_UNKEPT_RECORD_TOLD],[DEC_RESULT_ON_STANDARD_OUTPUT]
+/// output, anything else on standard error - and the status for it. A tool's
+/// step the container engine could not perform is reported as the step the
+/// run awaits, with the engine's failure.
+// @The result or the awaited step alone on standard output,IMPL_MAIN_REPORT,impl,[CREQ_COMMAND_RESULT_ON_STDOUT, CREQ_COMMAND_FAILURE_ON_STDERR, CREQ_COMMAND_UNKEPT_RECORD_TOLD, CREQ_COMMAND_TELLS_ENGINE_FAILURE],[DEC_RESULT_ON_STANDARD_OUTPUT, DEC_ENGINE_FAILURE_LEAVES_THE_STEP]
 fn report(stopped: &Stopped) -> u8 {
     match &stopped.outcome {
         Outcome::Ended(RunEnding::Completed(result)) => print(&result.render()),
         Outcome::Awaiting(activation) => {
             print(&awaited(activation));
-            eprintln!(
-                "agconflo: the run awaits a person for {}; answer it with `agconflo answer`",
-                activation.instance()
-            );
+            match &stopped.engine {
+                Some(failure) => eprintln!(
+                    "agconflo: the tool step for {} was not performed - {failure}; `agconflo resume` performs it again once the engine is back, or answer it with `agconflo answer`",
+                    activation.instance()
+                ),
+                None => eprintln!(
+                    "agconflo: the run awaits a person for {}; answer it with `agconflo answer`",
+                    activation.instance()
+                ),
+            }
         }
         Outcome::Ended(RunEnding::NodeFailed { instance, failure }) => {
             eprintln!("agconflo: the node {instance} failed: {failure}");

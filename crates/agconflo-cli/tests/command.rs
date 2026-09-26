@@ -584,3 +584,294 @@ fn misuse_exits_2() {
         .count();
     assert_eq!(left, 0);
 }
+
+/// The image the tool tests' containers are made from, by its digest.
+const IMAGE: &str =
+    "alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6";
+
+/// Docker's engine reached and the test image present, or a panic naming
+/// which is missing and how to mend it.
+fn needs_docker() {
+    let version = Command::new("docker")
+        .args(["version", "--format", "{{.Server.Version}}"])
+        .output();
+    match version {
+        Ok(version) if version.status.success() => {}
+        Ok(version) => panic!(
+            "this test needs Docker, and its engine was not reached: {}",
+            String::from_utf8_lossy(&version.stderr).trim()
+        ),
+        Err(error) => panic!("this test needs Docker, and docker could not be run: {error}"),
+    }
+    let image = docker(&["image", "inspect", "--format", "{{.Id}}", IMAGE]);
+    assert!(
+        !image.is_empty(),
+        "this test needs the image {IMAGE}; pull it with: docker pull {IMAGE}"
+    );
+}
+
+/// What `docker` with `args` printed to standard output.
+fn docker(args: &[&str]) -> String {
+    let output = Command::new("docker")
+        .args(args)
+        .output()
+        .expect("docker could be run");
+    String::from_utf8_lossy(&output.stdout).trim().to_owned()
+}
+
+/// The containers labelled with the record file `record`.
+fn labelled(record: &std::path::Path) -> Vec<String> {
+    let filter = format!("label=agconflo.record={}", record.display());
+    docker(&["ps", "-aq", "--filter", &filter])
+        .split_whitespace()
+        .map(str::to_owned)
+        .collect()
+}
+
+/// The node types of a tool workflow: `say`, an entry giving its brief as it
+/// is; `fetch`, reading a path; and `exec`, running a command.
+const TOOL_TYPES: &str = "[types.say]\nrequired = { brief = \"note\" }\noutput = \"note\"\n\n[types.fetch]\nrequired = { path = \"note\" }\noutput = \"note\"\n\n[types.exec]\nrequired = { command = \"note\" }\noutput = \"note\"\n";
+
+/// `say`'s script.
+const SAY: &str = "local given, host = ...\nreturn host.text(host.output, given.brief:render())\n";
+
+impl Scratch {
+    /// A project whose workflow document is `flow`, over the tests' node types
+    /// and the tool ones, with a person performing `review` and `tools` naming
+    /// each tool's node type and action; and grants of the test image allowing
+    /// `actions`, with `folders` as their folder tables.
+    fn tool_project(&self, flow: &str, tools: &str, actions: &str, folders: &str) {
+        self.project(flow, 10);
+        self.write("tool-types.toml", TOOL_TYPES);
+        self.write("say.lua", SAY);
+        let manifest = std::fs::read_to_string(self.path("manifest.toml")).expect("the manifest");
+        let manifest = manifest
+            .replace(
+                "types = [\"types.toml\"]",
+                "types = [\"types.toml\", \"tool-types.toml\"]",
+            )
+            .replace("[scripts]\n", "[scripts]\nsay = \"say.lua\"\n");
+        self.write("manifest.toml", format!("{manifest}\n[tools]\n{tools}"));
+        self.write(
+            "grants.toml",
+            format!("image = \"{IMAGE}\"\nactions = [{actions}]\n{folders}"),
+        );
+    }
+}
+
+/// `first` says its brief, `ran` runs it as a command, and `ran` is the
+/// result.
+const RUN_BRIEF: &str = "name = \"ran\"\noutput = \"ran\"\n\n[instances.first]\nnode_type = \"say\"\nentry = true\n\n[instances.ran]\nnode_type = \"exec\"\nbindings = { command = \"first\" }\n";
+
+#[test]
+fn grants_handed_on() {
+    needs_docker();
+    let scratch = Scratch::new("grants_handed_on");
+    scratch.tool_project(
+        "name = \"fetched\"\noutput = \"third\"\n\n[instances.first]\nnode_type = \"say\"\nentry = true\n\n[instances.fetched]\nnode_type = \"fetch\"\nbindings = { path = \"first\" }\n\n[instances.second]\nnode_type = \"review\"\nbindings = { before = \"fetched\" }\n\n[instances.third]\nnode_type = \"join\"\nbindings = { before = \"second\", start = \"fetched\" }\n",
+        "fetch = \"read\"\n",
+        "\"read\"",
+        "\n[folders.notes]\npath = \"notes\"\n",
+    );
+    scratch.write("notes/n.txt", "noted");
+    let files = [
+        "manifest.toml",
+        "--record",
+        "run.toml",
+        "--grants",
+        "grants.toml",
+    ];
+
+    let (status, out, err) = scratch.ran(&["check", "manifest.toml", "--grants", "grants.toml"]);
+    assert_eq!((status, out.as_str()), (0, ""), "{err}");
+
+    let mut run = vec!["run"];
+    run.extend(files);
+    run.extend(["--arg", "first", "brief", "notes/n.txt"]);
+    let (status, out, err) = scratch.ran(&run);
+    assert_eq!(status, 3, "{err}");
+    assert!(
+        out.contains("instance: second") && out.contains("noted"),
+        "{out}"
+    );
+
+    let mut answer = vec!["answer"];
+    answer.extend(files);
+    answer.extend(["--instance", "second", "--text", "ok"]);
+    let (status, out, err) = scratch.ran(&answer);
+    assert_eq!((status, out.as_str()), (0, "noted/ok"), "{err}");
+
+    let mut resume = vec!["resume"];
+    resume.extend(files);
+    let (status, out, err) = scratch.ran(&resume);
+    assert_eq!((status, out.as_str()), (0, "noted/ok"), "{err}");
+
+    let (status, out, err) = scratch.ran(&[
+        "run",
+        "manifest.toml",
+        "--record",
+        "second.toml",
+        "--arg",
+        "first",
+        "brief",
+        "notes/n.txt",
+    ]);
+    assert_eq!((status, out.as_str()), (4, ""));
+    assert!(err.contains("--grants"), "{err}");
+}
+
+#[test]
+fn engine_failure_told() {
+    needs_docker();
+    let scratch = Scratch::new("engine_failure_told");
+    scratch.tool_project(RUN_BRIEF, "exec = \"run\"\n", "\"run\"", "");
+    let record = scratch.path("run.toml");
+
+    let running = scratch
+        .agconflo(&[
+            "run",
+            "manifest.toml",
+            "--record",
+            "run.toml",
+            "--grants",
+            "grants.toml",
+            "--arg",
+            "first",
+            "brief",
+            "sleep 5; echo slept",
+        ])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("the run started");
+    let started = Instant::now();
+    let container = loop {
+        if let Some(container) = labelled(&record).pop() {
+            break container;
+        }
+        assert!(
+            started.elapsed() < Duration::from_secs(10),
+            "no container was made"
+        );
+        std::thread::sleep(Duration::from_millis(50));
+    };
+    std::thread::sleep(Duration::from_millis(1500));
+    docker(&["rm", "-f", &container]);
+    let output = running.wait_with_output().expect("the run ended");
+
+    let out = String::from_utf8(output.stdout).expect("text");
+    let err = String::from_utf8(output.stderr).expect("text");
+    assert_eq!(output.status.code(), Some(3), "{err}");
+    assert_eq!(
+        out,
+        "instance: ran\nproduces: note\ninput command (note):\nsleep 5; echo slept\n"
+    );
+    assert!(
+        err.contains("container engine failed") && err.contains("agconflo resume"),
+        "{err}"
+    );
+}
+
+#[test]
+fn killed_tool_step_performed_alone() {
+    needs_docker();
+    let scratch = Scratch::new("killed_tool_step_performed_alone");
+    scratch.tool_project(
+        RUN_BRIEF,
+        "exec = \"run\"\n",
+        "\"run\"",
+        "\n[folders.w]\npath = \"w\"\nwritable = true\n",
+    );
+    scratch.write("w/.keep", "");
+    let log = scratch.path("w/log");
+    let files = [
+        "manifest.toml",
+        "--record",
+        "run.toml",
+        "--grants",
+        "grants.toml",
+    ];
+    let mut run = vec!["run"];
+    run.extend(files);
+    run.extend([
+        "--arg",
+        "first",
+        "brief",
+        "echo start >> w/log; sleep 5; echo end >> w/log",
+    ]);
+
+    let running = Running(
+        scratch
+            .agconflo(&run)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("the run started"),
+    );
+    let started = Instant::now();
+    while !std::fs::read_to_string(&log).is_ok_and(|text| text.contains("start")) {
+        assert!(
+            started.elapsed() < Duration::from_secs(10),
+            "the step never started"
+        );
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    drop(running);
+
+    let mut resume = vec!["resume"];
+    resume.extend(files);
+    let (status, _, err) = scratch.ran(&resume);
+    assert_eq!(status, 0, "{err}");
+    // The resumed step slept as long as the interrupted one would have: any
+    // end of that one's is written by now.
+    assert_eq!(
+        std::fs::read_to_string(&log).expect("the log"),
+        "start\nstart\nend\n"
+    );
+    assert_eq!(labelled(&scratch.path("run.toml")), Vec::<String>::new());
+}
+
+#[test]
+fn tool_kept_to_its_grant() {
+    needs_docker();
+    let scratch = Scratch::new("tool_kept_to_its_grant");
+    scratch.tool_project(
+        RUN_BRIEF,
+        "exec = \"run\"\n",
+        "\"run\"",
+        "\n[folders.kept]\npath = \"kept\"\n\n[folders.open]\npath = \"open\"\nwritable = true\n",
+    );
+    scratch.write("kept/k.txt", "kept");
+    scratch.write("open/o.txt", "open");
+    scratch.write("beside/b.txt", "beside");
+
+    let (status, out, err) = scratch.ran(&[
+        "run",
+        "manifest.toml",
+        "--record",
+        "run.toml",
+        "--grants",
+        "grants.toml",
+        "--arg",
+        "first",
+        "brief",
+        "rm -rf /work/* /",
+    ]);
+
+    assert_eq!(status, 0, "{err}");
+    assert!(out.starts_with("exit status "), "{out}");
+    assert_eq!(
+        std::fs::read_to_string(scratch.path("kept/k.txt")).expect("kept"),
+        "kept"
+    );
+    assert_eq!(
+        std::fs::read_to_string(scratch.path("beside/b.txt")).expect("beside"),
+        "beside"
+    );
+    assert_eq!(
+        std::fs::read_dir(scratch.path("open"))
+            .expect("the folder")
+            .count(),
+        0
+    );
+}

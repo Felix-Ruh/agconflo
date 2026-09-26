@@ -538,7 +538,7 @@ catches it, and where one is caught only in part the case says so.
    :coverage: full
 
    With Docker: a ``run`` step appends ``start`` to a file in a writable
-   folder, sleeps three seconds, and appends ``end``. The command is killed
+   folder, sleeps five seconds, and appends ``end``. The command is killed
    once ``start`` is written, then the run resumed. The file ends as
    ``start``, ``start``, ``end``: the interrupted performance never wrote its
    ``end``, since its container was removed before the step was performed
