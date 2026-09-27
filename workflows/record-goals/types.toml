@@ -1,0 +1,193 @@
+[types.s_brief]
+required = { brief = "note" }
+output = "note"
+
+[types.s_statements]
+required = { brief = "note" }
+output = "note"
+
+[types.s_given_stakeholders]
+required = { brief = "note" }
+output = "note"
+
+[types.s_v_statements]
+required = { statements = "note" }
+output = "note"
+
+[types.s_cmd_listing]
+required = { brief = "note" }
+output = "note"
+
+[types.s_cmd_goals]
+required = { brief = "note" }
+output = "note"
+
+[types.s_cmd_named]
+required = { brief = "note" }
+output = "note"
+
+[types.s_cmd_rules]
+required = { brief = "note" }
+output = "note"
+
+[types.s_cmd_stakeholders]
+required = { brief = "note" }
+output = "note"
+
+[types.s_cmd_example]
+required = { brief = "note" }
+output = "note"
+
+[types.s_v_read]
+required = { rules = "note", example = "note", goals = "note", stakeholders = "note" }
+output = "note"
+
+[types.s_head]
+required = { state = "note", statements = "note", given_stakeholders = "note" }
+output = "note"
+
+[types.s_cmd_prep]
+required = { goal = "note" }
+output = "note"
+
+[types.m_pick_file]
+required = { goal = "note", listing = "note" }
+output = "note"
+description = "Step: Choose the one file under repo/docs/stakeholder/ the goal below belongs in, from the listing of those files with their introductions and their goals."
+
+[types.s_cmd_current]
+required = { file = "note", prep = "note" }
+output = "note"
+
+[types.s_file_goals]
+required = { current = "note" }
+output = "note"
+
+[types.m_keywords]
+required = { goal = "note" }
+output = "note"
+description = "Step: Choose words to search the repository's decisions for any that bear on the goal below."
+
+[types.s_cmd_decs]
+required = { keywords = "note" }
+output = "note"
+
+[types.m_neighbours]
+required = { goal = "note", brief = "note", named = "note", goals = "note", decs = "note", current = "note" }
+output = "note"
+description = "Step: From the needs below, list the existing needs the goal's body should name: any the brief names that concern this goal, those it depends on, those it could be mistaken for, and decisions that already make room for it."
+
+[types.m_naming]
+required = { goal = "note", stakeholders = "note", goals = "note", file_goals = "note" }
+output = "note"
+description = "Step: Name the goal below as a stakeholder requirement of this repository."
+
+[types.m_place]
+required = { goal = "note", file_goals = "note", neighbours = "note" }
+output = "note"
+description = "Step: Say after which goal of the file the goal below goes: beside the goals it is most closely related to."
+
+[types.s_intro0]
+required = { current = "note" }
+output = "note"
+
+[types.m_intro]
+required = { goal = "note", introduction = "note", file_goals = "note" }
+output = "note"
+description = "Step: Below is the introduction of the file the goal goes in."
+
+[types.m_draft]
+required = { goal = "note", naming = "note", neighbours = "note", example = "note", rules = "note", goals = "note", decs = "note", current = "note" }
+output = "note"
+description = "Step: Write one stkh_req directive for the goal below and nothing else: no fences, no commentary."
+
+[types.s_splice]
+required = { current = "note", place = "note", draft = "note", intro = "note" }
+output = "note"
+
+[types.s_path]
+required = { file = "note" }
+output = "note"
+
+[types.s_cmd_ubc]
+required = { write = "note" }
+output = "note"
+
+[types.s_cmd_diff]
+required = { write = "note" }
+output = "note"
+
+[types.s_closing]
+required = { draft = "note" }
+output = "note"
+
+[types.m_claims]
+required = { draft = "note", named = "note", goals = "note", decs = "note", current = "note" }
+output = "note"
+description = "Step: List every sentence of the draft's body below that states how Agconflo behaves, what it already does, or what another need says, leaving out sentences that name a need by its id (another step checks those), sentences giving the reason the goal exists and sentences saying what the goal deliberately does not say."
+
+[types.m_note]
+required = { brief = "note", goal = "note", draft = "note" }
+output = "note"
+description = "Step: Below is the task, which may carry a maintainer's note, and a draft for one of its goals."
+
+[types.s_pairs]
+required = { draft = "note", named = "note", goals = "note", decs = "note", current = "note" }
+output = "note"
+
+[types.m_relations]
+required = { pairs = "note" }
+output = "note"
+description = "Step: Each pair below is a sentence from a new requirement's body and the statement of a need it names."
+
+[types.s_judge]
+required = { goal = "note", previous = "note", ubc = "note", closing = "note", claims = "note", relations = "note", diff = "note", brief = "note", rules = "note", note = "note" }
+output = "note"
+routes = true
+
+[types.s_cmd_fin]
+required = { verdict = "note" }
+output = "note"
+
+[types.s_cmd_fdiff]
+required = { fin = "note" }
+output = "note"
+
+[types.s_cmd_fubc]
+required = { fin = "note" }
+output = "note"
+
+[types.s_v_final]
+required = { fdiff = "note", fubc = "note", statements = "note", given_stakeholders = "note", brief = "note" }
+output = "note"
+
+[types.m_describe]
+required = { brief = "note", diff = "note", final = "note", verdict = "note" }
+output = "note"
+description = "Step: Write the pull request for this change: a title in the imperative, then what changed and why, what was checked (the final check and the loop's verdicts), and every open defect the notes list, said plainly."
+
+[types.run_command]
+required = { command = "note" }
+output = "note"
+description = "Run a shell command with sh in /work: busybox tools and git. The repository is at repo/."
+
+[types.run_ubc]
+required = { command = "note" }
+output = "note"
+description = "Run a shell command with sh in /work, in a container that has ubc, the requirements tool, on its PATH. The repository is the folder repo, so its requirements project is repo/docs."
+
+[types.read_file]
+required = { path = "note" }
+output = "note"
+description = "Read one file. path is relative to /work: the repository is the folder repo, so a path looks like repo/AGENTS.md."
+
+[types.write_file]
+required = { path = "note", text = "note" }
+output = "note"
+description = "Replace one file with text, entirely: text holds the whole new file. path is relative to /work, e.g. repo/docs/stakeholder/execution.rst."
+
+[types.approve]
+required = { description = "note", final = "note", verdict = "note" }
+output = "note"
+description = "A person reads the proposed pull request and approves it or not. Nothing is published or merged: the run is a test."
+

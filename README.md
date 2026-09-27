@@ -508,6 +508,7 @@ docs/decisions/           choices made, grouped by what they are about
 docs/decisions/changes    every change to an existing requirement, with its impact analysis
 docs/evidence/            measurements the decisions rest on
 docs/test-runs.json       the latest run of each test case, written by the importer
+workflows/                the development workflows Agconflo runs on itself, one folder each
 ```
 
 Requirements are grouped by subject, and **the grouping is enforced**. Once any toctree exists, `ubc`

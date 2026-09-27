@@ -1,0 +1,3 @@
+local given, host = ...
+local file = given.file:render():match("FILE:%s*(%S+)") or "repo/NONE"
+return host.text(host.output, "cat " .. file)

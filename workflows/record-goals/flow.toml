@@ -1,0 +1,222 @@
+name = "record-goals"
+output = "approval"
+
+[instances.brief]
+node_type = "s_brief"
+
+[instances.statements]
+node_type = "s_statements"
+bindings = { brief = "brief" }
+
+[instances.given_stakeholders]
+node_type = "s_given_stakeholders"
+bindings = { brief = "brief" }
+
+[instances.v_statements]
+node_type = "s_v_statements"
+bindings = { statements = "statements" }
+
+[instances.cmd_listing]
+node_type = "s_cmd_listing"
+bindings = { brief = "brief" }
+
+[instances.listing]
+node_type = "run_command"
+bindings = { command = "cmd_listing" }
+
+[instances.cmd_goals]
+node_type = "s_cmd_goals"
+bindings = { brief = "brief" }
+
+[instances.goals]
+node_type = "run_ubc"
+bindings = { command = "cmd_goals" }
+
+[instances.cmd_named]
+node_type = "s_cmd_named"
+bindings = { brief = "brief" }
+
+[instances.named]
+node_type = "run_ubc"
+bindings = { command = "cmd_named" }
+
+[instances.cmd_rules]
+node_type = "s_cmd_rules"
+bindings = { brief = "brief" }
+
+[instances.rules]
+node_type = "run_command"
+bindings = { command = "cmd_rules" }
+
+[instances.cmd_stakeholders]
+node_type = "s_cmd_stakeholders"
+bindings = { brief = "brief" }
+
+[instances.stakeholders]
+node_type = "run_command"
+bindings = { command = "cmd_stakeholders" }
+
+[instances.cmd_example]
+node_type = "s_cmd_example"
+bindings = { brief = "brief" }
+
+[instances.example]
+node_type = "run_command"
+bindings = { command = "cmd_example" }
+
+[instances.v_read]
+node_type = "s_v_read"
+bindings = { rules = "rules", example = "example", goals = "goals", stakeholders = "stakeholders" }
+
+[instances.head]
+node_type = "s_head"
+bindings = { state = "judge", statements = "statements", given_stakeholders = "given_stakeholders" }
+
+[instances.cmd_prep]
+node_type = "s_cmd_prep"
+bindings = { goal = "head" }
+
+[instances.prep]
+node_type = "run_command"
+bindings = { command = "cmd_prep" }
+
+[instances.pick_file]
+node_type = "m_pick_file"
+bindings = { goal = "head", listing = "listing" }
+
+[instances.cmd_current]
+node_type = "s_cmd_current"
+bindings = { file = "pick_file", prep = "prep" }
+
+[instances.current]
+node_type = "run_command"
+bindings = { command = "cmd_current" }
+
+[instances.file_goals]
+node_type = "s_file_goals"
+bindings = { current = "current" }
+
+[instances.keywords]
+node_type = "m_keywords"
+bindings = { goal = "head" }
+
+[instances.cmd_decs]
+node_type = "s_cmd_decs"
+bindings = { keywords = "keywords" }
+
+[instances.decs]
+node_type = "run_ubc"
+bindings = { command = "cmd_decs" }
+
+[instances.neighbours]
+node_type = "m_neighbours"
+bindings = { goal = "head", brief = "brief", named = "named", goals = "goals", decs = "decs", current = "current" }
+
+[instances.naming]
+node_type = "m_naming"
+bindings = { goal = "head", stakeholders = "stakeholders", goals = "goals", file_goals = "file_goals" }
+
+[instances.place]
+node_type = "m_place"
+bindings = { goal = "head", file_goals = "file_goals", neighbours = "neighbours" }
+
+[instances.intro0]
+node_type = "s_intro0"
+bindings = { current = "current" }
+
+[instances.intro]
+node_type = "m_intro"
+bindings = { goal = "head", introduction = "intro0", file_goals = "file_goals" }
+
+[instances.draft]
+node_type = "m_draft"
+bindings = { goal = "head", naming = "naming", neighbours = "neighbours", example = "example", rules = "rules", goals = "goals", decs = "decs", current = "current" }
+
+[instances.splice]
+node_type = "s_splice"
+bindings = { current = "current", place = "place", draft = "draft", intro = "intro" }
+
+[instances.path]
+node_type = "s_path"
+bindings = { file = "pick_file" }
+
+[instances.write]
+node_type = "write_file"
+bindings = { path = "path", text = "splice" }
+
+[instances.cmd_ubc]
+node_type = "s_cmd_ubc"
+bindings = { write = "write" }
+
+[instances.ubc]
+node_type = "run_ubc"
+bindings = { command = "cmd_ubc" }
+
+[instances.cmd_diff]
+node_type = "s_cmd_diff"
+bindings = { write = "write" }
+
+[instances.diff]
+node_type = "run_command"
+bindings = { command = "cmd_diff" }
+
+[instances.closing]
+node_type = "s_closing"
+bindings = { draft = "draft" }
+
+[instances.claims]
+node_type = "m_claims"
+bindings = { draft = "draft", named = "named", goals = "goals", decs = "decs", current = "current" }
+
+[instances.note]
+node_type = "m_note"
+bindings = { brief = "brief", goal = "head", draft = "draft" }
+
+[instances.pairs]
+node_type = "s_pairs"
+bindings = { draft = "draft", named = "named", goals = "goals", decs = "decs", current = "current" }
+
+[instances.relations]
+node_type = "m_relations"
+bindings = { pairs = "pairs" }
+
+[instances.judge]
+node_type = "s_judge"
+bindings = { goal = "head", previous = "judge", ubc = "ubc", closing = "closing", claims = "claims", relations = "relations", diff = "diff", brief = "brief", rules = "rules", note = "note" }
+
+[instances.cmd_fin]
+node_type = "s_cmd_fin"
+bindings = { verdict = "judge" }
+
+[instances.fin]
+node_type = "run_command"
+bindings = { command = "cmd_fin" }
+
+[instances.cmd_fdiff]
+node_type = "s_cmd_fdiff"
+bindings = { fin = "fin" }
+
+[instances.fdiff]
+node_type = "run_command"
+bindings = { command = "cmd_fdiff" }
+
+[instances.cmd_fubc]
+node_type = "s_cmd_fubc"
+bindings = { fin = "fin" }
+
+[instances.fubc]
+node_type = "run_ubc"
+bindings = { command = "cmd_fubc" }
+
+[instances.v_final]
+node_type = "s_v_final"
+bindings = { fdiff = "fdiff", fubc = "fubc", statements = "statements", given_stakeholders = "given_stakeholders", brief = "brief" }
+
+[instances.describe]
+node_type = "m_describe"
+bindings = { brief = "brief", diff = "fdiff", final = "v_final", verdict = "judge" }
+
+[instances.approval]
+node_type = "approve"
+bindings = { description = "describe", final = "v_final", verdict = "judge" }
+
