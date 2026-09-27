@@ -107,6 +107,10 @@ server answering `/v1/chat/completions` in the OpenAI shape, named in the run's
 
 ## What it does not do yet
 
+- A need the brief names can go uncited: on #29, version 10 ended not ready
+  because no body cited the measurement its note names
+  (`EVD_BRIEF_NEED_LEFT_UNCITED`). Which of the brief's needs concern a goal
+  is still left to the step choosing its neighbours.
 - The bodies relate a goal to its neighbours need by need; the merged pull
   requests argue one or two relations at length.
 - Placement within a file is its own guess; #55 put its goals a few goals

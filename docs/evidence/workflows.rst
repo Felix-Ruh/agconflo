@@ -134,3 +134,38 @@ was taken, with the model named in it.
    and a goal about what a model may do reads as the second. The
    maintainer chose ``user`` for four of the five; #29's commit says its goals
    were "worded with the stakeholder".
+
+.. evd:: Given in the brief, every stakeholder was recorded as the maintainer chose
+   :id: EVD_STAKEHOLDER_FROM_THE_BRIEF
+   :evd_kind: measurement
+   :observed_on: 2026-09-27
+   :observation: In version 10, with each goal's stakeholder given in the brief, all 5 goals of #55 and #29 were recorded with the stakeholder their merged pull request has, and the final step checked each.
+
+   The brief carries it beside the statement, ``(stakeholder: user)``, as the
+   maintainer approves both together. The naming step still names a precedent,
+   and its check holds the stakeholder to the one given.
+
+.. evd:: Asked which set a closing word closes, the judge let most of them stand
+   :id: EVD_CLOSING_WORD_NAMES_ITS_SET
+   :evd_kind: measurement
+   :observed_on: 2026-09-27
+   :observation: In version 10 the judge's form asked which set each closing word declares complete; for 15 of 19 closing-word findings it named none and they were not counted, and both goals of #55 were accepted on their first pass in 9 minutes.
+
+   Version 9 had stopped #55's second goal at the pass limit on the word
+   *each* alone (``EVD_CLOSING_WORDS_BANNED_OUTRIGHT``). The policy sentence
+   is now the rule as ``AGENTS.md`` gives it: closing words are allowed
+   where the parent closes the world too.
+
+.. evd:: A need the brief names can go uncited by every goal
+   :id: EVD_BRIEF_NEED_LEFT_UNCITED
+   :evd_kind: measurement
+   :observed_on: 2026-09-27
+   :observation: Version 10 on #29 ended not ready: no body cited EVD_WORK_INSIDE_AN_ACTIVATION_REPEATS, which the brief names, and two goals stopped at the pass limit with a sentence of the maintainer's note contradicted or missing.
+
+   The yield goal's neighbours step chose four needs and not that one,
+   although it was told to take first any need the brief names that concerns
+   the goal. The note step then found the note's reason for the yield
+   missing on each pass, and the drafts did not put it back within three. The
+   final step caught the uncited need, as it is there to. Choosing which of
+   the brief's needs concern a goal is one more question for a step of its
+   own.

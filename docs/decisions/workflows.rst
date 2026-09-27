@@ -176,3 +176,31 @@ elsewhere, and none of these changes them.
    ``sh``, Docker and ``agconflo`` alone; Python is needed only to change it.
    ``DEC_NO_PYTHON`` is about building the requirements project, which this
    does not touch.
+
+.. dec:: The brief gives each goal's stakeholder
+   :id: DEC_STAKEHOLDER_IN_THE_BRIEF
+   :dec_status: accepted
+   :decided_on: 2026-09-27
+   :supported_by: EVD_STAKEHOLDER_FROM_THE_DEFINITION, EVD_STAKEHOLDER_FROM_THE_BRIEF
+   :statement: The record-goals workflow shall record each goal with the stakeholder its brief gives, and choose one by precedent only for a goal the brief gives none.
+
+   Whose goal it is belongs to the maintainer who approves it, with the
+   statement: #29's commit says its goals were "worded with the
+   stakeholder". Chosen by the weak model from the definition it matched
+   once in five, and by precedent three times in five
+   (``EVD_STAKEHOLDER_FROM_THE_DEFINITION``); given, five in five
+   (``EVD_STAKEHOLDER_FROM_THE_BRIEF``). Precedent stays for a brief that
+   leaves it out.
+
+.. dec:: A closing word is a defect only where it closes a set
+   :id: DEC_CLOSING_WORD_NAMES_ITS_SET
+   :dec_status: accepted
+   :decided_on: 2026-09-27
+   :supported_by: EVD_CLOSING_WORDS_BANNED_OUTRIGHT, EVD_CLOSING_WORD_NAMES_ITS_SET
+   :statement: A development workflow's judge shall count a closing word as a defect only when it names the set of options or mechanisms the sentence declares complete.
+
+   A script finds the words, and most uses close nothing: "each time", "how
+   many calls each operation takes". Banned outright, they stopped goals at
+   the pass limit (``EVD_CLOSING_WORDS_BANNED_OUTRIGHT``). The judge's form
+   now asks which set the sentence declares complete, and a finding whose
+   answer is NONE is not counted (``EVD_CLOSING_WORD_NAMES_ITS_SET``).
