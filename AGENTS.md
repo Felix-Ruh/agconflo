@@ -5,7 +5,8 @@ branch protection, the requirements metamodel and where files go. Read it first,
 it here — one copy is the only copy that stays true.
 
 This file is the working mode: how a change gets from a request to a merged commit. It applies to
-any agent or contributor working in this repository.
+any agent or contributor working in this repository, an agent that is a node of one of Agconflo's
+own workflows included.
 
 The short version: **plan before implementing, gather facts from the files rather than from
 recollection, verify by running rather than by reasoning, and review your own diff before
@@ -22,7 +23,9 @@ committing.**
    gates green between each.
 5. **Review your own diff before each commit.** A green gate is the input to that review, not a
    substitute for it.
-6. **Report with evidence** — real command output, not claims.
+6. **Review the whole pull request before handing it over**, and go back to planning or
+   implementing for whatever that finds.
+7. **Report with evidence** — real command output, not claims.
 
 Do one commit at a time: read its brief, do exactly that, verify it, report back. Do not run ahead
 into the next commit because it looks small.
@@ -258,6 +261,32 @@ Categories that produce hits here:
   the README gives under "Changing a rule".
 - **Mechanical.** Line endings, a bare key landing inside the previous table of a TOML file, a
   document added but never listed in the toctree.
+
+## Before handing over a pull request: review it whole
+
+A commit's review sees one commit. Before a pull request is opened for merging, or reported as
+ready to merge, whoever wrote it reviews it once more as a whole. It is short and it is not
+optional, because the defects it is for are the ones no single commit shows: #72 superseded four
+decisions and left five decisions still in force describing what it replaced, and its
+README said a refused run was told which node and why, which the command line never printed.
+
+1. **Against the plan.** Walk the approved plan row by row: every decision, requirement change,
+   test, rewording and follow-up it promised. Each is in the diff, or the pull request's
+   description says it was dropped or changed, and why.
+2. **Against what it replaced.** For everything the pull request supersedes, removes or renames,
+   ask the graph for every need not itself superseded that still names it, and search the README,
+   AGENTS.md and the code's comments for prose still describing it. A superseded need keeps its
+   history; one still in force says what is true now.
+3. **Against what a person sees.** Every behaviour the pull request claims - in the README, a
+   need's body, its description - checked where a person meets it: through the command line when
+   that is where they would, not only through the library.
+4. **At the head.** `git diff origin/main...HEAD` read whole, the gates green at the branch's head,
+   and the proofs re-run there, as "Re-run every proof against the final state" says.
+
+What it finds is a defect like any other: back to planning when the plan was wrong, to
+implementing when the code or a document is, each fix a commit reviewed as commits are, and then
+this review again on the result. The pull request's description says what the review checked and
+what it found, the fixes included. "Nothing found" is said only with what was looked at.
 
 ## Tests
 
