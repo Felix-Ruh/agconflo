@@ -2,16 +2,19 @@
 Components of a workflow repeating itself
 =========================================
 
-The requirements ``ARCH_REPETITION`` allocates to the two components it
-uses, each defined where its first feature put it: the run scheduler and the
-workflow run in ``components/run``. Each title is the grammatical subject of
+The requirements ``ARCH_REPETITION`` allocates to the components it uses,
+each defined where its first feature put it: the topology reader in
+``components/topology``, the wiring validator in ``components/wiring``, and
+the run scheduler and the workflow run in ``components/run``. Each title is
+the grammatical subject of
 the requirements allocated to it, and the gate in ``scripts/gates`` refuses a
 component requirement whose subject is anything else.
 
-An instance's passes follow from its wiring and the contexts the run is given
-(``DEC_PASS_CLOCKS``): the run's one pass, a router's passes on which it
-takes a branch naming the instance, a context the run gives followed by the
-passes of what the binding carries, or a cycle's own passes. One set of
+An instance's passes follow from its wiring and the first contexts its
+bindings declare (``DEC_PASS_CLOCKS``): the run's one pass, a router's passes
+on which it takes a branch naming the instance, a declared first context
+followed by the passes of what the binding carries, or a cycle's own passes.
+One set of
 passes encloses another when each pass of the other is part of one of its
 own. An input on the instance's own passes is taken pass by pass; one on
 passes enclosing them is read from the pass the activation belongs to.
@@ -134,27 +137,51 @@ passes enclosing them is read from the pass the activation belongs to.
    - **The output held for one reader of several**, and another waiting for
      a pass that went elsewhere.
 
-.. comp_req:: A context a run is given for a wired parameter is its edge's first
-   :id: CREQ_RUN_ARGUMENT_FIRST_ON_ITS_EDGE
-   :derived_from: FEAT_ARGUMENT_FIRST_ON_ITS_EDGE
-   :allocated_to: COMP_WORKFLOW_RUN
+.. comp_req:: A binding's declared first context is given on its first pass
+   :id: CREQ_SCHEDULER_GIVES_FIRST
+   :derived_from: FEAT_FIRST_CONTEXT_DECLARED
+   :allocated_to: COMP_RUN_SCHEDULER
    :ears_pattern: event
-   :statement: When a run is started with a context for a parameter a binding fills, Workflow run shall hold that context as the first that edge holds, before any context walked along it.
+   :statement: When a binding declares its first context, Run scheduler shall give that context to the binding's instance on the binding's first pass and what the binding carries on each pass after.
 
-   ``DEC_ARGUMENT_FIRST_ON_ITS_EDGE``. It is the binding's pass 0, and the
-   passes of what the binding carries are its passes 1 onward, whenever they
-   are made. Two contexts given for one parameter are refused as they are for
-   any (``CREQ_RUN_REFUSES_UNFILLED_SIGNATURE``).
+   ``DEC_FIRST_CONTEXT_DECLARED``: it is the binding's pass 0, and the passes
+   of what the binding carries are its passes 1 onward, whenever they are made
+   (``DEC_PASS_CLOCKS``).
 
    Failure modes:
 
-   - **The context refused as a second source**, which is what the run did,
-     and a loop given no way into its first pass.
    - **The context placed after what was walked first**, and what a pass is
      given turned on whether the binding's source happened to run before the
      instance.
    - **The context given for every pass**, as a parameter nothing binds is,
      and the wire's contexts never taken.
+   - **The context given to another binding of the instance**, or to the
+     same parameter of another instance.
+
+.. comp_req:: A run holds each first context its workflow declares
+   :id: CREQ_RUN_HOLDS_DECLARED_FIRST
+   :derived_from: FEAT_FIRST_CONTEXT_DECLARED
+   :allocated_to: COMP_WORKFLOW_RUN
+   :ears_pattern: event
+   :statement: When a run starts, Workflow run shall hold for each binding declaring its first context a context holding the declared text, of the type the binding's parameter is declared for.
+
+   ``DEC_FIRST_CONTEXT_DECLARED``: made when the run starts, after its wiring
+   and its signature are checked, from the identifier source its caller lends
+   it, and held as an argument is, so that its identifier is checked against
+   the arguments' (``CREQ_RUN_REFUSES_SHARED_ARGUMENT_IDENTIFIER``). A source
+   that has issued every identifier refuses the run.
+
+   Failure modes:
+
+   - **The context made from a source of its own**, and two contexts of the
+     run under one identifier.
+   - **Its type taken from elsewhere**, the source's output type or a
+     made-up one, and a node given a context its parameter is not declared
+     for.
+   - **A context made for every pass**, and the run's contexts growing with
+     nothing to say it.
+   - **An exhausted source passed over**, and a context with no identifier
+     of its own.
 
 .. comp_req:: A binding's first context is read as its text
    :id: CREQ_READER_READS_FIRST

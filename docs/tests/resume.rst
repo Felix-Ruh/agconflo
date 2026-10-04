@@ -72,15 +72,45 @@ that the record amended.
    :test_kind: error_path
    :coverage: partial
 
-   An instance reading its own output, given its first context, recorded after
+   An instance reading its own output, declaring its first context, recorded after
    two passes and resumed: the third pass is offered, given the second's
-   output. The same record saying the second pass was given the run's context
+   output. The same record saying the second pass was given the first context
    again is refused as diverged at that output.
 
    Nothing of where each edge stands is written in a record; the run holds it
    again by replaying the outputs in order (``DEC_RESUME_REPLAYS_CALLS``).
    Catches: a resumed run taking each edge from its start, which offers the
    first pass again; a record claiming an edge was taken twice accepted.
+
+.. test_case:: A record holds its run's first contexts, and a resumed run takes them
+   :id: TEST_RECORD_FIRSTS_RECORDED
+   :verifies: CREQ_RECORD_HOLDS_FIRSTS
+   :test_kind: positive
+   :coverage: full
+
+   A run whose instance declares its first context, recorded with its first
+   activation outstanding: the record holds no argument and one first context,
+   naming the instance, the parameter and the context, whose text is the one
+   declared. Resumed, the outstanding activation is given that context under
+   its recorded identifier.
+
+   Catches: the first contexts left out; the first contexts written as
+   arguments.
+
+.. test_case:: A record whose first context is not the workflow's is refused
+   :id: TEST_RECORD_CHANGED_FIRST_REFUSED
+   :verifies: CREQ_RECORD_REFUSES_CHANGED_FIRST
+   :test_kind: error_path
+   :coverage: full
+
+   The same record resumed against the workflow declaring another text, and
+   declaring none; and the record altered to hold another text, another type,
+   or no first context: each refused naming the binding's instance and
+   parameter, the last refused as unreadable or as differing. The control:
+   the record resumes against the workflow it was taken from.
+
+   Catches: the first context made again from the workflow; only the text
+   compared.
 
 .. test_case:: A resumed context is the context recorded
    :id: TEST_RECORD_CONTEXTS_KEPT

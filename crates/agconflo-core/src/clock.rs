@@ -1,12 +1,11 @@
 //! The passes each instance of a workflow runs on, worked out from its wiring
-//! and the parameters a run gives a first context to, before anything runs; and
+//! and the first contexts its bindings declare, before anything runs; and
 //! every instance whose inputs come on passes no one of which encloses the
 //! rest.
 
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 
-use crate::run::Arguments;
 use crate::workflow::{NodeInstance, WorkflowDefinition};
 
 /// The passes an instance runs on, or a binding carries contexts on.
@@ -14,7 +13,8 @@ use crate::workflow::{NodeInstance, WorkflowDefinition};
 pub(crate) enum Clock {
     /// The run's one pass.
     Once,
-    /// No pass: a cycle nothing given starts, and whatever reads from it.
+    /// No pass: a cycle no declared first context starts, and whatever reads
+    /// from it.
     Never,
     /// The passes of `router` on which it takes one of `branches`, by their
     /// position among the branches its instance declares, in ascending order.
@@ -22,7 +22,8 @@ pub(crate) enum Clock {
         router: String,
         branches: Vec<usize>,
     },
-    /// Pass 0 a context the run was given, then each pass of the clock inside.
+    /// Pass 0 the first context a binding declares, then each pass of the
+    /// clock inside.
     Given(Box<Clock>),
     /// The passes of a cycle no router is on, named by its first instance in
     /// the definition's order.
@@ -59,8 +60,7 @@ impl fmt::Display for Unpaired {
 
 impl std::error::Error for Unpaired {}
 
-/// The passes of every instance of one definition, run with one set of
-/// arguments.
+/// The passes of every instance of one definition.
 #[derive(Clone, Debug, Default)]
 pub(crate) struct Clocks {
     /// Each instance's passes, by name.
@@ -73,18 +73,18 @@ pub(crate) struct Clocks {
 }
 
 impl Clocks {
-    /// The passes of every instance of `definition`, run with `arguments`.
+    /// The passes of every instance of `definition`.
     ///
     /// An instance runs on the passes of the input that comes most often,
     /// every other input coming on passes enclosing those, and one with no
-    /// input a binding fills runs once. A parameter a binding fills and the
-    /// run gives a context to has it on pass 0 and the binding's after.
-    /// Instances on a cycle no router is on share the cycle's passes when the
-    /// run gives a context to a binding on it, and have none otherwise; so
-    /// does whatever reads from an instance that has none.
-    // @Each instance's passes from its wiring,IMPL_CLOCK_PASSES,impl,[CREQ_SCHEDULER_REPORTS_UNPAIRED],[DEC_PASS_CLOCKS, DEC_ARGUMENT_FIRST_ON_ITS_EDGE]
-    pub(crate) fn new(definition: &WorkflowDefinition, arguments: &Arguments) -> Self {
-        let mut work = Work::new(definition, arguments);
+    /// input a binding fills runs once. A binding declaring its first context
+    /// has it on pass 0 and what it carries after. Instances on a cycle no
+    /// router is on share the cycle's passes when a binding on it declares its
+    /// first context, and have none otherwise; so does whatever reads from an
+    /// instance that has none.
+    // @Each instance's passes from its wiring,IMPL_CLOCK_PASSES,impl,[CREQ_SCHEDULER_REPORTS_UNPAIRED],[DEC_PASS_CLOCKS, DEC_FIRST_CONTEXT_DECLARED]
+    pub(crate) fn new(definition: &WorkflowDefinition) -> Self {
+        let mut work = Work::new(definition);
         for instance in &definition.instances {
             work.clock(&instance.name);
         }
@@ -115,7 +115,6 @@ impl Clocks {
 /// The clocks of one definition being worked out.
 struct Work<'d> {
     definition: &'d WorkflowDefinition,
-    arguments: &'d Arguments,
     /// The instances whose node type routes.
     routers: HashSet<&'d str>,
     /// For each instance on a cycle no router is on, the cycle's first
@@ -135,7 +134,7 @@ struct Work<'d> {
 }
 
 impl<'d> Work<'d> {
-    fn new(definition: &'d WorkflowDefinition, arguments: &'d Arguments) -> Self {
+    fn new(definition: &'d WorkflowDefinition) -> Self {
         let routers = definition
             .instances
             .iter()
@@ -149,7 +148,6 @@ impl<'d> Work<'d> {
             .collect();
         let mut work = Self {
             definition,
-            arguments,
             routers,
             cycles: HashMap::new(),
             of: HashMap::new(),
@@ -194,8 +192,8 @@ impl<'d> Work<'d> {
 
     /// The cycles no router is on: each set of instances reaching one another
     /// through bindings from instances that do not route, one instance reading
-    /// its own output among them. A cycle has passes of its own when the run
-    /// gives a context to a binding between two of its instances, and none
+    /// its own output among them. A cycle has passes of its own when a binding
+    /// between two of its instances declares its first context, and none
     /// otherwise.
     // @Cycles no router is on found,IMPL_CLOCK_CYCLES,impl,[CREQ_SCHEDULER_REPORTS_UNPAIRED],[DEC_PASS_CLOCKS]
     fn find_cycles(&self) -> HashMap<&'d str, (&'d str, Clock)> {
@@ -219,9 +217,7 @@ impl<'d> Work<'d> {
             let given = members.iter().any(|&member| {
                 self.instance(member).is_some_and(|instance| {
                     instance.bindings.iter().any(|b| {
-                        self.plain(b)
-                            && members.contains(&b.source.as_str())
-                            && self.arguments.context_for(member, &b.parameter).is_some()
+                        self.plain(b) && members.contains(&b.source.as_str()) && b.first.is_some()
                     })
                 })
             });
@@ -275,11 +271,7 @@ impl<'d> Work<'d> {
         } else {
             self.clock(source)
         };
-        if self
-            .arguments
-            .context_for(&instance.name, parameter)
-            .is_some()
-        {
+        if binding.first.is_some() {
             Clock::Given(Box::new(inner))
         } else {
             inner
@@ -536,7 +528,7 @@ impl<'d> Work<'d> {
             Clock::Once => "the run's one pass".to_owned(),
             Clock::Never => "no pass".to_owned(),
             Clock::Given(inner) => {
-                format!("a context the run gives, then {}", self.describe(inner))
+                format!("a first context declared, then {}", self.describe(inner))
             }
             Clock::Cycle(first) => format!("the passes of the cycle through '{first}'"),
             Clock::Branch { router, branches } => {

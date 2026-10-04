@@ -27,7 +27,7 @@ from.
    :coverage: full
 
    An instance reading nothing, offered once and never again; an instance
-   reading its own output, the run giving it the first, offered on that and
+   reading its own output, declaring its first context, offered on that and
    then on each output it made; and an instance reading both, offered on each
    of the second's passes with the first's one context, and not offered
    between them however often it is asked.
@@ -102,8 +102,9 @@ from.
 
    The review loop with its join reading two branches no route takes
    together: the run is refused before it starts, naming the join and the
-   passes of both its inputs, in its message as well. The same workflow given
-   nothing for its loop, whose nodes then run on no pass, starts - the control.
+   passes of both its inputs, in its message as well. The same workflow
+   declaring no first context for its loop, whose nodes then run on no pass,
+   starts - the control.
 
    Catches: the run started; the first such instance named and the rest left;
    the instances counted in the message and not named.
@@ -114,7 +115,7 @@ from.
    :test_kind: positive
    :coverage: full
 
-   An instance read by two others, given its first context by the run and
+   An instance read by two others, given its declared first context and
    then reading one made once, so that it runs twice before either reader
    does: each reader is then given its first output, and on its next
    activation the second.
@@ -122,19 +123,60 @@ from.
    Catches: the output replacing an earlier pass's; the output held for one
    reader of several.
 
-.. test_case:: A context given for a wired parameter comes before what the wire carries
-   :id: TEST_RUN_ARGUMENT_FIRST_ON_ITS_EDGE
-   :verifies: CREQ_RUN_ARGUMENT_FIRST_ON_ITS_EDGE
+.. test_case:: A first context a binding declares comes before what the binding carries
+   :id: TEST_RUN_FIRST_CONTEXT_DECLARED_COMES_FIRST
+   :verifies: CREQ_SCHEDULER_GIVES_FIRST, CREQ_RUN_HOLDS_DECLARED_FIRST
    :test_kind: positive
    :coverage: full
 
-   An instance given a context for its wired parameter, whose binding's source
-   comes before it in the definition and produces before it runs: its first
-   activation is given the context the run was given, and its second the
-   source's output. Two contexts for that parameter are refused naming it.
+   An instance whose binding declares the first context ``start``, the
+   binding's source coming before it in the definition and producing before
+   it runs: its first activation is given a context holding ``start`` of the
+   parameter's type, which the run holds, and its second the source's output,
+   and the instance reading it is given each in turn. The binding is on no
+   cycle, so this is also a first context off one.
 
-   Catches: the context refused as a second source; the context placed after
-   what was walked first; the context given for every pass.
+   Catches: the context placed after what was walked first; the context given
+   for every pass; its type taken from elsewhere.
+
+.. test_case:: An argument for a parameter a binding fills is refused
+   :id: TEST_RUN_ARGUMENT_FOR_BOUND_PARAMETER_REFUSED
+   :verifies: CREQ_RUN_REFUSES_UNFILLED_SIGNATURE
+   :test_kind: error_path
+   :coverage: full
+
+   Arguments for a parameter whose binding declares a first context, and two
+   for one whose binding declares none: each is refused as matching no
+   parameter of the workflow, once for each argument, and nothing runs. The
+   control: given nothing, the run starts.
+
+   Catches: an argument for a parameter a binding fills taken as a second
+   source.
+
+.. test_case:: A first context's identifier is checked against the arguments'
+   :id: TEST_RUN_FIRST_SHARES_NO_IDENTIFIER
+   :verifies: CREQ_RUN_HOLDS_DECLARED_FIRST, CREQ_RUN_REFUSES_SHARED_ARGUMENT_IDENTIFIER
+   :test_kind: error_path
+   :coverage: full
+
+   An argument made from one source and the run lent another that has issued
+   nothing, so the first context is made under the argument's identifier: the
+   run is refused naming that identifier. The control: lent the source the
+   argument came from, it starts.
+
+   Catches: the context made from a source of its own.
+
+.. test_case:: A first context needing an exhausted source is refused
+   :id: TEST_RUN_FIRST_FROM_EXHAUSTED_SOURCE_REFUSED
+   :verifies: CREQ_RUN_HOLDS_DECLARED_FIRST
+   :test_kind: error_path
+   :coverage: full
+
+   A workflow declaring a first context, started with a source that has
+   issued every identifier: refused as such, with its message. The control:
+   a workflow declaring none starts with the same source.
+
+   Catches: an exhausted source passed over.
 
 .. test_case:: A review loop runs until its router says it is done
    :id: TEST_SCRIPTED_REVIEW_LOOP
@@ -145,8 +187,8 @@ from.
    A workflow of an instance giving the brief the run gave it, a drafter reading
    the brief and a router's input back, a reviewer, and a router sending the
    draft back to the drafter twice and then on to a finisher, through its two
-   declared branches. The run gives the drafter an empty draft for its first
-   pass (``CREQ_RUN_ARGUMENT_FIRST_ON_ITS_EDGE``). The run completes with the
+   declared branches. The drafter's binding declares an empty draft for its
+   first pass (``CREQ_SCHEDULER_GIVES_FIRST``). The run completes with the
    third draft, the drafter having run three times, each time with the brief
    and the draft before it, and its record holds each route. Performed by
    scripts, with no model.

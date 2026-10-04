@@ -337,8 +337,8 @@ catches it.
    the instance does not declare. Each is refused naming the instance and the
    parameter as given, no script runs, and no record file is made. The
    control: an argument for a parameter the instance declares and a binding
-   fills is made a context, and the run gives it to that instance before what
-   the wire carries.
+   fills is made a context, and the question is left to the run, which
+   refuses it as no parameter of the workflow's.
 
    Catches: the argument dropped; a made-up type given; the run's question
    answered by the runner.

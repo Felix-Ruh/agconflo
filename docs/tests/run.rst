@@ -341,7 +341,7 @@ single requirement to verify.
    :test_kind: error_path
    :coverage: partial
 
-   One instance reading its own output, given its first context by the run,
+   One instance reading its own output, declaring its first context,
    under a budget of five: it is activated five times, each given the output
    of the pass before, and the run ends reporting the budget.
 

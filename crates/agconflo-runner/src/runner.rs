@@ -913,7 +913,8 @@ fn unknown_argument_refused() {
     }
 
     // The control: a parameter a binding fills is declared, so the runner
-    // makes the context, and the run takes it before what the wire carries.
+    // makes the context and leaves the question to the run, which refuses it
+    // as no parameter of the workflow's.
     let arguments = [
         brief("x").remove(0),
         Argument {
@@ -922,8 +923,18 @@ fn unknown_argument_refused() {
             text: "given".to_owned(),
         },
     ];
-    let stopped = runtime().block_on(start(sources, &scratch.path("bound.toml"), &arguments));
-    assert_eq!(completed(stopped), "given+c+c");
+    match runtime().block_on(start(sources, &scratch.path("bound.toml"), &arguments)) {
+        Err(Refusal::Run(ScriptedRefusal::Start(agconflo_core::StartRefusal::Signature(
+            faults,
+        )))) => assert_eq!(
+            faults,
+            [agconflo_core::SignatureFault::ArgumentMatchesNothing {
+                instance: "second".to_owned(),
+                parameter: "before".to_owned(),
+            }]
+        ),
+        other => panic!("expected the run to refuse second.before, got {other:?}"),
+    }
 }
 
 #[cfg(test)]

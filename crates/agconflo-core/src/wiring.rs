@@ -1485,7 +1485,12 @@ fn call_to_missing_type_is_reported() {
     );
 
     // A run of it is refused before anything is offered, carrying all five.
-    match crate::Run::<std::convert::Infallible>::start(&workflow, crate::Arguments::new(), 10) {
+    match crate::Run::<std::convert::Infallible>::start(
+        &workflow,
+        crate::Arguments::new(),
+        10,
+        &mut crate::IdSource::new(),
+    ) {
         Err(crate::StartRefusal::Wiring(defects)) => assert_eq!(defects, report),
         other => panic!("a workflow calling a missing node type does not start: {other:?}"),
     }
@@ -1535,7 +1540,7 @@ fn unportable_call_name_is_reported() {
         ]
     );
     assert!(matches!(
-        crate::Run::<std::convert::Infallible>::start(&workflow, crate::Arguments::new(), 10),
+        crate::Run::<std::convert::Infallible>::start(&workflow, crate::Arguments::new(), 10, &mut crate::IdSource::new()),
         Err(crate::StartRefusal::Wiring(defects)) if defects == report
     ));
 }

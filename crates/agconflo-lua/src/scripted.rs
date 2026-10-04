@@ -149,7 +149,7 @@ pub async fn run_scripted(
     limits: Limits,
     keep: impl FnMut(String),
 ) -> Result<Outcome, ScriptedRefusal> {
-    let run = Run::start(definition, arguments, budget).map_err(ScriptedRefusal::Start)?;
+    let run = Run::start(definition, arguments, budget, source).map_err(ScriptedRefusal::Start)?;
     drive(
         run, definition, behaviours, roster, source, limits, None, keep,
     )
@@ -1988,7 +1988,9 @@ fn refused_call_fails_with_the_refusal() {
         YIELD_TYPES,
         "name = \"yielding\"\noutput = \"asker\"\n\n[instances.asker]\nnode_type = \"ask\"\n",
     );
-    let mut run = Run::<ScriptFailure>::start(&undeclaring, Arguments::new(), 20).expect("starts");
+    let mut run =
+        Run::<ScriptFailure>::start(&undeclaring, Arguments::new(), 20, &mut IdSource::new())
+            .expect("starts");
     let Step::Activate(activation) = run.step() else {
         panic!("the asker is offered")
     };
@@ -2467,7 +2469,7 @@ node_type = "give"
 
 [instances.drafter]
 node_type = "draft"
-bindings = { brief = "brief", previous = { from = "router", input = "draft" } }
+bindings = { brief = "brief", previous = { from = "router", input = "draft", first = { text = "" } } }
 
 [instances.reviewer]
 node_type = "review"
@@ -2524,15 +2526,13 @@ fn loop_scripts() -> Behaviours {
         )
 }
 
-/// The review loop started with the brief `B` and an empty first draft, and
-/// every record it handed over.
+/// The review loop started with the brief `B`, its drafter declaring an empty
+/// first draft, and every record it handed over.
 #[cfg(test)]
 fn loop_run(behaviours: &Behaviours) -> (Result<Outcome, ScriptedRefusal>, Vec<String>) {
     let definition = workflow(LOOP_TYPES, LOOP);
     let mut source = IdSource::new();
-    let arguments = Arguments::new()
-        .supply("brief", "input", note(&mut source, "note", "B"))
-        .supply("drafter", "previous", note(&mut source, "note", ""));
+    let arguments = Arguments::new().supply("brief", "input", note(&mut source, "note", "B"));
     let mut records = Vec::new();
     let ended = block(run_scripted(
         &definition,

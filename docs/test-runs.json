@@ -1380,6 +1380,15 @@
           "title": "agconflo-core reader::unnamed_keys_are_read",
           "type": "test_run"
         },
+        "RUN_RECORD_CHANGED_FIRST_REFUSED": {
+          "executes": [
+            "TEST_RECORD_CHANGED_FIRST_REFUSED"
+          ],
+          "id": "RUN_RECORD_CHANGED_FIRST_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-core record::changed_first_refused",
+          "type": "test_run"
+        },
         "RUN_RECORD_CONTEXTS_KEPT": {
           "executes": [
             "TEST_RECORD_CONTEXTS_KEPT"
@@ -1414,6 +1423,15 @@
           "id": "RUN_RECORD_EXCHANGES_KEPT",
           "test_outcome": "passed",
           "title": "agconflo-core record::exchanges_kept",
+          "type": "test_run"
+        },
+        "RUN_RECORD_FIRSTS_RECORDED": {
+          "executes": [
+            "TEST_RECORD_FIRSTS_RECORDED"
+          ],
+          "id": "RUN_RECORD_FIRSTS_RECORDED",
+          "test_outcome": "passed",
+          "title": "agconflo-core record::firsts_recorded",
           "type": "test_run"
         },
         "RUN_RECORD_HOLDS_EXCHANGES": {
@@ -1803,13 +1821,13 @@
           "title": "agconflo-core run::arguments_sharing_an_identifier_are_refused",
           "type": "test_run"
         },
-        "RUN_RUN_ARGUMENT_FIRST_ON_ITS_EDGE": {
+        "RUN_RUN_ARGUMENT_FOR_BOUND_PARAMETER_REFUSED": {
           "executes": [
-            "TEST_RUN_ARGUMENT_FIRST_ON_ITS_EDGE"
+            "TEST_RUN_ARGUMENT_FOR_BOUND_PARAMETER_REFUSED"
           ],
-          "id": "RUN_RUN_ARGUMENT_FIRST_ON_ITS_EDGE",
+          "id": "RUN_RUN_ARGUMENT_FOR_BOUND_PARAMETER_REFUSED",
           "test_outcome": "passed",
-          "title": "agconflo-core run::argument_first_on_its_edge",
+          "title": "agconflo-core run::argument_for_bound_parameter_refused",
           "type": "test_run"
         },
         "RUN_RUN_ARGUMENT_FOR_NO_PARAMETER_IS_REFUSED": {
@@ -1981,6 +1999,33 @@
           "id": "RUN_RUN_FAILURE_WITH_NO_ACTIVATION_IS_REFUSED",
           "test_outcome": "passed",
           "title": "agconflo-core run::failure_with_no_activation_is_refused",
+          "type": "test_run"
+        },
+        "RUN_RUN_FIRST_CONTEXT_DECLARED_COMES_FIRST": {
+          "executes": [
+            "TEST_RUN_FIRST_CONTEXT_DECLARED_COMES_FIRST"
+          ],
+          "id": "RUN_RUN_FIRST_CONTEXT_DECLARED_COMES_FIRST",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::first_context_declared_comes_first",
+          "type": "test_run"
+        },
+        "RUN_RUN_FIRST_FROM_EXHAUSTED_SOURCE_REFUSED": {
+          "executes": [
+            "TEST_RUN_FIRST_FROM_EXHAUSTED_SOURCE_REFUSED"
+          ],
+          "id": "RUN_RUN_FIRST_FROM_EXHAUSTED_SOURCE_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::first_from_exhausted_source_refused",
+          "type": "test_run"
+        },
+        "RUN_RUN_FIRST_SHARES_NO_IDENTIFIER": {
+          "executes": [
+            "TEST_RUN_FIRST_SHARES_NO_IDENTIFIER"
+          ],
+          "id": "RUN_RUN_FIRST_SHARES_NO_IDENTIFIER",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::first_shares_no_identifier",
           "type": "test_run"
         },
         "RUN_RUN_IDLE_INSTANCE_DOES_NOT_MAKE_IT_STUCK": {
