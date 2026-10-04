@@ -1893,13 +1893,16 @@ fn routes_kept() {
         ],
         vec![
             instance("d", "Src", &[]),
-            instance("r", "route", &[("draft", "d")])
-                .branching(&[("revise", &["revise"]), ("close", &["close"])]),
+            instance("r", "route", &[("draft", "d")]).branching(&[
+                ("revise", &["revise"]),
+                ("close", &["close"]),
+                ("end", &["out"]),
+            ]),
             instance("revise", "Take", &[("seed", "r")]),
             instance("close", "Take", &[]).taking("seed", "r", "draft"),
-            instance("never", "Take", &[("seed", "never")]),
+            instance("out", "Take", &[]).taking("seed", "r", "draft"),
         ],
-        &["never"],
+        &["out"],
     );
     let mut source = IdSource::new();
     let mut run = Run::<()>::start(&workflow, Arguments::new(), 10, &mut source).expect("starts");
@@ -2074,7 +2077,39 @@ fn changed_first_refused() {
     assert_eq!(refused(&repeating("other"), &record), differs());
     let mut none = repeating("first");
     none.instances[0].bindings[0].first = None;
-    assert_eq!(refused(&none, &record), differs());
+    assert!(
+        matches!(
+            refused(&none, &record),
+            ResumeRefusal::Start(StartRefusal::Wiring(_))
+        ),
+        "a self-loop declaring none is a cycle nothing starts"
+    );
+    // Off a cycle, a binding declaring none with one recorded.
+    let off = |first: Option<&str>| {
+        let mut later = instance("later", "Take", &[("seed", "src")]);
+        later.bindings[0].first = first.map(str::to_owned);
+        definition(
+            vec![
+                node_type("Src", &[], "note"),
+                node_type("Take", &[("seed", "note")], "note"),
+            ],
+            vec![instance("src", "Src", &[]), later],
+            &["later"],
+        )
+    };
+    let declaring = off(Some("first"));
+    let mut source = IdSource::new();
+    let mut run = Run::<()>::start(&declaring, Arguments::new(), 10, &mut source).expect("starts");
+    let _ = run.step();
+    let taken = run.record(&source);
+    assert!(Run::<()>::resume(&declaring, &taken).is_ok());
+    assert_eq!(
+        refused(&off(None), &taken),
+        ResumeRefusal::FirstDiffers {
+            instance: "later".to_owned(),
+            parameter: "seed".to_owned(),
+        }
+    );
 
     // The record holding another text for it, another type, or no first
     // context at all.

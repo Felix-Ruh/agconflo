@@ -127,9 +127,10 @@ The third, a binding into an entry node, is closed: there are no entry nodes
    :test_kind: positive
    :coverage: partial
 
-   Nothing is reported for a binding from an instance to itself, which is a cycle
-   of length one and legal (``DEC_BACK_EDGES_ALLOWED``), nor for two instances of
-   the same node type, which share a declaration and nothing else.
+   Nothing is reported for a binding from an instance to itself declaring its
+   first context, which is a cycle of length one and legal
+   (``DEC_CYCLE_STARTED_BY_A_FIRST``), nor for two instances of the same node
+   type, which share a declaration and nothing else.
 
    Both resolve, and both are what a resolver written as if the definition were a
    tree of distinct nodes refuses by accident.
@@ -450,8 +451,9 @@ The third, a binding into an entry node, is closed: there are no entry nodes
    type, exactly one designated output - the report is empty.
 
    The generator carries this case, and it must reach the shapes a validator
-   written to be strict refuses by accident: a cycle, a node nothing
-   reaches, a declared global that no binding carries, and an output bound by several parameters. A generator producing only
+   written to be strict refuses by accident: a cycle a first context starts
+   and nothing outside it feeds, a declared global that no binding carries,
+   and an output bound by several parameters. A generator producing only
    trees would pass against a validator that refuses every one of them, which
    would make this the weakest case in the document rather than the control every
    other case here is measured against.

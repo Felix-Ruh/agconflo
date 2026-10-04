@@ -108,14 +108,16 @@ architecture closes the file.
 
    ``FEAT_REPEAT_ON_NEW_CONTEXTS`` gives a node the contexts of one pass,
    and some wiring leaves a node none: a node joining two branches no route
-   takes together, or a loop's own node reading what a branch of it makes on
-   some passes alone. Run, such a node waits for ever or is given two passes'
-   contexts. ``STKH_WIRING_CHECKED`` rejects an invalid workflow before any
-   node runs, and this is the invalidity repetition adds.
+   takes together, a loop's own node reading what a branch of it makes on
+   some passes alone, or a node on a cycle no first context starts, which
+   has no pass at all. Run, such a node waits for ever or is given two
+   passes' contexts. ``STKH_WIRING_CHECKED`` rejects an invalid workflow
+   before any node runs, and this is the invalidity repetition adds.
 
-   It is a refusal of a run rather than of a workflow: which passes a loop
-   has depends on the parameters the run gives a first context to
-   (``DEC_PAIRING_CHECKED_AT_START``). Either way, nothing has run.
+   Every instance's passes follow from the workflow alone, its first contexts
+   among them (``DEC_FIRST_CONTEXT_DECLARED``), so it is a defect of the
+   workflow, which a check finds as well as a run
+   (``DEC_PAIRING_IS_WIRING``, ``DEC_CYCLE_STARTED_BY_A_FIRST``).
 
    It can be false while both parents hold only if a node could always be
    given one pass's contexts, which the first case above shows it cannot.

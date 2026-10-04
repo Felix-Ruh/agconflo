@@ -85,12 +85,14 @@ passes enclosing them is read from the pass the activation belongs to.
    :ears_pattern: unwanted
    :statement: If the inputs of an instance share no pass, then Run scheduler shall report that instance with the passes each of its inputs comes on.
 
-   Passes are worked out from the wiring and the parameters the run gives a
-   first context to, before anything runs (``DEC_PAIRING_CHECKED_AT_START``).
+   Passes are worked out from the wiring and the first contexts its bindings
+   declare, before anything runs (``DEC_PASS_CLOCKS``), and the wiring
+   validator reports what this finds (``CREQ_VALIDATOR_REPORTS_UNPAIRED``).
    Inputs share a pass when one's passes are enclosed by all the others', or
    when they come from branches of one router a single branch names together.
-   An instance on a loop no given context starts runs on no pass, as before,
-   and is not reported.
+   An instance on a cycle no first context starts runs on no pass and is not
+   reported here: the validator reports the cycle
+   (``CREQ_VALIDATOR_CYCLE_STARTED``).
 
    Failure modes:
 
@@ -100,8 +102,49 @@ passes enclosing them is read from the pass the activation belongs to.
      pass's context or waiting for ever.
    - **A join of two branches a route takes together reported**, refusing a
      workflow whose node has a pass.
-   - **A loop given nothing reported**, refusing a workflow that ran, idle,
-     before.
+   - **A cycle nothing starts reported as unpaired**, beside its own
+     defect, and the one fault named twice in two ways.
+
+.. comp_req:: A cycle no first context starts is a defect
+   :id: CREQ_VALIDATOR_CYCLE_STARTED
+   :derived_from: FEAT_PASSES_PAIRED_BEFORE_RUN
+   :allocated_to: COMP_WIRING_VALIDATOR
+   :ears_pattern: unwanted
+   :statement: If instances of a workflow reach one another through bindings none of which declares its first context, then Wiring validator shall report a defect naming those instances.
+
+   ``DEC_CYCLE_STARTED_BY_A_FIRST``: every instance on such a cycle waits for
+   another on it, so none can be given contexts of any pass. The cycle is
+   reported once, its instances in the definition's order, and an instance
+   reading from it is not reported beside it. Asked of a definition carrying
+   no other defect, whose bindings all resolve.
+
+   Failure modes:
+
+   - **The cycle passed**, and part of a run done before it stops with no
+     node able to go on (``EVD_LOOP_FIRST_CONTEXT_UNCHECKED``).
+   - **A cycle passed because one binding on it declares a first context**,
+     where another edge back declares none and closes a cycle of its own.
+   - **Each instance on it reported**, or every instance reading from it,
+     and the one forgotten first context named many times.
+   - **A cycle a first context starts reported**, refusing a loop that runs.
+
+.. comp_req:: An instance whose inputs share no pass is a defect
+   :id: CREQ_VALIDATOR_REPORTS_UNPAIRED
+   :derived_from: FEAT_PASSES_PAIRED_BEFORE_RUN
+   :allocated_to: COMP_WIRING_VALIDATOR
+   :ears_pattern: unwanted
+   :statement: If the inputs of an instance of a workflow share no pass, then Wiring validator shall report a defect naming that instance and the passes each of its inputs comes on.
+
+   ``DEC_PAIRING_IS_WIRING``: the passes follow from the definition alone, so
+   the check is the validator's, and ``agconflo check`` reports it. Asked of
+   a definition carrying no other defect and no cycle nothing starts.
+
+   Failure modes:
+
+   - **The instance found only when a run starts**, and a check passing a
+     workflow every run of it refuses (``EVD_LOOP_FIRST_CONTEXT_UNCHECKED``).
+   - **Passes worked out from bindings that do not resolve**, and defects
+     beside a broken binding that are its echo.
 
 .. comp_req:: A run whose nodes cannot be given one pass's contexts is refused
    :id: CREQ_RUN_REFUSES_UNPAIRED
@@ -110,9 +153,12 @@ passes enclosing them is read from the pass the activation belongs to.
    :ears_pattern: unwanted
    :statement: If an instance of a workflow cannot be given contexts of one pass, then Workflow run shall refuse to start naming every such instance.
 
-   Asked after the wiring and the signature, before the arguments'
-   identifiers: a refusal names what the caller supplied or what the
-   definition says, and the passes are both.
+   An instance whose inputs share no pass is a defect of the wiring
+   (``DEC_PAIRING_IS_WIRING``), reported by the wiring validator
+   (``CREQ_VALIDATOR_REPORTS_UNPAIRED``), so the run refuses it as it refuses
+   every wiring defect, before its signature is asked
+   (``CREQ_RUN_REFUSES_DEFECTS``), naming each such instance with the passes
+   of its inputs.
 
    Failure modes:
 

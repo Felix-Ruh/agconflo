@@ -81,10 +81,10 @@ from.
 
    A loop with three branches and nodes reading across them: none reported,
    a branch's node reading the loop's draft and a brief made once, a join of
-   two branches on the branch naming both, and a cycle no router is on given
-   its first context each put on the passes expected; the same loop given
-   nothing for it, none reported and its loop on no pass; and a cycle of two
-   instances no router is on, given its first context, read by a third on
+   two branches on the branch naming both, and a cycle no router is on
+   declaring its first context each put on the passes expected; the same loop
+   declaring none, none reported and its loop on no pass; and a cycle of two
+   instances no router is on, declaring its first context, read by a third on
    its passes. A join of two branches no route takes together, a loop's own
    node reading a branch of it, and a join of two separate cycles no router
    is on: each reported, naming the instance and the passes each of its
@@ -92,7 +92,7 @@ from.
 
    Catches: two branches no route takes together passed; a loop's node
    reading a branch of the loop passed; a join of two branches a route takes
-   together reported; a loop given nothing reported.
+   together reported; a cycle nothing starts reported as unpaired.
 
 .. test_case:: A run whose node cannot be given one pass's contexts is refused
    :id: TEST_RUN_UNPAIRED_RUN_REFUSED
@@ -101,13 +101,61 @@ from.
    :coverage: full
 
    The review loop with its join reading two branches no route takes
-   together: the run is refused before it starts, naming the join and the
-   passes of both its inputs, in its message as well. The same workflow
-   declaring no first context for its loop, whose nodes then run on no pass,
+   together: the run is refused before it starts, as for a wiring defect,
+   naming the join and the passes of both its inputs, in its message as
+   well. The loop with its join reading two branches a route takes together
    starts - the control.
 
    Catches: the run started; the first such instance named and the rest left;
    the instances counted in the message and not named.
+
+.. test_case:: A cycle no first context starts is a defect, reported once
+   :id: TEST_WIRING_CYCLE_UNSTARTED_REPORTED
+   :verifies: CREQ_VALIDATOR_CYCLE_STARTED
+   :test_kind: error_path
+   :coverage: full
+
+   A review loop whose drafter reads the router's output and its input back:
+   with both edges back declaring a first context it is sound, and with
+   neither, or with only one of the two, the drafter and the router are
+   reported once as a cycle. A cycle of two instances no router is on and an
+   instance reading its own output are each reported once, in the
+   definition's order, and an instance reading from one of them not at all;
+   each names its first instance and no parameter, and says what it is in
+   its message. The same definition with a broken binding reports that
+   binding and nothing about its cycles.
+
+   Catches: the cycle passed; a cycle passed because one binding on it
+   declares a first context; each instance on it reported; a cycle a first
+   context starts reported.
+
+.. test_case:: An instance whose inputs share no pass is a defect
+   :id: TEST_WIRING_UNPAIRED_REPORTED
+   :verifies: CREQ_VALIDATOR_REPORTS_UNPAIRED
+   :test_kind: error_path
+   :coverage: full
+
+   A loop whose node joins two branches no route takes together: the
+   validator reports one defect, naming the join, saying it in its message.
+   The control: the same join of two branches one route takes together
+   reports nothing.
+
+   Catches: the instance found only when a run starts.
+
+.. test_case:: A run of a workflow with a cycle nothing starts is refused
+   :id: TEST_RUN_CYCLE_UNSTARTED_REFUSED
+   :verifies: CREQ_RUN_REFUSES_DEFECTS, FEAT_PASSES_PAIRED_BEFORE_RUN
+   :test_kind: error_path
+   :coverage: full
+
+   Two instances bound to each other's output, with the designated output
+   among them, beside an instance that could run: the run is refused before
+   anything runs, naming the cycle, rather than ending quiescent once the
+   other instance has run (``EVD_LOOP_FIRST_CONTEXT_UNCHECKED``). The control:
+   one of the two bindings declaring its first context, the run completes.
+
+   Catches, for ``CREQ_VALIDATOR_CYCLE_STARTED``: the cycle passed, part of a
+   run done before it stops.
 
 .. test_case:: An output goes to every instance reading it, pass by pass
    :id: TEST_RUN_OUTPUT_WALKS_EVERY_EDGE
@@ -117,7 +165,8 @@ from.
 
    An instance read by two others, given its declared first context and
    then reading one made once, so that it runs twice before either reader
-   does: each reader is then given its first output, and on its next
+   does, and a join of the two readers coming last: each reader is then given
+   its first output, and on its next
    activation the second.
 
    Catches: the output replacing an earlier pass's; the output held for one

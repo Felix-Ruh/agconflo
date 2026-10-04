@@ -184,10 +184,11 @@ and names the components they are divided between, which are defined in
    separate, so an instance no route to the result passes through has no claim
    on the run.
 
-   A cycle written in bindings is the shape that reaches this honestly. It is
-   legal (``DEC_BACK_EDGES_ALLOWED``) and cannot be run until explicit control
-   edges exist, so every instance in it waits for the one before it, and the run
-   is quiescent from the start.
+   A router naming nothing is the shape that reaches this honestly: the
+   instances after it, the designated output among them, wait for a pass that
+   never comes. A cycle written in bindings with no first context declared
+   reached it too, from the start, and is now refused before the run starts
+   (``DEC_CYCLE_STARTED_BY_A_FIRST``).
 
 .. feat_req:: A failed activation ends the run with its failure
    :id: FEAT_RUN_FAILURE_CARRIED

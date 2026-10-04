@@ -6,7 +6,6 @@ use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::marker::PhantomData;
 
-use crate::clock::Unpaired;
 use crate::defect::WiringDefect;
 use crate::scheduler::{Activation, Passes, next_activation};
 use crate::workflow::{Branch, NodeType, WorkflowDefinition};
@@ -87,9 +86,6 @@ pub enum StartRefusal {
     /// Different contexts among the arguments, or among what they were composed
     /// from, share these identifiers, each named once in the order found.
     SharedIdentifiers(Vec<ContextId>),
-    /// The inputs of these instances come on passes no one of which encloses
-    /// the rest, each named once, in the definition's order.
-    Unpaired(Vec<Unpaired>),
     /// The identifier source lent to the start had issued every identifier,
     /// and the first contexts the workflow's bindings declare could not be
     /// made.
@@ -107,11 +103,6 @@ impl fmt::Display for StartRefusal {
             Self::Wiring(defects) => ("wiring defect", defects.len(), each(defects)),
             Self::Signature(faults) => ("signature fault", faults.len(), each(faults)),
             Self::SharedIdentifiers(ids) => ("shared identifier", ids.len(), Vec::new()),
-            Self::Unpaired(instances) => (
-                "node whose inputs cannot be paired",
-                instances.len(),
-                each(instances),
-            ),
             Self::SourceExhausted => {
                 return f.write_str(
                     "the identifier source has issued every identifier, so no first context can be made",
@@ -996,7 +987,7 @@ impl<'a, F> Run<'a, F> {
     /// declaring one made from `source`, the source the caller makes the run's
     /// contexts from; and the identifiers of the arguments and those first
     /// contexts last, against each other and everything they were composed from.
-    // @A run of a defective workflow does not start,IMPL_RUN_REFUSES_DEFECTS,impl,[CREQ_RUN_REFUSES_DEFECTS, CREQ_RUN_REFUSAL_NAMES_EVERY_DEFECT],[DEC_RUN_REFUSED_UNLESS_EVERY_INPUT_GIVEN]
+    // @A run of a defective workflow does not start,IMPL_RUN_REFUSES_DEFECTS,impl,[CREQ_RUN_REFUSES_DEFECTS, CREQ_RUN_REFUSAL_NAMES_EVERY_DEFECT, CREQ_RUN_REFUSES_UNPAIRED],[DEC_RUN_REFUSED_UNLESS_EVERY_INPUT_GIVEN, DEC_PAIRING_IS_WIRING]
     pub fn start(
         definition: &'a WorkflowDefinition,
         arguments: Arguments,
@@ -1028,7 +1019,7 @@ impl<'a, F> Run<'a, F> {
 
     /// A run of `definition`, its wiring and signature checked, holding
     /// `arguments` and `firsts`, the first context of each binding declaring
-    /// one - or the refusal of its pairing or its identifiers.
+    /// one - or the refusal of its identifiers.
     pub(crate) fn begun(
         definition: &'a WorkflowDefinition,
         arguments: Arguments,
@@ -1042,11 +1033,7 @@ impl<'a, F> Run<'a, F> {
             })
             .collect();
 
-        // @A run whose nodes cannot be given one pass's contexts does not start,IMPL_RUN_REFUSES_UNPAIRED,impl,[CREQ_RUN_REFUSES_UNPAIRED],[DEC_PAIRING_CHECKED_AT_START]
         let passes = Passes::new(definition, given);
-        if !passes.unpaired().is_empty() {
-            return Err(StartRefusal::Unpaired(passes.unpaired().to_vec()));
-        }
 
         let started = arguments
             .iter()
@@ -1546,8 +1533,16 @@ fn drive(
             Step::Activate(activation) => {
                 let produced = ctx(source, activation.output().as_str());
                 activated.push((activation.instance().to_owned(), produced.id()));
-                run.produced(produced)
-                    .expect("an activation had just been offered");
+                let routes = workflow
+                    .node_types
+                    .iter()
+                    .any(|declared| declared.name == activation.node_type() && declared.routes);
+                if routes {
+                    run.routed(produced, Vec::new())
+                } else {
+                    run.produced(produced)
+                }
+                .expect("an activation had just been offered");
             }
         }
     }
@@ -1725,21 +1720,38 @@ fn result_is_the_designated_context() {
 
 #[cfg(test)]
 #[test]
-fn cycle_ends_quiescent() {
+fn cycle_unstarted_refused() {
     let mut source = IdSource::new();
-    let types = vec![node_type("Step", &[("input", "note")], "note")];
+    let types = vec![
+        node_type("Src", &[], "note"),
+        node_type("Step", &[("input", "note")], "note"),
+    ];
+    // `e` could run, and `c1` and `c2` are bound to each other's output with
+    // no first context declared, the designated output among them.
     let instances = vec![
+        instance("e", "Src", &[]),
         instance("c1", "Step", &[("input", "c2")]),
         instance("c2", "Step", &[("input", "c1")]),
     ];
     let workflow = definition(types, instances, &["c1"]);
 
-    let (ending, activated) = drive(&workflow, Arguments::new(), 10, &mut source);
-    assert!(activated.is_empty());
-    match ending {
-        RunEnding::Quiescent { waiting } => assert_eq!(waiting, ["c1", "c2"]),
-        other => panic!("a cycle can do nothing, so the run is quiescent, not {other:?}"),
-    }
+    // Refused before anything runs, naming the cycle, rather than ending
+    // quiescent once `e` has run.
+    let refusal = Run::<Infallible>::start(&workflow, Arguments::new(), 10, &mut source)
+        .expect_err("a cycle nothing starts");
+    assert_eq!(
+        refusal,
+        StartRefusal::Wiring(vec![WiringDefect::CycleUnstarted {
+            instances: vec!["c1".to_owned(), "c2".to_owned()],
+        }])
+    );
+
+    // The control: one of its bindings declaring its first context, it runs.
+    let mut started = workflow.clone();
+    started.instances[1].bindings[0].first = Some(String::new());
+    let (ending, activated) = drive(&started, Arguments::new(), 10, &mut source);
+    assert!(matches!(ending, RunEnding::Completed(_)), "{ending:?}");
+    assert_eq!(names(&activated), ["e", "c1"]);
 }
 
 #[cfg(test)]
@@ -1749,20 +1761,23 @@ fn idle_instance_does_not_make_it_stuck() {
     let types = vec![
         node_type("Src", &[], "note"),
         node_type("Step", &[("input", "note")], "note"),
+        node_type("Route", &[("draft", "note")], "note").routing(),
     ];
-    // `stuckone` is bound to its own output and can never become ready. The
+    // `idle` is on a branch the router does not take, and never runs. The
     // designated instance does not depend on it, so the run finishes.
     let instances = vec![
-        instance("live", "Src", &[]),
-        instance("stuckone", "Step", &[("input", "stuckone")]),
+        instance("e", "Src", &[]),
+        instance("r", "Route", &[("draft", "e")]).branching(&[("side", &["idle"])]),
+        instance("idle", "Step", &[]).taking("input", "r", "draft"),
+        instance("out", "Step", &[("input", "e")]),
     ];
-    let workflow = definition(types, instances, &["live"]);
+    let workflow = definition(types, instances, &["out"]);
 
     let (ending, activated) = drive(&workflow, Arguments::new(), 10, &mut source);
-    assert_eq!(names(&activated), ["live"]);
+    assert_eq!(names(&activated), ["e", "r", "out"]);
     assert!(
         matches!(ending, RunEnding::Completed(_)),
-        "an instance that can never run is not a stuck run: {ending:?}"
+        "an instance no route reached is not a stuck run: {ending:?}"
     );
 }
 
@@ -1773,17 +1788,20 @@ fn quiescent_names_only_unproduced() {
     let types = vec![
         node_type("Src", &[], "note"),
         node_type("Step", &[("input", "note")], "note"),
+        node_type("Route", &[("draft", "note")], "note").routing(),
     ];
-    // `e` does its work; the rest are a cycle the designated instance sits in.
+    // `e` and the router do their work; the router names nothing, and the rest,
+    // the designated instance among them, are on the branch it did not take.
     let instances = vec![
         instance("e", "Src", &[]),
-        instance("c1", "Step", &[("input", "c2")]),
+        instance("r", "Route", &[("draft", "e")]).branching(&[("on", &["c1"])]),
+        instance("c1", "Step", &[]).taking("input", "r", "draft"),
         instance("c2", "Step", &[("input", "c1")]),
     ];
-    let workflow = definition(types, instances, &["c1"]);
+    let workflow = definition(types, instances, &["c2"]);
 
     let (ending, activated) = drive(&workflow, Arguments::new(), 10, &mut source);
-    assert_eq!(names(&activated), ["e"]);
+    assert_eq!(names(&activated), ["e", "r"]);
     match ending {
         RunEnding::Quiescent { waiting } => assert_eq!(waiting, ["c1", "c2"]),
         other => panic!("expected quiescence, got {other:?}"),
@@ -2180,21 +2198,22 @@ fn output_walks_every_edge() {
     let types = vec![
         node_type("Src", &[], "note"),
         node_type("Take", &[("seed", "note")], "note"),
+        node_type("Pair", &[("left", "note"), ("right", "note")], "note"),
     ];
     // p is given its declared first context and then q's output, and comes
-    // before its
-    // two consumers, so it produces twice before either runs. The designated
-    // instance reads only itself and never runs.
+    // before its two consumers, so it produces twice before either runs. The
+    // designated instance joins the two consumers and comes last, so it runs
+    // once each consumer has run its two passes.
     let instances = vec![
         instance("q", "Src", &[]),
         instance("p", "Take", &[("seed", "q")]).first("seed", ""),
         instance("c1", "Take", &[("seed", "p")]),
         instance("c2", "Take", &[("seed", "p")]),
-        instance("never", "Take", &[("seed", "never")]),
+        instance("j", "Pair", &[("left", "c1"), ("right", "c2")]),
     ];
-    let workflow = definition(types, instances, &["never"]);
+    let workflow = definition(types, instances, &["j"]);
     let (ending, passes) = passes(&workflow, Arguments::new(), 20, &mut source);
-    assert!(matches!(ending, RunEnding::Quiescent { .. }), "{ending:?}");
+    assert!(matches!(ending, RunEnding::Completed(_)), "{ending:?}");
     let of = |name: &str| -> Vec<(Vec<ContextId>, ContextId)> {
         passes
             .iter()
@@ -2205,7 +2224,7 @@ fn output_walks_every_edge() {
     let made: Vec<ContextId> = of("p").iter().map(|(_, made)| *made).collect();
     assert_eq!(made.len(), 2);
     let names: Vec<&str> = passes.iter().map(|(name, _, _)| name.as_str()).collect();
-    assert_eq!(names, ["q", "p", "p", "c1", "c1", "c2", "c2"]);
+    assert_eq!(names, ["q", "p", "p", "c1", "c1", "c2", "c2", "j"]);
 
     // Each consumer is given the first output, then the second.
     for consumer in ["c1", "c2"] {
@@ -2219,13 +2238,15 @@ fn output_walks_every_edge() {
 fn budget_counts_each_pass() {
     let mut source = IdSource::new();
     // One instance reading its own output, declaring its first context: it
-    // runs again on every output, until the budget stops it.
+    // runs again on every output, until the budget stops it. The designated
+    // instance reads it and comes after it, so it is never offered while the
+    // first is ready.
     let types = vec![node_type("Take", &[("seed", "note")], "note")];
     let instances = vec![
         instance("x", "Take", &[("seed", "x")]).first("seed", ""),
-        instance("never", "Take", &[("seed", "never")]),
+        instance("after", "Take", &[("seed", "x")]),
     ];
-    let workflow = definition(types, instances, &["never"]);
+    let workflow = definition(types, instances, &["after"]);
     let (ending, passes) = passes(&workflow, Arguments::new(), 5, &mut source);
     assert!(
         matches!(ending, RunEnding::BudgetExceeded { budget: 5 }),
@@ -2241,7 +2262,7 @@ fn budget_counts_each_pass() {
 
 /// A router given a draft and a review, with two branches after it: `revise`
 /// taking its output and its input `draft`, and `close` taking its input
-/// `review`. The designated instance reads itself and never runs.
+/// `review`. The designated instance is on a third branch, which no test takes.
 #[cfg(test)]
 fn branching() -> WorkflowDefinition {
     let types = vec![
@@ -2253,13 +2274,16 @@ fn branching() -> WorkflowDefinition {
     let instances = vec![
         instance("d", "Src", &[]),
         instance("w", "Src", &[]),
-        instance("r", "route", &[("draft", "d"), ("review", "w")])
-            .branching(&[("revise", &["revise"]), ("both", &["close", "revise"])]),
+        instance("r", "route", &[("draft", "d"), ("review", "w")]).branching(&[
+            ("revise", &["revise"]),
+            ("both", &["close", "revise"]),
+            ("end", &["out"]),
+        ]),
         instance("revise", "revise", &[("verdict", "r")]).taking("draft", "r", "draft"),
         instance("close", "Take", &[]).taking("seed", "r", "review"),
-        instance("never", "Take", &[("seed", "never")]),
+        instance("out", "Take", &[]).taking("seed", "r", "review"),
     ];
-    definition(types, instances, &["never"])
+    definition(types, instances, &["out"])
 }
 
 /// The run of `branching()` up to its router's activation, with what the two
@@ -2396,7 +2420,7 @@ fn route_not_a_branch_refused() {
     );
     assert_eq!(
         refused.to_string(),
-        "r named close, which is not one of its branches: revise = revise; both = close, revise"
+        "r named close, which is not one of its branches: revise = revise; both = close, revise; end = out"
     );
     assert_eq!(offered(&mut run).instance(), "r");
 
@@ -2444,13 +2468,14 @@ fn branching_loop() -> WorkflowDefinition {
             ("back", &["d"]),
             ("both", &["d", "y"]),
             ("on", &["f", "y"]),
+            ("end", &["never"]),
         ]),
         instance("y", "Take", &[]).taking("input", "r", "draft"),
         instance("f", "Take", &[]).taking("input", "r", "draft"),
         instance("j", "Pair", &[("left", "x"), ("right", "y")]),
         instance("m", "Pair", &[("left", "d"), ("right", "s")]),
         instance("g", "Pair", &[("left", "y"), ("right", "f")]),
-        instance("never", "Take", &[("input", "never")]),
+        instance("never", "Take", &[]).taking("input", "r", "draft"),
     ];
     definition(types, instances, &["never"])
 }
@@ -2590,6 +2615,7 @@ fn unpaired_run_refused() {
         ("back", &["d", "k"]),
         ("both", &["d", "y"]),
         ("on", &["f", "y"]),
+        ("end", &["never"]),
     ]);
     workflow.instances[7] = instance("j", "Pair", &[("left", "k"), ("right", "f")]);
     workflow
@@ -2600,7 +2626,7 @@ fn unpaired_run_refused() {
         Run::<()>::start(&workflow, Arguments::new(), 200, &mut source).expect_err("j has no pass");
     assert_eq!(
         refused,
-        StartRefusal::Unpaired(vec![crate::Unpaired {
+        StartRefusal::Wiring(vec![WiringDefect::Unpaired(crate::Unpaired {
             instance: "j".to_owned(),
             inputs: vec![
                 (
@@ -2612,21 +2638,18 @@ fn unpaired_run_refused() {
                     "the passes on which 'r' takes 'on'".to_owned()
                 ),
             ],
-        }])
+        })])
     );
     assert_eq!(
         refused.to_string(),
-        "the workflow carries 1 node whose inputs cannot be paired: the inputs of 'j' come on \
-         passes no one of which encloses the others, so no activation of it could be given one \
-         pass's contexts: 'left' on the passes on which 'r' takes 'back', 'right' on the passes \
-         on which 'r' takes 'on'"
+        "the workflow carries 1 wiring defect: the inputs of 'j' come on passes no one of which \
+         encloses the others, so no activation of it could be given one pass's contexts: 'left' \
+         on the passes on which 'r' takes 'back', 'right' on the passes on which 'r' takes 'on'"
     );
 
-    // The control: the same workflow declaring no first context for the
-    // loop is not refused, its loop running on no pass.
-    let mut unstarted = workflow.clone();
-    unstarted.instances[1].bindings[1].first = None;
-    assert!(Run::<()>::start(&unstarted, Arguments::new(), 200, &mut source).is_ok());
+    // The control: the loop with its join reading the two branches a route
+    // takes together starts.
+    assert!(Run::<()>::start(&branching_loop(), Arguments::new(), 200, &mut source).is_ok());
 }
 
 #[cfg(test)]
@@ -3797,6 +3820,8 @@ fn called_output_from_its_own_pass() {
     let mut source = IdSource::new();
     // An asker reading its own output, declaring its first context: every pass is
     // another activation of one instance, whose model names its calls alike.
+    // The designated instance reads it and comes after it, so it is never
+    // offered while the asker is ready.
     let types = vec![
         node_type("ask", &[("seed", "note")], "note"),
         node_type("lookup", &[("query", "note"), ("scope", "note")], "note"),
@@ -3806,9 +3831,9 @@ fn called_output_from_its_own_pass() {
         instance("asker", "ask", &[("seed", "asker")])
             .first("seed", "")
             .with_calls(&["lookup"]),
-        instance("never", "pass", &[("input", "never")]),
+        instance("after", "pass", &[("input", "asker")]),
     ];
-    let workflow = definition(types, instances, &["never"]);
+    let workflow = definition(types, instances, &["after"]);
     let mut run =
         Run::<Infallible>::start(&workflow, Arguments::new(), 10, &mut source).expect("sound");
 

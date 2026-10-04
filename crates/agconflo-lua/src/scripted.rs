@@ -1434,25 +1434,54 @@ fn awaiting_is_not_quiescent() {
     assert_eq!(again.instance(), "second");
     assert_eq!(input_ids(&again), input_ids(&activation));
 
-    // The control: a person's step no run can reach, in a cycle written in
-    // bindings. That run is stuck, and says so.
-    let types = "[types.ask]\nrequired = { input = \"note\" }\noutput = \"note\"\n";
-    let cycle = "\
-name = \"cycle\"
+    // The control: a person's step no run reaches, on a branch its router's
+    // script does not take. That run is stuck, and says so.
+    let types = "\
+[types.start]
+output = \"note\"
+
+[types.route]
+required = { draft = \"note\" }
+output = \"note\"
+routes = true
+
+[types.ask]
+required = { input = \"note\" }
+output = \"note\"
+";
+    let untaken = "\
+name = \"untaken\"
 output = \"y\"
 
-[instances.x]
-node_type = \"ask\"
-bindings = { input = \"y\" }
+[instances.s]
+node_type = \"start\"
+
+[instances.r]
+node_type = \"route\"
+bindings = { draft = \"s\" }
+branches = { on = [\"y\"] }
 
 [instances.y]
 node_type = \"ask\"
-bindings = { input = \"x\" }
+bindings = { input = { from = \"r\", input = \"draft\" } }
 ";
-    let behaviours = Behaviours::new().person("ask");
-    match run_with(&workflow(types, cycle), &behaviours, None) {
-        Ok(Outcome::Ended(RunEnding::Quiescent { waiting })) => assert_eq!(waiting, ["x", "y"]),
-        other => panic!("a cycle can do nothing, so the run is quiescent, not {other:?}"),
+    let behaviours = Behaviours::new()
+        .define(
+            "start",
+            "start.lua",
+            "local given, host = ...\nreturn host.text(host.output, 's')",
+        )
+        .define(
+            "route",
+            "route.lua",
+            "local given, host = ...\nhost.route({})\nreturn host.text(host.output, 'none')",
+        )
+        .person("ask");
+    match run_with(&workflow(types, untaken), &behaviours, None) {
+        Ok(Outcome::Ended(RunEnding::Quiescent { waiting })) => assert_eq!(waiting, ["y"]),
+        other => {
+            panic!("a step no route reaches is not awaited, so the run is quiescent, not {other:?}")
+        }
     }
 }
 

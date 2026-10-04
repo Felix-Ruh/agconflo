@@ -3,6 +3,7 @@
 use std::fmt;
 
 use crate::ContextType;
+use crate::clock::Unpaired;
 
 /// One thing wrong with one workflow definition, carrying the place it
 /// concerns as values - a node instance and a parameter, an instance alone, or
@@ -137,6 +138,18 @@ pub enum WiringDefect {
         /// The branch naming the same instances.
         repeated: String,
     },
+    /// Instances reaching one another through bindings none of which declares
+    /// its first context, so none of them can ever run: a cycle nothing
+    /// starts, reported once.
+    // @A cycle nothing starts as a defect,TRACE_DEFECT_CYCLE_UNSTARTED,trace,[],[DEC_CYCLE_STARTED_BY_A_FIRST]
+    CycleUnstarted {
+        /// The cycle's instances, in the definition's order.
+        instances: Vec<String>,
+    },
+    /// An instance whose inputs come on passes no one of which encloses the
+    /// rest, with each input's passes.
+    // @Inputs that share no pass as a defect,TRACE_DEFECT_UNPAIRED,trace,[],[DEC_PAIRING_IS_WIRING]
+    Unpaired(Unpaired),
 }
 
 impl WiringDefect {
@@ -157,6 +170,8 @@ impl WiringDefect {
             | Self::InstanceInNoBranch { instance, .. }
             | Self::BranchNamesUnentered { instance, .. }
             | Self::RepeatedBranch { instance, .. } => Some(instance),
+            Self::CycleUnstarted { instances } => instances.first().map(String::as_str),
+            Self::Unpaired(unpaired) => Some(&unpaired.instance),
             Self::SignatureOutputs { .. } | Self::UnresolvedOutput { .. } => None,
         }
     }
@@ -179,7 +194,9 @@ impl WiringDefect {
             | Self::BranchesNotRouted { .. }
             | Self::InstanceInNoBranch { .. }
             | Self::BranchNamesUnentered { .. }
-            | Self::RepeatedBranch { .. } => None,
+            | Self::RepeatedBranch { .. }
+            | Self::CycleUnstarted { .. }
+            | Self::Unpaired(_) => None,
         }
     }
 
@@ -301,6 +318,22 @@ impl fmt::Display for WiringDefect {
                 f,
                 "the branches '{first}' and '{repeated}' of the router '{instance}' name the same instances"
             ),
+            Self::CycleUnstarted { instances } => match instances.as_slice() {
+                [only] => write!(
+                    f,
+                    "the node '{only}' reads its own output and its binding declares no first context, so it can never run"
+                ),
+                _ => {
+                    let named: Vec<String> =
+                        instances.iter().map(|name| format!("'{name}'")).collect();
+                    write!(
+                        f,
+                        "the nodes {} form a cycle no binding on which declares a first context, so none of them can ever run",
+                        named.join(", ")
+                    )
+                }
+            },
+            Self::Unpaired(unpaired) => unpaired.fmt(f),
         }
     }
 }
@@ -342,7 +375,9 @@ proptest! {
                 | WiringDefect::BranchesNotRouted { .. }
                 | WiringDefect::InstanceInNoBranch { .. }
                 | WiringDefect::BranchNamesUnentered { .. }
-                | WiringDefect::RepeatedBranch { .. } => continue,
+                | WiringDefect::RepeatedBranch { .. }
+                | WiringDefect::CycleUnstarted { .. }
+                | WiringDefect::Unpaired(_) => continue,
             }
 
             let (Some(named), Some(parameter)) = (defect.instance(), defect.parameter()) else {

@@ -1578,6 +1578,15 @@
           "title": "agconflo-runner runner::argument_for_any_instance_taken",
           "type": "test_run"
         },
+        "RUN_RUNNER_CHECK_FINDS_UNSTARTED_LOOP": {
+          "executes": [
+            "TEST_RUNNER_CHECK_FINDS_UNSTARTED_LOOP"
+          ],
+          "id": "RUN_RUNNER_CHECK_FINDS_UNSTARTED_LOOP",
+          "test_outcome": "passed",
+          "title": "agconflo-runner runner::check_finds_unstarted_loop",
+          "type": "test_run"
+        },
         "RUN_RUNNER_CHECK_REPORTS_TOOLS": {
           "executes": [
             "TEST_RUNNER_CHECK_REPORTS_TOOLS"
@@ -1938,13 +1947,13 @@
           "title": "agconflo-core run::completes_on_designated_output",
           "type": "test_run"
         },
-        "RUN_RUN_CYCLE_ENDS_QUIESCENT": {
+        "RUN_RUN_CYCLE_UNSTARTED_REFUSED": {
           "executes": [
-            "TEST_RUN_CYCLE_ENDS_QUIESCENT"
+            "TEST_RUN_CYCLE_UNSTARTED_REFUSED"
           ],
-          "id": "RUN_RUN_CYCLE_ENDS_QUIESCENT",
+          "id": "RUN_RUN_CYCLE_UNSTARTED_REFUSED",
           "test_outcome": "passed",
-          "title": "agconflo-core run::cycle_ends_quiescent",
+          "title": "agconflo-core run::cycle_unstarted_refused",
           "type": "test_run"
         },
         "RUN_RUN_DECLARED_CALL_IS_OFFERED_NEXT": {
@@ -2937,6 +2946,15 @@
           "title": "agconflo-core wiring::call_to_missing_type_is_reported",
           "type": "test_run"
         },
+        "RUN_WIRING_CYCLE_UNSTARTED_REPORTED": {
+          "executes": [
+            "TEST_WIRING_CYCLE_UNSTARTED_REPORTED"
+          ],
+          "id": "RUN_WIRING_CYCLE_UNSTARTED_REPORTED",
+          "test_outcome": "passed",
+          "title": "agconflo-core wiring::cycle_unstarted_reported",
+          "type": "test_run"
+        },
         "RUN_WIRING_DECLARED_PARAMETERS_PASS": {
           "executes": [
             "TEST_WIRING_DECLARED_PARAMETERS_PASS"
@@ -3133,6 +3151,15 @@
           "id": "RUN_WIRING_UNDECLARED_PARAMETER_IS_REPORTED",
           "test_outcome": "passed",
           "title": "agconflo-core wiring::undeclared_parameter_is_reported",
+          "type": "test_run"
+        },
+        "RUN_WIRING_UNPAIRED_REPORTED": {
+          "executes": [
+            "TEST_WIRING_UNPAIRED_REPORTED"
+          ],
+          "id": "RUN_WIRING_UNPAIRED_REPORTED",
+          "test_outcome": "passed",
+          "title": "agconflo-core wiring::unpaired_reported",
           "type": "test_run"
         },
         "RUN_WIRING_UNPORTABLE_CALL_NAME_IS_REPORTED": {

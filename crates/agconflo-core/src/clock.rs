@@ -32,7 +32,7 @@ pub(crate) enum Clock {
 
 /// An instance whose inputs come on passes no one of which encloses the rest,
 /// so no activation of it could be given one pass's contexts.
-// @An instance whose inputs cannot be paired as values,TRACE_CLOCK_UNPAIRED,trace,[],[DEC_PAIRING_CHECKED_AT_START, DEC_FAILURES_NON_EXHAUSTIVE]
+// @An instance whose inputs cannot be paired as values,TRACE_CLOCK_UNPAIRED,trace,[],[DEC_PAIRING_IS_WIRING, DEC_FAILURES_NON_EXHAUSTIVE]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Unpaired {
     /// The instance.

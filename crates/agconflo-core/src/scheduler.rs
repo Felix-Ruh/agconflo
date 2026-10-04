@@ -4,7 +4,7 @@
 
 use std::collections::HashMap;
 
-use crate::clock::{Clock, Clocks, Unpaired};
+use crate::clock::{Clock, Clocks};
 use crate::run::Arguments;
 use crate::workflow::{Binding, NodeInstance, WorkflowDefinition};
 use crate::{Context, ContextType};
@@ -42,11 +42,6 @@ impl Passes {
             firsts,
             ..Self::default()
         }
-    }
-
-    /// Every instance whose inputs cannot be given contexts of one pass.
-    pub(crate) fn unpaired(&self) -> &[Unpaired] {
-        self.clocks.unpaired()
     }
 
     /// Record that `activation`, an instance's own, produced `output` as its
@@ -726,7 +721,6 @@ fn offered_once_per_pass() {
     let arguments = Arguments::new();
     let firsts = HashMap::from([(("x".to_owned(), "seed".to_owned()), seed.clone())]);
     let mut passes = Passes::new(&workflow, firsts);
-    assert_eq!(passes.unpaired(), []);
 
     // An instance reading nothing is offered once, and never again.
     let v = offered(&workflow, &arguments, &passes, "v").expect("nothing to wait for");
@@ -761,6 +755,9 @@ fn offered_once_per_pass() {
     let c = offered(&workflow, &arguments, &passes, "c").expect("its second pass");
     assert!(c.inputs()[0].1.is(&v0) && c.inputs()[1].1.is(&x1));
 }
+
+#[cfg(test)]
+use crate::clock::Unpaired;
 
 /// `workflow` with the bindings of `given`, each an instance and a parameter,
 /// declaring an empty first context.

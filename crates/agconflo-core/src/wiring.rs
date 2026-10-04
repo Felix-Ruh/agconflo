@@ -3,16 +3,19 @@
 
 use std::collections::{HashMap, HashSet};
 
+use crate::clock::Clocks;
 use crate::defect::WiringDefect;
 use crate::workflow::{Binding, NodeInstance, NodeType, Parameter, WorkflowDefinition};
 
 /// Every wiring defect `definition` carries, and nothing at all for one that
 /// carries none, in the definition's own order: each instance in turn, then the
-/// signature.
+/// signature. A definition carrying none of those is asked next for every cycle
+/// nothing starts, and one carrying none of those either for every instance
+/// whose inputs share no pass.
 ///
-/// Nothing here returns early, and the signature is checked with everything
-/// else. An instance whose name another carries too, and the wires of a
-/// parameter bound more than once, are reported and not looked behind.
+/// Nothing in the first round returns early, and the signature is checked with
+/// everything else. An instance whose name another carries too, and the wires
+/// of a parameter bound more than once, are reported and not looked behind.
 // @Every instance walked and everything collected,IMPL_WIRING_WALK,impl,[CREQ_VALIDATOR_EVERY_DEFECT, CREQ_VALIDATOR_ACCEPTS_WELL_FORMED]
 pub fn validate_wiring(definition: &WorkflowDefinition) -> Vec<WiringDefect> {
     let mut defects = Vec::new();
@@ -37,6 +40,16 @@ pub fn validate_wiring(definition: &WorkflowDefinition) -> Vec<WiringDefect> {
     }
     check_signature(definition, &mut defects);
     check_output_resolves(definition, &instances, &mut defects);
+
+    // Passes are worked out from bindings that resolve, so they are asked of
+    // a definition whose wiring is otherwise sound, and pairing of one whose
+    // every cycle starts.
+    if defects.is_empty() {
+        check_cycles_started(definition, &mut defects);
+    }
+    if defects.is_empty() {
+        check_pairing(definition, &mut defects);
+    }
 
     defects
 }
@@ -413,6 +426,59 @@ fn check_output_resolves(
     }
 }
 
+/// Every cycle of `definition` that no binding declaring its first context is
+/// on: each set of instances reaching one another through bindings declaring
+/// none, one instance reading its own output among them, reported once with its
+/// instances in the definition's order.
+// @A cycle nothing starts found,IMPL_WIRING_CYCLE_STARTED,impl,[CREQ_VALIDATOR_CYCLE_STARTED],[DEC_CYCLE_STARTED_BY_A_FIRST]
+fn check_cycles_started(definition: &WorkflowDefinition, defects: &mut Vec<WiringDefect>) {
+    let reach = |from: &str| -> HashSet<&str> {
+        let mut reached = HashSet::new();
+        let mut pending = vec![from];
+        while let Some(at) = pending.pop() {
+            for consumer in &definition.instances {
+                if consumer
+                    .bindings
+                    .iter()
+                    .any(|binding| binding.first.is_none() && binding.source == at)
+                    && reached.insert(consumer.name.as_str())
+                {
+                    pending.push(consumer.name.as_str());
+                }
+            }
+        }
+        reached
+    };
+
+    let mut placed: HashSet<&str> = HashSet::new();
+    for first in &definition.instances {
+        let first = first.name.as_str();
+        if placed.contains(first) || !reach(first).contains(first) {
+            continue;
+        }
+        let reached = reach(first);
+        let members: Vec<&str> = definition
+            .instances
+            .iter()
+            .map(|instance| instance.name.as_str())
+            .filter(|&member| reached.contains(member) && reach(member).contains(first))
+            .collect();
+        placed.extend(&members);
+        defects.push(WiringDefect::CycleUnstarted {
+            instances: members.into_iter().map(str::to_owned).collect(),
+        });
+    }
+}
+
+/// Every instance of `definition` whose inputs share no pass, in the
+/// definition's order, with the passes each of its inputs comes on.
+// @Inputs sharing no pass found by the validator,IMPL_WIRING_PAIRED,impl,[CREQ_VALIDATOR_REPORTS_UNPAIRED],[DEC_PAIRING_IS_WIRING]
+fn check_pairing(definition: &WorkflowDefinition, defects: &mut Vec<WiringDefect>) {
+    for unpaired in Clocks::new(definition).unpaired() {
+        defects.push(WiringDefect::Unpaired(unpaired.clone()));
+    }
+}
+
 // --- tests -------------------------------------------------------------------
 // Bare functions named after their test cases.
 
@@ -748,7 +814,7 @@ proptest! {
     }
 
     /// The control: generated sound definitions, each holding a cycle of two
-    /// nodes, a pair nothing reaches, an unbound global, an output bound by
+    /// nodes a first context starts, an unbound global, an output bound by
     /// several parameters, and an instance whose parameter nothing binds, are
     /// reported clean.
     #[test]
@@ -775,15 +841,17 @@ pub(crate) fn well_formed_definition() -> impl Strategy<Value = WorkflowDefiniti
             instance("seed_diff", "seed_diff", &[]),
             // A parameter nothing binds, which is the workflow's own.
             instance("given", "pass_note", &[]),
-            // A cycle of two, which nothing reaches. Both are legal.
-            instance("loop_a", "pass_note", &[("input", "loop_b")]),
-            instance("loop_b", "pass_note", &[("input", "loop_a")]),
             // One output bound by several parameters.
             instance("fan_x", "pass_note", &[("input", "seed")]),
             instance("fan_y", "pass_note", &[("input", "seed")]),
             // A declared global nothing carries - and calls, one of them listed
             // twice, to node types it carries.
             instance("lax", "lenient", &[]).with_calls(&["pass_note", "seed_diff", "pass_note"]),
+            // A cycle of two nothing outside it feeds, one binding on it
+            // declaring its first context. It is ready on every pass, so it
+            // comes after the designated output, which a run offers first.
+            instance("loop_a", "pass_note", &[("input", "loop_b")]).first("input", ""),
+            instance("loop_b", "pass_note", &[("input", "loop_a")]),
         ];
 
         for (extra, &kind) in extras.iter().enumerate() {
@@ -974,11 +1042,147 @@ fn instance_of_missing_type_is_reported() {
 }
 
 #[test]
+fn cycle_unstarted_reported() {
+    let types = vec![
+        node_type("source", &[], "note"),
+        node_type("pass", &[("input", "note")], "note"),
+        node_type(
+            "draft",
+            &[
+                ("brief", "note"),
+                ("previous", "note"),
+                ("feedback", "note"),
+            ],
+            "note",
+        ),
+        node_type("route", &[("draft", "note")], "note").routing(),
+    ];
+    let cycle = |instances: &[&str]| WiringDefect::CycleUnstarted {
+        instances: instances.iter().map(|&name| name.to_owned()).collect(),
+    };
+    // A review loop: the drafter reads the router's input and its output back.
+    let review = |previous: Option<&str>, feedback: Option<&str>| {
+        let mut drafter = instance("d", "draft", &[("brief", "b"), ("feedback", "r")])
+            .taking("previous", "r", "draft");
+        drafter.bindings[1].first = feedback.map(str::to_owned);
+        drafter.bindings[2].first = previous.map(str::to_owned);
+        definition(
+            types.clone(),
+            vec![
+                instance("b", "source", &[]),
+                drafter,
+                instance("r", "route", &[("draft", "d")])
+                    .branching(&[("again", &["d"]), ("done", &["out"])]),
+                instance("out", "pass", &[]).taking("input", "r", "draft"),
+            ],
+            &["out"],
+        )
+    };
+
+    // Each edge back declaring a first context: sound.
+    assert_eq!(validate_wiring(&review(Some(""), Some(""))), Vec::new());
+    // Neither, or only one of the two: the drafter and the router form a cycle
+    // the other edge back closes, reported once with both.
+    for (previous, feedback) in [(None, None), (Some(""), None), (None, Some(""))] {
+        assert_eq!(
+            validate_wiring(&review(previous, feedback)),
+            vec![cycle(&["d", "r"])],
+            "{previous:?} {feedback:?}"
+        );
+    }
+
+    // A cycle of two no router is on, and an instance reading its own output,
+    // each reported once, and an instance reading from one not reported.
+    let plain = definition(
+        types.clone(),
+        vec![
+            instance("x", "pass", &[("input", "y")]),
+            instance("y", "pass", &[("input", "x")]),
+            instance("z", "pass", &[("input", "z")]),
+            instance("w", "pass", &[("input", "x")]),
+        ],
+        &["w"],
+    );
+    let report = validate_wiring(&plain);
+    assert_eq!(report, vec![cycle(&["x", "y"]), cycle(&["z"])]);
+    assert_eq!(report[0].instance(), Some("x"));
+    assert_eq!(report[0].parameter(), None);
+    assert_eq!(
+        report[0].to_string(),
+        "the nodes 'x', 'y' form a cycle no binding on which declares a first context, so none of them can ever run"
+    );
+    assert_eq!(
+        report[1].to_string(),
+        "the node 'z' reads its own output and its binding declares no first context, so it can never run"
+    );
+
+    // Not asked of a definition carrying another defect: its bindings may not
+    // resolve.
+    let mut broken = plain.clone();
+    broken.instances[3].bindings[0].source = "gone".to_owned();
+    assert_eq!(
+        validate_wiring(&broken),
+        vec![unresolved("w", "input", "gone")]
+    );
+}
+
+#[test]
+fn unpaired_reported() {
+    let types = vec![
+        node_type("source", &[], "note"),
+        node_type("pass", &[("input", "note")], "note"),
+        node_type("pair", &[("left", "note"), ("right", "note")], "note"),
+        node_type("draft", &[("brief", "note"), ("feedback", "note")], "note"),
+        node_type("route", &[("draft", "note")], "note").routing(),
+    ];
+    // A join of two branches no route takes together, and the same join of two
+    // a route does take together.
+    let joining = |left_too: &[&str]| {
+        let mut back = vec!["d", "y"];
+        back.extend_from_slice(left_too);
+        definition(
+            types.clone(),
+            vec![
+                instance("b", "source", &[]),
+                instance("d", "draft", &[("brief", "b"), ("feedback", "r")]).first("feedback", ""),
+                instance("r", "route", &[("draft", "d")])
+                    .branching(&[("back", &back), ("on", &["z"])]),
+                instance("y", "pass", &[]).taking("input", "r", "draft"),
+                instance("z", "pass", &[]).taking("input", "r", "draft"),
+                instance("j", "pair", &[("left", "y"), ("right", "z")]),
+            ],
+            &["j"],
+        )
+    };
+    let report = validate_wiring(&joining(&[]));
+    assert_eq!(report.len(), 1, "{report:?}");
+    let WiringDefect::Unpaired(unpaired) = &report[0] else {
+        panic!("the join reported as unpaired: {report:?}")
+    };
+    assert_eq!(unpaired.instance, "j");
+    assert_eq!(report[0].instance(), Some("j"));
+    assert!(
+        report[0]
+            .to_string()
+            .starts_with("the inputs of 'j' come on passes no one of which encloses the others"),
+        "{}",
+        report[0]
+    );
+
+    // The control: the two on branches one route can take together.
+    let mut together = joining(&[]);
+    together.instances[2] = instance("r", "route", &[("draft", "d")])
+        .branching(&[("back", &["d", "y", "z"]), ("on", &["z"])]);
+    assert_eq!(validate_wiring(&together), Vec::new());
+}
+
+#[test]
 fn self_binding_and_shared_types_pass() {
-    // A binding from an instance to itself: a cycle of length one, and legal.
+    // A binding from an instance to itself declaring its first context: a
+    // cycle of length one, and legal.
     let looping = definition(
         vec![node_type("pass", &[("input", "note")], "note")],
-        vec![instance("a", "pass", &[("input", "a")])],
+        vec![instance("a", "pass", &[("input", "a")]).first("input", "")],
         &["a"],
     );
     assert_eq!(validate_wiring(&looping), Vec::new());

@@ -427,6 +427,20 @@ catches it.
 
    Catches: the record file taken first; a lock left held.
 
+.. test_case:: A check finds a loop nothing starts, running nothing
+   :id: TEST_RUNNER_CHECK_FINDS_UNSTARTED_LOOP
+   :verifies: CREQ_RUNNER_CHECKS
+   :test_kind: error_path
+   :coverage: partial
+
+   A project whose two instances read each other, no binding declaring a
+   first context: the check hands back that one cycle, naming both
+   instances. The control: the loop's binding declaring its first context,
+   nothing is found. No record file is made.
+
+   Catches: a loop nothing starts found only when a run of it is under way
+   (``EVD_LOOP_FIRST_CONTEXT_UNCHECKED``).
+
 .. test_case:: How a run stopped is handed back unchanged
    :id: TEST_RUNNER_ENDINGS_HANDED_BACK
    :verifies: CREQ_RUNNER_HANDS_BACK_HOW
@@ -434,8 +448,9 @@ catches it.
    :coverage: full
 
    Runs that complete, await a person, fail at a script raising an error, run
-   out of budget and end quiescent are each handed back as the ending or the
-   step the scripted run gave, the failure with its instance and its message.
+   out of budget and end quiescent, a router naming nothing, are each handed
+   back as the ending or the step the scripted run gave, the failure with its
+   instance and its message.
    A run that completes while its record file cannot be written is handed back
    completed, with which record the file holds.
 
@@ -498,9 +513,9 @@ catches it.
    :coverage: full
 
    Projects whose runs complete, await a person, are refused, fail at a
-   script, run out of budget, end quiescent, and complete without their record
-   kept exit 0, 3, 4, 5, 6, 7 and 8, all different, and a misread command line
-   exits 2. No status is 101.
+   script, run out of budget, end quiescent after a router names nothing, and
+   complete without their record kept exit 0, 3, 4, 5, 6, 7 and 8, all
+   different, and a misread command line exits 2. No status is 101.
 
    Catches: two ways sharing a status; a completed run whose record was not
    kept exiting 0; a panic's 101.

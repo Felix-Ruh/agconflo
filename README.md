@@ -157,9 +157,10 @@ each pass of what feeds it, and is given every input from the pass it is on: a n
 reading the loop's draft is given the draft of the pass the branch was taken on, and a brief made
 once reaches every pass. A node whose inputs share no pass - one joining two branches no route
 takes together, or a loop's own node reading what a branch of it makes on some passes alone - has
-nothing it could be given, and the run is refused before anything runs, naming it and where each of
-its inputs comes from. A loop no binding declares a first context for runs on no pass, and a
-repetition no router ends is stopped by the budget.
+nothing it could be given, and a loop no binding on it declares a first context for can never run:
+each is a defect of the workflow, which `agconflo check` reports and a run refuses before anything
+runs, naming the node and where each of its inputs comes from, or the loop's nodes. A repetition no
+router ends is stopped by the budget.
 
 ### Tools
 

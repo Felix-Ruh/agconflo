@@ -123,8 +123,9 @@ behaviour supplied by naming a person rather than by a script.
 
    A workflow whose last step is a person's, with nothing else left to run,
    returns that step rather than ending quiescent, and resumed from its record
-   returns the same step again. The control is a person's step that no run can
-   reach, in a cycle written in bindings: that run ends quiescent, naming it.
+   returns the same step again. The control is a person's step no run
+   reaches, on a branch its router's script does not take: that run ends
+   quiescent, naming it.
 
 .. test_case:: A person between two model calls repeats neither
    :id: TEST_SCRIPTED_PERSON_BETWEEN_MODEL_CALLS
