@@ -155,3 +155,28 @@ passes enclosing them is read from the pass the activation belongs to.
      instance.
    - **The context given for every pass**, as a parameter nothing binds is,
      and the wire's contexts never taken.
+
+.. comp_req:: A binding's first context is read as its text
+   :id: CREQ_READER_READS_FIRST
+   :derived_from: FEAT_FIRST_CONTEXT_DECLARED
+   :allocated_to: COMP_TOPOLOGY_READER
+   :ears_pattern: event
+   :statement: When a binding is written as a table holding first, Topology reader shall read the text first holds as the first context the binding declares.
+
+   ``DEC_FIRST_CONTEXT_DECLARED``: ``first`` is a table holding ``text``, a
+   string, and nothing else, in a binding table beside ``from`` and, for a
+   router's input, ``input``. A binding table declaring no ``first`` still
+   needs its ``input`` (``CREQ_READER_READS_ROUTED_INPUT``). A value of
+   another kind is refused where it is written
+   (``CREQ_READER_FAULT_LOCATED``).
+
+   Failure modes:
+
+   - **The key read past**, and a loop whose first context is declared
+     never started.
+   - **The text changed on the way**, trimmed or its line breaks dropped,
+     and a node given another first context than the one written.
+   - **A malformed first context read as none**, and a mistake in it found
+     only as a loop that never starts.
+   - **The input left optional for every binding table**, and a binding
+     meant to take a router's input read as taking its output.

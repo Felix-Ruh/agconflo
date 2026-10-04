@@ -210,18 +210,24 @@ fn write_bindings(written: &mut dyn TableLike, bindings: &[Binding]) {
 }
 
 /// What a binding is written as: the name of the instance whose output it
-/// carries, or a table of that instance and the input of it it carries.
-// @A binding written as a name or as a table of from and input,IMPL_WRITER_ROUTED_INPUT,impl,[CREQ_WRITER_WRITES],[DEC_ROUTED_INPUT_BOUND_BY_TABLE]
+/// carries, or a table of that instance, the input of it it carries when it
+/// takes one, and the text of its first context when it declares one.
+// @A binding written as a name or as a table of from and input,IMPL_WRITER_ROUTED_INPUT,impl,[CREQ_WRITER_WRITES],[DEC_ROUTED_INPUT_BOUND_BY_TABLE, DEC_FIRST_CONTEXT_DECLARED]
 fn bound(binding: &Binding) -> Value {
-    match &binding.input {
-        None => Value::from(binding.source.as_str()),
-        Some(input) => {
-            let mut table = InlineTable::new();
-            table.insert("from", Value::from(binding.source.as_str()));
-            table.insert("input", Value::from(input.as_str()));
-            Value::InlineTable(table)
-        }
+    if binding.input.is_none() && binding.first.is_none() {
+        return Value::from(binding.source.as_str());
     }
+    let mut table = InlineTable::new();
+    table.insert("from", Value::from(binding.source.as_str()));
+    if let Some(input) = &binding.input {
+        table.insert("input", Value::from(input.as_str()));
+    }
+    if let Some(text) = &binding.first {
+        let mut first = InlineTable::new();
+        first.insert("text", Value::from(text.as_str()));
+        table.insert("first", Value::InlineTable(first));
+    }
+    Value::InlineTable(table)
 }
 
 /// Every key of `table` not in `kept` removed, with whatever it holds.
@@ -549,6 +555,7 @@ fn apply(definition: &mut WorkflowDefinition, change: &Change) {
                         parameter: "input".to_owned(),
                         source: wired_to(wire / 2),
                         input: None,
+                        first: None,
                     });
                 }
                 definition.instances.insert(wire % (count + 1), added);
@@ -570,6 +577,7 @@ fn apply(definition: &mut WorkflowDefinition, change: &Change) {
                     parameter: parameter.to_owned(),
                     source: wired_to(source),
                     input: None,
+                    first: None,
                 });
             }
         }
@@ -852,6 +860,7 @@ bindings = { input = \"a\" }
         parameter: "input".to_owned(),
         source: "b".to_owned(),
         input: None,
+        first: None,
     });
     definition.designated_outputs = vec!["a".to_owned(), "b".to_owned()];
 
@@ -916,6 +925,56 @@ bindings = { input = { from = \"r\", input = \"draft\" } }   # the draft, sent o
     );
     assert!(
         written.contains("bindings = { input = { from = \"r\", input = \"draft\" } }"),
+        "{written}"
+    );
+    assert_eq!(read_back(&document, &catalogue), definition);
+}
+
+#[test]
+fn first_written() {
+    let catalogue = TypeCatalogue::gather(vec![node_type_document(
+        "types.toml",
+        vec![
+            node_type("route", &[("draft", "note")], "note").routing(),
+            node_type("sink", &[("input", "note"), ("hint", "note")], "note"),
+        ],
+    )])
+    .expect("two distinct types gather");
+    let text = "\
+name = \"w\"
+output = \"b\"
+
+[instances.r]
+node_type = \"route\"
+
+[instances.b]
+node_type = \"sink\"
+bindings = { input = { from = \"r\", input = \"draft\", first = { text = '' } }, hint = \"r\" }   # starts empty
+";
+    let (mut definition, mut document) =
+        read_workflow("w.toml", text, &catalogue).expect("it reads");
+
+    // Written back unchanged, the binding is left as written, quotes and
+    // comment and all.
+    write_workflow(&mut document, &definition).expect("it writes");
+    assert_eq!(document.to_string(), text);
+
+    // The router's input loses its first context, and the output gains one
+    // with a line break in it: each written as the definition holds it, and
+    // read back.
+    definition.instances[1].bindings[0].first = None;
+    definition.instances[1] = definition.instances[1]
+        .clone()
+        .first("hint", "goal 1\npass 1");
+    write_workflow(&mut document, &definition).expect("it writes");
+    let written = document.to_string();
+    assert!(
+        written.contains("input = { from = \"r\", input = \"draft\" }"),
+        "{written}"
+    );
+    assert!(
+        written
+            .contains("hint = { from = \"r\", first = { text = \"\"\"\ngoal 1\npass 1\"\"\" } }"),
         "{written}"
     );
     assert_eq!(read_back(&document, &catalogue), definition);

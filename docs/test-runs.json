@@ -1281,6 +1281,15 @@
           "title": "agconflo-core reader::faults_carry_their_place",
           "type": "test_run"
         },
+        "RUN_READER_FIRST_READ": {
+          "executes": [
+            "TEST_READER_FIRST_READ"
+          ],
+          "id": "RUN_READER_FIRST_READ",
+          "test_outcome": "passed",
+          "title": "agconflo-core reader::first_read",
+          "type": "test_run"
+        },
         "RUN_READER_LISTS_KEPT_APART": {
           "executes": [
             "TEST_READER_LISTS_KEPT_APART"
@@ -3124,6 +3133,15 @@
           "id": "RUN_WRITER_EVERY_CHANGE_READS_BACK",
           "test_outcome": "passed",
           "title": "agconflo-core writer::every_change_reads_back",
+          "type": "test_run"
+        },
+        "RUN_WRITER_FIRST_WRITTEN": {
+          "executes": [
+            "TEST_WRITER_FIRST_WRITTEN"
+          ],
+          "id": "RUN_WRITER_FIRST_WRITTEN",
+          "test_outcome": "passed",
+          "title": "agconflo-core writer::first_written",
           "type": "test_run"
         },
         "RUN_WRITER_REMOVALS_LEAVE_NOTHING_BEHIND": {

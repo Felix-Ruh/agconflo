@@ -155,3 +155,36 @@ from.
    ``FEAT_ENCLOSING_PASS_SERVES`` and ``FEAT_ROUTE_WALKS_CHOSEN_EDGES`` with
    it, where each unit case above could pass while their composition
    deadlocks.
+
+.. test_case:: A binding's first context is read as its text
+   :id: TEST_READER_FIRST_READ
+   :verifies: CREQ_READER_READS_FIRST
+   :test_kind: positive
+   :coverage: full
+
+   A router's input declaring an empty first context and an output declaring
+   one with a line break in it, written inline; one written as tables of
+   their own, its text a multi-line string; and a binding declaring none.
+   Each is read as written, and the one declaring none has none. A
+   ``first`` that is a string, one holding no ``text``, one whose ``text`` is
+   a number, and one holding a key beside ``text`` are each refused at the
+   value or key at fault. ``reader::routed_input_read`` still refuses a
+   binding table with neither ``input`` nor ``first``.
+
+   Catches: the key read past; the text changed on the way; a malformed first
+   context read as none; the input left optional for every binding table.
+
+.. test_case:: A binding's first context is written back as declared
+   :id: TEST_WRITER_FIRST_WRITTEN
+   :verifies: CREQ_WRITER_WRITES
+   :test_kind: positive
+   :coverage: full
+
+   A document whose router's input declares an empty first context, in
+   single quotes, with a comment after it: written back unchanged, it is the
+   same text. With that first context dropped and one with a line break
+   declared on an output, each binding is written as the definition holds
+   it, and the document reads back to the definition.
+
+   Catches: a first context lost or added on the way out; a binding
+   reformatted though nothing in it changed.

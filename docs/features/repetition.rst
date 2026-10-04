@@ -16,10 +16,12 @@ over the list itself (``DEC_LIST_HANDLED_IN_ONE_NODE``).
 
 Each requirement was checked by hand against the two questions every body here
 answers: could it be false while its parent holds, and could the parent hold
-while it is false? The first three are ``event``, the last ``unwanted``. The
+while it is false? The first four are ``event``, the last ``unwanted``. The
 third derives from ``STKH_RUN_FROM_ANY_PARAMETER`` as well: it is how a
 repetition's first pass is given what its later passes are given by the
-edges. The feature's architecture closes the file.
+edges. The fourth derives from ``STKH_WIRING_CHECKED`` as well: it is the
+same, said of the workflow, where a check can see it. The feature's
+architecture closes the file.
 
 .. feat_req:: A node runs again on each pass its inputs reach
    :id: FEAT_REPEAT_ON_NEW_CONTEXTS
@@ -93,6 +95,30 @@ edges. The feature's architecture closes the file.
 
    It claims no more than they need: it says which context comes first, not
    how many passes follow, which the edges decide.
+
+.. feat_req:: A first context a binding declares comes first
+   :id: FEAT_FIRST_CONTEXT_DECLARED
+   :derived_from: STKH_REPETITION, STKH_WIRING_CHECKED
+   :ears_pattern: event
+   :verification_method: test
+   :statement: When a binding declares its first context, Agconflo shall give that context to the binding's instance before any context walked along the binding.
+
+   ``STKH_REPETITION`` lets a workflow repeat part of itself, and a node in a
+   loop reads what comes back round, which cannot come back before the node
+   has run: something has to come before it. ``STKH_WIRING_CHECKED`` rejects
+   an invalid workflow before any node runs, and a loop nothing starts is
+   one, whose nodes can never run; the check can tell only if what starts a
+   loop is part of the workflow. A binding saying what comes first is both
+   (``DEC_FIRST_CONTEXT_DECLARED``). It is the binding's pass 0, and what the
+   binding carries its passes after (``DEC_PASS_CLOCKS``).
+
+   It can be false while both parents hold only if a loop could start from
+   something else a check could see, which would be a declaration by another
+   name.
+
+   It claims no more than they need: it says what the declared context is
+   given before, not how many passes follow, which the edges decide, nor
+   what the declaration is written as, which the decision says.
 
 .. feat_req:: A workflow whose nodes cannot be given one pass's contexts does not run
    :id: FEAT_PASSES_PAIRED_BEFORE_RUN
