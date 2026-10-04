@@ -92,17 +92,29 @@ pub enum StartRefusal {
     Unpaired(Vec<Unpaired>),
 }
 
+/// How many things were refused and of which kind, then each of them, but
+/// identifiers, which are counted alone.
 impl fmt::Display for StartRefusal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let (what, count) = match self {
-            Self::Wiring(defects) => ("wiring defect", defects.len()),
-            Self::Signature(faults) => ("signature fault", faults.len()),
-            Self::SharedIdentifiers(ids) => ("shared identifier", ids.len()),
-            Self::Unpaired(instances) => ("node whose inputs cannot be paired", instances.len()),
+        fn each<T: fmt::Display>(items: &[T]) -> Vec<String> {
+            items.iter().map(ToString::to_string).collect()
+        }
+        let (what, count, named) = match self {
+            Self::Wiring(defects) => ("wiring defect", defects.len(), each(defects)),
+            Self::Signature(faults) => ("signature fault", faults.len(), each(faults)),
+            Self::SharedIdentifiers(ids) => ("shared identifier", ids.len(), Vec::new()),
+            Self::Unpaired(instances) => (
+                "node whose inputs cannot be paired",
+                instances.len(),
+                each(instances),
+            ),
         };
         write!(f, "the workflow carries {count} {what}")?;
         if count != 1 {
             write!(f, "s")?;
+        }
+        if !named.is_empty() {
+            write!(f, ": {}", named.join("; "))?;
         }
         Ok(())
     }
@@ -2396,7 +2408,10 @@ fn unpaired_run_refused() {
     );
     assert_eq!(
         refused.to_string(),
-        "the workflow carries 1 node whose inputs cannot be paired"
+        "the workflow carries 1 node whose inputs cannot be paired: the inputs of 'j' come on \
+         passes no one of which encloses the others, so no activation of it could be given one \
+         pass's contexts: 'left' on the passes on which 'r' takes 'back', 'right' on the passes \
+         on which 'r' takes 'on'"
     );
 
     // The control: the same workflow given nothing for the loop is not

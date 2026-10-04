@@ -32,11 +32,11 @@ time a test is allowed.
    A workflow with two instances of one node type and one of another, given a
    script for the second type only and a script keyed by a misspelling of the
    first. The run is refused, with no activation performed, and the refusal holds
-   exactly one fault: the first type, named once.
+   exactly one fault: the first type, named once, in its message as well.
 
    Catches: found when the node is reached (nothing is performed); named by
    instance rather than by type (two instances, one fault); a misspelt key taken
-   to fill the gap.
+   to fill the gap; the faults counted in the message and not named.
 
 .. test_case:: A node type nothing instantiates needs no script
    :id: TEST_BEHAVIOURS_UNINSTANTIATED_TYPE_NEEDS_NO_SCRIPT

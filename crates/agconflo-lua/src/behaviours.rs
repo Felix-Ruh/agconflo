@@ -271,8 +271,13 @@ fn missing_script_is_refused() {
 
     // Refused before starting, with one fault naming the type once although two
     // instances name it.
+    let refused = run_with(&definition, &behaviours, None);
     assert_eq!(
-        faults_of(run_with(&definition, &behaviours, None)),
+        refused.as_ref().err().map(ToString::to_string).as_deref(),
+        Some("the scripts carry 1 fault: twin has no script")
+    );
+    assert_eq!(
+        faults_of(refused),
         vec![BehaviourFault::Missing {
             node_type: "twin".to_owned()
         }]

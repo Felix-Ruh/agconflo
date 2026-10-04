@@ -66,6 +66,10 @@ impl fmt::Display for ScriptedRefusal {
                 if faults.len() != 1 {
                     f.write_str("s")?;
                 }
+                if !faults.is_empty() {
+                    let named: Vec<String> = faults.iter().map(ToString::to_string).collect();
+                    write!(f, ": {}", named.join("; "))?;
+                }
                 Ok(())
             }
             Self::Resume(refusal) => refusal.fmt(f),
