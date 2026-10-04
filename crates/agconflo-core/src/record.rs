@@ -1805,7 +1805,8 @@ fn routes_kept() {
         ],
         vec![
             instance("d", "Src", &[]),
-            instance("r", "route", &[("draft", "d")]),
+            instance("r", "route", &[("draft", "d")])
+                .branching(&[("revise", &["revise"]), ("close", &["close"])]),
             instance("revise", "Take", &[("seed", "r")]),
             instance("close", "Take", &[]).taking("seed", "r", "draft"),
             instance("never", "Take", &[("seed", "never")]),

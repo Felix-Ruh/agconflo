@@ -8,7 +8,7 @@ use std::fmt;
 use toml_edit::{Array, InlineTable, Item, Table, TableLike, Value};
 
 use crate::reader::WorkflowDocument;
-use crate::workflow::{Binding, NodeInstance, WorkflowDefinition};
+use crate::workflow::{Binding, Branch, NodeInstance, WorkflowDefinition};
 
 /// Puts `definition` into `document`, or refuses to write it at all, naming
 /// every shape it holds that a workflow document cannot express.
@@ -124,6 +124,49 @@ fn write_instance(written: &mut dyn TableLike, instance: &NodeInstance) {
 
     write_bindings(written, &instance.bindings);
     write_calls(written, &instance.calls);
+    write_branches(written, &instance.branches);
+}
+
+/// The branches of one instance made to be exactly `branches`: ones naming the
+/// same instances under the same names in the same order are left alone
+/// however they are written, others replaced whole as an inline table, and none
+/// removes the key.
+// @A router's branches written as the definition declares them,IMPL_WRITER_BRANCHES,impl,[CREQ_WRITER_WRITES],[DEC_ROUTER_BRANCHES_DECLARED]
+fn write_branches(written: &mut dyn TableLike, branches: &[Branch]) {
+    if branches.is_empty() {
+        written.remove("branches");
+        return;
+    }
+    let unchanged = written
+        .get("branches")
+        .and_then(Item::as_table_like)
+        .is_some_and(|table| {
+            table.len() == branches.len()
+                && table.iter().zip(branches).all(|((name, item), branch)| {
+                    name == branch.name
+                        && item.as_array().is_some_and(|written| {
+                            same(
+                                &Value::Array(written.clone()),
+                                &Value::Array(array(&branch.instances)),
+                            )
+                        })
+                })
+        });
+    if !unchanged {
+        written.insert(
+            "branches",
+            Item::Value(Value::InlineTable(branch_table(branches))),
+        );
+    }
+}
+
+/// `branches` as an inline table keying each branch's instances by its name.
+fn branch_table(branches: &[Branch]) -> InlineTable {
+    let mut table = InlineTable::new();
+    for branch in branches {
+        table.insert(&branch.name, Value::Array(array(&branch.instances)));
+    }
+    table
 }
 
 /// The calls of one instance made to be exactly `calls`, in their order: a list
@@ -249,6 +292,12 @@ fn new_instance(instance: &NodeInstance) -> Item {
         table.insert(
             "bindings",
             Item::Value(Value::InlineTable(inline(&instance.bindings))),
+        );
+    }
+    if !instance.branches.is_empty() {
+        table.insert(
+            "branches",
+            Item::Value(Value::InlineTable(branch_table(&instance.branches))),
         );
     }
     Item::Table(table)
@@ -869,6 +918,64 @@ bindings = { input = { from = \"r\", input = \"draft\" } }   # the draft, sent o
         written.contains("bindings = { input = { from = \"r\", input = \"draft\" } }"),
         "{written}"
     );
+    assert_eq!(read_back(&document, &catalogue), definition);
+}
+
+#[test]
+fn branches_written() {
+    let catalogue = TypeCatalogue::gather(vec![node_type_document(
+        "types.toml",
+        vec![
+            node_type("route", &[("draft", "note")], "note").routing(),
+            node_type("sink", &[("input", "note")], "note"),
+        ],
+    )])
+    .expect("two distinct types gather");
+    let text = "\
+name = \"w\"
+output = \"b\"
+
+[instances.r]
+node_type = \"route\"
+
+[instances.r.branches]   # where the draft goes
+on = [\"b\"]
+back = [ \"r\" ]
+
+[instances.b]
+node_type = \"sink\"
+bindings = { input = \"r\" }
+";
+    let (mut definition, mut document) =
+        read_workflow("w.toml", text, &catalogue).expect("it reads");
+
+    // Written back unchanged, the table is left as it is, comment and spacing
+    // and all.
+    write_workflow(&mut document, &definition).expect("it writes");
+    assert_eq!(document.to_string(), text);
+
+    // Changed, the branches are written as the definition declares them, and
+    // a new router's too; read back, they are the definition's.
+    definition.instances[0] = definition.instances[0]
+        .clone()
+        .branching(&[("on", &["b", "c"]), ("back", &["r"])]);
+    definition
+        .instances
+        .push(instance("q", "route", &[]).branching(&[("stop", &[])]));
+    write_workflow(&mut document, &definition).expect("it writes");
+    let written = document.to_string();
+    assert!(
+        written.contains("branches = { on = [\"b\", \"c\"], back = [\"r\"] }"),
+        "{written}"
+    );
+    assert!(written.contains("branches = { stop = [] }"), "{written}");
+    assert_eq!(read_back(&document, &catalogue), definition);
+
+    // Declaring none removes the key.
+    definition.instances[0].branches.clear();
+    write_workflow(&mut document, &definition).expect("it writes");
+    let written = document.to_string();
+    assert_eq!(written.matches("branches").count(), 1, "{written}");
     assert_eq!(read_back(&document, &catalogue), definition);
 }
 

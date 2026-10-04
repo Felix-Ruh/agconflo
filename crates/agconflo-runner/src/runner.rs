@@ -2398,7 +2398,7 @@ fn person_routes() {
     );
     scratch.write(
         "flow.toml",
-        "name = \"routed\"\noutput = \"third\"\n\n[instances.first]\nnode_type = \"begin\"\n\n[instances.second]\nnode_type = \"choose\"\nbindings = { before = \"first\" }\n\n[instances.third]\nnode_type = \"add\"\nbindings = { before = \"second\" }\n\n[instances.fourth]\nnode_type = \"add\"\nbindings = { before = \"second\" }\n",
+        "name = \"routed\"\noutput = \"third\"\n\n[instances.first]\nnode_type = \"begin\"\n\n[instances.second]\nnode_type = \"choose\"\nbindings = { before = \"first\" }\nbranches = { third = [\"third\"], fourth = [\"fourth\"] }\n\n[instances.third]\nnode_type = \"add\"\nbindings = { before = \"second\" }\n\n[instances.fourth]\nnode_type = \"add\"\nbindings = { before = \"second\" }\n",
     );
     let text = std::fs::read_to_string(&manifest).expect("the manifest");
     std::fs::write(

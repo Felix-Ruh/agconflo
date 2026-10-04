@@ -15,8 +15,9 @@ test here can show, and no key is needed or held.
 A case's id is the path of the Rust test that implements it, uppercased: the
 host's in the module ``host``, the roster's in ``models``, a resumed script's in
 ``scripted`` and the model map's in ``model_map``; and, for taking a branch,
-the reader's in ``reader``, the validator's in ``wiring``, the run's in ``run``
-and the record's in ``record``, all in ``agconflo-core``. Every failure mode listed in
+the reader's in ``reader``, the writer's in ``writer``, the validator's in
+``wiring``, the run's in ``run`` and the record's in ``record``, all in
+``agconflo-core``. Every failure mode listed in
 ``components/routing`` is named by the case that catches it.
 
 .. test_case:: A script is given each question's choice and the answer as a context
@@ -269,3 +270,78 @@ and the record's in ``record``, all in ``agconflo-core``. Every failure mode lis
 
    Catches: the output resumed without its names; a record naming an instance
    the workflow no longer has resumed.
+
+.. test_case:: A router's instance declares its branches
+   :id: TEST_READER_BRANCHES_READ
+   :verifies: CREQ_READER_READS_BRANCHES
+   :test_kind: positive
+   :coverage: full
+
+   A router's instance declaring three branches, one of them empty, written
+   as an inline table and as a table of its own: each reads the branches in
+   the order written, each with its instances in the order written. An
+   instance declaring none has none. A ``branches`` that is an array, a branch
+   that is a string, and a branch holding a number are each refused at the
+   value.
+
+   Catches: the key read past; a branch's instances read out of order or one
+   dropped.
+
+.. test_case:: A router's branches are written back as declared
+   :id: TEST_WRITER_BRANCHES_WRITTEN
+   :verifies: CREQ_WRITER_WRITES
+   :test_kind: positive
+   :coverage: partial
+
+   A document whose router's branches are a table of their own, with a
+   comment and its own spacing, written back unchanged is the same text. With
+   the branches changed and a new router added, both are written as the
+   definition declares them and read back as the definition; with none
+   declared, the key goes.
+
+.. test_case:: Branches that are not the branches after a router are reported
+   :id: TEST_WIRING_BRANCHES_CHECKED
+   :verifies: CREQ_VALIDATOR_BRANCHES
+   :test_kind: error_path
+   :coverage: full
+
+   A router whose edges enter two instances, one through its output and one
+   through its input, declaring a branch for one, a branch for both and an
+   empty branch: no defect. The same router with one entered instance in no
+   branch, a branch naming an instance no edge enters twice, a second branch
+   naming the same instances in another order, and branches on an instance
+   that does not route: each reported once, naming the router and what is at
+   fault, in the definition's order.
+
+   Catches: an entered instance left in no branch passed; a branch naming an
+   instance no edge enters passed; a repeated branch passed; branches on a
+   node that does not route passed.
+
+.. test_case:: A router's naming that is no branch is refused
+   :id: TEST_RUN_ROUTE_NOT_A_BRANCH_REFUSED
+   :verifies: CREQ_RUN_REFUSES_UNDECLARED_BRANCH
+   :test_kind: error_path
+   :coverage: full
+
+   A router whose edges enter two instances, with branches for one and for
+   both, naming the other alone: refused, naming what was named and both
+   branches, the router still the activation outstanding. Then naming both
+   in another order, one twice: accepted, and each is given its own.
+
+   Catches: a set of instances that is no branch walked; a branch named in
+   another order refused.
+
+.. test_case:: A router naming no branch fails, and a person naming none answers again
+   :id: TEST_SCRIPTED_ROUTE_NOT_A_BRANCH_REFUSED
+   :verifies: CREQ_HOST_REFUSES_PERSON_ROUTE_NOT_A_BRANCH, FEAT_ROUTE_IS_A_DECLARED_BRANCH
+   :test_kind: error_path
+   :coverage: full
+
+   The review loop of ``TEST_SCRIPTED_REVIEW_LOOP``, its router's branches
+   sending the draft back or on. A router's script naming both instances
+   fails the router's activation with the run's refusal. A person answering
+   the router's step with both is refused, nothing run and no record handed
+   over, and answering again with one branch is taken.
+
+   Catches: the whole run failed for what the person can answer again; the
+   answer taken as given.

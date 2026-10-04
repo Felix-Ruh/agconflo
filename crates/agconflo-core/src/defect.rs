@@ -106,6 +106,37 @@ pub enum WiringDefect {
         /// The input it takes, as it was written.
         input: String,
     },
+    /// An instance declares branches, and its node type does not route.
+    BranchesNotRouted {
+        /// The instance declaring them.
+        instance: String,
+    },
+    /// An edge out of a router enters an instance that none of the branches
+    /// its instance declares names.
+    InstanceInNoBranch {
+        /// The router.
+        instance: String,
+        /// The instance its edge enters.
+        entered: String,
+    },
+    /// A branch a router declares names an instance no edge out of it enters.
+    BranchNamesUnentered {
+        /// The router.
+        instance: String,
+        /// The branch, as it was written.
+        branch: String,
+        /// The instance it names, as it was written.
+        named: String,
+    },
+    /// Two branches a router declares name the same instances.
+    RepeatedBranch {
+        /// The router.
+        instance: String,
+        /// The branch declared first.
+        first: String,
+        /// The branch naming the same instances.
+        repeated: String,
+    },
 }
 
 impl WiringDefect {
@@ -121,7 +152,11 @@ impl WiringDefect {
             | Self::ContextTypeDisagreement { instance, .. }
             | Self::UnresolvedCall { instance, .. }
             | Self::UnportableCallName { instance, .. }
-            | Self::UnroutedInput { instance, .. } => Some(instance),
+            | Self::UnroutedInput { instance, .. }
+            | Self::BranchesNotRouted { instance }
+            | Self::InstanceInNoBranch { instance, .. }
+            | Self::BranchNamesUnentered { instance, .. }
+            | Self::RepeatedBranch { instance, .. } => Some(instance),
             Self::SignatureOutputs { .. } | Self::UnresolvedOutput { .. } => None,
         }
     }
@@ -140,7 +175,11 @@ impl WiringDefect {
             | Self::SignatureOutputs { .. }
             | Self::UnresolvedOutput { .. }
             | Self::UnresolvedCall { .. }
-            | Self::UnportableCallName { .. } => None,
+            | Self::UnportableCallName { .. }
+            | Self::BranchesNotRouted { .. }
+            | Self::InstanceInNoBranch { .. }
+            | Self::BranchNamesUnentered { .. }
+            | Self::RepeatedBranch { .. } => None,
         }
     }
 
@@ -238,6 +277,30 @@ impl fmt::Display for WiringDefect {
                 f,
                 "'{parameter}' of the node '{instance}' takes the input '{input}' of '{source}', which is not a router declaring that input"
             ),
+            Self::BranchesNotRouted { instance } => write!(
+                f,
+                "the node '{instance}' declares branches, and its type does not route"
+            ),
+            Self::InstanceInNoBranch { instance, entered } => write!(
+                f,
+                "the router '{instance}' has an edge into '{entered}', which none of its branches names"
+            ),
+            Self::BranchNamesUnentered {
+                instance,
+                branch,
+                named,
+            } => write!(
+                f,
+                "the branch '{branch}' of the router '{instance}' names '{named}', which no edge out of it enters"
+            ),
+            Self::RepeatedBranch {
+                instance,
+                first,
+                repeated,
+            } => write!(
+                f,
+                "the branches '{first}' and '{repeated}' of the router '{instance}' name the same instances"
+            ),
         }
     }
 }
@@ -275,7 +338,11 @@ proptest! {
                 | WiringDefect::SignatureOutputs { .. }
                 | WiringDefect::UnresolvedOutput { .. }
                 | WiringDefect::UnresolvedCall { .. }
-                | WiringDefect::UnportableCallName { .. } => continue,
+                | WiringDefect::UnportableCallName { .. }
+                | WiringDefect::BranchesNotRouted { .. }
+                | WiringDefect::InstanceInNoBranch { .. }
+                | WiringDefect::BranchNamesUnentered { .. }
+                | WiringDefect::RepeatedBranch { .. } => continue,
             }
 
             let (Some(named), Some(parameter)) = (defect.instance(), defect.parameter()) else {

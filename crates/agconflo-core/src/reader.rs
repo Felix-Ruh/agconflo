@@ -11,7 +11,7 @@ use toml_edit::{Document, DocumentMut, Item, TableLike};
 
 use crate::catalogue::TypeCatalogue;
 use crate::context::{ContextType, InvalidTypeName};
-use crate::workflow::{Binding, NodeInstance, NodeType, Parameter, WorkflowDefinition};
+use crate::workflow::{Binding, Branch, NodeInstance, NodeType, Parameter, WorkflowDefinition};
 
 /// The node types one document declares, under the name its caller gave the
 /// document.
@@ -357,7 +357,41 @@ impl<'t> Reading<'t> {
             node_type,
             bindings,
             calls: self.calls(table, &key)?,
+            branches: self.branches(table, &key)?,
         })
+    }
+
+    /// The branches an instance declares under `branches`, a table keying the
+    /// instances each names by the branch's name, in the order written, or
+    /// none when it has no such key. A value of the wrong kind is refused where
+    /// it is written.
+    // @A router's branches read in the order written,IMPL_READER_BRANCHES,impl,[CREQ_READER_READS_BRANCHES],[DEC_ROUTER_BRANCHES_DECLARED]
+    fn branches(&self, table: &dyn TableLike, key: &[&str]) -> Result<Vec<Branch>, ReadFault> {
+        let Some(item) = table.get("branches") else {
+            return Ok(Vec::new());
+        };
+        let key = [key, &["branches"]].concat();
+        self.table(item, &key)?
+            .iter()
+            .map(|(name, named)| {
+                let at = [&key[..], &[name]].concat();
+                let Some(array) = named.as_array() else {
+                    return Err(self.wrong_type(named.span(), &at, "array", named.type_name()));
+                };
+                let instances = array
+                    .iter()
+                    .map(|instance| {
+                        instance.as_str().map(str::to_owned).ok_or_else(|| {
+                            self.wrong_type(instance.span(), &at, "string", instance.type_name())
+                        })
+                    })
+                    .collect::<Result<_, _>>()?;
+                Ok(Branch {
+                    name: name.to_owned(),
+                    instances,
+                })
+            })
+            .collect()
     }
 
     /// Nothing, or a fault for the `entry` key `instance` holds, placed at the
@@ -769,6 +803,7 @@ impl Written {
                         })
                         .collect(),
                     calls: written.calls.clone(),
+                    branches: Vec::new(),
                 })
                 .collect(),
             designated_outputs: self.output.iter().cloned().collect(),
@@ -1503,6 +1538,85 @@ fn routes_read() {
             }
         )
     );
+}
+
+#[test]
+fn branches_read() {
+    // In either TOML form, each branch's instances in the order written, the
+    // branches in the order written.
+    for text in [
+        "name = \"w\"\n\n[instances.r]\nnode_type = \"source\"\nbranches = { again = [\"d\", \"r\"], done = [\"f\"], stop = [] }\n",
+        "name = \"w\"\n\n[instances.r]\nnode_type = \"source\"\n\n[instances.r.branches]\nagain = [\"d\", \"r\"]\ndone = [\"f\"]\nstop = []\n",
+    ] {
+        let (definition, _) = read_workflow("w.toml", text, &catalogue()).expect("it reads");
+        let branches: Vec<(&str, Vec<&str>)> = definition.instances[0]
+            .branches
+            .iter()
+            .map(|b| {
+                (
+                    b.name.as_str(),
+                    b.instances.iter().map(String::as_str).collect(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            branches,
+            [
+                ("again", vec!["d", "r"]),
+                ("done", vec!["f"]),
+                ("stop", vec![])
+            ],
+            "{text}"
+        );
+    }
+
+    // An instance declaring none has none.
+    let (definition, _) = read_workflow(
+        "w.toml",
+        "name = \"w\"\n\n[instances.r]\nnode_type = \"source\"\n",
+        &catalogue(),
+    )
+    .expect("it reads");
+    assert!(definition.instances[0].branches.is_empty());
+
+    // Each wrong kind is refused where it is written.
+    let key = |parts: &[&str]| parts.iter().map(|&p| p.to_owned()).collect::<Vec<_>>();
+    for (text, place, kind) in [
+        (
+            "name = \"w\"\n[instances.r]\nnode_type = \"source\"\nbranches = [\"d\"]\n",
+            (4, 12),
+            FaultKind::WrongType {
+                key: key(&["instances", "r", "branches"]),
+                expected: "table",
+                found: "array",
+            },
+        ),
+        (
+            "name = \"w\"\n[instances.r]\nnode_type = \"source\"\nbranches = { again = \"d\" }\n",
+            (4, 22),
+            FaultKind::WrongType {
+                key: key(&["instances", "r", "branches", "again"]),
+                expected: "array",
+                found: "string",
+            },
+        ),
+        (
+            "name = \"w\"\n[instances.r]\nnode_type = \"source\"\nbranches = { again = [\"d\", 1] }\n",
+            (4, 28),
+            FaultKind::WrongType {
+                key: key(&["instances", "r", "branches", "again"]),
+                expected: "string",
+                found: "integer",
+            },
+        ),
+    ] {
+        let fault = read_workflow("w.toml", text, &catalogue()).expect_err(text);
+        assert_eq!(
+            ((fault.line(), fault.column()), fault.kind()),
+            (place, &kind),
+            "{text}"
+        );
+    }
 }
 
 #[test]

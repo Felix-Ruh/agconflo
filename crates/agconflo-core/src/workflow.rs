@@ -62,6 +62,17 @@ pub struct Binding {
     pub input: Option<String>,
 }
 
+/// One branch a router's instance declares: its name, and the instances a
+/// route taking it names, as the workflow lists them.
+// @A router's branch named with the instances it takes,TRACE_WORKFLOW_BRANCH,trace,[],[DEC_ROUTER_BRANCHES_DECLARED]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Branch {
+    /// The name the workflow gives the branch.
+    pub name: String,
+    /// The instances a route taking this branch names.
+    pub instances: Vec<String>,
+}
+
 /// One node in a workflow: its name, the type it instantiates, and what is
 /// wired into it.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -76,6 +87,9 @@ pub struct NodeInstance {
     /// the workflow lists them, a name listed twice kept twice.
     // @Calls declared on the instance,TRACE_WORKFLOW_CALLS,trace,[],[DEC_CALLS_DECLARED_ON_THE_INSTANCE]
     pub calls: Vec<String>,
+    /// The branches a router's instance declares, in the order the workflow
+    /// lists them, or none.
+    pub branches: Vec<Branch>,
 }
 
 /// A workflow definition: the node types it carries, the instances wired into
@@ -182,6 +196,7 @@ pub(crate) fn instance(name: &str, node_type: &str, bindings: &[(&str, &str)]) -
             })
             .collect(),
         calls: Vec::new(),
+        branches: Vec::new(),
     }
 }
 
@@ -195,6 +210,18 @@ impl NodeInstance {
             source: router.to_owned(),
             input: Some(input.to_owned()),
         });
+        self
+    }
+
+    /// The same instance, declaring `branches` as `(name, instances)` pairs.
+    pub(crate) fn branching(mut self, branches: &[(&str, &[&str])]) -> Self {
+        self.branches = branches
+            .iter()
+            .map(|&(name, instances)| Branch {
+                name: name.to_owned(),
+                instances: instances.iter().map(|&name| name.to_owned()).collect(),
+            })
+            .collect();
         self
     }
 }

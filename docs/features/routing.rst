@@ -109,24 +109,75 @@ closes the file.
    router again on resuming and trusting it to choose as it did, which a
    script edited since would not.
 
+.. feat_req:: A router names one of the branches its instance declares
+   :id: FEAT_ROUTE_IS_A_DECLARED_BRANCH
+   :derived_from: STKH_ROUTING, STKH_REPETITION
+   :ears_pattern: unwanted
+   :verification_method: test
+   :statement: If a router's activation names instances that are not those of one branch its instance declares, then Agconflo shall refuse that naming.
+
+   ``STKH_ROUTING`` lets a node decide which of the branches after it a run
+   takes: the branches are the workflow's, and the node picks among them.
+   ``STKH_REPETITION`` leaves how one pass's contexts are kept apart from the
+   next's to a decision, and the one taken works out each node's passes from
+   the wiring before the run starts (``DEC_PASS_CLOCKS``). Which instances a
+   router sends a run to together is part of that wiring
+   (``DEC_ROUTER_BRANCHES_DECLARED``): a naming that is not one of its
+   branches puts instances on passes the run was not checked for.
+
+   It can be false while ``STKH_ROUTING`` holds: a router taking any set of
+   the instances after it still decides which way the run goes. It cannot be
+   while ``STKH_REPETITION`` holds as decided, for a node reading two
+   instances a router can send a run to apart could be given two passes'
+   contexts (``EVD_PASSES_MISPAIRED_ACROSS_A_BRANCH``).
+
+   Naming nothing is not a branch and is not refused: the run goes nowhere
+   from there, as before.
+
+.. feat_req:: A router's declared branches are checked against its edges before anything runs
+   :id: FEAT_BRANCHES_CHECKED
+   :derived_from: STKH_WIRING_CHECKED, STKH_ROUTING
+   :ears_pattern: unwanted
+   :verification_method: test
+   :statement: If an instance declares branches that leave out an instance its edges enter or name one they do not enter or repeat a branch or belong to no router, then Agconflo shall reject the workflow before any node in it runs.
+
+   ``STKH_ROUTING`` has a node decide among the branches after it, and
+   ``STKH_WIRING_CHECKED`` rejects an invalid workflow before any node runs.
+   Each case here is a workflow whose branches are not the branches after
+   the node: an edge a router can never walk, a branch naming an instance it
+   has no edge into, two names for one choice, and branches on a node that
+   cannot choose. Found when the router first runs, each costs a run's work
+   up to there, and one of them - an edge in no branch - waits for ever
+   rather than failing.
+
+   It can be false while both parents hold only if branches were not part of
+   the workflow, which ``FEAT_ROUTE_IS_A_DECLARED_BRANCH`` makes them.
+
 .. feat_arch:: Taking a branch splits between the reader, the validator, the script host, the run and its record
    :id: ARCH_ROUTING
-   :realises: FEAT_ROUTE_WALKS_CHOSEN_EDGES, FEAT_ROUTE_RECORDED
+   :realises: FEAT_ROUTE_WALKS_CHOSEN_EDGES, FEAT_ROUTE_RECORDED, FEAT_ROUTE_IS_A_DECLARED_BRANCH, FEAT_BRANCHES_CHECKED
    :uses: COMP_TOPOLOGY_READER, COMP_WIRING_VALIDATOR, COMP_SCRIPT_HOST, COMP_WORKFLOW_RUN, COMP_RUN_RECORD
    :statement: Agconflo shall allocate taking a branch to the topology reader, the wiring validator, the script host, the workflow run and the run record.
 
    - The topology reader answers for what a document says: that a node type
-     routes, and which of a router's inputs a binding takes.
+     routes, which of a router's inputs a binding takes, and the branches a
+     router's instance declares.
    - The wiring validator answers for whether that is sound: a binding taking
-     an input from a node that does not route, or one it does not have, is a
-     defect before anything runs.
+     an input from a node that does not route, or one it does not have, and
+     branches that are not the branches after the router, are defects before
+     anything runs.
    - The script host answers for what a router's script says: the instances it
-     names, once.
+     names, once; and for a person's answer naming no branch, refused so that
+     they can answer again.
    - The workflow run answers for the walk: a router's edges into the
-     instances named, and no other, and a naming it refuses.
+     instances named, and no other, and a naming it refuses, one that is no
+     branch among them.
    - The run record answers for keeping the names, and giving them back.
+
+   ``FEAT_ROUTE_IS_A_DECLARED_BRANCH`` and ``FEAT_BRANCHES_CHECKED`` were added
+   to what it realises by ``DEC_CHANGE_ARCH_ROUTING``.
 
    The decisions it is built against are named here rather than linked:
    ``DEC_ONE_GRAPH``, ``DEC_ROUTER_DECLARED``,
-   ``DEC_ROUTER_OUTPUT_IS_ITS_DECISION``, ``DEC_ROUTED_INPUT_BOUND_BY_TABLE``
-   and ``DEC_ROUTE_RECORDED``.
+   ``DEC_ROUTER_OUTPUT_IS_ITS_DECISION``, ``DEC_ROUTED_INPUT_BOUND_BY_TABLE``,
+   ``DEC_ROUTE_RECORDED`` and ``DEC_ROUTER_BRANCHES_DECLARED``.

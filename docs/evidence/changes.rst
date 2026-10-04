@@ -243,3 +243,16 @@ or keeps, on the commit named. Re-running one later shows what has moved since.
    ``STKH_REPETITION``. Beside it: every requirement of
    ``COMP_TOPOLOGY_READER``, ``COMP_RUN_SCHEDULER`` and ``COMP_WORKFLOW_RUN``.
    In prose: one line of ``components/repetition``.
+
+.. evd:: The impact of taking a branch's architecture realising two more features
+   :id: EVD_IMPACT_ARCH_ROUTING
+   :evd_kind: measurement
+   :observed_on: 2026-10-04
+   :observation: ARCH_ROUTING answers to 5 needs, has nothing below it by link, uses components holding 86 requirements, and is named on 1 line.
+
+   Run as ``sh scripts/impact.sh ARCH_ROUTING`` on ``f271c79``. Above it:
+   ``FEAT_ROUTE_RECORDED``, ``FEAT_ROUTE_WALKS_CHOSEN_EDGES``,
+   ``STKH_ONE_OUTPUT``, ``STKH_RESUMABLE_RUN`` and ``STKH_ROUTING``. Beside
+   it: every requirement of ``COMP_TOPOLOGY_READER``,
+   ``COMP_WIRING_VALIDATOR``, ``COMP_SCRIPT_HOST``, ``COMP_WORKFLOW_RUN`` and
+   ``COMP_RUN_RECORD``. In prose: one line of ``components/routing``.

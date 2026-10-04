@@ -112,6 +112,28 @@ step a run awaits, is all that goes to standard output. The exit status says how
 5 a node failed, 6 the budget ran out, 7 no node can make further progress, and 8 the record could
 not be kept, whatever else happened.
 
+### Routers
+
+A node type declaring `routes = true` is a **router**: its script decides which of the branches
+after it the run takes, with `host.route({"drafter"})`, and its output is the context its decision
+is held in. An edge out of a router carries that output, or one of the contexts it was given,
+bound by naming the router and the input: `draft = { from = "router", input = "draft" }`.
+
+The router's instance declares its **branches**, each naming the instances a route taking it goes
+on to, and a route names the instances of one branch, in any order, or none at all:
+
+```toml
+[instances.router]
+node_type = "route"
+bindings = { draft = "drafter", review = "reviewer" }
+branches = { again = ["drafter"], done = ["finisher"] }
+```
+
+Every instance an edge out of the router enters is in a branch, and no two branches name the same
+instances; a workflow breaking either is refused before anything runs. A router a person performs
+is answered with `--route` once for each instance of the branch, and a route that is no branch is
+refused, naming the branches, so that it can be answered again.
+
 ### Tools
 
 A node type can be a **tool**: it reads a file, writes one, or runs a command, in a Docker container

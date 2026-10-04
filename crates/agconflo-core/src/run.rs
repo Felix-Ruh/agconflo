@@ -8,7 +8,7 @@ use std::marker::PhantomData;
 
 use crate::defect::WiringDefect;
 use crate::scheduler::{Activation, Edges, next_activation};
-use crate::workflow::{NodeType, WorkflowDefinition};
+use crate::workflow::{Branch, NodeType, WorkflowDefinition};
 use crate::{Context, ContextId, ContextType, validate_wiring};
 
 /// The contexts a run is given when it starts, each addressed by the instance
@@ -417,6 +417,16 @@ pub enum OutputRefusal {
         /// The instance it named.
         named: String,
     },
+    /// A router named instances that are not the instances of any one branch
+    /// its instance declares.
+    NotABranch {
+        /// The router.
+        instance: String,
+        /// The instances it named, in the order named.
+        named: Vec<String>,
+        /// The branches its instance declares.
+        branches: Vec<Branch>,
+    },
 }
 
 impl fmt::Display for OutputRefusal {
@@ -453,6 +463,22 @@ impl fmt::Display for OutputRefusal {
                 write!(
                     f,
                     "{instance} named {named}, which no edge out of it enters"
+                )
+            }
+            Self::NotABranch {
+                instance,
+                named,
+                branches,
+            } => {
+                let declared: Vec<String> = branches
+                    .iter()
+                    .map(|branch| format!("{} = {}", branch.name, branch.instances.join(", ")))
+                    .collect();
+                write!(
+                    f,
+                    "{instance} named {}, which is not one of its branches: {}",
+                    named.join(", "),
+                    declared.join("; ")
                 )
             }
         }
@@ -1009,6 +1035,31 @@ impl<'a, F> Run<'a, F> {
                 .any(|declared| declared.name == activation.node_type() && declared.routes)
     }
 
+    /// The branches `router`'s instance declares.
+    fn branches_of(&self, router: &str) -> &[Branch] {
+        self.definition
+            .instances
+            .iter()
+            .find(|node| node.name == router)
+            .map_or(&[], |node| &node.branches)
+    }
+
+    /// The position of the branch of `router` naming exactly the instances
+    /// `named` names, in whatever order and however often, or `None` when no
+    /// branch does.
+    // @A route is one of the router's branches,IMPL_RUN_ROUTE_IS_A_BRANCH,impl,[CREQ_RUN_REFUSES_UNDECLARED_BRANCH],[DEC_ROUTER_BRANCHES_DECLARED]
+    fn branch_named(&self, router: &str, named: &[String]) -> Option<usize> {
+        let named: HashSet<&str> = named.iter().map(String::as_str).collect();
+        self.branches_of(router).iter().position(|branch| {
+            branch
+                .instances
+                .iter()
+                .map(String::as_str)
+                .collect::<HashSet<_>>()
+                == named
+        })
+    }
+
     /// An output checked and accepted, with the route a router named.
     fn accept(
         &mut self,
@@ -1036,6 +1087,13 @@ impl<'a, F> Run<'a, F> {
                     return Err(OutputRefusal::NoEdgeTo {
                         instance,
                         named: named.clone(),
+                    });
+                }
+                if !named.is_empty() && self.branch_named(&instance, named).is_none() {
+                    return Err(OutputRefusal::NotABranch {
+                        instance: instance.clone(),
+                        named: named.clone(),
+                        branches: self.branches_of(&instance).to_vec(),
                     });
                 }
             }
@@ -1963,7 +2021,8 @@ fn branching() -> WorkflowDefinition {
     let instances = vec![
         instance("d", "Src", &[]),
         instance("w", "Src", &[]),
-        instance("r", "route", &[("draft", "d"), ("review", "w")]),
+        instance("r", "route", &[("draft", "d"), ("review", "w")])
+            .branching(&[("revise", &["revise"]), ("both", &["close", "revise"])]),
         instance("revise", "revise", &[("verdict", "r")]).taking("draft", "r", "draft"),
         instance("close", "Take", &[]).taking("seed", "r", "review"),
         instance("never", "Take", &[("seed", "never")]),
@@ -2080,6 +2139,52 @@ fn bad_route_refused() {
         })
     );
     assert_eq!(offered(&mut run).instance(), "d");
+}
+
+#[cfg(test)]
+#[test]
+fn route_not_a_branch_refused() {
+    let workflow = branching();
+    let mut source = IdSource::new();
+    let (mut run, draft, _) = at_the_router(&workflow, &mut source);
+
+    // Each instance an edge enters, and together not a branch: refused naming
+    // what was named and the branches declared, and nothing walked.
+    let refused = run
+        .routed(ctx(&mut source, "note"), vec!["close".to_owned()])
+        .expect_err("close alone is no branch");
+    assert_eq!(
+        refused,
+        OutputRefusal::NotABranch {
+            instance: "r".to_owned(),
+            named: vec!["close".to_owned()],
+            branches: workflow.instances[2].branches.clone(),
+        }
+    );
+    assert_eq!(
+        refused.to_string(),
+        "r named close, which is not one of its branches: revise = revise; both = close, revise"
+    );
+    assert_eq!(offered(&mut run).instance(), "r");
+
+    // A branch named in another order, one instance twice, is that branch.
+    run.routed(
+        ctx(&mut source, "note"),
+        vec!["revise".to_owned(), "close".to_owned(), "revise".to_owned()],
+    )
+    .expect("the branch both");
+    let mut offered_next = Vec::new();
+    for _ in 0..2 {
+        let next = offered(&mut run);
+        offered_next.push(next.instance().to_owned());
+        if next.instance() == "revise" {
+            assert!(next.inputs()[1].1.is(&draft));
+        }
+        run.produced(ctx(&mut source, "note"))
+            .expect("of the declared type");
+    }
+    offered_next.sort();
+    assert_eq!(offered_next, ["close", "revise"]);
 }
 
 #[cfg(test)]

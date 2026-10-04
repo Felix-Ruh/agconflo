@@ -915,3 +915,41 @@ that changed them show through, and are revised here.
      unaffected; ``CREQ_RUN_ARGUMENT_FIRST_ON_ITS_EDGE`` is added to the
      workflow run's.
    - Text, the line of ``components/repetition`` naming it: unchanged.
+
+.. dec:: Revised: taking a branch's architecture also realises a router's declared branches
+   :id: DEC_CHANGE_ARCH_ROUTING
+   :dec_status: accepted
+   :decided_on: 2026-10-04
+   :supported_by: EVD_IMPACT_ARCH_ROUTING
+   :statement: Agconflo's requirements project shall have ARCH_ROUTING realise FEAT_ROUTE_IS_A_DECLARED_BRANCH and FEAT_BRANCHES_CHECKED because the five components it uses answer for both.
+
+   Amends ``ARCH_ROUTING``'s links: it realises
+   ``FEAT_ROUTE_IS_A_DECLARED_BRANCH`` and ``FEAT_BRANCHES_CHECKED`` beside
+   the two features it realised. Its statement and the components it uses are
+   unchanged.
+
+   Raised by declaring a router's branches (``DEC_ROUTER_BRANCHES_DECLARED``),
+   whose two features need an architecture: the reader reads the branches, the
+   validator checks them, the run refuses a naming that is none of them, and
+   the script host refuses a person's.
+
+   Justification: the architecture answers to the features it realises, and
+   this adds two without changing what it says of the others. Each is about
+   taking a branch, and needs no component the architecture does not already
+   use. A second architecture over the same five components was the
+   alternative, and would split one router's naming across two allocations.
+
+   Verdicts on the impact analysis (``EVD_IMPACT_ARCH_ROUTING``):
+
+   - Up, ``FEAT_ROUTE_WALKS_CHOSEN_EDGES``, ``FEAT_ROUTE_RECORDED``,
+     ``STKH_ROUTING``, ``STKH_ONE_OUTPUT`` and ``STKH_RESUMABLE_RUN``:
+     unchanged; ``FEAT_ROUTE_IS_A_DECLARED_BRANCH``, ``FEAT_BRANCHES_CHECKED``,
+     ``STKH_REPETITION`` and ``STKH_WIRING_CHECKED`` added above it.
+   - Down: nothing links to it.
+   - Sideways, the 86 requirements of the five components it uses:
+     unaffected; ``CREQ_READER_READS_BRANCHES``, ``CREQ_VALIDATOR_BRANCHES``,
+     ``CREQ_RUN_REFUSES_UNDECLARED_BRANCH`` and
+     ``CREQ_HOST_REFUSES_PERSON_ROUTE_NOT_A_BRANCH`` are added to theirs.
+     ``CREQ_RUN_REFUSES_BAD_ROUTE`` keeps its statement: a naming that is no
+     branch is a further refusal, not a change to the three it lists.
+   - Text, the line of ``components/routing`` naming it: unchanged.

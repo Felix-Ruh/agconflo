@@ -33,6 +33,7 @@ pub fn validate_wiring(definition: &WorkflowDefinition) -> Vec<WiringDefect> {
         }
         check_instance(instance, &declarations, &instances, &shared, &mut defects);
         check_calls(instance, &declarations, &mut defects);
+        check_branches(instance, definition, &declarations, &mut defects);
     }
     check_signature(definition, &mut defects);
     check_output_resolves(definition, &instances, &mut defects);
@@ -300,6 +301,74 @@ fn check_calls(
                 instance: instance.name.clone(),
                 name: call.clone(),
             });
+        }
+    }
+}
+
+/// The branches an instance declares against the edges out of it: none on an
+/// instance whose node type does not route, and on a router's, every instance
+/// an edge out of it enters named by a branch, no branch naming one no edge
+/// enters, and no two branches naming the same instances. An instance whose
+/// node type does not resolve is not looked at.
+// @A router's branches checked against the edges out of it,IMPL_WIRING_BRANCHES,impl,[CREQ_VALIDATOR_BRANCHES],[DEC_ROUTER_BRANCHES_DECLARED]
+fn check_branches(
+    instance: &NodeInstance,
+    definition: &WorkflowDefinition,
+    declarations: &HashMap<&str, &NodeType>,
+    defects: &mut Vec<WiringDefect>,
+) {
+    let Some(declaration) = declarations.get(instance.node_type.as_str()) else {
+        return;
+    };
+    if !declaration.routes {
+        if !instance.branches.is_empty() {
+            defects.push(WiringDefect::BranchesNotRouted {
+                instance: instance.name.clone(),
+            });
+        }
+        return;
+    }
+
+    let mut entered: Vec<&str> = Vec::new();
+    for consumer in &definition.instances {
+        if consumer.bindings.iter().any(|b| b.source == instance.name)
+            && !entered.contains(&consumer.name.as_str())
+        {
+            entered.push(&consumer.name);
+        }
+    }
+    for &consumer in &entered {
+        if !instance
+            .branches
+            .iter()
+            .any(|branch| branch.instances.iter().any(|named| named == consumer))
+        {
+            defects.push(WiringDefect::InstanceInNoBranch {
+                instance: instance.name.clone(),
+                entered: consumer.to_owned(),
+            });
+        }
+    }
+
+    let mut sets: Vec<(&str, HashSet<&str>)> = Vec::new();
+    for branch in &instance.branches {
+        let mut looked_at = HashSet::new();
+        for named in &branch.instances {
+            if looked_at.insert(named.as_str()) && !entered.contains(&named.as_str()) {
+                defects.push(WiringDefect::BranchNamesUnentered {
+                    instance: instance.name.clone(),
+                    branch: branch.name.clone(),
+                    named: named.clone(),
+                });
+            }
+        }
+        match sets.iter().find(|(_, set)| *set == looked_at) {
+            Some((first, _)) => defects.push(WiringDefect::RepeatedBranch {
+                instance: instance.name.clone(),
+                first: (*first).to_owned(),
+                repeated: branch.name.clone(),
+            }),
+            None => sets.push((&branch.name, looked_at)),
         }
     }
 }
@@ -1260,7 +1329,8 @@ fn routed_input_checked() {
         node_type("patch", &[("input", "diff")], "diff"),
     ];
     let instances = vec![
-        instance("r", "route", &[]),
+        instance("r", "route", &[])
+            .branching(&[("all", &["sound", "undeclared", "crossed", "patched"])]),
         instance("p", "pass", &[]),
         // The router's declared input, into a parameter of its type: sound.
         instance("sound", "take", &[]).taking("input", "r", "draft"),
@@ -1280,6 +1350,69 @@ fn routed_input_checked() {
             unrouted("not_router", "input", "p", "draft"),
             unrouted("undeclared", "input", "r", "brief"),
             disagreement("crossed", "input", "note", "diff"),
+        ]
+    );
+}
+
+#[test]
+fn branches_checked() {
+    let types = vec![
+        node_type("source", &[], "note"),
+        node_type("route", &[("draft", "note")], "note").routing(),
+        node_type("take", &[("input", "note")], "note"),
+    ];
+    let branched = |router: &str, branches: &[(&str, &[&str])]| {
+        vec![
+            instance("s", "source", &[]),
+            instance(router, "route", &[("draft", "s")]).branching(branches),
+            instance("a", "take", &[("input", router)]),
+            instance("b", "take", &[]).taking("input", router, "draft"),
+            instance("c", "take", &[("input", "a")]),
+        ]
+    };
+
+    // Sound: every instance an edge enters in a branch, an instance in two
+    // branches, and an empty branch.
+    let sound = branched(
+        "r",
+        &[("one", &["a"]), ("both", &["a", "b"]), ("none", &[])],
+    );
+    assert_eq!(
+        validate_wiring(&definition(types.clone(), sound, &["c"])),
+        vec![]
+    );
+
+    // Each way to get it wrong, each reported once: an entered instance in no
+    // branch, a branch naming an instance no edge enters (named twice,
+    // reported once), the same instances named again in another order, and
+    // branches on an instance whose type does not route.
+    let mut broken = branched("r", &[("one", &["a", "c", "c"]), ("again", &["c", "a"])]);
+    broken[4] = broken[4].clone().branching(&[("x", &["a"])]);
+    assert_eq!(
+        validate_wiring(&definition(types, broken, &["c"])),
+        vec![
+            WiringDefect::InstanceInNoBranch {
+                instance: "r".to_owned(),
+                entered: "b".to_owned(),
+            },
+            WiringDefect::BranchNamesUnentered {
+                instance: "r".to_owned(),
+                branch: "one".to_owned(),
+                named: "c".to_owned(),
+            },
+            WiringDefect::BranchNamesUnentered {
+                instance: "r".to_owned(),
+                branch: "again".to_owned(),
+                named: "c".to_owned(),
+            },
+            WiringDefect::RepeatedBranch {
+                instance: "r".to_owned(),
+                first: "one".to_owned(),
+                repeated: "again".to_owned(),
+            },
+            WiringDefect::BranchesNotRouted {
+                instance: "c".to_owned(),
+            },
         ]
     );
 }
