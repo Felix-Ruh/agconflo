@@ -81,3 +81,50 @@ any of them was kept but what is written here.
    ``x`` read from the same pass, put ``s`` and ``j`` of
    ``EVD_STANDING_BY_INSTANCE_ORDER`` on the loop's passes with no order
    between them, and refused a node joining two branches of one router.
+
+.. evd:: A review loop runs live, each pass given its own, and the last node the review of the last pass
+   :id: EVD_REVIEW_LOOP_LIVE
+   :evd_kind: measurement
+   :observed_on: 2026-10-04
+   :observation: Against qwen3.8-27b-ridge on LM Studio, a review loop with declared branches revised once and ended in 19 s, every activation given its own pass's contexts and the node after the loop the review of the pass it ended on.
+
+   Taken after #72 merged, with the ``agconflo`` binary built at ``f878ace``
+   for debugging, in a scratch directory, the model mapping sending the role
+   ``drafting`` to ``openai::qwen3.8-27b-ridge`` at LM Studio's endpoint with
+   its key in ``LM_API_TOKEN``, read from the repository's ``.env``, and every
+   ``*_API_KEY`` variable removed from the process's environment.
+
+   The workflow: a brief; a drafter asking the model for one sentence,
+   reading the brief, the draft the router sends back and the router's
+   verdict, the run giving it an empty first of each; a reviewer asking the
+   model to approve only a sentence naming a sound, a colour and a smell; a
+   router declaring ``branches = { again = ["drafter"], done = ["finisher"] }``
+   and sending the draft on when the review approves it; a finisher; and a
+   last node joining the finisher and the reviewer, on the passes of
+   ``done`` reading the reviewer from every pass of the loop. Each activation
+   in the record, written as what made each input::
+
+     drafter#0  given brief#0, empty, empty
+     reviewer#0 given drafter#0
+     router#0   given drafter#0, reviewer#0   route ["drafter"]
+     drafter#1  given brief#0, drafter#0, router#0
+     reviewer#1 given drafter#1
+     router#1   given drafter#1, reviewer#1   route ["finisher"]
+     finisher#0 given drafter#1
+     final#0    given finisher#0, reviewer#1
+
+   The last node was given ``reviewer#1``, of the pass the loop ended on;
+   counted per edge, it would have been ``reviewer#0``, the first its edge
+   held. Two runs before it: with the reviewer approving freely, the first
+   draft was approved and the run ended in one pass in 11 s; with the
+   drafter not yet wired to the verdict, nothing it wrote was approved and
+   the budget of 20 stopped the run at the drafter's seventh pass, after six
+   of the router's, each drafter, reviewer and router given its own pass's
+   contexts and every drafter the one brief.
+
+   Given the first ``previous`` and not the first ``feedback``, the run was
+   refused before any model was called, exit status 4, no record file
+   written, the drafter's two inputs from the router coming on different
+   passes. The message said only "the workflow carries 1 node whose inputs
+   cannot be paired": every refusal a run starts with is printed as a count
+   by ``agconflo run``, which names neither the node nor its inputs.
