@@ -30,10 +30,15 @@ from the first of those, and were taken while specifying it: a node runs again
 only on something new, and an instance that cannot run again leaves its output
 standing.
 
-The last three, taken on 2026-10-04 on measurements of those four, supersede
-all four: a pass is what the wiring says it is, a node whose inputs cannot
-share one is refused before the run starts, and no output is declared
+The three after them, taken on 2026-10-04 on measurements of those four,
+supersede all four: a pass is what the wiring says it is, a node whose inputs
+cannot share one is refused before the run starts, and no output is declared
 standing.
+
+The last two, taken the same day on measurements of those three, supersede the
+decision that a run gives a wired parameter its first context, and where the
+pairing is checked: a binding's first context is declared in the workflow, so
+a node whose inputs share no pass is a defect of the wiring.
 
 What this slice does not settle is as load-bearing as what it does, so it is
 named here rather than left to be inferred. Nothing below decides whether node
@@ -218,14 +223,14 @@ to leave every one of them open.
    forgotten binding reaches no validator, and this refusal is the first thing
    to name it - before any node runs, as ``STKH_WIRING_CHECKED`` asks.
 
-   A context given to a parameter a binding fills is not a second source:
-   it is the first context that edge holds, and the wire's come after it
-   (``DEC_ARGUMENT_FIRST_ON_ITS_EDGE``). Two given for one parameter are
-   refused, whether a binding fills it or not.
+   A context given to a parameter a binding fills is refused: that parameter
+   is not one of the workflow's, and a first context for its binding is
+   declared in the workflow (``DEC_FIRST_CONTEXT_DECLARED``). Two given for
+   one parameter are refused too.
 
 .. dec:: A context given for a bound parameter is the first its edge holds
    :id: DEC_ARGUMENT_FIRST_ON_ITS_EDGE
-   :dec_status: accepted
+   :dec_status: superseded
    :decided_on: 2026-09-26
    :statement: Agconflo shall hold a context a run is given for a parameter a binding fills as the first context that edge holds, before any context walked along the binding.
 
@@ -323,6 +328,12 @@ to leave every one of them open.
    about the designated output and not about the graph. A run is stuck when that
    output can no longer be produced, however many instances are idle, and an
    idle instance on its own is not a defect to report.
+
+   The instance measured is one now: bound to its own output with no first
+   context declared, it is a cycle nothing starts, which no run could ever
+   activate, and its workflow is refused before any node runs
+   (``DEC_CYCLE_STARTED_BY_A_FIRST``). What this decision says stands for an
+   instance a run did not activate, on a branch no router took.
 
 .. dec:: An instance activates at most once in a run
    :id: DEC_ACTIVATION_ONCE_PER_RUN
@@ -538,15 +549,14 @@ to leave every one of them open.
    - **A branch's passes**: an instance a router's edges enter runs on the
      passes on which the router takes a branch naming it, a part of the
      router's own (``DEC_ROUTER_BRANCHES_DECLARED``).
-   - **Pass 0 given, then the passes inside**: a parameter a binding fills and
-     the run gives a first context to has that context on pass 0 and the
-     binding's on every pass after (``DEC_ARGUMENT_FIRST_ON_ITS_EDGE``). This
-     is how a loop starts.
+   - **Pass 0 declared, then the passes inside**: a binding declaring its
+     first context has that context on pass 0 and what it carries on every
+     pass after (``DEC_FIRST_CONTEXT_DECLARED``). This is how a loop starts.
    - **A cycle's own passes**, for instances on a cycle no router is on that a
-     given context starts; they run until the budget stops them.
-   - **None**, for a cycle no given context starts. Nothing on it runs, as
-     nothing on it ran before; refusing such a workflow is a decision of its
-     own.
+     declared first context starts; they run until the budget stops them.
+   - **None**, for a cycle no first context starts, and whatever reads from
+     it. Nothing on it could run, and such a workflow is refused
+     (``DEC_CYCLE_STARTED_BY_A_FIRST``).
 
    An instance runs on the passes all its inputs share: those of the input
    that comes most often, when every other input comes on passes enclosing
@@ -558,8 +568,8 @@ to leave every one of them open.
    on a branch reading what was made on every pass of the loop is given what
    was made on the pass the branch was taken, and a brief made once reaches
    every pass. An instance whose inputs share no pass has none to be given
-   them on, and is refused before the run starts
-   (``DEC_PAIRING_CHECKED_AT_START``). It runs once per pass, so it runs again
+   them on, and its workflow is refused before anything runs
+   (``DEC_PAIRING_IS_WIRING``). It runs once per pass, so it runs again
    exactly when its next pass's inputs are there, which is what
    ``DEC_RUN_AGAIN_ON_SOMETHING_NEW`` and ``DEC_ONCE_RUN_OUTPUTS_STAND`` each
    had to say apart.
@@ -575,7 +585,7 @@ to leave every one of them open.
      a pass only where the clocks agree, so the check would be this decision
      and the queues a second copy of the state.
    - **Tagging contexts while the run goes.** Without a loop construct, which
-     ``DEC_REPETITION_BY_EDGES`` rules out, a context's lineage does not say
+     ``DEC_CYCLE_STARTED_BY_A_FIRST`` rules out, a context's lineage does not say
      which edge took it back round: the drafter's next draft and the router's
      verdict are both made from one draft, and only one starts a new pass. A
      context left unmatched would also be dropped without a word.
@@ -587,7 +597,7 @@ to leave every one of them open.
 
 .. dec:: A run is refused unless every node's inputs share a pass
    :id: DEC_PAIRING_CHECKED_AT_START
-   :dec_status: accepted
+   :dec_status: superseded
    :decided_on: 2026-10-04
    :supported_by: EVD_PASSES_MISPAIRED_ACROSS_A_BRANCH
    :statement: Agconflo shall refuse to start a run in which a node instance's inputs share no pass, naming the instance and the passes each of its inputs comes on.
@@ -630,7 +640,100 @@ to leave every one of them open.
    would leave a document saying something its run does not do.
 
    An input from passes a node's own enclose - a brief a person edits on some
-   passes, read on every one - is refused by ``DEC_PAIRING_CHECKED_AT_START``.
+   passes, read on every one - is refused by ``DEC_PAIRING_IS_WIRING``.
    Holding the latest context made on an earlier pass, Lustre's ``current``,
    declared on the binding that reads it, is how that would be met. No
    workflow needs it yet, so it is not built.
+
+.. dec:: A binding's first context is a text its workflow declares
+   :id: DEC_FIRST_CONTEXT_DECLARED
+   :dec_status: accepted
+   :decided_on: 2026-10-04
+   :supersedes: DEC_ARGUMENT_FIRST_ON_ITS_EDGE
+   :supported_by: EVD_LOOP_FIRST_CONTEXT_UNCHECKED, EVD_FIRST_CONTEXTS_ARE_CONSTANT
+   :statement: Agconflo shall give a binding its first context from a text the workflow document declares on that binding rather than from a run's arguments.
+
+   What ``DEC_ARGUMENT_FIRST_ON_ITS_EDGE`` decided about a first context
+   stands: it comes before anything walked along its binding, as the
+   binding's pass 0, and it is how a loop starts (``DEC_PASS_CLOCKS``). What
+   changes is where it comes from. The maintainer chose the run's context,
+   which every parameter could already be given, and three things were found
+   against it once it was built.
+
+   - **It is outside the workflow's signature.** The signature is the
+     parameters nothing binds (``DEC_SIGNATURE_IS_WHAT_NOTHING_BINDS``), as
+     ``STKH_WORKFLOW_AS_NODE`` has it, and a first context is given to a
+     parameter a binding fills. A workflow with a loop in it could not be
+     invoked as a node, for its invoker would have no way to give it.
+   - **No check can see it.** Which loops start, and whether a node's inputs
+     share a pass, turned on the run's arguments, so ``agconflo check``
+     passed a workflow that every run of it refused or left stuck
+     (``EVD_LOOP_FIRST_CONTEXT_UNCHECKED``).
+   - **It is the workflow's, not the caller's.** Every first context measured
+     is a fixed text, the same on every run, and the first development
+     workflow keeps them beside its documents for a script to hand over
+     (``EVD_FIRST_CONTEXTS_ARE_CONSTANT``).
+
+   It is written on the binding, beside where the binding's contexts come
+   from, for a router's input and for an instance's output alike::
+
+     previous = { from = "router", input = "draft", first = { text = "" } }
+     state = { from = "judge", first = { text = "goal 1" } }
+
+   The context is of the type
+   the parameter is declared for and holds the text. A binding off any cycle
+   may declare one too, and its instance then runs once on it before the
+   passes of what the binding carries.
+
+   The run makes each such context when it starts, from the identifier source
+   its caller lends it, and holds it as it holds the arguments, so its
+   identifier is checked against theirs. A run's record holds the first
+   contexts apart from its arguments, and a resumed run takes them from the
+   record, never making them again, and refuses one that is no longer the
+   text its workflow declares. A run given an argument for a parameter a
+   binding fills refuses it: that parameter is not one of the workflow's.
+
+   Rejected:
+
+   - **The run's argument**, as it was, for the three findings above.
+   - **An argument the document marks as one of the workflow's inputs.** The
+     signature would no longer be the parameters nothing binds, which is
+     what ``STKH_WORKFLOW_AS_NODE`` says it is, and the invoker of a workflow
+     would have to give the empty drafts its loops start from.
+   - **A first context naming an instance.** Each fixed text would need a
+     node and a script of its own, the cost ``DEC_ARGUMENT_FIRST_ON_ITS_EDGE``
+     named, and no first context measured varies. It is how a first context
+     made from other contexts would be written, ``first = "instance"`` the way
+     a binding names one, which is why a text is written as a table and not
+     as a bare string.
+   - **A file the binding names.** Paths are the manifest's to give, and the
+     longest first context measured is four lines, which a TOML string holds.
+
+.. dec:: A node whose inputs share no pass is a defect of the wiring
+   :id: DEC_PAIRING_IS_WIRING
+   :dec_status: accepted
+   :decided_on: 2026-10-04
+   :supersedes: DEC_PAIRING_CHECKED_AT_START
+   :supported_by: EVD_PASSES_MISPAIRED_ACROSS_A_BRANCH, EVD_LOOP_FIRST_CONTEXT_UNCHECKED
+   :statement: Agconflo shall report a node instance whose inputs share no pass as a defect of its workflow's wiring, naming the instance and the passes each of its inputs comes on.
+
+   What ``DEC_PAIRING_CHECKED_AT_START`` decided stands, and moves where it
+   said it would. It checked pairing when the run started because a loop's
+   passes turned on which parameters the run gave a first context to. A
+   loop's first context is now declared in the workflow document
+   (``DEC_FIRST_CONTEXT_DECLARED``), so every instance's passes follow from
+   the definition alone, and the check is the wiring validator's. A run of
+   such a workflow is still refused before any node runs, as for any wiring
+   defect, and ``agconflo check`` now names it, which it could not while the
+   passes waited for the run (``EVD_LOOP_FIRST_CONTEXT_UNCHECKED``).
+
+   A node joining two branches of one router runs on the passes on which the
+   router takes a branch naming both, and is a defect where no branch does:
+   there is no construct merging them. A loop inside another, started again
+   on each outer pass, shares no pass with the outer loop either, and is a
+   defect alike: a constant declared as its first context has no outer pass
+   to start again on. Starting a loop again on every pass of another is
+   Scade's ``restart``, a construct of its own that no workflow needs inside
+   one graph. Invoking the inner loop as a workflow of its own, once per outer
+   pass, starts it from its declared first context each time
+   (``STKH_WORKFLOW_AS_NODE``).

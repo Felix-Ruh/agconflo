@@ -18,12 +18,16 @@ supersede four of the first: a workflow is one graph whose edges carry contexts,
 it repeats part of itself only by walking those edges again, and a node type
 declares no optional parameter. The one after them follows from the last of
 those: a node type document still declaring optional parameters is refused
-rather than read without them. The last was the maintainer's too: a list is
+rather than read without them. The next was the maintainer's too: a list is
 handled item by item inside one node.
 
-None of them rests on a measurement, and none carries evidence. They are
+None of those rests on a measurement, and none carries evidence. They are
 judgements about a model, and the honest record of a judgement is its reasoning
 and what it turned down.
+
+The last, taken on 2026-10-04, does rest on one, and supersedes how a workflow
+repeats itself: a cycle is accepted only when a binding on it declares the
+first context it starts from.
 
 .. dec:: Node types and workflows are separate layers
    :id: DEC_TWO_LAYERS
@@ -192,7 +196,7 @@ and what it turned down.
 
 .. dec:: A workflow repeats part of itself by walking its edges again
    :id: DEC_REPETITION_BY_EDGES
-   :dec_status: accepted
+   :dec_status: superseded
    :decided_on: 2026-09-26
    :supersedes: DEC_BACK_EDGES_ALLOWED
    :statement: Agconflo shall accept a workflow whose edges form a cycle and repeat part of a workflow only by walking its edges again, with no loop construct.
@@ -233,7 +237,7 @@ and what it turned down.
    instance with parameters nothing binds, which the run is given
    (``DEC_SIGNATURE_IS_WHAT_NOTHING_BINDS``). An ordering between nodes that act on the world is an edge: the node
    that must come second is given the first one's output. A back edge is an
-   edge walked again (``DEC_REPETITION_BY_EDGES``). And a router gates a branch
+   edge walked again (``DEC_CYCLE_STARTED_BY_A_FIRST``). And a router gates a branch
    by which edges it walks.
 
    A router creates no content. Its script decides which of the edges after it
@@ -327,3 +331,35 @@ and what it turned down.
    pairing each gathered item with the list it came from. It is left until an
    item needs a route of its own. What it costs now is that one activation
    spends the call limit for every item.
+
+.. dec:: A cycle is started by a first context its workflow declares
+   :id: DEC_CYCLE_STARTED_BY_A_FIRST
+   :dec_status: accepted
+   :decided_on: 2026-10-04
+   :supersedes: DEC_REPETITION_BY_EDGES
+   :supported_by: EVD_LOOP_FIRST_CONTEXT_UNCHECKED
+   :statement: Agconflo shall accept a cycle in a workflow only when it passes through a binding declaring its first context, and repeat part of a workflow only by walking its edges again, with no loop construct.
+
+   What ``DEC_REPETITION_BY_EDGES`` decided stands: a workflow repeats part of
+   itself by walking its edges again, an edge back is an edge like any other,
+   and there is no loop, no scope and no iteration counter. What it left open
+   is the cycle nothing starts. Every instance on it waits for another on it,
+   so none of them ever runs, and nor does anything reading from them
+   (``DEC_PASS_CLOCKS``). That was found only when a run had already started
+   and part of it had run (``EVD_LOOP_FIRST_CONTEXT_UNCHECKED``).
+
+   A binding declaring its first context is where a cycle starts
+   (``DEC_FIRST_CONTEXT_DECLARED``), so whether one does is a question of the
+   wiring alone, and a cycle passing through none is a defect of the wiring:
+   reported by the validator, refused before any node runs, and named by
+   ``agconflo check``. It is Lustre's rule that every cycle passes through a
+   delay, here a binding saying what comes before the first context walked
+   along it.
+
+   It is a defect wherever the cycle is, and not only where the designated
+   output depends on it. An instance that no run can ever activate is a
+   mistake in the wiring - a forgotten first context, most often - and one on
+   a branch the output does not need would otherwise go unrun without a word.
+   An instance that a run merely did not activate, on a branch no router took,
+   is not one: whether that happens is the run's, and
+   ``DEC_COMPLETION_IS_DESIGNATED_OUTPUT`` still holds for it.
