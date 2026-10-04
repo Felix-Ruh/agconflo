@@ -2,104 +2,137 @@
 Components of a workflow repeating itself
 =========================================
 
-The requirements ``ARCH_REPETITION`` allocates to the three components it
-uses, each defined where its first feature put it: the topology reader in
-``components/topology``, the run scheduler and the workflow run in
-``components/run``. Each title is the grammatical subject of the requirements
-allocated to it, and the gate in ``scripts/gates`` refuses a component
-requirement whose subject is anything else.
+The requirements ``ARCH_REPETITION`` allocates to the two components it
+uses, each defined where its first feature put it: the run scheduler and the
+workflow run in ``components/run``. Each title is the grammatical subject of
+the requirements allocated to it, and the gate in ``scripts/gates`` refuses a
+component requirement whose subject is anything else.
 
-An edge is a binding: one instance's parameter, and what fills it. Each edge
-holds the contexts walked along it in the order they were walked, and an
-instance takes from each the earliest it has not taken
-(``DEC_EDGE_GENERATIONS``). An output stands when its node type declares it
-(``DEC_STANDING_OUTPUTS``) or its instance cannot run again
-(``DEC_ONCE_RUN_OUTPUTS_STAND``).
+An instance's passes follow from its wiring and the contexts the run is given
+(``DEC_PASS_CLOCKS``): the run's one pass, a router's passes on which it
+takes a branch naming the instance, a context the run gives followed by the
+passes of what the binding carries, or a cycle's own passes. One set of
+passes encloses another when each pass of the other is part of one of its
+own. An input on the instance's own passes is taken pass by pass; one on
+passes enclosing them is read from the pass the activation belongs to.
 
-.. comp_req:: An activation takes the earliest new context from each edge
-   :id: CREQ_SCHEDULER_TAKES_EARLIEST
+.. comp_req:: An activation is given each input of its own pass
+   :id: CREQ_SCHEDULER_GIVES_ONE_PASS
    :derived_from: FEAT_REPEAT_ON_NEW_CONTEXTS
    :allocated_to: COMP_RUN_SCHEDULER
-   :ears_pattern: ubiquitous
-   :statement: Run scheduler shall give an instance's activation from each edge into it the earliest context that edge holds that the instance has not taken, or the context that stands on it when it holds none.
+   :ears_pattern: event
+   :statement: When an instance reads an output made on its own passes, Run scheduler shall give each of its activations the context made on the same pass.
+
+   A router's output, or an input it passes on, is made on the pass of the
+   router on which it takes a branch naming the instance; another output on
+   the pass of the instance that made it.
 
    Failure modes:
 
-   - **The latest context taken**, and a pass whose draft is paired with the
-     review of a later draft.
-   - **One pass's contexts taken from edges that moved at different rates**,
-     each edge's latest rather than each edge's next.
-   - **A context taken twice**, and a node answering the same pass again.
+   - **The earliest context not yet taken given**, and a node joining a
+     branch taken on some passes with one taken on all given two passes'
+     contexts (``EVD_PASSES_MISPAIRED_ACROSS_A_BRANCH``), which is what the
+     scheduler did.
+   - **The latest context given**, and what a pass is given turning on the
+     order instances are offered in (``EVD_STANDING_BY_INSTANCE_ORDER``).
+   - **A context given twice**, and a node answering the same pass again.
 
-.. comp_req:: An instance that has run is offered again on something new
+.. comp_req:: An instance is offered on its next pass once its inputs hold it
    :id: CREQ_SCHEDULER_OFFERS_AGAIN
    :derived_from: FEAT_REPEAT_ON_NEW_CONTEXTS
    :allocated_to: COMP_RUN_SCHEDULER
    :ears_pattern: event
-   :statement: When every edge into an instance that has run holds a context that stands or one it has not taken and at least one holds one it has not taken, Run scheduler shall offer that instance for activation.
+   :statement: When every input of an instance holds a context of the next of its passes, Run scheduler shall offer that instance for activation.
 
-   ``DEC_RUN_AGAIN_ON_SOMETHING_NEW``. An instance with no edge into it, or
-   whose every edge stands, is offered once, by ``CREQ_SCHEDULER_READY_WHEN_BOUND``,
-   and never again.
+   An instance on the run's one pass is offered once, and one on no pass
+   never. Restated by ``DEC_CHANGE_SCHEDULER_OFFERS_AGAIN``.
 
    Failure modes:
 
-   - **An instance offered once and never again**, which is what the engine
-     did, and a repetition that stops after its first pass.
-   - **An instance offered on its standing inputs alone**, and a node running
-     for ever on the same contexts until the budget stops it.
-   - **An instance offered while an edge into it holds nothing new or
-     standing**, and given an input it already answered.
+   - **An instance offered once and never again**, and a repetition that
+     stops after its first pass.
+   - **An instance offered again on inputs of a pass it has run**, and a
+     node running for ever on the same contexts until the budget stops it.
+   - **An instance offered before every input holds its next pass**, and
+     given another pass's context or none.
 
-.. comp_req:: An output goes along every edge out of its instance
+.. comp_req:: An activation reads what was made on enclosing passes from the pass it belongs to
+   :id: CREQ_SCHEDULER_READS_ENCLOSING_PASS
+   :derived_from: FEAT_ENCLOSING_PASS_SERVES
+   :allocated_to: COMP_RUN_SCHEDULER
+   :ears_pattern: event
+   :statement: When an instance reads an output made on passes enclosing its own, Run scheduler shall give each of its activations the context made on the enclosing pass that activation belongs to.
+
+   A pass of a router's branch belongs to the router's pass on which it took
+   the branch; every pass belongs to the run's one pass. A pass on a set of a
+   router's branches belongs, among the router's passes on a larger set, to
+   the one it was taken on.
+
+   Failure modes:
+
+   - **A context made once taken once**, and a repetition reading the brief
+     stalling on its second pass.
+   - **A branch's node given the enclosing pass's first or latest context**,
+     not the one of the pass the branch was taken on.
+
+.. comp_req:: Instances whose inputs share no pass are found
+   :id: CREQ_SCHEDULER_REPORTS_UNPAIRED
+   :derived_from: FEAT_PASSES_PAIRED_BEFORE_RUN
+   :allocated_to: COMP_RUN_SCHEDULER
+   :ears_pattern: unwanted
+   :statement: If the inputs of an instance share no pass, then Run scheduler shall report that instance with the passes each of its inputs comes on.
+
+   Passes are worked out from the wiring and the parameters the run gives a
+   first context to, before anything runs (``DEC_PAIRING_CHECKED_AT_START``).
+   Inputs share a pass when one's passes are enclosed by all the others', or
+   when they come from branches of one router a single branch names together.
+   An instance on a loop no given context starts runs on no pass, as before,
+   and is not reported.
+
+   Failure modes:
+
+   - **Two branches no route takes together passed**, and their join waiting
+     for ever.
+   - **A loop's node reading a branch of the loop passed**, and given another
+     pass's context or waiting for ever.
+   - **A join of two branches a route takes together reported**, refusing a
+     workflow whose node has a pass.
+   - **A loop given nothing reported**, refusing a workflow that ran, idle,
+     before.
+
+.. comp_req:: A run whose nodes cannot be given one pass's contexts is refused
+   :id: CREQ_RUN_REFUSES_UNPAIRED
+   :derived_from: FEAT_PASSES_PAIRED_BEFORE_RUN
+   :allocated_to: COMP_WORKFLOW_RUN
+   :ears_pattern: unwanted
+   :statement: If an instance of a workflow cannot be given contexts of one pass, then Workflow run shall refuse to start naming every such instance.
+
+   Asked after the wiring and the signature, before the arguments'
+   identifiers: a refusal names what the caller supplied or what the
+   definition says, and the passes are both.
+
+   Failure modes:
+
+   - **The run started**, and a node's activation given two passes' contexts
+     or none after half of an expensive run.
+   - **The first such instance named and the rest left**, and a fix found one
+     instance at a time.
+
+.. comp_req:: An output is given to every instance reading it on the pass it was made
    :id: CREQ_RUN_WALKS_EVERY_EDGE
    :derived_from: FEAT_REPEAT_ON_NEW_CONTEXTS
    :allocated_to: COMP_WORKFLOW_RUN
    :ears_pattern: event
-   :statement: When the caller reports the output of an instance whose node type does not route, Workflow run shall walk it along every edge out of that instance as the next context that edge holds.
+   :statement: When the caller reports the output of an instance whose node type does not route, Workflow run shall hold it as the output of the instance's next pass for every instance reading it.
+
+   Restated by ``DEC_CHANGE_RUN_WALKS_EVERY_EDGE``.
 
    Failure modes:
 
-   - **The output replacing what an edge holds**, and a pass not yet taken
-     lost to the next.
-   - **One edge out of several walked**, and a consumer waiting for a pass
-     that went elsewhere.
-
-.. comp_req:: A node type may declare its output standing
-   :id: CREQ_READER_READS_STANDING
-   :derived_from: FEAT_STANDING_SERVES_LATER_PASSES
-   :allocated_to: COMP_TOPOLOGY_READER
-   :ears_pattern: event
-   :statement: When a node type declares standing = true, Topology reader shall read that type's output as standing.
-
-   ``DEC_STANDING_OUTPUTS``: in the node type's declaration, fixed before any
-   run. A value that is not a boolean is refused as any value of the wrong
-   type is (``CREQ_READER_FAULT_LOCATED``).
-
-   Failure modes:
-
-   - **The key read past**, as keys the reader does not know are, and the
-     output ending with its first pass.
-   - **``standing = false`` read as standing.**
-
-.. comp_req:: An output that stands serves every later activation
-   :id: CREQ_SCHEDULER_STANDING_SERVES
-   :derived_from: FEAT_STANDING_SERVES_LATER_PASSES
-   :allocated_to: COMP_RUN_SCHEDULER
-   :ears_pattern: event
-   :statement: When an instance whose output stands has produced, Run scheduler shall give that output to every later activation reading it until the instance produces another.
-
-   An output stands when its node type declares it or when its instance has no
-   edge into it that does not stand (``DEC_ONCE_RUN_OUTPUTS_STAND``).
-
-   Failure modes:
-
-   - **A standing output taken once**, and a repetition that reads the brief
-     stalling on its second pass.
-   - **The first of a standing node's outputs kept after it produced a
-     second.**
-   - **The output of an instance the run gave every input taken once**, it
-     being declared standing nowhere.
+   - **The output replacing an earlier pass's**, and a reader that has not
+     yet run that pass given the later one.
+   - **The output held for one reader of several**, and another waiting for
+     a pass that went elsewhere.
 
 .. comp_req:: A context a run is given for a wired parameter is its edge's first
    :id: CREQ_RUN_ARGUMENT_FIRST_ON_ITS_EDGE
@@ -108,10 +141,10 @@ instance takes from each the earliest it has not taken
    :ears_pattern: event
    :statement: When a run is started with a context for a parameter a binding fills, Workflow run shall hold that context as the first that edge holds, before any context walked along it.
 
-   ``DEC_ARGUMENT_FIRST_ON_ITS_EDGE``. It is generation 0 of the edge, and
-   the binding's contexts are 1 onward, whenever they are walked. Two
-   contexts given for one parameter are refused as they are for any
-   (``CREQ_RUN_REFUSES_UNFILLED_SIGNATURE``).
+   ``DEC_ARGUMENT_FIRST_ON_ITS_EDGE``. It is the binding's pass 0, and the
+   passes of what the binding carries are its passes 1 onward, whenever they
+   are made. Two contexts given for one parameter are refused as they are for
+   any (``CREQ_RUN_REFUSES_UNFILLED_SIGNATURE``).
 
    Failure modes:
 

@@ -9,6 +9,7 @@
 //! graph by `docs/code/agconflo-core.rst`, which gives its shapes.
 
 mod catalogue;
+mod clock;
 mod context;
 mod defect;
 mod id;
@@ -25,6 +26,7 @@ mod writer;
 mod compile_fail;
 
 pub use catalogue::{RepeatedType, RepeatedTypes, TypeCatalogue};
+pub use clock::Unpaired;
 pub use context::{Context, ContextType, InvalidTypeName};
 pub use defect::WiringDefect;
 pub use id::{ContextId, IdSource, SourceExhausted};

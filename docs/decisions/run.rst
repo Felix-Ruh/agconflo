@@ -545,19 +545,21 @@ to leave every one of them open.
      nothing on it ran before; refusing such a workflow is a decision of its
      own.
 
-   An instance runs on the passes of the input that comes most often, and
-   every other input has to come on passes enclosing those: the run's one
-   pass encloses every other, and a router's passes enclose its branches'. An
-   input on the instance's own passes is taken pass by pass; one on passes
-   enclosing them is read from the enclosing pass the activation belongs to.
-   So a node on a branch reading what was made on every pass of the loop is
-   given what was made on the pass the branch was taken, and a brief made once
-   reaches every pass. An instance whose inputs come on passes neither of
-   which encloses the other has no pass to be given them on, and is refused
-   before the run starts (``DEC_PAIRING_CHECKED_AT_START``). It runs once per
-   pass, so it runs again exactly when its next pass's inputs are there, which
-   is what ``DEC_RUN_AGAIN_ON_SOMETHING_NEW`` and
-   ``DEC_ONCE_RUN_OUTPUTS_STAND`` each had to say apart.
+   An instance runs on the passes all its inputs share: those of the input
+   that comes most often, when every other input comes on passes enclosing
+   them - the run's one pass encloses every other, and a router's passes
+   enclose its branches' - and, for inputs from different branches of one
+   router, the passes on which it takes a branch naming them all. An input on
+   the instance's own passes is taken pass by pass; one on passes enclosing
+   them is read from the enclosing pass the activation belongs to. So a node
+   on a branch reading what was made on every pass of the loop is given what
+   was made on the pass the branch was taken, and a brief made once reaches
+   every pass. An instance whose inputs share no pass has none to be given
+   them on, and is refused before the run starts
+   (``DEC_PAIRING_CHECKED_AT_START``). It runs once per pass, so it runs again
+   exactly when its next pass's inputs are there, which is what
+   ``DEC_RUN_AGAIN_ON_SOMETHING_NEW`` and ``DEC_ONCE_RUN_OUTPUTS_STAND`` each
+   had to say apart.
 
    Every context an activation is given is a function of the outputs and the
    routes the run accepted, never of the order instances are written in or
@@ -580,12 +582,12 @@ to leave every one of them open.
    - **Detecting a mispairing as it happens.** It needs the same notion of a
      pass, and fails the run half way through instead of before it starts.
 
-.. dec:: A run is refused unless every node's inputs come on passes one of which encloses the rest
+.. dec:: A run is refused unless every node's inputs share a pass
    :id: DEC_PAIRING_CHECKED_AT_START
    :dec_status: accepted
    :decided_on: 2026-10-04
    :supported_by: EVD_PASSES_MISPAIRED_ACROSS_A_BRANCH
-   :statement: Agconflo shall refuse to start a run in which a node instance's inputs come on passes neither of which encloses the other, naming the instance and the passes each of its inputs comes on.
+   :statement: Agconflo shall refuse to start a run in which a node instance's inputs share no pass, naming the instance and the passes each of its inputs comes on.
 
    ``STKH_WIRING_CHECKED`` rejects an invalid workflow before any node runs,
    and a node that cannot be given one pass's contexts is that: its answer is
@@ -596,9 +598,13 @@ to leave every one of them open.
    become part of the workflow document, the same check would move to the
    validator unchanged.
 
-   A node joining two branches of one router is refused by it: the two never
-   share a pass, and there is no construct merging them. That is a goal of its
-   own if one is wanted.
+   A node joining two branches of one router runs on the passes on which the
+   router takes a branch naming both, and is refused where no branch does:
+   the two then never share a pass, and there is no construct merging them.
+   That is a goal of its own if one is wanted. Two loops whose passes neither
+   encloses the other's - a loop inside another, re-started on each outer
+   pass - share none either, and are refused alike until a loop's first
+   context can come from the wiring rather than from the run.
 
 .. dec:: A node type declaring its output standing is refused
    :id: DEC_STANDING_REFUSED

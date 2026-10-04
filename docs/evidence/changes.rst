@@ -256,3 +256,96 @@ or keeps, on the commit named. Re-running one later shows what has moved since.
    it: every requirement of ``COMP_TOPOLOGY_READER``,
    ``COMP_WIRING_VALIDATOR``, ``COMP_SCRIPT_HOST``, ``COMP_WORKFLOW_RUN`` and
    ``COMP_RUN_RECORD``. In prose: one line of ``components/routing``.
+
+.. evd:: The impact of a node being given one pass's contexts
+   :id: EVD_IMPACT_REPEAT_ON_NEW_CONTEXTS
+   :evd_kind: measurement
+   :observed_on: 2026-10-04
+   :observation: FEAT_REPEAT_ON_NEW_CONTEXTS answers to 1 need, has 15 below it by link, shares components with 26 requirements and an architecture with 2, and is named on 2 lines.
+
+   Run as ``sh scripts/impact.sh FEAT_REPEAT_ON_NEW_CONTEXTS`` on
+   ``2ea52d1``. Above it: ``STKH_REPETITION``. Below it:
+   ``CREQ_SCHEDULER_TAKES_EARLIEST``, ``CREQ_SCHEDULER_OFFERS_AGAIN``,
+   ``CREQ_RUN_WALKS_EVERY_EDGE``, ``ARCH_REPETITION``, their three markers,
+   four test cases and their runs. Beside it: the run scheduler's and the
+   workflow run's requirements, and ``FEAT_ARGUMENT_FIRST_ON_ITS_EDGE`` and
+   ``FEAT_STANDING_SERVES_LATER_PASSES`` under ``ARCH_REPETITION``. In prose:
+   two lines of the change records.
+
+.. evd:: The impact of removing an output declared standing
+   :id: EVD_IMPACT_STANDING_SERVES_LATER_PASSES
+   :evd_kind: measurement
+   :observed_on: 2026-10-04
+   :observation: FEAT_STANDING_SERVES_LATER_PASSES answers to 1 need, has 10 below it by link, shares components with 13 requirements and an architecture with 2, and is named on 3 lines.
+
+   Run as ``sh scripts/impact.sh FEAT_STANDING_SERVES_LATER_PASSES`` on
+   ``2ea52d1``. Below it: ``CREQ_READER_READS_STANDING``,
+   ``CREQ_SCHEDULER_STANDING_SERVES``, ``ARCH_REPETITION``, three markers and
+   two test cases with their runs. In prose: two lines of the change records
+   and one of ``tests/repetition``.
+
+.. evd:: The impact of repetition's architecture realising passes
+   :id: EVD_IMPACT_ARCH_REPETITION_PASSES
+   :evd_kind: measurement
+   :observed_on: 2026-10-04
+   :observation: ARCH_REPETITION answers to 5 needs, has nothing below it by link, uses components holding 38 requirements, and is named on 5 lines.
+
+   Run as ``sh scripts/impact.sh ARCH_REPETITION`` on ``2ea52d1``. Above it:
+   its three features and ``STKH_REPETITION`` and
+   ``STKH_RUN_FROM_ANY_PARAMETER``. Beside it: every requirement of the
+   topology reader, the run scheduler and the workflow run. In prose: one
+   line of ``components/repetition`` and four of the change records.
+
+.. evd:: The impact of removing the earliest context an edge holds
+   :id: EVD_IMPACT_SCHEDULER_TAKES_EARLIEST
+   :evd_kind: measurement
+   :observed_on: 2026-10-04
+   :observation: CREQ_SCHEDULER_TAKES_EARLIEST answers to 2 needs, has 4 below it by link and 5 requirements sharing its component, and is named on 2 lines.
+
+   Run as ``sh scripts/impact.sh CREQ_SCHEDULER_TAKES_EARLIEST`` on
+   ``2ea52d1``. Below it: ``IMPL_SCHEDULER_READY``,
+   ``IMPL_SCHEDULER_TAKES_EARLIEST``, ``TEST_SCHEDULER_TAKES_EARLIEST`` and its
+   run. In prose: those two markers in ``scheduler.rs``.
+
+.. evd:: The impact of offering an instance on its next pass
+   :id: EVD_IMPACT_SCHEDULER_OFFERS_AGAIN
+   :evd_kind: measurement
+   :observed_on: 2026-10-04
+   :observation: CREQ_SCHEDULER_OFFERS_AGAIN answers to 2 needs, has 3 below it by link and 5 requirements sharing its component, and is named on 6 lines.
+
+   Run as ``sh scripts/impact.sh CREQ_SCHEDULER_OFFERS_AGAIN`` on
+   ``2ea52d1``. Below it: ``IMPL_SCHEDULER_READY``,
+   ``TEST_SCHEDULER_OFFERED_AGAIN_ON_SOMETHING_NEW`` and its run. In prose:
+   the marker in ``scheduler.rs``, two lines of ``components/run``, one of
+   ``components/yield`` and two of the change records.
+
+.. evd:: The impact of removing a standing output serving later activations
+   :id: EVD_IMPACT_SCHEDULER_STANDING_SERVES
+   :evd_kind: measurement
+   :observed_on: 2026-10-04
+   :observation: CREQ_SCHEDULER_STANDING_SERVES answers to 2 needs, has 4 below it by link and 5 requirements sharing its component, and is named on 2 lines.
+
+   Run as ``sh scripts/impact.sh CREQ_SCHEDULER_STANDING_SERVES`` on
+   ``2ea52d1``. Below it: ``IMPL_SCHEDULER_STANDING``,
+   ``IMPL_SCHEDULER_TAKES_EARLIEST``, ``TEST_SCHEDULER_STANDING_SERVES_LATER``
+   and its run. In prose: those two markers in ``scheduler.rs``.
+
+.. evd:: The impact of removing the reading of a standing declaration
+   :id: EVD_IMPACT_READER_READS_STANDING
+   :evd_kind: measurement
+   :observed_on: 2026-10-04
+   :observation: CREQ_READER_READS_STANDING answers to 2 needs, has 3 below it by link and 8 requirements sharing its component, and is named on 1 line.
+
+   Run as ``sh scripts/impact.sh CREQ_READER_READS_STANDING`` on ``2ea52d1``.
+   Below it: ``IMPL_READER_STANDING``, ``TEST_READER_STANDING_READ`` and its
+   run. In prose: that marker in ``reader.rs``.
+
+.. evd:: The impact of holding an output as its instance's next pass
+   :id: EVD_IMPACT_RUN_WALKS_EVERY_EDGE
+   :evd_kind: measurement
+   :observed_on: 2026-10-04
+   :observation: CREQ_RUN_WALKS_EVERY_EDGE answers to 2 needs, has 3 below it by link and 22 requirements sharing its component, and is named on 1 line.
+
+   Run as ``sh scripts/impact.sh CREQ_RUN_WALKS_EVERY_EDGE`` on ``2ea52d1``.
+   Below it: ``IMPL_RUN_WALKS_EVERY_EDGE``, ``TEST_RUN_OUTPUT_WALKS_EVERY_EDGE``
+   and its run. In prose: that marker in ``scheduler.rs``.

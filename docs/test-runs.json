@@ -1353,13 +1353,13 @@
           "title": "agconflo-core reader::routes_read",
           "type": "test_run"
         },
-        "RUN_READER_STANDING_READ": {
+        "RUN_READER_STANDING_REFUSED": {
           "executes": [
-            "TEST_READER_STANDING_READ"
+            "TEST_READER_STANDING_REFUSED"
           ],
-          "id": "RUN_READER_STANDING_READ",
+          "id": "RUN_READER_STANDING_REFUSED",
           "test_outcome": "passed",
-          "title": "agconflo-core reader::standing_read",
+          "title": "agconflo-core reader::standing_refused",
           "type": "test_run"
         },
         "RUN_READER_UNNAMED_KEYS_ARE_READ": {
@@ -1830,6 +1830,15 @@
           "title": "agconflo-core run::bad_route_refused",
           "type": "test_run"
         },
+        "RUN_RUN_BRANCH_READS_ITS_OWN_PASS": {
+          "executes": [
+            "TEST_RUN_BRANCH_READS_ITS_OWN_PASS"
+          ],
+          "id": "RUN_RUN_BRANCH_READS_ITS_OWN_PASS",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::branch_reads_its_own_pass",
+          "type": "test_run"
+        },
         "RUN_RUN_BUDGET_COUNTS_EACH_PASS": {
           "executes": [
             "TEST_RUN_BUDGET_COUNTS_EACH_PASS"
@@ -2091,6 +2100,15 @@
           "title": "agconflo-core run::passed_through_output_is_refused",
           "type": "test_run"
         },
+        "RUN_RUN_PASSES_IGNORE_INSTANCE_ORDER": {
+          "executes": [
+            "TEST_RUN_PASSES_IGNORE_INSTANCE_ORDER"
+          ],
+          "id": "RUN_RUN_PASSES_IGNORE_INSTANCE_ORDER",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::passes_ignore_instance_order",
+          "type": "test_run"
+        },
         "RUN_RUN_QUIESCENT_NAMES_ONLY_UNPRODUCED": {
           "executes": [
             "TEST_RUN_QUIESCENT_NAMES_ONLY_UNPRODUCED"
@@ -2197,6 +2215,15 @@
           "id": "RUN_RUN_UNFILLED_CALL_IS_REFUSED",
           "test_outcome": "passed",
           "title": "agconflo-core run::unfilled_call_is_refused",
+          "type": "test_run"
+        },
+        "RUN_RUN_UNPAIRED_RUN_REFUSED": {
+          "executes": [
+            "TEST_RUN_UNPAIRED_RUN_REFUSED"
+          ],
+          "id": "RUN_RUN_UNPAIRED_RUN_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::unpaired_run_refused",
           "type": "test_run"
         },
         "RUN_RUN_WELL_FORMED_RUNS_COMPLETE": {
@@ -2469,13 +2496,13 @@
           "title": "agconflo-core scheduler::none_ready_only_when_none",
           "type": "test_run"
         },
-        "RUN_SCHEDULER_OFFERED_AGAIN_ON_SOMETHING_NEW": {
+        "RUN_SCHEDULER_OFFERED_ONCE_PER_PASS": {
           "executes": [
-            "TEST_SCHEDULER_OFFERED_AGAIN_ON_SOMETHING_NEW"
+            "TEST_SCHEDULER_OFFERED_ONCE_PER_PASS"
           ],
-          "id": "RUN_SCHEDULER_OFFERED_AGAIN_ON_SOMETHING_NEW",
+          "id": "RUN_SCHEDULER_OFFERED_ONCE_PER_PASS",
           "test_outcome": "passed",
-          "title": "agconflo-core scheduler::offered_again_on_something_new",
+          "title": "agconflo-core scheduler::offered_once_per_pass",
           "type": "test_run"
         },
         "RUN_SCHEDULER_PARTIAL_INPUTS_STILL_QUIESCENT": {
@@ -2496,24 +2523,6 @@
           "title": "agconflo-core scheduler::produced_instance_not_offered",
           "type": "test_run"
         },
-        "RUN_SCHEDULER_STANDING_SERVES_LATER": {
-          "executes": [
-            "TEST_SCHEDULER_STANDING_SERVES_LATER"
-          ],
-          "id": "RUN_SCHEDULER_STANDING_SERVES_LATER",
-          "test_outcome": "passed",
-          "title": "agconflo-core scheduler::standing_serves_later",
-          "type": "test_run"
-        },
-        "RUN_SCHEDULER_TAKES_EARLIEST": {
-          "executes": [
-            "TEST_SCHEDULER_TAKES_EARLIEST"
-          ],
-          "id": "RUN_SCHEDULER_TAKES_EARLIEST",
-          "test_outcome": "passed",
-          "title": "agconflo-core scheduler::takes_earliest",
-          "type": "test_run"
-        },
         "RUN_SCHEDULER_UNBOUND_PARAMETER_NEVER_READY": {
           "executes": [
             "TEST_SCHEDULER_UNBOUND_PARAMETER_NEVER_READY"
@@ -2521,6 +2530,15 @@
           "id": "RUN_SCHEDULER_UNBOUND_PARAMETER_NEVER_READY",
           "test_outcome": "passed",
           "title": "agconflo-core scheduler::unbound_parameter_never_ready",
+          "type": "test_run"
+        },
+        "RUN_SCHEDULER_UNPAIRED_INPUTS_REPORTED": {
+          "executes": [
+            "TEST_SCHEDULER_UNPAIRED_INPUTS_REPORTED"
+          ],
+          "id": "RUN_SCHEDULER_UNPAIRED_INPUTS_REPORTED",
+          "test_outcome": "passed",
+          "title": "agconflo-core scheduler::unpaired_inputs_reported",
           "type": "test_run"
         },
         "RUN_SCHEDULER_UNRESOLVED_SOURCE_NEVER_READY": {

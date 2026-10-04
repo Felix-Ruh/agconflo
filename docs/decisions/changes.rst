@@ -953,3 +953,282 @@ that changed them show through, and are revised here.
      ``CREQ_RUN_REFUSES_BAD_ROUTE`` keeps its statement: a naming that is no
      branch is a further refusal, not a change to the three it lists.
    - Text, the line of ``components/routing`` naming it: unchanged.
+
+The eight records below are one change, made on 2026-10-04: the passes a
+repeated node is given its contexts on are worked out from the wiring rather
+than counted per edge (``DEC_PASS_CLOCKS``), and no output is declared
+standing (``DEC_STANDING_REFUSED``). Two measurements raised it
+(``EVD_PASSES_MISPAIRED_ACROSS_A_BRANCH``, ``EVD_STANDING_BY_INSTANCE_ORDER``),
+and each impact analysis was taken on ``2ea52d1``, before any of the eight
+changed.
+
+.. dec:: Restated: a node runs again on each pass its inputs reach, given that pass's contexts
+   :id: DEC_CHANGE_REPEAT_ON_NEW_CONTEXTS
+   :dec_status: accepted
+   :decided_on: 2026-10-04
+   :supported_by: EVD_IMPACT_REPEAT_ON_NEW_CONTEXTS
+   :statement: Agconflo's requirements project shall state FEAT_REPEAT_ON_NEW_CONTEXTS as a node given the contexts of one pass because the mechanism it named gave a node two passes' contexts while it held.
+
+   Amends ``FEAT_REPEAT_ON_NEW_CONTEXTS``.
+
+   Before: "When every edge into a node instance that has run holds a context
+   that stands or one it has not taken and at least one holds one it has not
+   taken, Agconflo shall activate that instance again." After: "When the
+   inputs of a node instance hold the contexts of a pass it has not run,
+   Agconflo shall activate the instance with the contexts of that pass."
+
+   Raised by ``EVD_PASSES_MISPAIRED_ACROSS_A_BRANCH``: a node joining an edge
+   a router walks on some passes with one walked on every pass was activated
+   under the old statement, every edge holding a context not taken, and was
+   given the first pass's context beside the second's.
+
+   Justification: it is wrong against its own parent. ``STKH_REPETITION`` lets
+   a workflow repeat part of itself and leaves how one pass's contexts are
+   kept apart from the next's to a decision; the old statement named the
+   mechanism of the day - edges, contexts taken and not taken, outputs that
+   stand - and held while it failed to keep passes apart, so it claimed both
+   more than its parent (a mechanism) and less (a pass given its own). The
+   new statement says what the parent needs of any mechanism, and would read
+   the same had no measurement been taken.
+
+   Verdicts on the impact analysis (``EVD_IMPACT_REPEAT_ON_NEW_CONTEXTS``):
+
+   - Up, ``STKH_REPETITION``: unchanged.
+   - Down: ``CREQ_SCHEDULER_TAKES_EARLIEST`` is removed for
+     ``CREQ_SCHEDULER_GIVES_ONE_PASS`` (``DEC_CHANGE_SCHEDULER_TAKES_EARLIEST``);
+     ``CREQ_SCHEDULER_OFFERS_AGAIN`` and ``CREQ_RUN_WALKS_EVERY_EDGE`` are
+     restated (``DEC_CHANGE_SCHEDULER_OFFERS_AGAIN``,
+     ``DEC_CHANGE_RUN_WALKS_EVERY_EDGE``); ``ARCH_REPETITION`` changes its
+     links (``DEC_CHANGE_ARCH_REPETITION_PASSES``). ``IMPL_SCHEDULER_READY``
+     now implements the restated requirements; ``IMPL_SCHEDULER_TAKES_EARLIEST``
+     goes with its code. ``TEST_SCHEDULER_TAKES_EARLIEST`` and
+     ``TEST_SCHEDULER_OFFERED_AGAIN_ON_SOMETHING_NEW`` go with their tests, for
+     ``TEST_SCHEDULER_OFFERED_ONCE_PER_PASS``, ``TEST_RUN_BRANCH_READS_ITS_OWN_PASS``
+     and ``TEST_RUN_PASSES_IGNORE_INSTANCE_ORDER``.
+     ``TEST_RUN_OUTPUT_WALKS_EVERY_EDGE`` and ``TEST_SCRIPTED_REVIEW_LOOP`` are
+     unchanged and pass.
+   - Sideways, the requirements of the run scheduler and the workflow run:
+     unaffected but those named above; ``FEAT_STANDING_SERVES_LATER_PASSES``,
+     beside it under ``ARCH_REPETITION``, is removed
+     (``DEC_CHANGE_STANDING_SERVES_LATER_PASSES``), and
+     ``FEAT_ARGUMENT_FIRST_ON_ITS_EDGE`` is unchanged.
+   - Text, two lines of the records above naming it: unchanged, as history.
+
+.. dec:: Removed: an output declared standing serving later passes
+   :id: DEC_CHANGE_STANDING_SERVES_LATER_PASSES
+   :dec_status: accepted
+   :decided_on: 2026-10-04
+   :supported_by: EVD_IMPACT_STANDING_SERVES_LATER_PASSES
+   :statement: Agconflo's requirements project shall replace FEAT_STANDING_SERVES_LATER_PASSES with FEAT_ENCLOSING_PASS_SERVES because it named a declaration whose result turned on the order instances are written in.
+
+   Removes ``FEAT_STANDING_SERVES_LATER_PASSES``: "When a node instance
+   produces an output that stands, Agconflo shall give that output to every
+   later activation reading it until the instance produces another."
+   ``FEAT_ENCLOSING_PASS_SERVES`` takes its place: "When a node instance
+   reads an output made on passes enclosing its own, Agconflo shall give each
+   of its activations the context made on the enclosing pass that activation
+   belongs to."
+
+   Raised by ``EVD_STANDING_BY_INSTANCE_ORDER``: a standing output made again
+   reached its reader as each pass's own or as the first pass's on every
+   pass, depending on which of two instances the definition wrote first.
+
+   Justification: it is wrong against its own parent. ``STKH_REPETITION``
+   needs a pass to read what does not change from pass to pass; the
+   requirement named one mechanism for it, a standing output, and its "every
+   later activation" served whichever context was latest when the reader
+   ran, so it held while a pass was given another's. What the parent needs is
+   that a context made outside a pass reaches it as made on the pass it
+   belongs to, which the new requirement says without naming how.
+
+   Verdicts on the impact analysis (``EVD_IMPACT_STANDING_SERVES_LATER_PASSES``):
+
+   - Up, ``STKH_REPETITION``: unchanged.
+   - Down: ``CREQ_READER_READS_STANDING`` and ``CREQ_SCHEDULER_STANDING_SERVES``
+     are removed (``DEC_CHANGE_READER_READS_STANDING``,
+     ``DEC_CHANGE_SCHEDULER_STANDING_SERVES``), with ``IMPL_READER_STANDING``,
+     ``IMPL_SCHEDULER_STANDING`` and ``IMPL_SCHEDULER_TAKES_EARLIEST`` and the
+     tests behind ``TEST_READER_STANDING_READ`` and
+     ``TEST_SCHEDULER_STANDING_SERVES_LATER``. ``ARCH_REPETITION`` realises
+     ``FEAT_ENCLOSING_PASS_SERVES`` instead.
+   - Sideways, the reader's and the scheduler's requirements: unaffected but
+     those named; the reader refuses the key under ``CREQ_READER_FAULT_LOCATED``
+     (``DEC_STANDING_REFUSED``).
+   - Text, the records above and ``TEST_SCRIPTED_REVIEW_LOOP``'s body: the
+     records unchanged as history, the test case's body naming the new
+     requirement.
+
+.. dec:: Revised: repetition's architecture realises passes, and no longer uses the reader
+   :id: DEC_CHANGE_ARCH_REPETITION_PASSES
+   :dec_status: accepted
+   :decided_on: 2026-10-04
+   :supported_by: EVD_IMPACT_ARCH_REPETITION_PASSES
+   :statement: Agconflo's requirements project shall have ARCH_REPETITION realise the repetition features as they now stand and use the run scheduler and the workflow run because nothing of repetition is the topology reader's any more.
+
+   Amends ``ARCH_REPETITION``. Before: it realised
+   ``FEAT_REPEAT_ON_NEW_CONTEXTS``, ``FEAT_STANDING_SERVES_LATER_PASSES`` and
+   ``FEAT_ARGUMENT_FIRST_ON_ITS_EDGE``, used the topology reader, the run
+   scheduler and the workflow run, and stated "Agconflo shall allocate
+   repetition to the topology reader, the run scheduler and the workflow
+   run." After: it realises ``FEAT_REPEAT_ON_NEW_CONTEXTS``,
+   ``FEAT_ENCLOSING_PASS_SERVES``, ``FEAT_ARGUMENT_FIRST_ON_ITS_EDGE`` and
+   ``FEAT_PASSES_PAIRED_BEFORE_RUN``, uses the run scheduler and the workflow
+   run, and states "Agconflo shall allocate repetition to the run scheduler
+   and the workflow run."
+
+   Justification: its parents changed. One feature it realised is removed
+   and two are added, and the one requirement it allocated to the topology
+   reader, reading ``standing``, is removed with the declaration; refusing the
+   key is the reader's under its own feature (``CREQ_READER_FAULT_LOCATED``).
+
+   Verdicts on the impact analysis (``EVD_IMPACT_ARCH_REPETITION_PASSES``):
+
+   - Up: as above.
+   - Down: nothing links to it.
+   - Sideways, the 38 requirements of the three components it used: those of
+     the reader unaffected, and no longer beside it; the scheduler's and the
+     run's as the records above and below say.
+   - Text, the line of ``components/repetition`` naming it: rewritten for two
+     components; the records naming it unchanged as history.
+
+.. dec:: Removed: an activation taking the earliest context each edge holds
+   :id: DEC_CHANGE_SCHEDULER_TAKES_EARLIEST
+   :dec_status: accepted
+   :decided_on: 2026-10-04
+   :supported_by: EVD_IMPACT_SCHEDULER_TAKES_EARLIEST
+   :statement: Agconflo's requirements project shall replace CREQ_SCHEDULER_TAKES_EARLIEST with CREQ_SCHEDULER_GIVES_ONE_PASS because its parent now asks for the contexts of one pass.
+
+   Removes ``CREQ_SCHEDULER_TAKES_EARLIEST``: "Run scheduler shall give an
+   instance's activation from each edge into it the earliest context that
+   edge holds that the instance has not taken, or the context that stands on
+   it when it holds none." ``CREQ_SCHEDULER_GIVES_ONE_PASS`` takes its place:
+   "When an instance reads an output made on its own passes, Run scheduler
+   shall give each of its activations the context made on the same pass."
+
+   Justification: its parent changed (``DEC_CHANGE_REPEAT_ON_NEW_CONTEXTS``).
+   The earliest context not taken is what gave the join two passes'
+   contexts, and is now its first failure mode.
+
+   Verdicts on the impact analysis (``EVD_IMPACT_SCHEDULER_TAKES_EARLIEST``):
+
+   - Up, ``FEAT_REPEAT_ON_NEW_CONTEXTS`` and ``STKH_REPETITION``: as above.
+   - Down: ``IMPL_SCHEDULER_TAKES_EARLIEST`` goes with its code;
+     ``IMPL_SCHEDULER_READY`` implements the new requirement through
+     ``IMPL_SCHEDULER_ONE_PASS``; ``TEST_SCHEDULER_TAKES_EARLIEST`` goes with
+     its test.
+   - Sideways, the scheduler's other requirements: unaffected but
+     ``CREQ_SCHEDULER_OFFERS_AGAIN`` and ``CREQ_SCHEDULER_STANDING_SERVES``,
+     recorded beside this.
+   - Text, its two markers in ``scheduler.rs``: gone with the code.
+
+.. dec:: Restated: an instance is offered on its next pass once its inputs hold it
+   :id: DEC_CHANGE_SCHEDULER_OFFERS_AGAIN
+   :dec_status: accepted
+   :decided_on: 2026-10-04
+   :supported_by: EVD_IMPACT_SCHEDULER_OFFERS_AGAIN
+   :statement: Agconflo's requirements project shall state CREQ_SCHEDULER_OFFERS_AGAIN as offering an instance on its next pass because its parent now asks for the contexts of one pass.
+
+   Amends ``CREQ_SCHEDULER_OFFERS_AGAIN``. Before: "When every edge into an
+   instance that has run holds a context that stands or one it has not taken
+   and at least one holds one it has not taken, Run scheduler shall offer that
+   instance for activation." After: "When every input of an instance holds a
+   context of the next of its passes, Run scheduler shall offer that instance
+   for activation."
+
+   Justification: its parent changed (``DEC_CHANGE_REPEAT_ON_NEW_CONTEXTS``).
+   "Something new on one edge" is what the old mechanism offered on; one
+   pass at a time is what the parent asks, and an instance whose inputs all
+   come once is on the run's one pass and offered once, which the old
+   statement needed "at least one" to say.
+
+   Verdicts on the impact analysis (``EVD_IMPACT_SCHEDULER_OFFERS_AGAIN``):
+
+   - Up: as above.
+   - Down: ``IMPL_SCHEDULER_READY`` implements the restated requirement;
+     ``TEST_SCHEDULER_OFFERED_AGAIN_ON_SOMETHING_NEW`` is replaced by
+     ``TEST_SCHEDULER_OFFERED_ONCE_PER_PASS``.
+   - Sideways: as for ``DEC_CHANGE_SCHEDULER_TAKES_EARLIEST``.
+   - Text, two lines of ``components/run``, one of ``components/yield`` and
+     two of a record above: each names it for an instance that has run being
+     offered again, which still holds; unchanged.
+
+.. dec:: Removed: a standing output serving every later activation
+   :id: DEC_CHANGE_SCHEDULER_STANDING_SERVES
+   :dec_status: accepted
+   :decided_on: 2026-10-04
+   :supported_by: EVD_IMPACT_SCHEDULER_STANDING_SERVES
+   :statement: Agconflo's requirements project shall replace CREQ_SCHEDULER_STANDING_SERVES with CREQ_SCHEDULER_READS_ENCLOSING_PASS because its parent was replaced.
+
+   Removes ``CREQ_SCHEDULER_STANDING_SERVES``: "When an instance whose output
+   stands has produced, Run scheduler shall give that output to every later
+   activation reading it until the instance produces another."
+   ``CREQ_SCHEDULER_READS_ENCLOSING_PASS`` takes its place, derived from
+   ``FEAT_ENCLOSING_PASS_SERVES``.
+
+   Justification: its parent changed (``DEC_CHANGE_STANDING_SERVES_LATER_PASSES``).
+
+   Verdicts on the impact analysis (``EVD_IMPACT_SCHEDULER_STANDING_SERVES``):
+
+   - Up, ``FEAT_STANDING_SERVES_LATER_PASSES`` and ``STKH_REPETITION``: the
+     first removed, the second unchanged.
+   - Down: ``IMPL_SCHEDULER_STANDING`` and ``IMPL_SCHEDULER_TAKES_EARLIEST`` go
+     with their code, and ``TEST_SCHEDULER_STANDING_SERVES_LATER`` with its
+     test; ``IMPL_SCHEDULER_ENCLOSING_PASS`` and
+     ``TEST_RUN_BRANCH_READS_ITS_OWN_PASS`` meet and check the new requirement.
+   - Sideways: as for ``DEC_CHANGE_SCHEDULER_TAKES_EARLIEST``.
+   - Text, its two markers in ``scheduler.rs``: gone with the code.
+
+.. dec:: Removed: a node type declaring its output standing, read
+   :id: DEC_CHANGE_READER_READS_STANDING
+   :dec_status: accepted
+   :decided_on: 2026-10-04
+   :supported_by: EVD_IMPACT_READER_READS_STANDING
+   :statement: Agconflo's requirements project shall remove CREQ_READER_READS_STANDING because its parent was removed and the key it read is refused.
+
+   Removes ``CREQ_READER_READS_STANDING``: "When a node type declares
+   standing = true, Topology reader shall read that type's output as
+   standing." Nothing takes its place: the key is refused at its place, under
+   ``CREQ_READER_FAULT_LOCATED``, as ``optional`` and ``entry`` are
+   (``DEC_STANDING_REFUSED``).
+
+   Justification: its parent changed (``DEC_CHANGE_STANDING_SERVES_LATER_PASSES``).
+
+   Verdicts on the impact analysis (``EVD_IMPACT_READER_READS_STANDING``):
+
+   - Up: the first removed, ``STKH_REPETITION`` unchanged.
+   - Down: ``IMPL_READER_STANDING`` is renamed ``IMPL_READER_ROUTES``, which
+     reads ``routes`` alone; ``TEST_READER_STANDING_READ`` is replaced by
+     ``TEST_READER_STANDING_REFUSED``, verifying ``CREQ_READER_FAULT_LOCATED``.
+   - Sideways, the reader's other eight requirements: unaffected;
+     ``CREQ_READER_FAULT_LOCATED`` gains the failure mode of a standing
+     declaration read past.
+   - Text, its marker in ``reader.rs``: replaced.
+
+.. dec:: Restated: an output is held for every reader as its instance's next pass
+   :id: DEC_CHANGE_RUN_WALKS_EVERY_EDGE
+   :dec_status: accepted
+   :decided_on: 2026-10-04
+   :supported_by: EVD_IMPACT_RUN_WALKS_EVERY_EDGE
+   :statement: Agconflo's requirements project shall state CREQ_RUN_WALKS_EVERY_EDGE as an output held as its instance's next pass because its parent no longer names edges holding contexts in turn.
+
+   Amends ``CREQ_RUN_WALKS_EVERY_EDGE``. Before: "When the caller reports the
+   output of an instance whose node type does not route, Workflow run shall
+   walk it along every edge out of that instance as the next context that
+   edge holds." After: "When the caller reports the output of an instance
+   whose node type does not route, Workflow run shall hold it as the output of
+   the instance's next pass for every instance reading it."
+
+   Justification: its parent changed (``DEC_CHANGE_REPEAT_ON_NEW_CONTEXTS``).
+   What an edge holds next was the queue the old mechanism kept; what the
+   parent needs of the run is that each output is there for every reader as
+   the pass it was made on.
+
+   Verdicts on the impact analysis (``EVD_IMPACT_RUN_WALKS_EVERY_EDGE``):
+
+   - Up: as above.
+   - Down: ``IMPL_RUN_WALKS_EVERY_EDGE`` moves to the code holding each
+     output by pass; ``TEST_RUN_OUTPUT_WALKS_EVERY_EDGE`` is unchanged and
+     passes, its two readers each given the first output and then the second.
+   - Sideways, the run's other requirements: unaffected but
+     ``CREQ_RUN_REFUSES_UNPAIRED``, added beside it.
+   - Text, its marker in ``scheduler.rs``: moved with the code.

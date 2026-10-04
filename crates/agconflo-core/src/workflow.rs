@@ -36,10 +36,6 @@ pub struct NodeType {
     pub globals: Vec<ContextType>,
     /// The context type of the one output a node of this type produces.
     pub output: ContextType,
-    /// Whether that output stands: serves every later activation reading it
-    /// until the instance produces another.
-    // @A standing output declared on the node type,TRACE_WORKFLOW_STANDING,trace,[],[DEC_STANDING_OUTPUTS]
-    pub standing: bool,
     /// Whether a node of this type is a router: its script names the
     /// instances its run goes on to, and its output is its decision.
     // @A router declared on the node type,TRACE_WORKFLOW_ROUTES,trace,[],[DEC_ROUTER_DECLARED]
@@ -127,7 +123,6 @@ pub(crate) fn node_type(name: &str, required: &[(&str, &str)], output: &str) -> 
         required: parameters(required),
         globals: Vec::new(),
         output: context_type(output),
-        standing: false,
         routes: false,
     }
 }
@@ -137,12 +132,6 @@ impl NodeType {
     /// The same declaration, described as `description`.
     pub(crate) fn described(mut self, description: &str) -> Self {
         self.description = description.to_owned();
-        self
-    }
-
-    /// The same declaration, its output standing.
-    pub(crate) fn standing(mut self) -> Self {
-        self.standing = true;
         self
     }
 
