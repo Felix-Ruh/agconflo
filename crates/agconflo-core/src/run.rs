@@ -6,11 +6,10 @@ use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::marker::PhantomData;
 
-use crate::clock::Unpaired;
 use crate::defect::WiringDefect;
 use crate::scheduler::{Activation, Passes, next_activation};
 use crate::workflow::{Branch, NodeType, WorkflowDefinition};
-use crate::{Context, ContextId, ContextType, validate_wiring};
+use crate::{Context, ContextId, ContextType, IdSource, validate_wiring};
 
 /// The contexts a run is given when it starts, each addressed by the instance
 /// and the parameter it fills. Every argument supplied is kept, a second one
@@ -87,9 +86,10 @@ pub enum StartRefusal {
     /// Different contexts among the arguments, or among what they were composed
     /// from, share these identifiers, each named once in the order found.
     SharedIdentifiers(Vec<ContextId>),
-    /// The inputs of these instances come on passes no one of which encloses
-    /// the rest, each named once, in the definition's order.
-    Unpaired(Vec<Unpaired>),
+    /// The identifier source lent to the start had issued every identifier,
+    /// and the first contexts the workflow's bindings declare could not be
+    /// made.
+    SourceExhausted,
 }
 
 /// How many things were refused and of which kind, then each of them, but
@@ -103,11 +103,11 @@ impl fmt::Display for StartRefusal {
             Self::Wiring(defects) => ("wiring defect", defects.len(), each(defects)),
             Self::Signature(faults) => ("signature fault", faults.len(), each(faults)),
             Self::SharedIdentifiers(ids) => ("shared identifier", ids.len(), Vec::new()),
-            Self::Unpaired(instances) => (
-                "node whose inputs cannot be paired",
-                instances.len(),
-                each(instances),
-            ),
+            Self::SourceExhausted => {
+                return f.write_str(
+                    "the identifier source has issued every identifier, so no first context can be made",
+                );
+            }
         };
         write!(f, "the workflow carries {count} {what}")?;
         if count != 1 {
@@ -207,11 +207,10 @@ impl fmt::Display for SignatureFault {
 impl std::error::Error for SignatureFault {}
 
 /// Every way the arguments fail to fill the parameters nothing binds exactly
-/// once each, or give a bound parameter more than one context or one of
-/// another type, every parameter and every argument looked at: in the
+/// once each, every parameter and every argument looked at: in the
 /// definition's order, then the arguments that matched nothing in the order
-/// supplied.
-// @A run whose inputs are not each given does not start,IMPL_RUN_SIGNATURE,impl,[CREQ_RUN_REFUSES_UNFILLED_SIGNATURE],[DEC_SIGNATURE_IS_WHAT_NOTHING_BINDS, DEC_ARGUMENT_FIRST_ON_ITS_EDGE]
+/// supplied, a parameter a binding fills among them.
+// @A run whose inputs are not each given does not start,IMPL_RUN_SIGNATURE,impl,[CREQ_RUN_REFUSES_UNFILLED_SIGNATURE],[DEC_SIGNATURE_IS_WHAT_NOTHING_BINDS, DEC_FIRST_CONTEXT_DECLARED]
 fn signature_faults(definition: &WorkflowDefinition, arguments: &Arguments) -> Vec<SignatureFault> {
     let mut faults = Vec::new();
     let mut matched: Vec<(&str, &str)> = Vec::new();
@@ -226,9 +225,11 @@ fn signature_faults(definition: &WorkflowDefinition, arguments: &Arguments) -> V
         };
 
         for parameter in &declared.required {
+            if node.bindings.iter().any(|b| b.parameter == parameter.name) {
+                continue;
+            }
             matched.push((&node.name, &parameter.name));
             let supplied = arguments.count_for(&node.name, &parameter.name);
-            let bound = node.bindings.iter().any(|b| b.parameter == parameter.name);
 
             if supplied > 1 {
                 faults.push(SignatureFault::ParameterSuppliedTwice {
@@ -248,8 +249,6 @@ fn signature_faults(definition: &WorkflowDefinition, arguments: &Arguments) -> V
                     });
                 }
                 Some(_) => {}
-                // A wire fills it, and an argument would only have come first.
-                None if bound => {}
                 None => faults.push(SignatureFault::ParameterUnfilled {
                     instance: node.name.clone(),
                     parameter: parameter.name.clone(),
@@ -271,13 +270,70 @@ fn signature_faults(definition: &WorkflowDefinition, arguments: &Arguments) -> V
     faults
 }
 
-/// Everything the run's arguments hold, or every identifier that different
-/// contexts among them share, each named once.
-// @Arguments hold one context per identifier,IMPL_RUN_HELD_ARGUMENTS,impl,[CREQ_RUN_REFUSES_SHARED_ARGUMENT_IDENTIFIER]
-fn held_arguments(arguments: &Arguments) -> Result<HashMap<ContextId, Context>, Vec<ContextId>> {
+/// The first context each binding of `definition` declares, with its instance
+/// and parameter, in the definition's order: the text it declares, of the type
+/// its parameter is declared for. Asked only of a definition whose wiring is
+/// sound, so every such parameter is declared.
+pub(crate) fn declared_firsts(
+    definition: &WorkflowDefinition,
+) -> Vec<(&str, &str, ContextType, &str)> {
+    let mut declared = Vec::new();
+    for node in &definition.instances {
+        let Some(node_type) = definition
+            .node_types
+            .iter()
+            .find(|declared| declared.name == node.node_type)
+        else {
+            continue;
+        };
+        for binding in &node.bindings {
+            let (Some(text), Some(parameter)) = (
+                &binding.first,
+                node_type
+                    .required
+                    .iter()
+                    .find(|parameter| parameter.name == binding.parameter),
+            ) else {
+                continue;
+            };
+            declared.push((
+                node.name.as_str(),
+                binding.parameter.as_str(),
+                parameter.context_type.clone(),
+                text.as_str(),
+            ));
+        }
+    }
+    declared
+}
+
+/// The first context of each binding of `definition` declaring one, made from
+/// `source`, with its instance and parameter, in the definition's order.
+// @First contexts made when a run starts,IMPL_RUN_MAKES_FIRSTS,impl,[CREQ_RUN_HOLDS_DECLARED_FIRST],[DEC_FIRST_CONTEXT_DECLARED]
+fn made_firsts(
+    definition: &WorkflowDefinition,
+    source: &mut IdSource,
+) -> Result<Vec<(String, String, Context)>, StartRefusal> {
+    declared_firsts(definition)
+        .into_iter()
+        .map(|(instance, parameter, context_type, text)| {
+            Context::text(source, context_type, text)
+                .map(|context| (instance.to_owned(), parameter.to_owned(), context))
+                .map_err(|_| StartRefusal::SourceExhausted)
+        })
+        .collect()
+}
+
+/// Everything the contexts a run starts holding hold - its arguments, then
+/// its first contexts - or every identifier that different contexts among them
+/// share, each named once.
+// @Arguments hold one context per identifier,IMPL_RUN_HELD_ARGUMENTS,impl,[CREQ_RUN_REFUSES_SHARED_ARGUMENT_IDENTIFIER, CREQ_RUN_HOLDS_DECLARED_FIRST],[DEC_FIRST_CONTEXT_DECLARED]
+fn held_from_the_start<'c>(
+    started: impl Iterator<Item = &'c Context>,
+) -> Result<HashMap<ContextId, Context>, Vec<ContextId>> {
     let mut held = HashMap::new();
     let mut shared: Vec<ContextId> = Vec::new();
-    for (_, _, argument) in arguments.iter() {
+    for argument in started {
         let (brought, found) = brought_in(&[&held], argument);
         held.extend(brought);
         for id in found {
@@ -841,6 +897,9 @@ pub(crate) struct Recorded<'r> {
     pub(crate) spent: usize,
     /// What it was started with.
     pub(crate) arguments: &'r Arguments,
+    /// The first context of each binding declaring one, with its instance and
+    /// parameter, in the definition's order.
+    pub(crate) firsts: &'r [(String, String, Context)],
     /// Every exchange, call and output the run accepted, in the order it
     /// accepted them.
     pub(crate) log: &'r [Event],
@@ -876,12 +935,15 @@ pub(crate) enum Event {
 pub struct Run<'a, F> {
     definition: &'a WorkflowDefinition,
     arguments: Arguments,
+    /// The first context of each binding declaring one, with its instance and
+    /// parameter, in the definition's order.
+    firsts: Vec<(String, String, Context)>,
     /// What each instance has produced, pass by pass, and the passes it runs
     /// on.
     passes: Passes,
-    /// Every context the run holds - its arguments, the outputs it has
-    /// accepted, and everything any of them was composed from - each under its
-    /// identifier.
+    /// Every context the run holds - its arguments, its first contexts, the
+    /// outputs it has accepted, and everything any of them was composed from -
+    /// each under its identifier.
     held: HashMap<ContextId, Context>,
     /// Every exchange, call and output accepted, in the order they were
     /// accepted.
@@ -921,36 +983,69 @@ impl<F> fmt::Debug for Run<'_, F> {
 impl<'a, F> Run<'a, F> {
     /// A run of `definition`, or a refusal saying why it cannot be started: the
     /// wiring checked first, refusing on every defect; the signature second, only
-    /// when the wiring is sound; and the arguments' identifiers third, against
-    /// each other and everything they were composed from.
-    // @A run of a defective workflow does not start,IMPL_RUN_REFUSES_DEFECTS,impl,[CREQ_RUN_REFUSES_DEFECTS, CREQ_RUN_REFUSAL_NAMES_EVERY_DEFECT],[DEC_RUN_REFUSED_UNLESS_EVERY_INPUT_GIVEN]
+    /// when the wiring is sound; then the first context of each binding
+    /// declaring one made from `source`, the source the caller makes the run's
+    /// contexts from; and the identifiers of the arguments and those first
+    /// contexts last, against each other and everything they were composed from.
+    // @A run of a defective workflow does not start,IMPL_RUN_REFUSES_DEFECTS,impl,[CREQ_RUN_REFUSES_DEFECTS, CREQ_RUN_REFUSAL_NAMES_EVERY_DEFECT, CREQ_RUN_REFUSES_UNPAIRED],[DEC_RUN_REFUSED_UNLESS_EVERY_INPUT_GIVEN, DEC_PAIRING_IS_WIRING]
     pub fn start(
         definition: &'a WorkflowDefinition,
         arguments: Arguments,
         budget: usize,
+        source: &mut IdSource,
     ) -> Result<Self, StartRefusal> {
+        Self::checked(definition, &arguments)?;
+        let firsts = made_firsts(definition, source)?;
+        Self::begun(definition, arguments, firsts, budget)
+    }
+
+    /// Nothing, or the refusal of a run of `definition` given `arguments` for
+    /// its wiring, then for its signature.
+    pub(crate) fn checked(
+        definition: &WorkflowDefinition,
+        arguments: &Arguments,
+    ) -> Result<(), StartRefusal> {
         let defects = validate_wiring(definition);
         if !defects.is_empty() {
             return Err(StartRefusal::Wiring(defects));
         }
 
-        let faults = signature_faults(definition, &arguments);
+        let faults = signature_faults(definition, arguments);
         if !faults.is_empty() {
             return Err(StartRefusal::Signature(faults));
         }
+        Ok(())
+    }
 
-        // @A run whose nodes cannot be given one pass's contexts does not start,IMPL_RUN_REFUSES_UNPAIRED,impl,[CREQ_RUN_REFUSES_UNPAIRED],[DEC_PAIRING_CHECKED_AT_START]
-        let passes = Passes::new(definition, &arguments);
-        if !passes.unpaired().is_empty() {
-            return Err(StartRefusal::Unpaired(passes.unpaired().to_vec()));
-        }
+    /// A run of `definition`, its wiring and signature checked, holding
+    /// `arguments` and `firsts`, the first context of each binding declaring
+    /// one - or the refusal of its identifiers.
+    pub(crate) fn begun(
+        definition: &'a WorkflowDefinition,
+        arguments: Arguments,
+        firsts: Vec<(String, String, Context)>,
+        budget: usize,
+    ) -> Result<Self, StartRefusal> {
+        let given = firsts
+            .iter()
+            .map(|(instance, parameter, context)| {
+                ((instance.clone(), parameter.clone()), context.clone())
+            })
+            .collect();
 
-        let held = held_arguments(&arguments).map_err(StartRefusal::SharedIdentifiers)?;
+        let passes = Passes::new(definition, given);
+
+        let started = arguments
+            .iter()
+            .map(|(_, _, context)| context)
+            .chain(firsts.iter().map(|(_, _, context)| context));
+        let held = held_from_the_start(started).map_err(StartRefusal::SharedIdentifiers)?;
 
         Ok(Self {
             definition,
             passes,
             arguments,
+            firsts,
             held,
             log: Vec::new(),
             settled_exchanges: Vec::new(),
@@ -1364,6 +1459,7 @@ impl<'a, F> Run<'a, F> {
             budget: self.budget,
             spent: self.activations,
             arguments: &self.arguments,
+            firsts: &self.firsts,
             log: &self.log,
             held: self.known(),
         }
@@ -1406,8 +1502,6 @@ impl<'a, F> Run<'a, F> {
 use std::convert::Infallible;
 
 #[cfg(test)]
-use crate::IdSource;
-#[cfg(test)]
 use crate::wiring::{any_definition, well_formed_definition};
 #[cfg(test)]
 use crate::workflow::{context_type, definition, instance, node_type};
@@ -1431,7 +1525,7 @@ fn drive(
     source: &mut IdSource,
 ) -> (RunEnding<Infallible>, Vec<(String, ContextId)>) {
     let mut run =
-        Run::<Infallible>::start(workflow, arguments, budget).expect("the wiring is sound");
+        Run::<Infallible>::start(workflow, arguments, budget, source).expect("the wiring is sound");
     let mut activated = Vec::new();
     loop {
         match run.step() {
@@ -1439,8 +1533,16 @@ fn drive(
             Step::Activate(activation) => {
                 let produced = ctx(source, activation.output().as_str());
                 activated.push((activation.instance().to_owned(), produced.id()));
-                run.produced(produced)
-                    .expect("an activation had just been offered");
+                let routes = workflow
+                    .node_types
+                    .iter()
+                    .any(|declared| declared.name == activation.node_type() && declared.routes);
+                if routes {
+                    run.routed(produced, Vec::new())
+                } else {
+                    run.produced(produced)
+                }
+                .expect("an activation had just been offered");
             }
         }
     }
@@ -1486,7 +1588,7 @@ fn defective_workflow_is_refused() {
 
     // Refused, and carrying wiring defects rather than one of the four endings:
     // a caller can tell a workflow it must fix from a run that happened.
-    let refusal = Run::<Infallible>::start(&broken, Arguments::new(), 10)
+    let refusal = Run::<Infallible>::start(&broken, Arguments::new(), 10, &mut IdSource::new())
         .expect_err("a defective workflow does not start");
     let StartRefusal::Wiring(defects) = refusal else {
         panic!("a broken wire is a wiring defect, not a signature fault: {refusal:?}")
@@ -1504,7 +1606,7 @@ fn defective_workflow_is_refused() {
         ],
         &["sink"],
     );
-    assert!(Run::<Infallible>::start(&sound, Arguments::new(), 10).is_ok());
+    assert!(Run::<Infallible>::start(&sound, Arguments::new(), 10, &mut IdSource::new()).is_ok());
 }
 
 #[cfg(test)]
@@ -1526,7 +1628,7 @@ fn refusal_carries_every_defect() {
     // And no designated output, a fifth defect of a fifth class.
     let broken = definition(types, instances, &[]);
 
-    let refusal = Run::<Infallible>::start(&broken, Arguments::new(), 10)
+    let refusal = Run::<Infallible>::start(&broken, Arguments::new(), 10, &mut IdSource::new())
         .expect_err("a defective workflow does not start");
     let StartRefusal::Wiring(defects) = refusal else {
         panic!("every one of these is a wiring defect: {refusal:?}")
@@ -1618,21 +1720,38 @@ fn result_is_the_designated_context() {
 
 #[cfg(test)]
 #[test]
-fn cycle_ends_quiescent() {
+fn cycle_unstarted_refused() {
     let mut source = IdSource::new();
-    let types = vec![node_type("Step", &[("input", "note")], "note")];
+    let types = vec![
+        node_type("Src", &[], "note"),
+        node_type("Step", &[("input", "note")], "note"),
+    ];
+    // `e` could run, and `c1` and `c2` are bound to each other's output with
+    // no first context declared, the designated output among them.
     let instances = vec![
+        instance("e", "Src", &[]),
         instance("c1", "Step", &[("input", "c2")]),
         instance("c2", "Step", &[("input", "c1")]),
     ];
     let workflow = definition(types, instances, &["c1"]);
 
-    let (ending, activated) = drive(&workflow, Arguments::new(), 10, &mut source);
-    assert!(activated.is_empty());
-    match ending {
-        RunEnding::Quiescent { waiting } => assert_eq!(waiting, ["c1", "c2"]),
-        other => panic!("a cycle can do nothing, so the run is quiescent, not {other:?}"),
-    }
+    // Refused before anything runs, naming the cycle, rather than ending
+    // quiescent once `e` has run.
+    let refusal = Run::<Infallible>::start(&workflow, Arguments::new(), 10, &mut source)
+        .expect_err("a cycle nothing starts");
+    assert_eq!(
+        refusal,
+        StartRefusal::Wiring(vec![WiringDefect::CycleUnstarted {
+            instances: vec!["c1".to_owned(), "c2".to_owned()],
+        }])
+    );
+
+    // The control: one of its bindings declaring its first context, it runs.
+    let mut started = workflow.clone();
+    started.instances[1].bindings[0].first = Some(String::new());
+    let (ending, activated) = drive(&started, Arguments::new(), 10, &mut source);
+    assert!(matches!(ending, RunEnding::Completed(_)), "{ending:?}");
+    assert_eq!(names(&activated), ["e", "c1"]);
 }
 
 #[cfg(test)]
@@ -1642,20 +1761,23 @@ fn idle_instance_does_not_make_it_stuck() {
     let types = vec![
         node_type("Src", &[], "note"),
         node_type("Step", &[("input", "note")], "note"),
+        node_type("Route", &[("draft", "note")], "note").routing(),
     ];
-    // `stuckone` is bound to its own output and can never become ready. The
+    // `idle` is on a branch the router does not take, and never runs. The
     // designated instance does not depend on it, so the run finishes.
     let instances = vec![
-        instance("live", "Src", &[]),
-        instance("stuckone", "Step", &[("input", "stuckone")]),
+        instance("e", "Src", &[]),
+        instance("r", "Route", &[("draft", "e")]).branching(&[("side", &["idle"])]),
+        instance("idle", "Step", &[]).taking("input", "r", "draft"),
+        instance("out", "Step", &[("input", "e")]),
     ];
-    let workflow = definition(types, instances, &["live"]);
+    let workflow = definition(types, instances, &["out"]);
 
     let (ending, activated) = drive(&workflow, Arguments::new(), 10, &mut source);
-    assert_eq!(names(&activated), ["live"]);
+    assert_eq!(names(&activated), ["e", "r", "out"]);
     assert!(
         matches!(ending, RunEnding::Completed(_)),
-        "an instance that can never run is not a stuck run: {ending:?}"
+        "an instance no route reached is not a stuck run: {ending:?}"
     );
 }
 
@@ -1666,17 +1788,20 @@ fn quiescent_names_only_unproduced() {
     let types = vec![
         node_type("Src", &[], "note"),
         node_type("Step", &[("input", "note")], "note"),
+        node_type("Route", &[("draft", "note")], "note").routing(),
     ];
-    // `e` does its work; the rest are a cycle the designated instance sits in.
+    // `e` and the router do their work; the router names nothing, and the rest,
+    // the designated instance among them, are on the branch it did not take.
     let instances = vec![
         instance("e", "Src", &[]),
-        instance("c1", "Step", &[("input", "c2")]),
+        instance("r", "Route", &[("draft", "e")]).branching(&[("on", &["c1"])]),
+        instance("c1", "Step", &[]).taking("input", "r", "draft"),
         instance("c2", "Step", &[("input", "c1")]),
     ];
-    let workflow = definition(types, instances, &["c1"]);
+    let workflow = definition(types, instances, &["c2"]);
 
     let (ending, activated) = drive(&workflow, Arguments::new(), 10, &mut source);
-    assert_eq!(names(&activated), ["e"]);
+    assert_eq!(names(&activated), ["e", "r"]);
     match ending {
         RunEnding::Quiescent { waiting } => assert_eq!(waiting, ["c1", "c2"]),
         other => panic!("expected quiescence, got {other:?}"),
@@ -1739,7 +1864,7 @@ proptest! {
     #[test]
     fn activations_never_exceed_budget(workflow in any_definition(), budget in 0..6usize) {
         let mut source = IdSource::new();
-        if let Ok(mut run) = Run::<Infallible>::start(&workflow, Arguments::new(), budget) {
+        if let Ok(mut run) = Run::<Infallible>::start(&workflow, Arguments::new(), budget, &mut source) {
             let mut activations = 0;
             loop {
                 match run.step() {
@@ -1822,7 +1947,7 @@ fn missing_argument_is_refused() {
 
     // Which answer came back is the assertion, not merely that the run did not
     // complete.
-    let refusal = Run::<Infallible>::start(&workflow, Arguments::new(), 10)
+    let refusal = Run::<Infallible>::start(&workflow, Arguments::new(), 10, &mut IdSource::new())
         .expect_err("a parameter nothing binds with no argument is refused");
     assert_eq!(
         signature(refusal),
@@ -1845,7 +1970,7 @@ fn argument_of_wrong_type_is_refused() {
     assert!(validate_wiring(&workflow).is_empty());
 
     let arguments = Arguments::new().supply("e", "seed", ctx(&mut source, "diff"));
-    let refusal = Run::<Infallible>::start(&workflow, arguments, 10)
+    let refusal = Run::<Infallible>::start(&workflow, arguments, 10, &mut source)
         .expect_err("an argument of the wrong context type is refused");
     assert_eq!(
         signature(refusal),
@@ -1860,7 +1985,7 @@ fn argument_of_wrong_type_is_refused() {
 
 #[cfg(test)]
 #[test]
-fn argument_first_on_its_edge() {
+fn first_context_declared_comes_first() {
     let mut source = IdSource::new();
     let types = vec![
         node_type("Src", &[], "note"),
@@ -1868,23 +1993,25 @@ fn argument_first_on_its_edge() {
     ];
     let instances = vec![
         instance("a", "Src", &[]),
-        instance("e", "Take", &[("seed", "a")]),
+        instance("e", "Take", &[("seed", "a")]).first("seed", "start"),
         instance("sink", "Take", &[("seed", "e")]),
     ];
     let workflow = definition(types, instances, &["sink"]);
     assert!(validate_wiring(&workflow).is_empty());
 
-    // Given a context for the wired parameter, e takes it first, and then what
-    // a walked along the wire - though a produced before e ran at all.
-    let first = ctx(&mut source, "note");
-    let first_id = first.id();
-    let arguments = Arguments::new().supply("e", "seed", first);
-    let mut run = Run::<Infallible>::start(&workflow, arguments, 10).expect("one context for e");
+    // e takes the first context its binding declares first, and then what a
+    // walked along the binding - though a produced before e ran at all.
+    let mut run = Run::<Infallible>::start(&workflow, Arguments::new(), 10, &mut source)
+        .expect("nothing to give");
     let mut given = Vec::new();
     let mut outputs = HashMap::new();
+    let mut first = None;
     loop {
         match run.step() {
             Step::Activate(activation) => {
+                if activation.instance() == "e" && first.is_none() {
+                    first = Some(activation.inputs()[0].1.clone());
+                }
                 let produced = ctx(&mut source, "note");
                 given.push((
                     activation.instance().to_owned(),
@@ -1906,28 +2033,196 @@ fn argument_first_on_its_edge() {
             }
         }
     }
+    let first = first.expect("e ran");
+    assert_eq!(
+        (first.render().as_ref(), first.declared_type().as_str()),
+        ("start", "note")
+    );
     assert_eq!(
         given,
         vec![
             ("a".to_owned(), vec![]),
-            ("e".to_owned(), vec![first_id]),
+            ("e".to_owned(), vec![first.id()]),
             ("e".to_owned(), vec![outputs["a"][0]]),
             ("sink".to_owned(), vec![outputs["e"][0]]),
         ]
     );
+    // It is held by the run, as an argument is.
+    assert!(run.holds(first.id()));
+}
 
-    // Two contexts for it are refused, as for any parameter.
-    let twice = Arguments::new()
+#[cfg(test)]
+#[test]
+fn argument_for_bound_parameter_refused() {
+    let mut source = IdSource::new();
+    let types = vec![
+        node_type("Src", &[], "note"),
+        node_type("Take", &[("seed", "note")], "note"),
+    ];
+    let instances = vec![
+        instance("a", "Src", &[]),
+        instance("e", "Take", &[("seed", "a")]).first("seed", ""),
+        instance("f", "Take", &[("seed", "a")]),
+    ];
+    let workflow = definition(types, instances, &["f"]);
+
+    // A context for a parameter a binding fills, declaring a first context or
+    // not, is not one of the workflow's parameters: each refused, once.
+    let arguments = Arguments::new()
         .supply("e", "seed", ctx(&mut source, "note"))
-        .supply("e", "seed", ctx(&mut source, "note"));
-    let refusal = Run::<Infallible>::start(&workflow, twice, 10).expect_err("two for one");
+        .supply("f", "seed", ctx(&mut source, "note"))
+        .supply("f", "seed", ctx(&mut source, "note"));
+    let refusal = Run::<Infallible>::start(&workflow, arguments, 10, &mut source)
+        .expect_err("not the workflow's parameters");
+    let matches_nothing = |instance: &str| SignatureFault::ArgumentMatchesNothing {
+        instance: instance.to_owned(),
+        parameter: "seed".to_owned(),
+    };
     assert_eq!(
         signature(refusal),
-        vec![SignatureFault::ParameterSuppliedTwice {
-            instance: "e".to_owned(),
-            parameter: "seed".to_owned(),
+        vec![
+            matches_nothing("e"),
+            matches_nothing("f"),
+            matches_nothing("f")
+        ]
+    );
+
+    // The control: given nothing, it starts.
+    assert!(Run::<Infallible>::start(&workflow, Arguments::new(), 10, &mut source).is_ok());
+}
+
+#[cfg(test)]
+#[test]
+fn router_reads_its_own_output() {
+    let mut source = IdSource::new();
+    let types = vec![
+        node_type("Src", &[], "note"),
+        node_type("Judge", &[("goal", "note"), ("previous", "note")], "note").routing(),
+        node_type("Take", &[("input", "note")], "note"),
+    ];
+    // A router reading its own output, declaring its first context, going
+    // round again by naming itself and on by naming `out`.
+    let instances = vec![
+        instance("g", "Src", &[]),
+        instance("judge", "Judge", &[("goal", "g"), ("previous", "judge")])
+            .first("previous", "start")
+            .branching(&[("again", &["judge"]), ("done", &["out"])]),
+        instance("out", "Take", &[]).taking("input", "judge", "goal"),
+    ];
+    let workflow = definition(types, instances, &["out"]);
+    assert_eq!(validate_wiring(&workflow), Vec::new());
+
+    let mut run = Run::<Infallible>::start(&workflow, Arguments::new(), 20, &mut source)
+        .expect("a loop its first context starts");
+    let goal = ctx(&mut source, "note");
+    assert_eq!(offered(&mut run).instance(), "g");
+    run.produced(goal.clone()).expect("the goal");
+
+    // Each pass of the judge is given the goal and the judge's output of the
+    // pass before - the declared text on its first.
+    let mut made: Vec<Context> = Vec::new();
+    for pass in 0..3 {
+        let judged = offered(&mut run);
+        assert_eq!(judged.instance(), "judge");
+        assert!(judged.inputs()[0].1.is(&goal));
+        let previous = &judged.inputs()[1].1;
+        match pass {
+            0 => assert_eq!(previous.render(), "start"),
+            _ => assert!(previous.is(&made[pass - 1])),
+        }
+        let output = ctx(&mut source, "note");
+        made.push(output.clone());
+        let route = if pass < 2 { "judge" } else { "out" };
+        run.routed(output, vec![route.to_owned()])
+            .expect("a branch");
+    }
+
+    // Once it names `out`, `out` is given the goal the judge was given, and
+    // the run completes.
+    let last = offered(&mut run);
+    assert_eq!(last.instance(), "out");
+    assert!(last.inputs()[0].1.is(&goal));
+    run.produced(ctx(&mut source, "note")).expect("the result");
+    assert!(matches!(run.step(), Step::Ended(RunEnding::Completed(_))));
+
+    // The control: declaring no first context, the judge is a cycle nothing
+    // starts.
+    let mut unstarted = workflow.clone();
+    unstarted.instances[1].bindings[1].first = None;
+    assert_eq!(
+        validate_wiring(&unstarted),
+        vec![WiringDefect::CycleUnstarted {
+            instances: vec!["judge".to_owned()],
         }]
     );
+}
+
+#[cfg(test)]
+#[test]
+fn first_from_exhausted_source_refused() {
+    let types = vec![node_type("Take", &[("seed", "note")], "note")];
+    let declaring = definition(
+        types.clone(),
+        vec![instance("x", "Take", &[("seed", "x")]).first("seed", "")],
+        &["x"],
+    );
+    let refusal = Run::<Infallible>::start(
+        &declaring,
+        Arguments::new(),
+        10,
+        &mut IdSource::resumed_at(None),
+    )
+    .expect_err("nothing left to issue");
+    assert_eq!(refusal, StartRefusal::SourceExhausted);
+    assert_eq!(
+        refusal.to_string(),
+        "the identifier source has issued every identifier, so no first context can be made"
+    );
+
+    // The control: a workflow declaring none needs nothing of the source.
+    let declaring_none = definition(types, vec![instance("x", "Take", &[])], &["x"]);
+    let mut source = IdSource::new();
+    let argument = ctx(&mut source, "note");
+    let arguments = Arguments::new().supply("x", "seed", argument);
+    assert!(
+        Run::<Infallible>::start(
+            &declaring_none,
+            arguments,
+            10,
+            &mut IdSource::resumed_at(None)
+        )
+        .is_ok()
+    );
+}
+
+#[cfg(test)]
+#[test]
+fn first_shares_no_identifier() {
+    let types = vec![
+        node_type("Take", &[("seed", "note")], "note"),
+        node_type("Pair", &[("left", "note"), ("right", "note")], "note"),
+    ];
+    let instances = vec![
+        instance("x", "Take", &[("seed", "x")]).first("seed", ""),
+        instance("j", "Pair", &[("left", "x")]),
+    ];
+    let workflow = definition(types, instances, &["j"]);
+
+    // The argument made from one source, and the run lent another that has
+    // issued nothing: the first context is made under the argument's
+    // identifier, and the run is refused naming it.
+    let argument = ctx(&mut IdSource::new(), "note");
+    let held = argument.id();
+    let arguments = Arguments::new().supply("j", "right", argument);
+    let refusal = Run::<Infallible>::start(&workflow, arguments.clone(), 10, &mut IdSource::new())
+        .expect_err("two contexts under one identifier");
+    assert_eq!(refusal, StartRefusal::SharedIdentifiers(vec![held]));
+
+    // The control: lent the source the argument came from, it starts.
+    let mut source = IdSource::new();
+    let argument = ctx(&mut source, "note");
+    let arguments = Arguments::new().supply("j", "right", argument);
+    assert!(Run::<Infallible>::start(&workflow, arguments, 10, &mut source).is_ok());
 }
 
 /// Drive a run of `workflow` to its ending, each activation producing a fresh
@@ -1944,7 +2239,7 @@ fn passes(
     RunEnding<Infallible>,
     Vec<(String, Vec<ContextId>, ContextId)>,
 ) {
-    let mut run = Run::<Infallible>::start(workflow, arguments, budget).expect("it starts");
+    let mut run = Run::<Infallible>::start(workflow, arguments, budget, source).expect("it starts");
     let mut passes = Vec::new();
     loop {
         match run.step() {
@@ -1969,22 +2264,22 @@ fn output_walks_every_edge() {
     let types = vec![
         node_type("Src", &[], "note"),
         node_type("Take", &[("seed", "note")], "note"),
+        node_type("Pair", &[("left", "note"), ("right", "note")], "note"),
     ];
-    // p is given a context first and then q's output, and comes before its
-    // two consumers, so it produces twice before either runs. The designated
-    // instance reads only itself and never runs.
+    // p is given its declared first context and then q's output, and comes
+    // before its two consumers, so it produces twice before either runs. The
+    // designated instance joins the two consumers and comes last, so it runs
+    // once each consumer has run its two passes.
     let instances = vec![
         instance("q", "Src", &[]),
-        instance("p", "Take", &[("seed", "q")]),
+        instance("p", "Take", &[("seed", "q")]).first("seed", ""),
         instance("c1", "Take", &[("seed", "p")]),
         instance("c2", "Take", &[("seed", "p")]),
-        instance("never", "Take", &[("seed", "never")]),
+        instance("j", "Pair", &[("left", "c1"), ("right", "c2")]),
     ];
-    let workflow = definition(types, instances, &["never"]);
-    let arguments = Arguments::new().supply("p", "seed", ctx(&mut source, "note"));
-
-    let (ending, passes) = passes(&workflow, arguments, 20, &mut source);
-    assert!(matches!(ending, RunEnding::Quiescent { .. }), "{ending:?}");
+    let workflow = definition(types, instances, &["j"]);
+    let (ending, passes) = passes(&workflow, Arguments::new(), 20, &mut source);
+    assert!(matches!(ending, RunEnding::Completed(_)), "{ending:?}");
     let of = |name: &str| -> Vec<(Vec<ContextId>, ContextId)> {
         passes
             .iter()
@@ -1995,7 +2290,7 @@ fn output_walks_every_edge() {
     let made: Vec<ContextId> = of("p").iter().map(|(_, made)| *made).collect();
     assert_eq!(made.len(), 2);
     let names: Vec<&str> = passes.iter().map(|(name, _, _)| name.as_str()).collect();
-    assert_eq!(names, ["q", "p", "p", "c1", "c1", "c2", "c2"]);
+    assert_eq!(names, ["q", "p", "p", "c1", "c1", "c2", "c2", "j"]);
 
     // Each consumer is given the first output, then the second.
     for consumer in ["c1", "c2"] {
@@ -2008,17 +2303,17 @@ fn output_walks_every_edge() {
 #[test]
 fn budget_counts_each_pass() {
     let mut source = IdSource::new();
-    // One instance reading its own output, given its first context: it runs
-    // again on every output, until the budget stops it.
+    // One instance reading its own output, declaring its first context: it
+    // runs again on every output, until the budget stops it. The designated
+    // instance reads it and comes after it, so it is never offered while the
+    // first is ready.
     let types = vec![node_type("Take", &[("seed", "note")], "note")];
     let instances = vec![
-        instance("x", "Take", &[("seed", "x")]),
-        instance("never", "Take", &[("seed", "never")]),
+        instance("x", "Take", &[("seed", "x")]).first("seed", ""),
+        instance("after", "Take", &[("seed", "x")]),
     ];
-    let workflow = definition(types, instances, &["never"]);
-    let arguments = Arguments::new().supply("x", "seed", ctx(&mut source, "note"));
-
-    let (ending, passes) = passes(&workflow, arguments, 5, &mut source);
+    let workflow = definition(types, instances, &["after"]);
+    let (ending, passes) = passes(&workflow, Arguments::new(), 5, &mut source);
     assert!(
         matches!(ending, RunEnding::BudgetExceeded { budget: 5 }),
         "{ending:?}"
@@ -2033,7 +2328,7 @@ fn budget_counts_each_pass() {
 
 /// A router given a draft and a review, with two branches after it: `revise`
 /// taking its output and its input `draft`, and `close` taking its input
-/// `review`. The designated instance reads itself and never runs.
+/// `review`. The designated instance is on a third branch, which no test takes.
 #[cfg(test)]
 fn branching() -> WorkflowDefinition {
     let types = vec![
@@ -2045,13 +2340,16 @@ fn branching() -> WorkflowDefinition {
     let instances = vec![
         instance("d", "Src", &[]),
         instance("w", "Src", &[]),
-        instance("r", "route", &[("draft", "d"), ("review", "w")])
-            .branching(&[("revise", &["revise"]), ("both", &["close", "revise"])]),
+        instance("r", "route", &[("draft", "d"), ("review", "w")]).branching(&[
+            ("revise", &["revise"]),
+            ("both", &["close", "revise"]),
+            ("end", &["out"]),
+        ]),
         instance("revise", "revise", &[("verdict", "r")]).taking("draft", "r", "draft"),
         instance("close", "Take", &[]).taking("seed", "r", "review"),
-        instance("never", "Take", &[("seed", "never")]),
+        instance("out", "Take", &[]).taking("seed", "r", "review"),
     ];
-    definition(types, instances, &["never"])
+    definition(types, instances, &["out"])
 }
 
 /// The run of `branching()` up to its router's activation, with what the two
@@ -2061,7 +2359,7 @@ fn at_the_router<'w>(
     workflow: &'w WorkflowDefinition,
     source: &mut IdSource,
 ) -> (Run<'w, Infallible>, Context, Context) {
-    let mut run = Run::<Infallible>::start(workflow, Arguments::new(), 20).expect("sound");
+    let mut run = Run::<Infallible>::start(workflow, Arguments::new(), 20, source).expect("sound");
     let mut made = Vec::new();
     for expected in ["d", "w"] {
         assert_eq!(offered(&mut run).instance(), expected);
@@ -2154,7 +2452,8 @@ fn bad_route_refused() {
 
     // A transform's output reported with a route.
     let mut source = IdSource::new();
-    let mut run = Run::<Infallible>::start(&workflow, Arguments::new(), 20).expect("sound");
+    let mut run =
+        Run::<Infallible>::start(&workflow, Arguments::new(), 20, &mut source).expect("sound");
     assert_eq!(offered(&mut run).instance(), "d");
     assert_eq!(
         run.routed(ctx(&mut source, "note"), vec!["r".to_owned()]),
@@ -2187,7 +2486,7 @@ fn route_not_a_branch_refused() {
     );
     assert_eq!(
         refused.to_string(),
-        "r named close, which is not one of its branches: revise = revise; both = close, revise"
+        "r named close, which is not one of its branches: revise = revise; both = close, revise; end = out"
     );
     assert_eq!(offered(&mut run).instance(), "r");
 
@@ -2212,7 +2511,7 @@ fn route_not_a_branch_refused() {
 }
 
 /// A review loop with a branch beside it: `d` drafts from a brief and what the
-/// router `r` sends back, the run giving it its first; `x` and `s` read every
+/// router `r` sends back, declaring its first; `x` and `s` read every
 /// draft; `r` sends it `back` to `d`, `both` back and to `y`, or `on` to `f`
 /// and `y`; `j` joins `x` and `y`, `m` the draft and `s`, `g` the `y` and
 /// `f` of the pass the loop ends on; and `never` reads only itself, so a run
@@ -2228,20 +2527,21 @@ fn branching_loop() -> WorkflowDefinition {
     ];
     let instances = vec![
         instance("b", "Src", &[]),
-        instance("d", "Draft", &[("brief", "b"), ("feedback", "r")]),
+        instance("d", "Draft", &[("brief", "b"), ("feedback", "r")]).first("feedback", ""),
         instance("x", "Take", &[("input", "d")]),
         instance("s", "Take", &[("input", "d")]),
         instance("r", "Route", &[("draft", "d")]).branching(&[
             ("back", &["d"]),
             ("both", &["d", "y"]),
             ("on", &["f", "y"]),
+            ("end", &["never"]),
         ]),
         instance("y", "Take", &[]).taking("input", "r", "draft"),
         instance("f", "Take", &[]).taking("input", "r", "draft"),
         instance("j", "Pair", &[("left", "x"), ("right", "y")]),
         instance("m", "Pair", &[("left", "d"), ("right", "s")]),
         instance("g", "Pair", &[("left", "y"), ("right", "f")]),
-        instance("never", "Take", &[("input", "never")]),
+        instance("never", "Take", &[]).taking("input", "r", "draft"),
     ];
     definition(types, instances, &["never"])
 }
@@ -2273,8 +2573,7 @@ fn drive_loop(
     stop_after: Option<usize>,
 ) -> Driven {
     let mut source = IdSource::new();
-    let arguments = Arguments::new().supply("d", "feedback", ctx(&mut source, "note"));
-    let run = Run::<()>::start(workflow, arguments, 200).expect("it starts");
+    let run = Run::<()>::start(workflow, Arguments::new(), 200, &mut source).expect("it starts");
     continue_loop(run, source, routes, stop_after, Vec::new(), HashMap::new())
 }
 
@@ -2382,17 +2681,18 @@ fn unpaired_run_refused() {
         ("back", &["d", "k"]),
         ("both", &["d", "y"]),
         ("on", &["f", "y"]),
+        ("end", &["never"]),
     ]);
     workflow.instances[7] = instance("j", "Pair", &[("left", "k"), ("right", "f")]);
     workflow
         .instances
         .push(instance("k", "Take", &[]).taking("input", "r", "draft"));
     let mut source = IdSource::new();
-    let arguments = Arguments::new().supply("d", "feedback", ctx(&mut source, "note"));
-    let refused = Run::<()>::start(&workflow, arguments, 200).expect_err("j has no pass");
+    let refused =
+        Run::<()>::start(&workflow, Arguments::new(), 200, &mut source).expect_err("j has no pass");
     assert_eq!(
         refused,
-        StartRefusal::Unpaired(vec![crate::Unpaired {
+        StartRefusal::Wiring(vec![WiringDefect::Unpaired(crate::Unpaired {
             instance: "j".to_owned(),
             inputs: vec![
                 (
@@ -2404,19 +2704,18 @@ fn unpaired_run_refused() {
                     "the passes on which 'r' takes 'on'".to_owned()
                 ),
             ],
-        }])
+        })])
     );
     assert_eq!(
         refused.to_string(),
-        "the workflow carries 1 node whose inputs cannot be paired: the inputs of 'j' come on \
-         passes no one of which encloses the others, so no activation of it could be given one \
-         pass's contexts: 'left' on the passes on which 'r' takes 'back', 'right' on the passes \
-         on which 'r' takes 'on'"
+        "the workflow carries 1 wiring defect: the inputs of 'j' come on passes no one of which \
+         encloses the others, so no activation of it could be given one pass's contexts: 'left' \
+         on the passes on which 'r' takes 'back', 'right' on the passes on which 'r' takes 'on'"
     );
 
-    // The control: the same workflow given nothing for the loop is not
-    // refused, its loop running on no pass, as before.
-    assert!(Run::<()>::start(&workflow, Arguments::new(), 200).is_ok());
+    // The control: the loop with its join reading the two branches a route
+    // takes together starts.
+    assert!(Run::<()>::start(&branching_loop(), Arguments::new(), 200, &mut source).is_ok());
 }
 
 #[cfg(test)]
@@ -2496,7 +2795,7 @@ fn inputs_given_where_nothing_binds() {
     let workflow = definition(types, instances, &["c"]);
 
     // Given nothing, the run is refused naming both, in the definition's order.
-    let refusal = Run::<Infallible>::start(&workflow, Arguments::new(), 10)
+    let refusal = Run::<Infallible>::start(&workflow, Arguments::new(), 10, &mut source)
         .expect_err("two inputs are not given");
     assert_eq!(
         signature(refusal),
@@ -2520,7 +2819,8 @@ fn inputs_given_where_nothing_binds() {
     let arguments = Arguments::new()
         .supply("b", "right", for_b)
         .supply("c", "right", for_c);
-    let mut run = Run::<Infallible>::start(&workflow, arguments, 10).expect("every input given");
+    let mut run =
+        Run::<Infallible>::start(&workflow, arguments, 10, &mut source).expect("every input given");
     let mut given = Vec::new();
     loop {
         match run.step() {
@@ -2574,7 +2874,7 @@ fn argument_for_no_parameter_is_refused() {
         "seed",
         ctx(&mut source, "note"),
     );
-    let refusal = Run::<Infallible>::start(&workflow, arguments, 10)
+    let refusal = Run::<Infallible>::start(&workflow, arguments, 10, &mut source)
         .expect_err("an argument naming no instance is refused");
     assert_eq!(
         signature(refusal),
@@ -2589,7 +2889,7 @@ fn argument_for_no_parameter_is_refused() {
         Arguments::new()
             .supply("e", "seed", good)
             .supply("e", "sead", ctx(&mut source, "note"));
-    let refusal = Run::<Infallible>::start(&workflow, arguments, 10)
+    let refusal = Run::<Infallible>::start(&workflow, arguments, 10, &mut source)
         .expect_err("an argument naming no parameter is refused");
     assert_eq!(
         signature(refusal),
@@ -2603,7 +2903,7 @@ fn argument_for_no_parameter_is_refused() {
     let arguments = Arguments::new()
         .supply("e", "seed", ctx(&mut source, "note"))
         .supply("e", "seed", ctx(&mut source, "note"));
-    let refusal = Run::<Infallible>::start(&workflow, arguments, 10)
+    let refusal = Run::<Infallible>::start(&workflow, arguments, 10, &mut source)
         .expect_err("a parameter supplied twice is refused");
     assert_eq!(
         signature(refusal),
@@ -2618,7 +2918,7 @@ fn argument_for_no_parameter_is_refused() {
         .supply("e", "seed", ctx(&mut source, "note"))
         .supply("ee", "seed", ctx(&mut source, "note"))
         .supply("e", "sead", ctx(&mut source, "note"));
-    let refusal = Run::<Infallible>::start(&workflow, arguments, 10)
+    let refusal = Run::<Infallible>::start(&workflow, arguments, 10, &mut source)
         .expect_err("two arguments matching nothing are refused");
     assert_eq!(
         signature(refusal),
@@ -2674,8 +2974,8 @@ fn signature_filled_exactly_starts() {
         .supply("q", "seed", beta_seed)
         .supply("p2", "seed", p2_seed);
 
-    let mut run =
-        Run::<Infallible>::start(&workflow, arguments, 10).expect("the signature is filled");
+    let mut run = Run::<Infallible>::start(&workflow, arguments, 10, &mut source)
+        .expect("the signature is filled");
 
     // Each instance is given its own argument rather than one shared by
     // name, which is the whole point of addressing them per instance.
@@ -2730,7 +3030,8 @@ fn failed_activation_ends_the_run() {
     let mut source = IdSource::new();
     let workflow = two_ready();
 
-    let mut run = Run::<NodeTrouble>::start(&workflow, Arguments::new(), 10).expect("sound");
+    let mut run =
+        Run::<NodeTrouble>::start(&workflow, Arguments::new(), 10, &mut source).expect("sound");
     let Step::Activate(activation) = run.step() else {
         panic!("an instance with nothing to wait for is offered")
     };
@@ -2778,14 +3079,16 @@ fn failure_with_no_activation_is_refused() {
     let workflow = two_ready();
 
     // Nothing has been offered yet.
-    let run = Run::<NodeTrouble>::start(&workflow, Arguments::new(), 10).expect("sound");
+    let run =
+        Run::<NodeTrouble>::start(&workflow, Arguments::new(), 10, &mut source).expect("sound");
     assert_eq!(
         run.fail(NodeTrouble::TimedOut).unwrap_err(),
         NothingOutstanding
     );
 
     // And nothing is outstanding once an outcome has been reported for it.
-    let mut run = Run::<NodeTrouble>::start(&workflow, Arguments::new(), 10).expect("sound");
+    let mut run =
+        Run::<NodeTrouble>::start(&workflow, Arguments::new(), 10, &mut source).expect("sound");
     let Step::Activate(_) = run.step() else {
         panic!("an instance with nothing to wait for is offered")
     };
@@ -2811,7 +3114,8 @@ fn offered<F: fmt::Debug>(run: &mut Run<'_, F>) -> Activation {
 fn undeclared_output_is_refused() {
     let mut source = IdSource::new();
     let workflow = chain(2);
-    let mut run = Run::<Infallible>::start(&workflow, Arguments::new(), 10).expect("sound");
+    let mut run =
+        Run::<Infallible>::start(&workflow, Arguments::new(), 10, &mut source).expect("sound");
 
     assert_eq!(offered(&mut run).instance(), "n0");
     // `n0`'s type declares `note`, and it is answered with a `diff`.
@@ -2845,7 +3149,8 @@ fn designated_undeclared_output_is_refused() {
         vec![instance("only", "Src", &[])],
         &["only"],
     );
-    let mut run = Run::<Infallible>::start(&workflow, Arguments::new(), 10).expect("sound");
+    let mut run =
+        Run::<Infallible>::start(&workflow, Arguments::new(), 10, &mut source).expect("sound");
 
     offered(&mut run);
     let refusal = run
@@ -2888,7 +3193,8 @@ fn output_of_declared_type_is_accepted() {
 
     // And with a composition of the declared type whose part is a `note`: a
     // composition's type is the one it was declared with, whatever its parts'.
-    let mut run = Run::<Infallible>::start(&workflow, Arguments::new(), 10).expect("sound");
+    let mut run =
+        Run::<Infallible>::start(&workflow, Arguments::new(), 10, &mut source).expect("sound");
     offered(&mut run);
     run.produced(ctx(&mut source, "note"))
         .expect("of the declared type");
@@ -2914,7 +3220,7 @@ fn passed_through_argument_is_refused() {
     let argument = ctx(&mut source, "note");
     let held = argument.id();
     let arguments = Arguments::new().supply("e", "seed", argument);
-    let mut run = Run::<Infallible>::start(&workflow, arguments, 10).expect("sound");
+    let mut run = Run::<Infallible>::start(&workflow, arguments, 10, &mut source).expect("sound");
 
     let activation = offered(&mut run);
     let refusal = run
@@ -2934,7 +3240,7 @@ fn passed_through_argument_is_refused() {
     let argument = Context::compose(&mut source, context_type("note"), [&inner], "")
         .expect("a fresh source issues");
     let arguments = Arguments::new().supply("e", "seed", argument);
-    let mut run = Run::<Infallible>::start(&workflow, arguments, 10).expect("sound");
+    let mut run = Run::<Infallible>::start(&workflow, arguments, 10, &mut source).expect("sound");
     offered(&mut run);
     assert_eq!(
         run.produced(inner.clone()),
@@ -2956,7 +3262,8 @@ fn passed_through_output_is_refused() {
         vec![instance("a", "Src", &[]), instance("b", "Src", &[])],
         &["b"],
     );
-    let mut run = Run::<Infallible>::start(&workflow, Arguments::new(), 10).expect("sound");
+    let mut run =
+        Run::<Infallible>::start(&workflow, Arguments::new(), 10, &mut source).expect("sound");
 
     assert_eq!(offered(&mut run).instance(), "a");
     let from_a = ctx(&mut source, "note");
@@ -2980,7 +3287,8 @@ fn passed_through_output_is_refused() {
 fn output_composing_its_input_is_accepted() {
     let mut source = IdSource::new();
     let workflow = chain(2);
-    let mut run = Run::<Infallible>::start(&workflow, Arguments::new(), 10).expect("sound");
+    let mut run =
+        Run::<Infallible>::start(&workflow, Arguments::new(), 10, &mut source).expect("sound");
 
     offered(&mut run);
     run.produced(ctx(&mut source, "note"))
@@ -3060,7 +3368,7 @@ proptest! {
         let argument = ctx(&mut source, "note");
         let mut held = vec![argument.clone()];
         let arguments = Arguments::new().supply("n0", "seed", argument);
-        let mut run = Run::<Infallible>::start(&workflow, arguments, answers.len())
+        let mut run = Run::<Infallible>::start(&workflow, arguments, answers.len(), &mut source)
             .expect("sound");
 
         for answer in &answers {
@@ -3100,7 +3408,8 @@ proptest! {
 fn refused_output_keeps_the_activation() {
     let mut source = IdSource::new();
     let workflow = chain(2);
-    let mut run = Run::<Infallible>::start(&workflow, Arguments::new(), 10).expect("sound");
+    let mut run =
+        Run::<Infallible>::start(&workflow, Arguments::new(), 10, &mut source).expect("sound");
 
     assert_eq!(offered(&mut run).instance(), "n0");
     run.produced(ctx(&mut source, "diff"))
@@ -3124,7 +3433,8 @@ fn refusal_does_not_spend_the_budget() {
     let mut source = IdSource::new();
     let workflow = chain(2);
     // Exactly as many activations as there are instances.
-    let mut run = Run::<Infallible>::start(&workflow, Arguments::new(), 2).expect("sound");
+    let mut run =
+        Run::<Infallible>::start(&workflow, Arguments::new(), 2, &mut source).expect("sound");
 
     offered(&mut run);
     run.produced(ctx(&mut source, "diff"))
@@ -3149,7 +3459,8 @@ fn refusal_does_not_spend_the_budget() {
 fn refused_output_can_be_failed() {
     let mut source = IdSource::new();
     let workflow = chain(2);
-    let mut run = Run::<NodeTrouble>::start(&workflow, Arguments::new(), 10).expect("sound");
+    let mut run =
+        Run::<NodeTrouble>::start(&workflow, Arguments::new(), 10, &mut source).expect("sound");
 
     offered(&mut run);
     run.produced(ctx(&mut source, "diff"))
@@ -3215,8 +3526,8 @@ fn arguments_sharing_an_identifier_are_refused() {
         .supply("pb", "seed", second)
         .supply("pc", "seed", third.clone())
         .supply("pd", "seed", fourth);
-    let refusal =
-        Run::<Infallible>::start(&workflow, arguments, 10).expect_err("two contexts, one id");
+    let refusal = Run::<Infallible>::start(&workflow, arguments, 10, &mut IdSource::new())
+        .expect_err("two contexts, one id");
     // Both identifiers, each once, as a refusal of its own kind.
     assert_eq!(
         refusal,
@@ -3251,7 +3562,8 @@ fn part_sharing_an_identifier_is_refused() {
     let (mut own, mut other) = (IdSource::new(), IdSource::new());
     let argument = ctx(&mut own, "note");
     let arguments = Arguments::new().supply("n0", "seed", argument.clone());
-    let mut run = Run::<Infallible>::start(&workflow, arguments, 10).expect("sound");
+    let mut run =
+        Run::<Infallible>::start(&workflow, arguments, 10, &mut IdSource::new()).expect("sound");
 
     // The measured shape: a new part under the argument's identifier.
     let activation = offered(&mut run);
@@ -3308,7 +3620,8 @@ fn part_sharing_an_identifier_is_refused() {
 #[test]
 fn parts_sharing_an_identifier_are_refused() {
     let workflow = chain(1);
-    let mut run = Run::<Infallible>::start(&workflow, Arguments::new(), 10).expect("sound");
+    let mut run = Run::<Infallible>::start(&workflow, Arguments::new(), 10, &mut IdSource::new())
+        .expect("sound");
     offered(&mut run);
 
     // Two new contexts, from two sources, under an identifier the run has never
@@ -3337,7 +3650,7 @@ fn output_composing_held_parts_is_accepted() {
     let argument = Context::compose(&mut source, context_type("note"), [&inner], "")
         .expect("a fresh source issues");
     let arguments = Arguments::new().supply("n0", "seed", argument);
-    let mut run = Run::<Infallible>::start(&workflow, arguments, 10).expect("sound");
+    let mut run = Run::<Infallible>::start(&workflow, arguments, 10, &mut source).expect("sound");
 
     // The input, a part the input was composed from, and a new context: every
     // held context in it is the context the run holds.
@@ -3390,7 +3703,7 @@ proptest! {
         let argument = ctx(&mut sources[0], "note");
         let mut accepted = vec![argument.clone()];
         let arguments = Arguments::new().supply("n0", "seed", argument);
-        let mut run = Run::<Infallible>::start(&workflow, arguments, answers.len())
+        let mut run = Run::<Infallible>::start(&workflow, arguments, answers.len(), &mut IdSource::new())
             .expect("sound");
 
         for (use_second, picks, add_new) in &answers {
@@ -3468,7 +3781,8 @@ fn lookup_call(source: &mut IdSource, id: &str) -> (Call, Context, Context) {
 fn declared_call_is_offered_next() {
     let mut source = IdSource::new();
     let workflow = calling("second");
-    let mut run = Run::<Infallible>::start(&workflow, Arguments::new(), 10).expect("sound");
+    let mut run =
+        Run::<Infallible>::start(&workflow, Arguments::new(), 10, &mut source).expect("sound");
 
     let asking = offered(&mut run);
     assert_eq!((asking.instance(), asking.call()), ("asker", None));
@@ -3518,7 +3832,8 @@ fn declared_call_is_offered_next() {
 fn call_output_goes_back_to_the_caller() {
     let mut source = IdSource::new();
     let workflow = calling("asker");
-    let mut run = Run::<Infallible>::start(&workflow, Arguments::new(), 10).expect("sound");
+    let mut run =
+        Run::<Infallible>::start(&workflow, Arguments::new(), 10, &mut source).expect("sound");
 
     offered(&mut run);
     let (call, query, _) = lookup_call(&mut source, "call_1");
@@ -3569,20 +3884,24 @@ fn call_output_goes_back_to_the_caller() {
 #[test]
 fn called_output_from_its_own_pass() {
     let mut source = IdSource::new();
-    // An asker reading its own output, given its first context: every pass is
+    // An asker reading its own output, declaring its first context: every pass is
     // another activation of one instance, whose model names its calls alike.
+    // The designated instance reads it and comes after it, so it is never
+    // offered while the asker is ready.
     let types = vec![
         node_type("ask", &[("seed", "note")], "note"),
         node_type("lookup", &[("query", "note"), ("scope", "note")], "note"),
         node_type("pass", &[("input", "note")], "note"),
     ];
     let instances = vec![
-        instance("asker", "ask", &[("seed", "asker")]).with_calls(&["lookup"]),
-        instance("never", "pass", &[("input", "never")]),
+        instance("asker", "ask", &[("seed", "asker")])
+            .first("seed", "")
+            .with_calls(&["lookup"]),
+        instance("after", "pass", &[("input", "asker")]),
     ];
-    let workflow = definition(types, instances, &["never"]);
-    let arguments = Arguments::new().supply("asker", "seed", ctx(&mut source, "note"));
-    let mut run = Run::<Infallible>::start(&workflow, arguments, 10).expect("sound");
+    let workflow = definition(types, instances, &["after"]);
+    let mut run =
+        Run::<Infallible>::start(&workflow, Arguments::new(), 10, &mut source).expect("sound");
 
     // The first pass calls, is answered, and produces.
     offered(&mut run);
@@ -3615,7 +3934,8 @@ fn called_output_from_its_own_pass() {
 fn undeclared_call_is_refused() {
     let mut source = IdSource::new();
     let workflow = calling("second");
-    let mut run = Run::<Infallible>::start(&workflow, Arguments::new(), 10).expect("sound");
+    let mut run =
+        Run::<Infallible>::start(&workflow, Arguments::new(), 10, &mut source).expect("sound");
 
     // Nothing outstanding yet.
     let (call, ..) = lookup_call(&mut source, "early");
@@ -3659,7 +3979,8 @@ fn undeclared_call_is_refused() {
 fn unfilled_call_is_refused() {
     let mut source = IdSource::new();
     let workflow = calling("second");
-    let mut run = Run::<Infallible>::start(&workflow, Arguments::new(), 10).expect("sound");
+    let mut run =
+        Run::<Infallible>::start(&workflow, Arguments::new(), 10, &mut source).expect("sound");
     offered(&mut run);
 
     // A parameter lookup does not declare, one of the wrong type, and a
@@ -3703,7 +4024,8 @@ fn call_sharing_an_identifier_is_refused() {
     // is a different context under an identifier the run holds.
     let mut second_source = IdSource::new();
     let workflow = calling("second");
-    let mut run = Run::<Infallible>::start(&workflow, Arguments::new(), 10).expect("sound");
+    let mut run =
+        Run::<Infallible>::start(&workflow, Arguments::new(), 10, &mut source).expect("sound");
     offered(&mut run);
 
     let window = ctx(&mut source, "note");
@@ -3762,7 +4084,8 @@ fn exchanges_held_with_their_activation() {
         ],
         &["b"],
     );
-    let mut run = Run::<Infallible>::start(&workflow, Arguments::new(), 10).expect("sound");
+    let mut run =
+        Run::<Infallible>::start(&workflow, Arguments::new(), 10, &mut source).expect("sound");
 
     assert_eq!(offered(&mut run).instance(), "a");
     let first = ctx(&mut source, "note");
@@ -3844,7 +4167,8 @@ fn called_output_of_undeclared_type_is_refused() {
         vec![instance("asker", "ask", &[]).with_calls(&["lookup"])],
         &["asker"],
     );
-    let mut run = Run::<Infallible>::start(&workflow, Arguments::new(), 10).expect("sound");
+    let mut run =
+        Run::<Infallible>::start(&workflow, Arguments::new(), 10, &mut source).expect("sound");
     offered(&mut run);
     run.call(Call::new("call_1", "lookup")).expect("declared");
     offered(&mut run);
@@ -3888,7 +4212,7 @@ proptest! {
         let last = names.last().cloned().unwrap_or_default();
         let workflow = definition(types, instances, &[&last]);
 
-        let mut run = Run::<Infallible>::start(&workflow, Arguments::new(), budget).expect("sound");
+        let mut run = Run::<Infallible>::start(&workflow, Arguments::new(), budget, &mut source).expect("sound");
         let mut offers = 0;
         let mut seen = HashSet::new();
         let mut made: HashMap<String, usize> = HashMap::new();

@@ -214,13 +214,13 @@ component requirement whose subject is anything else.
    - **An argument of a context type the declaration does not name.** The wiring
      validator refuses this between two instances and cannot see it here, because
      there is no binding to look at.
-   - **Two arguments for one parameter**, whether a binding fills it or not,
-     with nothing to order them. An argument for a parameter a binding fills is
-     not a second source but the first context its edge holds
-     (``CREQ_RUN_ARGUMENT_FIRST_ON_ITS_EDGE``).
+   - **Two arguments for one parameter**, with nothing to order them.
    - **An argument naming an instance or parameter the workflow does not have.**
      A typo in a parameter name then leaves the real parameter unfilled while the
-     caller believes it supplied it.
+     caller believes it supplied it. A parameter a binding fills is not one of
+     the workflow's either: a first context for its binding is declared in the
+     workflow (``CREQ_RUN_HOLDS_DECLARED_FIRST``), and an argument for it would
+     be a second source with nothing to order the two.
 
    Must pass unreported: one argument per parameter nothing binds, of the
    declared type, on whichever instances hold them; and two instances of the

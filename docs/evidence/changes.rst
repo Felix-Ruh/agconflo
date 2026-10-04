@@ -349,3 +349,45 @@ or keeps, on the commit named. Re-running one later shows what has moved since.
    Run as ``sh scripts/impact.sh CREQ_RUN_WALKS_EVERY_EDGE`` on ``2ea52d1``.
    Below it: ``IMPL_RUN_WALKS_EVERY_EDGE``, ``TEST_RUN_OUTPUT_WALKS_EVERY_EDGE``
    and its run. In prose: that marker in ``scheduler.rs``.
+
+.. evd:: The impact of removing a run's context for a wired parameter coming first
+   :id: EVD_IMPACT_ARGUMENT_FIRST_ON_ITS_EDGE
+   :evd_kind: measurement
+   :observed_on: 2026-10-04
+   :observation: FEAT_ARGUMENT_FIRST_ON_ITS_EDGE answers to 2 needs, has 4 below it by link, 23 requirements sharing its components and 3 features its architecture, and is named on 7 lines.
+
+   Run as ``sh scripts/impact.sh FEAT_ARGUMENT_FIRST_ON_ITS_EDGE`` on
+   ``49ab514``, its documents as committed and the scheduler's marker already
+   moved to the requirement replacing it. Above it: ``STKH_REPETITION`` and
+   ``STKH_RUN_FROM_ANY_PARAMETER``. Below it:
+   ``CREQ_RUN_ARGUMENT_FIRST_ON_ITS_EDGE``, ``ARCH_REPETITION``,
+   ``TEST_RUN_ARGUMENT_FIRST_ON_ITS_EDGE`` and its run. Beside it: every
+   requirement of the workflow run, and ``FEAT_REPEAT_ON_NEW_CONTEXTS``,
+   ``FEAT_ENCLOSING_PASS_SERVES`` and ``FEAT_PASSES_PAIRED_BEFORE_RUN``. In
+   prose: six lines of the change records and one of their evidence.
+
+.. evd:: The impact of removing a run holding a wired parameter's context first
+   :id: EVD_IMPACT_RUN_ARGUMENT_FIRST_ON_ITS_EDGE
+   :evd_kind: measurement
+   :observed_on: 2026-10-04
+   :observation: CREQ_RUN_ARGUMENT_FIRST_ON_ITS_EDGE answers to 3 needs, has 2 below it by link and 23 requirements sharing its component, and is named on 3 lines.
+
+   Run as ``sh scripts/impact.sh CREQ_RUN_ARGUMENT_FIRST_ON_ITS_EDGE`` on
+   ``49ab514``, as the record above was. Below it:
+   ``TEST_RUN_ARGUMENT_FIRST_ON_ITS_EDGE`` and its run. Beside it: every
+   requirement of the workflow run. In prose: a failure mode of
+   ``CREQ_RUN_REFUSES_UNFILLED_SIGNATURE``, the review loop's test case, and
+   one line of the change records.
+
+.. evd:: The impact of repetition's architecture taking in the reader and the validator
+   :id: EVD_IMPACT_ARCH_REPETITION_FIRST
+   :evd_kind: measurement
+   :observed_on: 2026-10-04
+   :observation: ARCH_REPETITION answers to 7 needs, has nothing below it by link, uses components holding 31 requirements, and is named on 15 lines.
+
+   Run as ``sh scripts/impact.sh ARCH_REPETITION`` on ``49ab514``, as the
+   records above were. Above it: its four features and ``STKH_REPETITION``,
+   ``STKH_RUN_FROM_ANY_PARAMETER`` and ``STKH_WIRING_CHECKED``. Beside it:
+   every requirement of the run scheduler and the workflow run. In prose: the
+   opening of ``components/repetition``, and fourteen lines of the change
+   records and their evidence.

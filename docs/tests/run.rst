@@ -341,9 +341,10 @@ single requirement to verify.
    :test_kind: error_path
    :coverage: partial
 
-   One instance reading its own output, given its first context by the run,
-   under a budget of five: it is activated five times, each given the output
-   of the pass before, and the run ends reporting the budget.
+   One instance reading its own output, declaring its first context,
+   under a budget of five, the designated output reading it and written after
+   it: it is activated five times, each given the output of the pass before,
+   and the run ends reporting the budget.
 
    Catches ``CREQ_RUN_STOPS_AT_BUDGET``'s "counted per instance rather than
    per activation", which could not be told apart while no instance ran twice:
@@ -384,29 +385,18 @@ single requirement to verify.
    offers no more activations than the budget allows, whichever of the four ways
    it ends.
 
-.. test_case:: A cycle ends the run and names what was waiting
-   :id: TEST_RUN_CYCLE_ENDS_QUIESCENT
-   :verifies: CREQ_RUN_ENDS_QUIESCENT
-   :test_kind: error_path
-   :coverage: partial
-
-   Two instances bound to each other's output, with the designated output among
-   them. The run ends quiescent, naming both, and reports none of the other
-   three endings.
-
-   A cycle is legal to write (``DEC_BACK_EDGES_ALLOWED``) and cannot be run
-   until explicit control edges exist, so this is the shape that reaches
-   quiescence honestly rather than through a mistake.
-
-.. test_case:: An instance that can never run does not make a run stuck
+.. test_case:: An instance a run never reaches does not make it stuck
    :id: TEST_RUN_IDLE_INSTANCE_DOES_NOT_MAKE_IT_STUCK
    :verifies: CREQ_RUN_ENDS_QUIESCENT
    :test_kind: positive
    :coverage: partial
 
-   The measured shape (``EVD_RUN_COMPLETES_WITH_IDLE``): a definition holding an
-   instance bound to its own output, which can never become ready, beside a
-   designated output that produces. The run completes.
+   The measured shape (``EVD_RUN_COMPLETES_WITH_IDLE``), as it can still be
+   written: an instance on a branch its router does not take, which never
+   runs, beside a designated output that produces. The run completes. An
+   instance bound to its own output with no first context, the shape
+   measured, is now refused before the run starts
+   (``TEST_RUN_CYCLE_UNSTARTED_REFUSED``).
 
    The control that keeps quiescence from firing on every workflow with a branch
    the result does not depend on, and the case that catches a scheduler's
@@ -418,9 +408,11 @@ single requirement to verify.
    :test_kind: error_path
    :coverage: partial
 
-   A workflow whose first instance, given its input by the run, produces and
-   whose remaining instances form a cycle: the ending names the cycle's
-   instances and not the first, which did its work.
+   A workflow whose first instance produces and whose router, reading it,
+   names nothing, the remaining instances on the branch it did not take, the
+   designated output among them: the run ends quiescent, the ending naming
+   those instances and not the two that did their work. The other three
+   endings are not reported.
 
    Naming everything would point a reader at the whole graph, which is the same
    as naming nothing.

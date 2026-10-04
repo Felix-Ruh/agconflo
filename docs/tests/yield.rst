@@ -167,7 +167,7 @@ The run
    :test_kind: error_path
    :coverage: partial
 
-   An instance reading its own output, given its first context, whose model
+   An instance reading its own output, declaring its first context, whose model
    names its call ``call_1`` on each pass. After the first pass's call is
    answered and the pass produces, the second pass is asked for ``call_1``
    before making it, and is given nothing; once it makes the call and is
@@ -289,15 +289,19 @@ Records and resuming
    Catches: the window written as its rendering; the call's identifier made up;
    version 1 kept.
 
-.. test_case:: A record of version 1 is refused
+.. test_case:: A record of an earlier version is refused
    :id: TEST_RECORD_VERSION_ONE_REFUSED
-   :verifies: CREQ_RECORD_REFUSES_UNREADABLE
+   :verifies: CREQ_RECORD_REFUSES_UNREADABLE, CREQ_RECORD_HOLDS_FIRSTS
    :test_kind: error_path
    :coverage: partial
 
    A record written before exchanges existed is refused as unreadable, naming
    the version and where in the text it is, and no run is resumed - rather than
-   one resumed as having made no model call.
+   one resumed as having made no model call. The same record at version 2,
+   written before a binding declared its first context, is refused alike.
+
+   Catches: a record of the earlier version read as one holding no first
+   context.
 
 .. test_case:: A resumed run holds its record's exchanges
    :id: TEST_RECORD_EXCHANGES_KEPT

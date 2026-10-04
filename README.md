@@ -138,17 +138,28 @@ refused, naming the branches, so that it can be answered again.
 ### Repetition
 
 A workflow repeats part of itself by an edge going back: the drafter above reads the draft the
-router sends back. Each pass of a loop is started by what comes back round, so its first is given
-by the run, as a context for that bound parameter - `--arg drafter previous ""` - which the drafter
-reads on its first pass and the router's on every pass after.
+router sends back. Each pass of a loop is started by what comes back round, so the binding says
+what comes before it, its **first** context - a text, of the type its parameter is declared for -
+which the drafter reads on its first pass and the router's on every pass after:
+
+```toml
+[instances.drafter]
+node_type = "draft"
+bindings = { brief = "brief", previous = { from = "router", input = "draft", first = { text = "" } } }
+```
+
+`first` goes beside `from` for an instance's output just the same, with no `input`. A first
+context is the workflow's, not the run's: `--arg` gives only parameters nothing binds, and one for
+a bound parameter is refused.
 
 What each node is given is worked out from the wiring before the run starts. A node runs once for
 each pass of what feeds it, and is given every input from the pass it is on: a node on a branch
 reading the loop's draft is given the draft of the pass the branch was taken on, and a brief made
 once reaches every pass. A node whose inputs share no pass - one joining two branches no route
 takes together, or a loop's own node reading what a branch of it makes on some passes alone - has
-nothing it could be given, and the run is refused before anything runs, naming it and where each of
-its inputs comes from. A loop the run gives no first context to runs on no pass, and a repetition no
+nothing it could be given, and a loop no binding on it declares a first context for can never run:
+each is a defect of the workflow, which `agconflo check` reports and a run refuses before anything
+runs, naming the node and where each of its inputs comes from, or the loop's nodes. A repetition no
 router ends is stopped by the budget.
 
 ### Tools

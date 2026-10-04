@@ -541,8 +541,9 @@ impl<'t> Reading<'t> {
 
     /// One binding, written under `key` as `parameter = source`: a string
     /// naming the instance whose output it carries, or a table of `from`, that
-    /// instance, and `input`, the input of it the binding carries, both needed
-    /// and nothing else.
+    /// instance, then `input`, the input of it the binding carries, and
+    /// `first`, the first context it gives, and nothing else. `from` is needed,
+    /// and so is `input` in a table declaring no `first`.
     // @A binding read as an output or a router's input,IMPL_READER_ROUTED_INPUT,impl,[CREQ_READER_READS_ROUTED_INPUT],[DEC_ROUTED_INPUT_BOUND_BY_TABLE]
     fn binding(&self, parameter: &str, source: &Item, key: &[&str]) -> Result<Binding, ReadFault> {
         let at = [key, &[parameter]].concat();
@@ -551,34 +552,66 @@ impl<'t> Reading<'t> {
                 parameter: parameter.to_owned(),
                 source: source.to_owned(),
                 input: None,
+                first: None,
             });
         }
         let Some(table) = source.as_table_like() else {
             return Err(self.wrong_type(source.span(), &at, "string or table", source.type_name()));
         };
-        for (name, _) in table.iter() {
-            if name != "from" && name != "input" {
-                let span = table.key(name).and_then(|written| written.span());
-                return Err(self.fault(
-                    span,
-                    FaultKind::UnknownKey {
-                        key: path(&[&at[..], &[name]].concat()),
-                    },
-                ));
-            }
-        }
+        self.only(table, &at, &["from", "input", "first"])?;
         let from = self.needed(source, table, &at, "from")?;
-        let input = self.needed(source, table, &at, "input")?;
+        let input = if table.contains_key("input") || !table.contains_key("first") {
+            let input = self.needed(source, table, &at, "input")?;
+            Some(
+                self.string(input, &[&at[..], &["input"]].concat())?
+                    .to_owned(),
+            )
+        } else {
+            None
+        };
         Ok(Binding {
             parameter: parameter.to_owned(),
             source: self
                 .string(from, &[&at[..], &["from"]].concat())?
                 .to_owned(),
-            input: Some(
-                self.string(input, &[&at[..], &["input"]].concat())?
-                    .to_owned(),
-            ),
+            input,
+            first: self.first(table, &at)?,
         })
+    }
+
+    /// The text of the first context the binding written as `binding` under
+    /// `key` declares: its `first`, a table holding `text`, a string, and
+    /// nothing else, or `None` when it declares none.
+    // @A binding's first context read as a text,IMPL_READER_FIRST,impl,[CREQ_READER_READS_FIRST],[DEC_FIRST_CONTEXT_DECLARED]
+    fn first(&self, binding: &dyn TableLike, key: &[&str]) -> Result<Option<String>, ReadFault> {
+        let Some(first) = binding.get("first") else {
+            return Ok(None);
+        };
+        let at = [key, &["first"]].concat();
+        let table = self.table(first, &at)?;
+        self.only(table, &at, &["text"])?;
+        let text = self.needed(first, table, &at, "text")?;
+        Ok(Some(
+            self.string(text, &[&at[..], &["text"]].concat())?
+                .to_owned(),
+        ))
+    }
+
+    /// Nothing, or a fault at the first key of `table`, written under `key`,
+    /// that is not one of `known`.
+    fn only(&self, table: &dyn TableLike, key: &[&str], known: &[&str]) -> Result<(), ReadFault> {
+        for (name, _) in table.iter() {
+            if !known.contains(&name) {
+                let span = table.key(name).and_then(|written| written.span());
+                return Err(self.fault(
+                    span,
+                    FaultKind::UnknownKey {
+                        key: path(&[key, &[name]].concat()),
+                    },
+                ));
+            }
+        }
+        Ok(())
     }
 
     /// Nothing, or a fault for the `standing` key `declaration` holds, placed
@@ -827,6 +860,7 @@ impl Written {
                             parameter: parameter.clone(),
                             input: None,
                             source: source.clone(),
+                            first: None,
                         })
                         .collect(),
                     calls: written.calls.clone(),
@@ -1699,6 +1733,108 @@ fn routed_input_read() {
             58,
             &FaultKind::UnknownKey {
                 key: key(&["instances", "next", "bindings", "input", "as"])
+            }
+        )
+    );
+}
+
+#[test]
+fn first_read() {
+    let key = |parts: &[&str]| {
+        parts
+            .iter()
+            .map(|&part| part.to_owned())
+            .collect::<Vec<_>>()
+    };
+    let read = |text: &str| read_workflow("w.toml", text, &catalogue());
+
+    // On a router's input, on an output, written inline or as tables of their
+    // own, and with a line break in the text: each is read as written.
+    let text = "name = \"w\"\n\n[instances.next]\nnode_type = \"sink\"\nbindings = { input = { from = \"router\", input = \"draft\", first = { text = \"\" } }, hint = { from = \"next\", first = { text = \"goal 1\\npass 1\" } } }\n";
+    let (definition, _) = read(text).expect("it reads");
+    let bindings: Vec<(&str, &str, Option<&str>, Option<&str>)> = definition.instances[0]
+        .bindings
+        .iter()
+        .map(|b| {
+            (
+                b.parameter.as_str(),
+                b.source.as_str(),
+                b.input.as_deref(),
+                b.first.as_deref(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        bindings,
+        [
+            ("input", "router", Some("draft"), Some("")),
+            ("hint", "next", None, Some("goal 1\npass 1")),
+        ]
+    );
+    let tables = "name = \"w\"\n\n[instances.next]\nnode_type = \"sink\"\n\n[instances.next.bindings.hint]\nfrom = \"next\"\n\n[instances.next.bindings.hint.first]\ntext = \"\"\"\nstart\nnotes:\n\"\"\"\n";
+    let (definition, _) = read(tables).expect("it reads");
+    assert_eq!(
+        definition.instances[0].bindings[0].first.as_deref(),
+        Some("start\nnotes:\n")
+    );
+    // A binding declaring none has none.
+    let (definition, _) = read(
+        "name = \"w\"\n\n[instances.next]\nnode_type = \"sink\"\nbindings = { hint = \"next\" }\n",
+    )
+    .expect("it reads");
+    assert_eq!(definition.instances[0].bindings[0].first, None);
+
+    // A first context that is no table, holds no text, holds a text that is
+    // no string, or holds a key besides it, is refused where it is written.
+    let refused = |bindings: &str| {
+        let fault = read(&format!(
+            "name = \"w\"\n\n[instances.next]\nnode_type = \"sink\"\nbindings = {bindings}\n"
+        ))
+        .expect_err("refused");
+        (fault.line(), fault.column(), fault.kind().clone())
+    };
+    let at = |last: &[&str]| key(&[&["instances", "next", "bindings", "hint"][..], last].concat());
+    assert_eq!(
+        refused("{ hint = { from = \"next\", first = \"\" } }"),
+        (
+            5,
+            46,
+            FaultKind::WrongType {
+                key: at(&["first"]),
+                expected: "table",
+                found: "string"
+            }
+        )
+    );
+    assert_eq!(
+        refused("{ hint = { from = \"next\", first = {} } }"),
+        (
+            5,
+            46,
+            FaultKind::MissingKey {
+                key: at(&["first", "text"])
+            }
+        )
+    );
+    assert_eq!(
+        refused("{ hint = { from = \"next\", first = { text = 1 } } }"),
+        (
+            5,
+            55,
+            FaultKind::WrongType {
+                key: at(&["first", "text"]),
+                expected: "string",
+                found: "integer"
+            }
+        )
+    );
+    assert_eq!(
+        refused("{ hint = { from = \"next\", first = { text = \"\", file = \"x\" } } }"),
+        (
+            5,
+            59,
+            FaultKind::UnknownKey {
+                key: at(&["first", "file"])
             }
         )
     );

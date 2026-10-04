@@ -4,17 +4,21 @@
 
 use std::collections::HashMap;
 
-use crate::clock::{Clock, Clocks, Unpaired};
+use crate::clock::{Clock, Clocks};
 use crate::run::Arguments;
 use crate::workflow::{Binding, NodeInstance, WorkflowDefinition};
 use crate::{Context, ContextType};
 
 /// What each instance of a run has produced, pass by pass, and each router's
 /// inputs and the branch it took on each of its passes - with the passes each
-/// instance runs on, worked out when the run started.
+/// instance runs on, worked out when the run started, and the first context
+/// each binding declaring one gives.
 #[derive(Clone, Debug, Default)]
 pub(crate) struct Passes {
     clocks: Clocks,
+    /// The first context of each binding declaring one, by its instance and
+    /// the parameter it fills.
+    firsts: HashMap<(String, String), Context>,
     /// Each instance's own outputs, the output of its pass `k` at `k`.
     outputs: HashMap<String, Vec<Context>>,
     /// Each router's inputs on each of its passes.
@@ -26,18 +30,18 @@ pub(crate) struct Passes {
 }
 
 impl Passes {
-    /// The passes of a run of `definition` given `arguments`, before anything
-    /// has run.
-    pub(crate) fn new(definition: &WorkflowDefinition, arguments: &Arguments) -> Self {
+    /// The passes of a run of `definition` whose bindings declaring a first
+    /// context give `firsts`, by instance and parameter, before anything has
+    /// run.
+    pub(crate) fn new(
+        definition: &WorkflowDefinition,
+        firsts: HashMap<(String, String), Context>,
+    ) -> Self {
         Self {
-            clocks: Clocks::new(definition, arguments),
+            clocks: Clocks::new(definition),
+            firsts,
             ..Self::default()
         }
-    }
-
-    /// Every instance whose inputs cannot be given contexts of one pass.
-    pub(crate) fn unpaired(&self) -> &[Unpaired] {
-        self.clocks.unpaired()
     }
 
     /// Record that `activation`, an instance's own, produced `output` as its
@@ -133,22 +137,18 @@ impl Passes {
 
     /// The context `binding` gives `instance` on its pass `pass`, or `None`
     /// while it has none: the context made on the same pass of what the binding
-    /// carries, or on the pass enclosing it - and where the run gave the
-    /// binding its first context, that on pass 0 and the binding's after.
-    // @A binding's context of the activation's own pass,IMPL_SCHEDULER_ONE_PASS,impl,[CREQ_SCHEDULER_GIVES_ONE_PASS, CREQ_RUN_ARGUMENT_FIRST_ON_ITS_EDGE],[DEC_PASS_CLOCKS, DEC_ARGUMENT_FIRST_ON_ITS_EDGE]
-    fn input<'p>(
-        &'p self,
-        arguments: &'p Arguments,
-        instance: &NodeInstance,
-        binding: &Binding,
-        pass: usize,
-    ) -> Option<&'p Context> {
+    /// carries, or on the pass enclosing it - and where the binding declares
+    /// its first context, that on pass 0 and what it carries after.
+    // @A binding's context of the activation's own pass,IMPL_SCHEDULER_ONE_PASS,impl,[CREQ_SCHEDULER_GIVES_ONE_PASS, CREQ_SCHEDULER_GIVES_FIRST],[DEC_PASS_CLOCKS, DEC_FIRST_CONTEXT_DECLARED]
+    fn input(&self, instance: &NodeInstance, binding: &Binding, pass: usize) -> Option<&Context> {
         let edge = self.clocks.edge(&instance.name, &binding.parameter);
         let mine = self.clocks.of(&instance.name);
         let mut carried = self.pass_of(mine, pass, edge)?;
-        if let Some(first) = arguments.context_for(&instance.name, &binding.parameter) {
+        if binding.first.is_some() {
             if carried == 0 {
-                return Some(first);
+                return self
+                    .firsts
+                    .get(&(instance.name.clone(), binding.parameter.clone()));
             }
             carried -= 1;
         }
@@ -274,7 +274,7 @@ pub(crate) fn activation_for(
             .iter()
             .find(|b| b.parameter == parameter.name)
         {
-            Some(binding) => passes.input(arguments, instance, binding, pass)?,
+            Some(binding) => passes.input(instance, binding, pass)?,
             None => arguments.context_for(&instance.name, &parameter.name)?,
         };
         inputs.push((parameter.name.clone(), context.clone()));
@@ -323,7 +323,7 @@ impl Passes {
 /// `produced` names has produced its context once, in the definition's order.
 #[cfg(test)]
 fn passes_of(workflow: &WorkflowDefinition, produced: &Produced) -> Passes {
-    let mut passes = Passes::new(workflow, &Arguments::new());
+    let mut passes = Passes::new(workflow, HashMap::new());
     for node in &workflow.instances {
         if let Some(output) = produced.get(&node.name) {
             passes.walked(&node.name, output);
@@ -381,7 +381,7 @@ fn given(activation: &Activation) -> Vec<&str> {
 fn answers(workflow: &WorkflowDefinition) -> Vec<String> {
     let mut source = IdSource::new();
     let arguments = Arguments::new();
-    let mut passes = Passes::new(workflow, &arguments);
+    let mut passes = Passes::new(workflow, HashMap::new());
     let mut answers = Vec::new();
 
     while let Some(activation) = next_activation(workflow, &arguments, &passes) {
@@ -499,8 +499,12 @@ fn input_is_ready_at_once() {
     let seed_id = seed.id();
     let arguments = Arguments::new().supply("e", "seed", seed);
 
-    let activation = next_activation(&workflow, &arguments, &Passes::new(&workflow, &arguments))
-        .expect("an instance given its inputs is ready before anything has run");
+    let activation = next_activation(
+        &workflow,
+        &arguments,
+        &Passes::new(&workflow, HashMap::new()),
+    )
+    .expect("an instance given its inputs is ready before anything has run");
     assert_eq!(activation.instance(), "e");
     assert_eq!(given(&activation), ["seed"]);
     assert_eq!(activation.inputs()[0].1.id(), seed_id);
@@ -700,7 +704,7 @@ fn offered(
 #[test]
 fn offered_once_per_pass() {
     let mut source = IdSource::new();
-    // `x` reads its own output, the run giving it the first; `c` reads `x` and
+    // `x` reads its own output, declaring the first; `c` reads `x` and
     // `v`, which reads nothing and runs once.
     let types = vec![
         node_type("Src", &[], "note"),
@@ -709,14 +713,14 @@ fn offered_once_per_pass() {
     ];
     let instances = vec![
         instance("v", "Src", &[]),
-        instance("x", "Take", &[("seed", "x")]),
+        instance("x", "Take", &[("seed", "x")]).first("seed", "x"),
         instance("c", "Pair", &[("left", "v"), ("right", "x")]),
     ];
     let workflow = definition(types, instances, &["c"]);
     let seed = ctx(&mut source, "note");
-    let arguments = Arguments::new().supply("x", "seed", seed.clone());
-    let mut passes = Passes::new(&workflow, &arguments);
-    assert_eq!(passes.unpaired(), []);
+    let arguments = Arguments::new();
+    let firsts = HashMap::from([(("x".to_owned(), "seed".to_owned()), seed.clone())]);
+    let mut passes = Passes::new(&workflow, firsts);
 
     // An instance reading nothing is offered once, and never again.
     let v = offered(&workflow, &arguments, &passes, "v").expect("nothing to wait for");
@@ -726,7 +730,7 @@ fn offered_once_per_pass() {
         assert!(offered(&workflow, &arguments, &passes, "v").is_none());
     }
 
-    // `x` on its first pass is given what the run gave; `c` waits for it.
+    // `x` on its first pass is given its declared first; `c` waits for it.
     assert!(offered(&workflow, &arguments, &passes, "c").is_none());
     let x = offered(&workflow, &arguments, &passes, "x").expect("given its first");
     assert!(x.inputs()[0].1.is(&seed));
@@ -752,20 +756,35 @@ fn offered_once_per_pass() {
     assert!(c.inputs()[0].1.is(&v0) && c.inputs()[1].1.is(&x1));
 }
 
-/// The instances of `workflow` with the run giving `given` their first
-/// contexts, each paired with a description of the passes it runs on.
 #[cfg(test)]
-fn unpaired_of(workflow: &WorkflowDefinition, given: &[(&str, &str)]) -> Vec<Unpaired> {
-    let mut source = IdSource::new();
-    let mut arguments = Arguments::new();
+use crate::clock::Unpaired;
+
+/// `workflow` with the bindings of `given`, each an instance and a parameter,
+/// declaring an empty first context.
+#[cfg(test)]
+fn declaring(workflow: &WorkflowDefinition, given: &[(&str, &str)]) -> WorkflowDefinition {
+    let mut declared = workflow.clone();
     for &(instance, parameter) in given {
-        arguments = arguments.supply(instance, parameter, ctx(&mut source, "note"));
+        let at = declared
+            .instances
+            .iter()
+            .position(|node| node.name == instance)
+            .expect("the instance is in the workflow");
+        declared.instances[at] = declared.instances[at].clone().first(parameter, "");
     }
-    Clocks::new(workflow, &arguments).unpaired().to_vec()
+    declared
 }
 
-/// A review loop: `d` reads a brief and what the router `r` sends back, the
-/// run giving it its first; `r` reads the draft and names `branches`; then
+/// The instances of `workflow` whose inputs share no pass, with the bindings
+/// of `given` declaring their first contexts, each paired with a
+/// description of the passes it runs on.
+#[cfg(test)]
+fn unpaired_of(workflow: &WorkflowDefinition, given: &[(&str, &str)]) -> Vec<Unpaired> {
+    Clocks::new(&declaring(workflow, given)).unpaired().to_vec()
+}
+
+/// A review loop: `d` reads a brief and what the router `r` sends back, with
+/// no first context declared; `r` reads the draft and names `branches`; then
 /// whatever `more` adds.
 #[cfg(test)]
 fn looping(branches: &[(&str, &[&str])], more: Vec<NodeInstance>) -> WorkflowDefinition {
@@ -791,8 +810,8 @@ fn unpaired_inputs_reported() {
     // Sound, each: a review loop sending the draft on; a node on a branch
     // reading one made on every pass, and one made once; two instances on one
     // branch; an instance in two branches read beside one in one of them; a
-    // cycle no router is on, given its first context; a loop given nothing,
-    // whose instances run on no pass and are reported for nothing.
+    // cycle no router is on, declaring its first context; a loop declaring
+    // none, whose instances run on no pass and are reported for nothing.
     let sound = looping(
         &[
             ("back", &["d", "w"]),
@@ -815,11 +834,7 @@ fn unpaired_inputs_reported() {
         unpaired_of(&sound, &[("d", "feedback"), ("z", "input")]),
         []
     );
-    let mut source = IdSource::new();
-    let given = Arguments::new()
-        .supply("d", "feedback", ctx(&mut source, "note"))
-        .supply("z", "input", ctx(&mut source, "note"));
-    let clocks = Clocks::new(&sound, &given);
+    let clocks = Clocks::new(&declaring(&sound, &[("d", "feedback"), ("z", "input")]));
     let on = |branches: &[usize]| Clock::Branch {
         router: "r".to_owned(),
         branches: branches.to_vec(),
@@ -832,7 +847,7 @@ fn unpaired_inputs_reported() {
     assert_eq!(clocks.of("l"), &on(&[2]));
     assert_eq!(clocks.of("n"), &on(&[1]));
     assert_eq!(clocks.of("z"), &Clock::Cycle("z".to_owned()));
-    let clocks = Clocks::new(&sound, &Arguments::new());
+    let clocks = Clocks::new(&sound);
     assert_eq!(clocks.of("d"), &Clock::Never);
     assert_eq!(clocks.of("j"), &Clock::Never);
     assert_eq!(unpaired_of(&sound, &[]), []);
@@ -888,7 +903,7 @@ fn unpaired_inputs_reported() {
             ("brief".to_owned(), "the run's one pass".to_owned()),
             (
                 "feedback".to_owned(),
-                "a context the run gives, then the passes on which 'r' takes 'back' or 'side'"
+                "a first context declared, then the passes on which 'r' takes 'back' or 'side'"
                     .to_owned()
             ),
             (
@@ -905,7 +920,7 @@ fn unpaired_inputs_reported() {
         found[0]
     );
 
-    // Cycles no router is on: one of two instances, given its first context,
+    // Cycles no router is on: one of two instances, declaring its first context,
     // read by a third, which runs on its passes; and two such cycles, each of
     // one instance, joined, which share none.
     let types = vec![
@@ -922,9 +937,7 @@ fn unpaired_inputs_reported() {
         &["c"],
     );
     assert_eq!(unpaired_of(&cycle, &[("a", "input")]), []);
-    let mut source = IdSource::new();
-    let given = Arguments::new().supply("a", "input", ctx(&mut source, "note"));
-    let clocks = Clocks::new(&cycle, &given);
+    let clocks = Clocks::new(&declaring(&cycle, &[("a", "input")]));
     let through_a = Clock::Cycle("a".to_owned());
     assert_eq!(
         [clocks.of("a"), clocks.of("b"), clocks.of("c")],

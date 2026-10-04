@@ -47,6 +47,29 @@ the run's rule of one context per identifier, kept across an interruption.
    - **A context written once per holder.** A part held by two contexts comes
      back as two values under one identifier.
 
+.. comp_req:: A record holds the first contexts its run holds
+   :id: CREQ_RECORD_HOLDS_FIRSTS
+   :derived_from: FEAT_RUN_RECORDED
+   :allocated_to: COMP_RUN_RECORD
+   :ears_pattern: ubiquitous
+   :statement: Run record shall write each first context a run holds for a binding apart from its arguments, naming the binding's instance and parameter and the context.
+
+   A run makes the first context of each binding declaring one when it starts
+   (``CREQ_RUN_HOLDS_DECLARED_FIRST``), from the source its caller lends it,
+   so it is part of the run's state as an argument is, and is not one: it is
+   the workflow's (``DEC_FIRST_CONTEXT_DECLARED``). The record's version says
+   whether it holds them.
+
+   Failure modes:
+
+   - **The first contexts left out.** A resumed run makes them again under
+     new identifiers, and every activation recorded as given one diverges.
+   - **The first contexts written as arguments.** A resumed run starts with
+     an argument for a parameter a binding fills, which the run refuses.
+   - **A record of the earlier version read as one holding none.** A run
+     recorded before a binding declared its first context resumes with
+     contexts it never held.
+
 .. comp_req:: A resumed run continues where it was recorded
    :id: CREQ_RECORD_CONTINUES_THE_RUN
    :derived_from: FEAT_RESUME_REPEATS_NO_OUTPUT
@@ -146,6 +169,25 @@ the run's rule of one context per identifier, kept across an interruption.
      fault in the record.
    - **The start's checks skipped.** A defective workflow is resumed, which no
      run of it could have been.
+
+.. comp_req:: A record whose first contexts are not the workflow's is refused
+   :id: CREQ_RECORD_REFUSES_CHANGED_FIRST
+   :derived_from: FEAT_RESUME_REFUSES_ANOTHER_RUN
+   :allocated_to: COMP_RUN_RECORD
+   :ears_pattern: unwanted
+   :statement: If a record's first context for a binding is not the text and type the workflow it is resumed against declares for that binding, then Run record shall refuse to resume it naming the binding's instance and parameter.
+
+   A binding declaring none with one recorded, and one declaring one with
+   none recorded, are refused alike: the record is then of a run of another
+   workflow (``DEC_FIRST_CONTEXT_DECLARED``).
+
+   Failure modes:
+
+   - **The first context made again from the workflow.** A record of a run
+     whose first context has since been edited resumes with outputs made from
+     a text the run no longer gives.
+   - **Only the text compared.** A first context of another type, which no
+     run of the workflow could have held, is resumed.
 
 .. comp_req:: A text that is not a record is refused with its fault
    :id: CREQ_RECORD_REFUSES_UNREADABLE

@@ -56,6 +56,10 @@ pub struct Binding {
     /// router's inputs rather than the instance's output.
     // @A binding taking a router's input,TRACE_WORKFLOW_ROUTED_INPUT,trace,[],[DEC_ROUTED_INPUT_BOUND_BY_TABLE, DEC_ROUTER_OUTPUT_IS_ITS_DECISION]
     pub input: Option<String>,
+    /// The text of the first context this binding gives its instance, before
+    /// any it carries, when it declares one.
+    // @A binding's first context declared as a text,TRACE_WORKFLOW_FIRST,trace,[],[DEC_FIRST_CONTEXT_DECLARED]
+    pub first: Option<String>,
 }
 
 /// One branch a router's instance declares: its name, and the instances a
@@ -182,6 +186,7 @@ pub(crate) fn instance(name: &str, node_type: &str, bindings: &[(&str, &str)]) -
                 parameter: parameter.to_owned(),
                 source: source.to_owned(),
                 input: None,
+                first: None,
             })
             .collect(),
         calls: Vec::new(),
@@ -198,7 +203,20 @@ impl NodeInstance {
             parameter: parameter.to_owned(),
             source: router.to_owned(),
             input: Some(input.to_owned()),
+            first: None,
         });
+        self
+    }
+
+    /// The same instance, its binding of `parameter` declaring `text` as its
+    /// first context. Panics when nothing binds `parameter`.
+    pub(crate) fn first(mut self, parameter: &str, text: &str) -> Self {
+        let binding = self
+            .bindings
+            .iter_mut()
+            .find(|binding| binding.parameter == parameter)
+            .expect("a first context is declared on a binding the instance has");
+        binding.first = Some(text.to_owned());
         self
     }
 

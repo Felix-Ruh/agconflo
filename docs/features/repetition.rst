@@ -7,7 +7,7 @@ the pass it is on, and a workflow whose nodes could not be given that refused
 before it runs. Every requirement here derives from ``STKH_REPETITION`` and is
 written against the decisions in ``decisions/run`` and ``decisions/workflow``,
 which record the model each node's passes are worked out by
-(``DEC_PASS_CLOCKS``, ``DEC_REPETITION_BY_EDGES``).
+(``DEC_PASS_CLOCKS``, ``DEC_CYCLE_STARTED_BY_A_FIRST``).
 
 What decides that a repetition ends is not here: it is a router's, in
 ``features/routing``, and a repetition no router ends is what the step budget
@@ -17,9 +17,10 @@ over the list itself (``DEC_LIST_HANDLED_IN_ONE_NODE``).
 Each requirement was checked by hand against the two questions every body here
 answers: could it be false while its parent holds, and could the parent hold
 while it is false? The first three are ``event``, the last ``unwanted``. The
-third derives from ``STKH_RUN_FROM_ANY_PARAMETER`` as well: it is how a
+third derives from ``STKH_WIRING_CHECKED`` as well: it is how a
 repetition's first pass is given what its later passes are given by the
-edges. The feature's architecture closes the file.
+edges, said of the workflow, where a check can see it. The feature's
+architecture closes the file.
 
 .. feat_req:: A node runs again on each pass its inputs reach
    :id: FEAT_REPEAT_ON_NEW_CONTEXTS
@@ -29,7 +30,7 @@ edges. The feature's architecture closes the file.
    :statement: When the inputs of a node instance hold the contexts of a pass it has not run, Agconflo shall activate the instance with the contexts of that pass.
 
    The parent lets a workflow repeat part of itself, and a part is repeated by
-   walking its edges again (``DEC_REPETITION_BY_EDGES``): a node runs again
+   walking its edges again (``DEC_CYCLE_STARTED_BY_A_FIRST``): a node runs again
    when what it reads has moved on to another pass. The parent leaves how one
    pass's contexts are kept apart from the next's to a decision
    (``DEC_PASS_CLOCKS``); what it needs of every way of keeping them is that a
@@ -70,29 +71,33 @@ edges. The feature's architecture closes the file.
    It replaces ``FEAT_STANDING_SERVES_LATER_PASSES``, which met the same need
    through an output declared standing (``DEC_CHANGE_STANDING_SERVES_LATER_PASSES``).
 
-.. feat_req:: A context a run is given for a wired parameter comes first
-   :id: FEAT_ARGUMENT_FIRST_ON_ITS_EDGE
-   :derived_from: STKH_RUN_FROM_ANY_PARAMETER, STKH_REPETITION
+.. feat_req:: A first context a binding declares comes first
+   :id: FEAT_FIRST_CONTEXT_DECLARED
+   :derived_from: STKH_REPETITION, STKH_WIRING_CHECKED
    :ears_pattern: event
    :verification_method: test
-   :statement: When a run is started with a context for a parameter a binding fills, Agconflo shall give that context to the parameter's instance before any context walked along the binding.
+   :statement: When a binding declares its first context, Agconflo shall give that context to the binding's instance before any context walked along the binding.
 
-   ``STKH_RUN_FROM_ANY_PARAMETER`` lets a run be given a context for any
-   node's parameter, and a parameter a binding fills is one of them. Given a
-   context there, something has to say which comes first, it or what the wire
-   carries; saying nothing refuses one or loses the other.
-   ``STKH_REPETITION`` needs the answer to be "it": a node in a loop reads
-   what comes back round, which cannot come back before the node has run
-   (``DEC_ARGUMENT_FIRST_ON_ITS_EDGE``). It is the first pass of the passes the
-   binding gives the node (``DEC_PASS_CLOCKS``).
+   ``STKH_REPETITION`` lets a workflow repeat part of itself, and a node in a
+   loop reads what comes back round, which cannot come back before the node
+   has run: something has to come before it. ``STKH_WIRING_CHECKED`` rejects
+   an invalid workflow before any node runs, and a loop nothing starts is
+   one, whose nodes can never run; the check can tell only if what starts a
+   loop is part of the workflow. A binding saying what comes first is both
+   (``DEC_FIRST_CONTEXT_DECLARED``). It is the binding's pass 0, and what the
+   binding carries its passes after (``DEC_PASS_CLOCKS``).
 
-   It can be false while both parents hold. A run could refuse a context for
-   a wired parameter, as it did, and every other parameter could still be
-   given one; the loop would then have no way into its first pass, and would
-   repeat nothing.
+   It can be false while both parents hold only if a loop could start from
+   something else a check could see, which would be a declaration by another
+   name.
 
-   It claims no more than they need: it says which context comes first, not
-   how many passes follow, which the edges decide.
+   It claims no more than they need: it says what the declared context is
+   given before, not how many passes follow, which the edges decide, nor
+   what the declaration is written as, which the decision says.
+
+   It replaces ``FEAT_ARGUMENT_FIRST_ON_ITS_EDGE``, which took the first
+   context from the run's arguments
+   (``DEC_CHANGE_ARGUMENT_FIRST_ON_ITS_EDGE``).
 
 .. feat_req:: A workflow whose nodes cannot be given one pass's contexts does not run
    :id: FEAT_PASSES_PAIRED_BEFORE_RUN
@@ -103,37 +108,43 @@ edges. The feature's architecture closes the file.
 
    ``FEAT_REPEAT_ON_NEW_CONTEXTS`` gives a node the contexts of one pass,
    and some wiring leaves a node none: a node joining two branches no route
-   takes together, or a loop's own node reading what a branch of it makes on
-   some passes alone. Run, such a node waits for ever or is given two passes'
-   contexts. ``STKH_WIRING_CHECKED`` rejects an invalid workflow before any
-   node runs, and this is the invalidity repetition adds.
+   takes together, a loop's own node reading what a branch of it makes on
+   some passes alone, or a node on a cycle no first context starts, which
+   has no pass at all. Run, such a node waits for ever or is given two
+   passes' contexts. ``STKH_WIRING_CHECKED`` rejects an invalid workflow
+   before any node runs, and this is the invalidity repetition adds.
 
-   It is a refusal of a run rather than of a workflow: which passes a loop
-   has depends on the parameters the run gives a first context to
-   (``DEC_PAIRING_CHECKED_AT_START``). Either way, nothing has run.
+   Every instance's passes follow from the workflow alone, its first contexts
+   among them (``DEC_FIRST_CONTEXT_DECLARED``), so it is a defect of the
+   workflow, which a check finds as well as a run
+   (``DEC_PAIRING_IS_WIRING``, ``DEC_CYCLE_STARTED_BY_A_FIRST``).
 
    It can be false while both parents hold only if a node could always be
    given one pass's contexts, which the first case above shows it cannot.
 
-.. feat_arch:: Repetition splits between the run scheduler and the workflow run
+.. feat_arch:: Repetition splits between the topology reader, the wiring validator, the run scheduler and the workflow run
    :id: ARCH_REPETITION
-   :realises: FEAT_REPEAT_ON_NEW_CONTEXTS, FEAT_ENCLOSING_PASS_SERVES, FEAT_ARGUMENT_FIRST_ON_ITS_EDGE, FEAT_PASSES_PAIRED_BEFORE_RUN
-   :uses: COMP_RUN_SCHEDULER, COMP_WORKFLOW_RUN
-   :statement: Agconflo shall allocate repetition to the run scheduler and the workflow run.
+   :realises: FEAT_REPEAT_ON_NEW_CONTEXTS, FEAT_ENCLOSING_PASS_SERVES, FEAT_FIRST_CONTEXT_DECLARED, FEAT_PASSES_PAIRED_BEFORE_RUN
+   :uses: COMP_TOPOLOGY_READER, COMP_WIRING_VALIDATOR, COMP_RUN_SCHEDULER, COMP_WORKFLOW_RUN
+   :statement: Agconflo shall allocate repetition to the topology reader, the wiring validator, the run scheduler and the workflow run.
 
+   - The topology reader answers for what the workflow document declares:
+     the first context a binding gives.
+   - The wiring validator answers for what the wiring allows: a cycle no
+     declared first context starts, and an instance whose inputs share no
+     pass, each a defect before anything runs.
    - The run scheduler answers for passes: which passes each instance runs
-     on, worked out from the wiring and the contexts the run is given, which
-     instances cannot be given one pass's contexts, and for each activation
-     the contexts of its pass.
-   - The workflow run answers for what it holds and when it starts: each
-     output as its instance's next pass, a context it was given for a wired
-     parameter as that binding's first, and a refusal before anything runs of
-     a workflow whose nodes the scheduler found unpaired.
+     on, worked out from the wiring, and for each activation the contexts of
+     its pass, a binding's declared first context on its pass 0.
+   - The workflow run answers for what it holds: each output as its
+     instance's next pass, and each declared first context, made when the
+     run starts.
 
-   Its links were changed by ``DEC_CHANGE_ARCH_REPETITION`` and
-   ``DEC_CHANGE_ARCH_REPETITION_PASSES``.
+   Its links were changed by ``DEC_CHANGE_ARCH_REPETITION``,
+   ``DEC_CHANGE_ARCH_REPETITION_PASSES`` and
+   ``DEC_CHANGE_ARCH_REPETITION_FIRST``.
 
    The decisions it is built against are named here rather than linked:
-   ``DEC_PASS_CLOCKS``, ``DEC_PAIRING_CHECKED_AT_START``,
-   ``DEC_REPETITION_BY_EDGES``, ``DEC_ARGUMENT_FIRST_ON_ITS_EDGE`` and
+   ``DEC_PASS_CLOCKS``, ``DEC_PAIRING_IS_WIRING``,
+   ``DEC_CYCLE_STARTED_BY_A_FIRST``, ``DEC_FIRST_CONTEXT_DECLARED`` and
    ``DEC_RUN_IS_DRIVEN``.

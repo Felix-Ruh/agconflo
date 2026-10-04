@@ -1232,3 +1232,130 @@ changed.
    - Sideways, the run's other requirements: unaffected but
      ``CREQ_RUN_REFUSES_UNPAIRED``, added beside it.
    - Text, its marker in ``scheduler.rs``: moved with the code.
+
+.. dec:: Removed: a context a run is given for a wired parameter coming first
+   :id: DEC_CHANGE_ARGUMENT_FIRST_ON_ITS_EDGE
+   :dec_status: accepted
+   :decided_on: 2026-10-04
+   :supported_by: EVD_IMPACT_ARGUMENT_FIRST_ON_ITS_EDGE
+   :statement: Agconflo's requirements project shall replace FEAT_ARGUMENT_FIRST_ON_ITS_EDGE with FEAT_FIRST_CONTEXT_DECLARED because it named the run's arguments as where a loop starts, which neither of its parents asks for.
+
+   Removes ``FEAT_ARGUMENT_FIRST_ON_ITS_EDGE``: "When a run is started with a
+   context for a parameter a binding fills, Agconflo shall give that context
+   to the parameter's instance before any context walked along the binding."
+   ``FEAT_FIRST_CONTEXT_DECLARED`` takes its place: "When a binding declares
+   its first context, Agconflo shall give that context to the binding's
+   instance before any context walked along the binding."
+
+   Raised by ``EVD_LOOP_FIRST_CONTEXT_UNCHECKED``: a check passed a loop that
+   every run of it left stuck or refused, because what started the loop was
+   in no run but the one given it.
+
+   Justification: it is wrong against its own parents, claiming more than
+   they need. ``STKH_RUN_FROM_ANY_PARAMETER`` gives a run contexts for the
+   parameters nothing binds - its body says a workflow is invoked by giving
+   each of those its context - and asks nothing of a parameter a binding
+   fills. ``STKH_REPETITION`` needs a loop to have a way into its first pass
+   and leaves how to a decision. The requirement named one way, the run's
+   argument, as the requirement itself; a loop started from what its
+   workflow declares meets both parents and broke it. What
+   ``STKH_REPETITION`` needs of a way in, said where ``STKH_WIRING_CHECKED``
+   can see it, is the new requirement, and it no longer derives from
+   ``STKH_RUN_FROM_ANY_PARAMETER``.
+
+   Verdicts on the impact analysis (``EVD_IMPACT_ARGUMENT_FIRST_ON_ITS_EDGE``):
+
+   - Up, ``STKH_REPETITION`` and ``STKH_RUN_FROM_ANY_PARAMETER``: unchanged.
+   - Down: ``CREQ_RUN_ARGUMENT_FIRST_ON_ITS_EDGE`` is removed with it
+     (``DEC_CHANGE_RUN_ARGUMENT_FIRST_ON_ITS_EDGE``); ``ARCH_REPETITION``
+     realises the new requirement (``DEC_CHANGE_ARCH_REPETITION_FIRST``);
+     ``TEST_RUN_ARGUMENT_FIRST_ON_ITS_EDGE`` goes with its test, for
+     ``TEST_RUN_FIRST_CONTEXT_DECLARED_COMES_FIRST``, and its run with it.
+   - Sideways, the workflow run's requirements: unaffected but
+     ``CREQ_RUN_REFUSES_UNFILLED_SIGNATURE``, whose failure modes now say an
+     argument for a bound parameter matches nothing of the workflow's - its
+     statement, about the parameters nothing binds, is unchanged - and
+     ``CREQ_RUN_HOLDS_DECLARED_FIRST``, added beside it. The three features
+     beside it under ``ARCH_REPETITION``: unaffected, and
+     ``FEAT_PASSES_PAIRED_BEFORE_RUN``'s body changes with the pairing check's
+     place in a record of its own.
+   - Text, six lines of the records above and one of their evidence:
+     unchanged, as history.
+
+.. dec:: Removed: a run holding a context given for a wired parameter first
+   :id: DEC_CHANGE_RUN_ARGUMENT_FIRST_ON_ITS_EDGE
+   :dec_status: accepted
+   :decided_on: 2026-10-04
+   :supported_by: EVD_IMPACT_RUN_ARGUMENT_FIRST_ON_ITS_EDGE
+   :statement: Agconflo's requirements project shall replace CREQ_RUN_ARGUMENT_FIRST_ON_ITS_EDGE with CREQ_SCHEDULER_GIVES_FIRST and CREQ_RUN_HOLDS_DECLARED_FIRST because its parent is removed.
+
+   Removes ``CREQ_RUN_ARGUMENT_FIRST_ON_ITS_EDGE``: "When a run is started
+   with a context for a parameter a binding fills, Workflow run shall hold
+   that context as the first that edge holds, before any context walked along
+   it." ``CREQ_SCHEDULER_GIVES_FIRST`` takes its place for when the context is
+   given: "When a binding declares its first context, Run scheduler shall give
+   that context to the binding's instance on the binding's first pass and what
+   the binding carries on each pass after." ``CREQ_RUN_HOLDS_DECLARED_FIRST``
+   for where it comes from: "When a run starts, Workflow run shall hold for
+   each binding declaring its first context a context holding the declared
+   text, of the type the binding's parameter is declared for."
+
+   Justification: its parent changed - removed for
+   ``FEAT_FIRST_CONTEXT_DECLARED`` (``DEC_CHANGE_ARGUMENT_FIRST_ON_ITS_EDGE``).
+   Its three failure modes stand: the first two are the scheduler's now, and
+   the third, refusing the context as a second source, is what the run now
+   does to an argument for a bound parameter, on purpose.
+
+   Verdicts on the impact analysis
+   (``EVD_IMPACT_RUN_ARGUMENT_FIRST_ON_ITS_EDGE``):
+
+   - Up, ``FEAT_ARGUMENT_FIRST_ON_ITS_EDGE``: removed, above; its two
+     stakeholder requirements unchanged.
+   - Down: ``TEST_RUN_ARGUMENT_FIRST_ON_ITS_EDGE`` and its run go with the
+     test; ``IMPL_SCHEDULER_ONE_PASS`` implements the scheduler's requirement,
+     and ``IMPL_RUN_MAKES_FIRSTS`` and ``IMPL_RUN_HELD_ARGUMENTS`` the run's.
+   - Sideways, the workflow run's requirements: as the record above says.
+   - Text: the failure mode of ``CREQ_RUN_REFUSES_UNFILLED_SIGNATURE`` and
+     the review loop's test case, rewritten for the new requirements; one line
+     of the records above, unchanged as history.
+
+.. dec:: Amended: repetition's architecture realises a declared first context and uses the reader and the validator
+   :id: DEC_CHANGE_ARCH_REPETITION_FIRST
+   :dec_status: accepted
+   :decided_on: 2026-10-04
+   :supported_by: EVD_IMPACT_ARCH_REPETITION_FIRST
+   :statement: Agconflo's requirements project shall have ARCH_REPETITION realise FEAT_FIRST_CONTEXT_DECLARED and use the topology reader and the wiring validator because a loop's first context is now read from the workflow and checked there.
+
+   Amends ``ARCH_REPETITION``. Before: it realised
+   ``FEAT_REPEAT_ON_NEW_CONTEXTS``, ``FEAT_ENCLOSING_PASS_SERVES``,
+   ``FEAT_ARGUMENT_FIRST_ON_ITS_EDGE`` and ``FEAT_PASSES_PAIRED_BEFORE_RUN``,
+   used the run scheduler and the workflow run, and stated "Agconflo shall
+   allocate repetition to the run scheduler and the workflow run." After: it
+   realises ``FEAT_FIRST_CONTEXT_DECLARED`` in place of
+   ``FEAT_ARGUMENT_FIRST_ON_ITS_EDGE``, uses the topology reader, the wiring
+   validator, the run scheduler and the workflow run, and states "Agconflo
+   shall allocate repetition to the topology reader, the wiring validator, the
+   run scheduler and the workflow run."
+
+   Justification: its parents changed. One feature it realised is replaced
+   (``DEC_CHANGE_ARGUMENT_FIRST_ON_ITS_EDGE``), and what the new one and
+   ``FEAT_PASSES_PAIRED_BEFORE_RUN`` need is now partly the reader's - the
+   first context is written in the workflow document - and the validator's -
+   the passes follow from the definition alone, so a node whose inputs share
+   none, and a cycle no first context starts, are defects of the wiring
+   (``DEC_PAIRING_IS_WIRING``, ``DEC_CYCLE_STARTED_BY_A_FIRST``).
+
+   Verdicts on the impact analysis (``EVD_IMPACT_ARCH_REPETITION_FIRST``):
+
+   - Up, its four features and three stakeholder requirements: as above;
+     ``STKH_RUN_FROM_ANY_PARAMETER`` is no longer among them, and nothing
+     changes for it.
+   - Down: nothing links to it.
+   - Sideways, the 31 requirements of the scheduler and the run: unaffected
+     but those the records beside this name. The reader's and the
+     validator's requirements are beside it now: unaffected, the reader
+     gaining ``CREQ_READER_READS_FIRST`` and the validator the requirements
+     the pairing check moves into.
+   - Text: the opening of ``components/repetition``, rewritten for four
+     components; fourteen lines of the records and their evidence, unchanged
+     as history.

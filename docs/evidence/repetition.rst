@@ -10,6 +10,13 @@ ran a model of the decision being weighed, in Python, over the wiring of the
 first development workflow written for Agconflo, at ``52b4088``. Nothing of
 any of them was kept but what is written here.
 
+The fourth was taken live once that decision was built. The two after it were
+taken the same day at ``6d84dcf``, before deciding where a loop's first context
+comes from: one ran the ``agconflo`` command over the fourth's workflow, the
+other read every first context the repository and the first development
+workflow give. The last was taken live once that was decided and built, at
+``84676b1``.
+
 .. evd:: A join after a branch some passes skip is given contexts of two passes
    :id: EVD_PASSES_MISPAIRED_ACROSS_A_BRANCH
    :evd_kind: measurement
@@ -128,3 +135,89 @@ any of them was kept but what is written here.
    passes. The message said only "the workflow carries 1 node whose inputs
    cannot be paired": every refusal a run starts with is printed as a count
    by ``agconflo run``, which names neither the node nor its inputs.
+
+.. evd:: A check passes a loop that its runs leave stuck or refuse
+   :id: EVD_LOOP_FIRST_CONTEXT_UNCHECKED
+   :evd_kind: measurement
+   :observed_on: 2026-10-04
+   :observation: agconflo check reported nothing that would refuse the review loop, while a run given no first context ran one node and ended with no node able to go on, and a run given one of its two was refused.
+
+   The workflow of ``EVD_REVIEW_LOOP_LIVE``, with the ``agconflo`` binary
+   built at ``6d84dcf`` and its model mapping read as for that run. Its
+   drafter takes ``previous`` and ``feedback`` from the router, and the run is
+   what gave each its first context. Three commands, as printed::
+
+     agconflo check  -> agconflo: nothing found that would refuse a run   (exit 0)
+     agconflo run --arg brief input "a lighthouse"
+                     -> agconflo: no node can make further progress; nothing
+                        came from drafter, reviewer, router, finisher, final  (exit 7)
+     agconflo run --arg brief input "a lighthouse" --arg drafter previous ""
+                     -> agconflo: refused: the workflow carries 1 node whose
+                        inputs cannot be paired: the inputs of 'drafter' ...  (exit 4)
+
+   The second run's record holds one activation, ``brief``'s: a part of the
+   workflow ran before the run found it could not go on. A check cannot know
+   which parameters a run will give a first context to, so the loop's passes,
+   and whether its nodes share one, are left to each run.
+
+.. evd:: Every first context a loop is given is the same text on every run
+   :id: EVD_FIRST_CONTEXTS_ARE_CONSTANT
+   :evd_kind: measurement
+   :observed_on: 2026-10-04
+   :observation: Of the four first contexts the live review loop and the first development workflow give a loop, all four are a fixed text, two of them empty and two of four lines, and none varies from one run to the next.
+
+   Read at ``6d84dcf`` and, for the development workflow, at ``52b4088`` on
+   its open branch. The live review loop gives its drafter an empty
+   ``previous`` and ``feedback``, and the repository's tests give a fixed
+   placeholder text or an empty one. The development
+   workflow keeps one file per first context, ``arguments/head.state.txt``
+   holding ``goal 1``, ``pass 1``, ``stage no`` and ``feedback:``, and
+   ``arguments/judge.previous.txt`` holding ``start``, ``notes:``, an empty
+   line and ``feedback:``; its ``run.sh`` hands every file there to every run
+   as an argument. What the run gives the loop is part of the workflow, kept
+   beside it, and nothing about it is the caller's.
+
+.. evd:: A review loop whose first contexts its workflow declares runs live, and a check finds one that declares none
+   :id: EVD_FIRST_CONTEXT_LIVE
+   :evd_kind: measurement
+   :observed_on: 2026-10-04
+   :observation: Against qwen3.8-27b-ridge on LM Studio, the review loop declaring its drafter's two first contexts revised three times and completed in 56 s, while agconflo check named the cycle of the same loop declaring one of the two or none.
+
+   The workflow of ``EVD_REVIEW_LOOP_LIVE``, with the ``agconflo`` binary
+   built at ``84676b1`` for debugging and the model mapping, key and
+   environment as for that run. The drafter's two bindings from the router
+   now declare their first contexts::
+
+     previous = { from = "router", input = "draft", first = { text = "" } }
+     feedback = { from = "router", first = { text = "" } }
+
+   Run with ``--arg brief input "a lighthouse at night"`` and nothing for the
+   drafter, each activation in the record, written as what made each input::
+
+     drafter#0  given brief#0, first:drafter.previous, first:drafter.feedback
+     reviewer#0 given drafter#0
+     router#0   given drafter#0, reviewer#0   route ["drafter"]
+     drafter#1  given brief#0, drafter#0, router#0
+     ...
+     router#3   given drafter#3, reviewer#3   route ["finisher"]
+     finisher#0 given drafter#3
+     final#0    given finisher#0, reviewer#3
+
+   The record is version 3, holding the two first contexts as ``[[first]]``
+   entries, each an empty ``note``, under identifiers 1 and 2, made after the
+   brief's 0 from the source the runner lent the run.
+
+   Four commands around it, as printed::
+
+     check, both declared       -> agconflo: nothing found that would refuse a run   (exit 0)
+     check, feedback's dropped  -> agconflo: the nodes 'drafter', 'reviewer', 'router' form a
+                                   cycle no binding on which declares a first context, so none
+                                   of them can ever run   (exit 4)
+     check, neither declared    -> the same, exit 4
+     run --arg drafter previous ""
+                                -> agconflo: refused: the workflow carries 1 signature fault:
+                                   drafter.previous is not a parameter of this workflow   (exit 4)
+
+   The last wrote no record. The workflow declaring neither is the one
+   ``EVD_LOOP_FIRST_CONTEXT_UNCHECKED`` checked at ``6d84dcf``, where the
+   check found nothing.

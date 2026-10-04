@@ -149,7 +149,7 @@ pub async fn run_scripted(
     limits: Limits,
     keep: impl FnMut(String),
 ) -> Result<Outcome, ScriptedRefusal> {
-    let run = Run::start(definition, arguments, budget).map_err(ScriptedRefusal::Start)?;
+    let run = Run::start(definition, arguments, budget, source).map_err(ScriptedRefusal::Start)?;
     drive(
         run, definition, behaviours, roster, source, limits, None, keep,
     )
@@ -1434,25 +1434,54 @@ fn awaiting_is_not_quiescent() {
     assert_eq!(again.instance(), "second");
     assert_eq!(input_ids(&again), input_ids(&activation));
 
-    // The control: a person's step no run can reach, in a cycle written in
-    // bindings. That run is stuck, and says so.
-    let types = "[types.ask]\nrequired = { input = \"note\" }\noutput = \"note\"\n";
-    let cycle = "\
-name = \"cycle\"
+    // The control: a person's step no run reaches, on a branch its router's
+    // script does not take. That run is stuck, and says so.
+    let types = "\
+[types.start]
+output = \"note\"
+
+[types.route]
+required = { draft = \"note\" }
+output = \"note\"
+routes = true
+
+[types.ask]
+required = { input = \"note\" }
+output = \"note\"
+";
+    let untaken = "\
+name = \"untaken\"
 output = \"y\"
 
-[instances.x]
-node_type = \"ask\"
-bindings = { input = \"y\" }
+[instances.s]
+node_type = \"start\"
+
+[instances.r]
+node_type = \"route\"
+bindings = { draft = \"s\" }
+branches = { on = [\"y\"] }
 
 [instances.y]
 node_type = \"ask\"
-bindings = { input = \"x\" }
+bindings = { input = { from = \"r\", input = \"draft\" } }
 ";
-    let behaviours = Behaviours::new().person("ask");
-    match run_with(&workflow(types, cycle), &behaviours, None) {
-        Ok(Outcome::Ended(RunEnding::Quiescent { waiting })) => assert_eq!(waiting, ["x", "y"]),
-        other => panic!("a cycle can do nothing, so the run is quiescent, not {other:?}"),
+    let behaviours = Behaviours::new()
+        .define(
+            "start",
+            "start.lua",
+            "local given, host = ...\nreturn host.text(host.output, 's')",
+        )
+        .define(
+            "route",
+            "route.lua",
+            "local given, host = ...\nhost.route({})\nreturn host.text(host.output, 'none')",
+        )
+        .person("ask");
+    match run_with(&workflow(types, untaken), &behaviours, None) {
+        Ok(Outcome::Ended(RunEnding::Quiescent { waiting })) => assert_eq!(waiting, ["y"]),
+        other => {
+            panic!("a step no route reaches is not awaited, so the run is quiescent, not {other:?}")
+        }
     }
 }
 
@@ -1988,7 +2017,9 @@ fn refused_call_fails_with_the_refusal() {
         YIELD_TYPES,
         "name = \"yielding\"\noutput = \"asker\"\n\n[instances.asker]\nnode_type = \"ask\"\n",
     );
-    let mut run = Run::<ScriptFailure>::start(&undeclaring, Arguments::new(), 20).expect("starts");
+    let mut run =
+        Run::<ScriptFailure>::start(&undeclaring, Arguments::new(), 20, &mut IdSource::new())
+            .expect("starts");
     let Step::Activate(activation) = run.step() else {
         panic!("the asker is offered")
     };
@@ -2467,7 +2498,7 @@ node_type = "give"
 
 [instances.drafter]
 node_type = "draft"
-bindings = { brief = "brief", previous = { from = "router", input = "draft" } }
+bindings = { brief = "brief", previous = { from = "router", input = "draft", first = { text = "" } } }
 
 [instances.reviewer]
 node_type = "review"
@@ -2524,15 +2555,13 @@ fn loop_scripts() -> Behaviours {
         )
 }
 
-/// The review loop started with the brief `B` and an empty first draft, and
-/// every record it handed over.
+/// The review loop started with the brief `B`, its drafter declaring an empty
+/// first draft, and every record it handed over.
 #[cfg(test)]
 fn loop_run(behaviours: &Behaviours) -> (Result<Outcome, ScriptedRefusal>, Vec<String>) {
     let definition = workflow(LOOP_TYPES, LOOP);
     let mut source = IdSource::new();
-    let arguments = Arguments::new()
-        .supply("brief", "input", note(&mut source, "note", "B"))
-        .supply("drafter", "previous", note(&mut source, "note", ""));
+    let arguments = Arguments::new().supply("brief", "input", note(&mut source, "note", "B"));
     let mut records = Vec::new();
     let ended = block(run_scripted(
         &definition,

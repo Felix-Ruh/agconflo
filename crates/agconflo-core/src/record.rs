@@ -3,7 +3,8 @@
 //!
 //! A record is a TOML document holding the run's budget, the activations it
 //! spent, the position of the identifier source its contexts came from, its
-//! arguments, every event the run accepted in the order it accepted them, and
+//! arguments, the first contexts its bindings declare, every event the run
+//! accepted in the order it accepted them, and
 //! every context those hold, once each, in a table keyed by identifier - a
 //! composition naming its parts. Every number is a decimal string. A run is
 //! resumed by reporting each recorded event to it in turn, and nothing here
@@ -20,19 +21,20 @@ use crate::id::{ContextId, IdSource};
 use crate::reader::line_and_column;
 use crate::run::{
     Arguments, Call, CallRefusal, Event, Exchange, OutputRefusal, Run, StartRefusal, Step,
+    declared_firsts,
 };
 use crate::workflow::WorkflowDefinition;
 
 /// The version of the record this module writes, and the only one it reads.
-// @Records at version 2,TRACE_RECORD_VERSION,trace,[],[DEC_RECORD_HOLDS_EXCHANGES, DEC_RECORD_IN_TOML, DEC_RECORD_IN_CORE]
-const VERSION: &str = "2";
+// @Records at version 3,TRACE_RECORD_VERSION,trace,[],[DEC_RECORD_HOLDS_EXCHANGES, DEC_RECORD_IN_TOML, DEC_RECORD_IN_CORE, DEC_FIRST_CONTEXT_DECLARED]
+const VERSION: &str = "3";
 
 /// What a record says of a source that has issued every identifier it has.
 const EXHAUSTED: &str = "exhausted";
 
 /// The keys a record holds at its top, and nothing else.
-const TOP: [&str; 7] = [
-    "version", "budget", "spent", "source", "argument", "event", "context",
+const TOP: [&str; 8] = [
+    "version", "budget", "spent", "source", "argument", "first", "event", "context",
 ];
 
 /// Why a record was not resumed, asked in the order a caller fixes them.
@@ -45,6 +47,15 @@ pub enum ResumeRefusal {
     /// A run of the workflow with the recorded arguments would not start, and
     /// this is the refusal its start gives.
     Start(StartRefusal),
+    /// The record's first context for a binding is not the one the workflow
+    /// declares for it: another text or type, or none where it declares one,
+    /// or one where it declares none.
+    FirstDiffers {
+        /// The instance the binding fills a parameter of.
+        instance: String,
+        /// The parameter it fills.
+        parameter: String,
+    },
     /// The workflow would not have produced this record: the first recorded
     /// output it disagrees with.
     Diverged {
@@ -213,6 +224,13 @@ impl fmt::Display for ResumeRefusal {
         match self {
             Self::Unreadable(fault) => write!(f, "not a run record: {fault}"),
             Self::Start(refusal) => refusal.fmt(f),
+            Self::FirstDiffers {
+                instance,
+                parameter,
+            } => write!(
+                f,
+                "the recorded first context of {instance}.{parameter} is not the one the workflow declares"
+            ),
             Self::Diverged {
                 output,
                 instance,
@@ -334,6 +352,17 @@ impl<'a, F> Run<'a, F> {
         }
         record["argument"] = Item::ArrayOfTables(arguments);
 
+        // @First contexts written apart from the arguments,IMPL_RECORD_FIRSTS,impl,[CREQ_RECORD_HOLDS_FIRSTS],[DEC_FIRST_CONTEXT_DECLARED]
+        let mut firsts = ArrayOfTables::new();
+        for (instance, parameter, context) in state.firsts {
+            let mut first = Table::new();
+            first["instance"] = value(instance);
+            first["parameter"] = value(parameter);
+            first["context"] = value(context.id().value().to_string());
+            firsts.push(first);
+        }
+        record["first"] = Item::ArrayOfTables(firsts);
+
         let mut events = ArrayOfTables::new();
         for event in state.log {
             events.push(written_event(event));
@@ -377,14 +406,15 @@ impl<'a, F> Run<'a, F> {
     /// with a source standing where the recorded one stood - or why it cannot
     /// be.
     ///
-    /// The run is started from the recorded arguments and budget and handed
+    /// The run is started from the recorded arguments, first contexts and
+    /// budget, each first context the one the workflow declares, and handed
     /// each recorded event in turn, in the activation the record says it
     /// happened in: an output, which the run must offer the recorded activation
     /// with the recorded inputs for and accept; a call, which it must accept
     /// from that activation; and an exchange, which it holds with the
     /// activation. Then whatever was outstanding when the record was taken is
     /// offered again, counted once. Nothing is performed.
-    // @A record replayed through the run,IMPL_RECORD_RESUME,impl,[CREQ_RECORD_CONTINUES_THE_RUN, CREQ_RECORD_REFUSES_DIVERGENCE, CREQ_RECORD_REFUSES_WHAT_START_REFUSES, CREQ_RECORD_KEEPS_EXCHANGES, CREQ_RECORD_REFUSES_UNDECLARED_CALL],[DEC_RESUME_REPLAYS_CALLS, DEC_RECORD_CARRIES_THE_SOURCE]
+    // @A record replayed through the run,IMPL_RECORD_RESUME,impl,[CREQ_RECORD_CONTINUES_THE_RUN, CREQ_RECORD_REFUSES_DIVERGENCE, CREQ_RECORD_REFUSES_WHAT_START_REFUSES, CREQ_RECORD_KEEPS_EXCHANGES, CREQ_RECORD_REFUSES_UNDECLARED_CALL, CREQ_RECORD_REFUSES_CHANGED_FIRST],[DEC_RESUME_REPLAYS_CALLS, DEC_RECORD_CARRIES_THE_SOURCE, DEC_FIRST_CONTEXT_DECLARED]
     pub fn resume(
         definition: &'a WorkflowDefinition,
         record: &str,
@@ -410,8 +440,10 @@ impl<'a, F> Run<'a, F> {
         for (instance, parameter, id) in &read.arguments {
             arguments = arguments.supply(instance, parameter, read.contexts[id].clone());
         }
+        Run::<F>::checked(definition, &arguments).map_err(ResumeRefusal::Start)?;
+        let firsts = recorded_firsts(definition, &read)?;
         let mut run =
-            Run::start(definition, arguments, read.budget).map_err(ResumeRefusal::Start)?;
+            Run::begun(definition, arguments, firsts, read.budget).map_err(ResumeRefusal::Start)?;
 
         let mut replayed = 0;
         for recorded in &read.events {
@@ -495,6 +527,44 @@ impl<'a, F> Run<'a, F> {
 
         Ok((run, IdSource::resumed_at(read.source)))
     }
+}
+
+/// The first contexts `read` holds, each matched to the binding of
+/// `definition` declaring it, in the definition's order - or the first
+/// binding whose recorded first context is not the text and type it
+/// declares, or that has one recorded and declares none.
+fn recorded_firsts(
+    definition: &WorkflowDefinition,
+    read: &Read<'_>,
+) -> Result<Vec<(String, String, Context)>, ResumeRefusal> {
+    let differs = |instance: &str, parameter: &str| ResumeRefusal::FirstDiffers {
+        instance: instance.to_owned(),
+        parameter: parameter.to_owned(),
+    };
+    let declared = declared_firsts(definition);
+    let mut firsts = Vec::new();
+    for (instance, parameter, context_type, text) in &declared {
+        let context = read
+            .firsts
+            .iter()
+            .find(|(at, filling, _)| at == instance && filling == parameter)
+            .map(|(_, _, id)| &read.contexts[id])
+            .filter(|context| {
+                context.separator().is_none()
+                    && context.declared_type() == context_type
+                    && context.render().as_ref() == *text
+            })
+            .ok_or_else(|| differs(instance, parameter))?;
+        firsts.push((instance.to_string(), parameter.to_string(), context.clone()));
+    }
+    if let Some((instance, parameter, _)) = read.firsts.iter().find(|(at, filling, _)| {
+        !declared
+            .iter()
+            .any(|(instance, parameter, _, _)| instance == at && parameter == filling)
+    }) {
+        return Err(differs(instance, parameter));
+    }
+    Ok(firsts)
 }
 
 impl<F> Run<'_, F> {
@@ -612,6 +682,7 @@ struct Read<'t> {
     spent: usize,
     source: Option<u64>,
     arguments: Vec<(String, String, ContextId)>,
+    firsts: Vec<(String, String, ContextId)>,
     events: Vec<Recorded>,
     contexts: HashMap<ContextId, Context>,
     /// The contexts' identifiers in the order the record writes them, so that a
@@ -744,27 +815,8 @@ impl<'t> Reading<'t> {
             }
         };
 
-        let mut arguments = Vec::new();
-        for (index, argument) in self.entries(top.get("argument"), "argument")? {
-            let at = index.to_string();
-            let place = argument.span();
-            self.only(
-                argument,
-                &["argument", &at],
-                &["instance", "parameter", "context"],
-            )?;
-            let instance = self.needed(argument, place.clone(), &["argument", &at, "instance"])?;
-            let parameter =
-                self.needed(argument, place.clone(), &["argument", &at, "parameter"])?;
-            let context = self.needed(argument, place, &["argument", &at, "context"])?;
-            arguments.push((
-                self.string(instance, &["argument", &at, "instance"])?
-                    .to_owned(),
-                self.string(parameter, &["argument", &at, "parameter"])?
-                    .to_owned(),
-                known(context, &["argument", &at, "context"])?,
-            ));
-        }
+        let arguments = self.given(top, "argument", &known)?;
+        let firsts = self.given(top, "first", &known)?;
 
         let mut events = Vec::new();
         for (index, event) in self.entries(top.get("event"), "event")? {
@@ -777,11 +829,38 @@ impl<'t> Reading<'t> {
             spent,
             source,
             arguments,
+            firsts,
             events,
             contexts,
             order,
             spans,
         })
+    }
+
+    /// Each `[[name]]` entry: the instance and the parameter a context is given
+    /// to, and that context.
+    fn given(
+        &self,
+        top: &Table,
+        name: &str,
+        known: &Known<'_>,
+    ) -> Result<Vec<(String, String, ContextId)>, RecordFault> {
+        let mut given = Vec::new();
+        for (index, entry) in self.entries(top.get(name), name)? {
+            let at = index.to_string();
+            let place = entry.span();
+            self.only(entry, &[name, &at], &["instance", "parameter", "context"])?;
+            let instance = self.needed(entry, place.clone(), &[name, &at, "instance"])?;
+            let parameter = self.needed(entry, place.clone(), &[name, &at, "parameter"])?;
+            let context = self.needed(entry, place, &[name, &at, "context"])?;
+            given.push((
+                self.string(instance, &[name, &at, "instance"])?.to_owned(),
+                self.string(parameter, &[name, &at, "parameter"])?
+                    .to_owned(),
+                known(context, &[name, &at, "context"])?,
+            ));
+        }
+        Ok(given)
     }
 
     /// One `[[event]]` entry: the instance, the call it performs if any, and
@@ -1357,6 +1436,7 @@ fn two_of_three(workflow: &WorkflowDefinition) -> (String, IdSource) {
         workflow,
         Arguments::new().supply("n0", "input", argument),
         5,
+        &mut source,
     )
     .expect("a sound chain starts");
     for _ in 0..2 {
@@ -1389,6 +1469,7 @@ fn holds_the_run() {
         &workflow,
         Arguments::new().supply("n0", "input", argument),
         7,
+        &mut source,
     )
     .expect("a sound chain starts");
     for _ in 0..2 {
@@ -1406,7 +1487,7 @@ fn holds_the_run() {
     // the text holds and not what a reader makes of it.
     let text = run.record(&source);
     let record: DocumentMut = text.parse().expect("a record is TOML");
-    assert_eq!(record["version"].as_str(), Some("2"));
+    assert_eq!(record["version"].as_str(), Some("3"));
     assert_eq!(record["budget"].as_str(), Some("7"));
     // Two outputs and one activation outstanding.
     assert_eq!(record["spent"].as_str(), Some("3"));
@@ -1458,7 +1539,7 @@ proptest! {
     fn resumed_run_ends_alike(workflow in well_formed_definition(), budget in 0..6usize) {
         let mut source = IdSource::new();
         let arguments = filled(&workflow, &mut source);
-        let mut run = Run::<()>::start(&workflow, arguments, budget).expect("sound");
+        let mut run = Run::<()>::start(&workflow, arguments, budget, &mut source).expect("sound");
         let mut records = Vec::new();
         let (answered, ended) = drive(&mut run, &mut source, &mut |record, done| records.push((record, done)));
         prop_assert!(!records.is_empty());
@@ -1483,6 +1564,7 @@ fn outstanding_not_charged_again() {
         &workflow,
         Arguments::new().supply("n0", "input", argument),
         3,
+        &mut source,
     )
     .expect("a sound chain starts");
     let mut last = None;
@@ -1553,7 +1635,7 @@ proptest! {
             .expect("a fresh source issues");
 
         let workflow = definition(vec![node_type("Take", &[("input", "note")], "note")], vec![instance("only", "Take", &[])], &["only"]);
-        let run = Run::<()>::start(&workflow, Arguments::new().supply("only", "input", everything.clone()), 1)
+        let run = Run::<()>::start(&workflow, Arguments::new().supply("only", "input", everything.clone()), 1, &mut source)
             .expect("starts");
         let (mut resumed, _) = Run::<()>::resume(&workflow, &run.record(&source)).expect("resumes");
         let Step::Activate(activation) = resumed.step() else { panic!("offered") };
@@ -1594,7 +1676,7 @@ fn deep_composition_kept() {
         deep = Context::compose(&mut source, context_type("note"), [&deep], "")
             .expect("a fresh source issues");
     }
-    let source = IdSource::resumed_at(Some(DEPTH + 1));
+    let mut source = IdSource::resumed_at(Some(DEPTH + 1));
     let workflow = definition(
         vec![node_type("Take", &[("input", "note")], "note")],
         vec![instance("only", "Take", &[])],
@@ -1604,6 +1686,7 @@ fn deep_composition_kept() {
         &workflow,
         Arguments::new().supply("only", "input", deep.clone()),
         1,
+        &mut source,
     )
     .expect("starts");
     let record = run.record(&source);
@@ -1645,7 +1728,7 @@ proptest! {
         for _ in 0..after {
             issued.insert(note(&mut source, "dropped").id());
         }
-        let run = Run::<()>::start(&workflow, Arguments::new().supply("n0", "input", argument), 3)
+        let run = Run::<()>::start(&workflow, Arguments::new().supply("n0", "input", argument), 3, &mut source)
             .expect("starts");
         let record = run.record(&source);
         let (_, mut again) = Run::<()>::resume(&workflow, &record).expect("resumes");
@@ -1695,7 +1778,7 @@ fn diverged_record_refused() {
     let arguments = Arguments::new()
         .supply("x", "input", ax)
         .supply("y", "input", ay);
-    let mut run = Run::<()>::start(&original, arguments, 10).expect("starts");
+    let mut run = Run::<()>::start(&original, arguments, 10, &mut source).expect("starts");
     for _ in 0..3 {
         let Step::Activate(activation) = run.step() else {
             panic!("offered")
@@ -1743,8 +1826,13 @@ fn diverged_record_refused() {
     let three = chain(3);
     let mut source = IdSource::new();
     let argument = note(&mut source, "hello");
-    let mut run = Run::<()>::start(&three, Arguments::new().supply("n0", "input", argument), 5)
-        .expect("starts");
+    let mut run = Run::<()>::start(
+        &three,
+        Arguments::new().supply("n0", "input", argument),
+        5,
+        &mut source,
+    )
+    .expect("starts");
     let (_, _) = drive(&mut run, &mut source, &mut |_, _| {});
     let complete = run.record(&source);
     let (output, instance_name, divergence) = refused(&chain(2), &complete);
@@ -1805,16 +1893,19 @@ fn routes_kept() {
         ],
         vec![
             instance("d", "Src", &[]),
-            instance("r", "route", &[("draft", "d")])
-                .branching(&[("revise", &["revise"]), ("close", &["close"])]),
+            instance("r", "route", &[("draft", "d")]).branching(&[
+                ("revise", &["revise"]),
+                ("close", &["close"]),
+                ("end", &["out"]),
+            ]),
             instance("revise", "Take", &[("seed", "r")]),
             instance("close", "Take", &[]).taking("seed", "r", "draft"),
-            instance("never", "Take", &[("seed", "never")]),
+            instance("out", "Take", &[]).taking("seed", "r", "draft"),
         ],
-        &["never"],
+        &["out"],
     );
     let mut source = IdSource::new();
-    let mut run = Run::<()>::start(&workflow, Arguments::new(), 10).expect("starts");
+    let mut run = Run::<()>::start(&workflow, Arguments::new(), 10, &mut source).expect("starts");
     for _ in 0..2 {
         let Step::Activate(activation) = run.step() else {
             panic!("offered")
@@ -1857,31 +1948,46 @@ fn routes_kept() {
     }
 }
 
+/// One instance reading its own output, declaring `first` as its first
+/// context, then a router reading it whose one branch goes on to the output.
+/// The instance is ready on every pass and comes first, so the router is
+/// never offered while the instance is answered, and no run completes.
+#[cfg(test)]
+fn repeating(first: &str) -> WorkflowDefinition {
+    definition(
+        vec![
+            node_type("Take", &[("seed", "note")], "note"),
+            node_type("Route", &[("draft", "note")], "note").routing(),
+        ],
+        vec![
+            instance("x", "Take", &[("seed", "x")]).first("seed", first),
+            instance("r", "Route", &[("draft", "x")]).branching(&[("on", &["out"])]),
+            instance("out", "Take", &[]).taking("seed", "r", "draft"),
+        ],
+        &["out"],
+    )
+}
+
 #[test]
 fn resumes_mid_repetition() {
-    // One instance reading its own output, given its first context: each pass
-    // is given the output of the one before.
-    let workflow = definition(
-        vec![node_type("Take", &[("seed", "note")], "note")],
-        vec![
-            instance("x", "Take", &[("seed", "x")]),
-            instance("never", "Take", &[("seed", "never")]),
-        ],
-        &["never"],
-    );
+    // One instance reading its own output, declaring its first context: each
+    // pass is given the output of the one before.
+    let workflow = repeating("first");
     let mut source = IdSource::new();
-    let first = note(&mut source, "first");
-    let arguments = Arguments::new().supply("x", "seed", first.clone());
-    let mut run = Run::<()>::start(&workflow, arguments, 10).expect("starts");
+    let mut run = Run::<()>::start(&workflow, Arguments::new(), 10, &mut source).expect("starts");
     let mut outputs = Vec::new();
+    let mut given = Vec::new();
     for _ in 0..2 {
         let Step::Activate(activation) = run.step() else {
             panic!("offered")
         };
+        given.push(activation.inputs()[0].1.clone());
         let output = answer(&mut source, &activation);
         outputs.push(output.clone());
         run.produced(output).expect("accepted");
     }
+    let first = given[0].clone();
+    assert_eq!(first.render(), "first");
     let record = run.record(&source);
 
     // Resumed, the third pass is offered with the second's output: the edge's
@@ -1910,6 +2016,135 @@ fn resumes_mid_repetition() {
 
 #[cfg(test)]
 #[test]
+fn firsts_recorded() {
+    let workflow = repeating("first");
+    let mut source = IdSource::new();
+    let mut run = Run::<()>::start(&workflow, Arguments::new(), 10, &mut source).expect("starts");
+    let Step::Activate(activation) = run.step() else {
+        panic!("offered")
+    };
+    let first = activation.inputs()[0].1.clone();
+    let record = run.record(&source);
+
+    // The first context is written apart from the arguments, by its binding,
+    // with the context it names; there are no arguments.
+    let written = record.parse::<DocumentMut>().expect("TOML");
+    assert!(written.get("argument").is_none(), "{record}");
+    let firsts = written["first"]
+        .as_array_of_tables()
+        .expect("first contexts");
+    assert_eq!(firsts.len(), 1);
+    let entry = firsts.get(0).expect("one");
+    let id = first.id().value().to_string();
+    assert_eq!(
+        [
+            entry["instance"].as_str(),
+            entry["parameter"].as_str(),
+            entry["context"].as_str()
+        ],
+        [Some("x"), Some("seed"), Some(id.as_str())]
+    );
+    assert_eq!(written["context"][&id]["text"].as_str(), Some("first"));
+
+    // Resumed, the outstanding first pass is given the context recorded, under
+    // its identifier, not one made again under another.
+    let (mut resumed, _) = Run::<()>::resume(&workflow, &record).expect("it resumes");
+    let Step::Activate(again) = resumed.step() else {
+        panic!("offered again")
+    };
+    assert_eq!(again.inputs()[0].1.id(), first.id());
+    assert_eq!(again.inputs()[0].1.render(), "first");
+}
+
+#[cfg(test)]
+#[test]
+fn changed_first_refused() {
+    let workflow = repeating("first");
+    let mut source = IdSource::new();
+    let mut run = Run::<()>::start(&workflow, Arguments::new(), 10, &mut source).expect("starts");
+    let _ = run.step();
+    let record = run.record(&source);
+    let differs = || ResumeRefusal::FirstDiffers {
+        instance: "x".to_owned(),
+        parameter: "seed".to_owned(),
+    };
+    let refused = |workflow: &WorkflowDefinition, record: &str| {
+        Run::<()>::resume(workflow, record).expect_err("refused")
+    };
+
+    // The workflow declaring another text, or none, since the record was
+    // taken.
+    assert_eq!(refused(&repeating("other"), &record), differs());
+    let mut none = repeating("first");
+    none.instances[0].bindings[0].first = None;
+    assert!(
+        matches!(
+            refused(&none, &record),
+            ResumeRefusal::Start(StartRefusal::Wiring(_))
+        ),
+        "a self-loop declaring none is a cycle nothing starts"
+    );
+    // Off a cycle, a binding declaring none with one recorded.
+    let off = |first: Option<&str>| {
+        let mut later = instance("later", "Take", &[("seed", "src")]);
+        later.bindings[0].first = first.map(str::to_owned);
+        definition(
+            vec![
+                node_type("Src", &[], "note"),
+                node_type("Take", &[("seed", "note")], "note"),
+            ],
+            vec![instance("src", "Src", &[]), later],
+            &["later"],
+        )
+    };
+    let declaring = off(Some("first"));
+    let mut source = IdSource::new();
+    let mut run = Run::<()>::start(&declaring, Arguments::new(), 10, &mut source).expect("starts");
+    let _ = run.step();
+    let taken = run.record(&source);
+    assert!(Run::<()>::resume(&declaring, &taken).is_ok());
+    assert_eq!(
+        refused(&off(None), &taken),
+        ResumeRefusal::FirstDiffers {
+            instance: "later".to_owned(),
+            parameter: "seed".to_owned(),
+        }
+    );
+
+    // The record holding another text for it, another type, or no first
+    // context at all.
+    assert!(record.contains("text = \"first\""), "{record}");
+    assert_eq!(
+        refused(
+            &workflow,
+            &record.replacen("text = \"first\"", "text = \"firsts\"", 1)
+        ),
+        differs()
+    );
+    let typed = record.replacen(
+        "type = \"note\"\ntext = \"first\"",
+        "type = \"other\"\ntext = \"first\"",
+        1,
+    );
+    assert_ne!(typed, record);
+    assert_eq!(refused(&workflow, &typed), differs());
+    let at = record.find("[[first]]").expect("written");
+    let end = record[at..]
+        .find("\n\n")
+        .map_or(record.len(), |end| at + end + 2);
+    let dropped = format!("{}{}", &record[..at], &record[end..]);
+    assert!(!dropped.contains("[[first]]"), "{dropped}");
+    assert!(matches!(
+        Run::<()>::resume(&workflow, &dropped),
+        Err(ResumeRefusal::FirstDiffers { .. }) | Err(ResumeRefusal::Unreadable(_))
+    ));
+
+    // The control: the same record resumes against the same workflow.
+    assert!(Run::<()>::resume(&workflow, &record).is_ok());
+}
+
+#[cfg(test)]
+#[test]
 fn start_refusal_carried() {
     let workflow = chain(3);
     let (record, _) = two_of_three(&workflow);
@@ -1921,7 +2156,7 @@ fn start_refusal_carried() {
     // A wiring defect: a binding to an instance the workflow does not have.
     let mut defective = chain(3);
     defective.instances[2].bindings[0].source = "nowhere".to_owned();
-    let started = Run::<()>::start(&defective, argument(), 5).err();
+    let started = Run::<()>::start(&defective, argument(), 5, &mut IdSource::new()).err();
     assert!(matches!(started, Some(StartRefusal::Wiring(_))));
     assert_eq!(
         Run::<()>::resume(&defective, &record).err(),
@@ -1931,7 +2166,7 @@ fn start_refusal_carried() {
     // A parameter nothing binds that the recorded argument does not fill.
     let mut renamed = chain(3);
     renamed.node_types[0].required[0].name = "prompt".to_owned();
-    let started = Run::<()>::start(&renamed, argument(), 5).err();
+    let started = Run::<()>::start(&renamed, argument(), 5, &mut IdSource::new()).err();
     assert!(matches!(started, Some(StartRefusal::Signature(_))));
     assert_eq!(
         Run::<()>::resume(&renamed, &record).err(),
@@ -1971,9 +2206,9 @@ fn unreadable_refused() {
     assert_eq!(not_toml.line(), 2);
 
     assert_eq!(
-        damaged("version = \"2\"", "version = \"3\"").kind(),
+        damaged("version = \"3\"", "version = \"4\"").kind(),
         &RecordFaultKind::Version {
-            found: "3".to_owned()
+            found: "4".to_owned()
         }
     );
     assert_eq!(
@@ -2053,6 +2288,7 @@ fn identifiers_only_with_a_source() {
         &workflow,
         Arguments::new().supply("n0", "input", argument),
         3,
+        &mut source,
     )
     .expect("starts");
     let record = run.record(&source);
@@ -2125,7 +2361,7 @@ fn events_of(text: &str) -> Vec<Table> {
 fn holds_exchanges() {
     let workflow = asking(1);
     let mut source = IdSource::new();
-    let mut run = Run::<()>::start(&workflow, Arguments::new(), 10).expect("sound");
+    let mut run = Run::<()>::start(&workflow, Arguments::new(), 10, &mut source).expect("sound");
     let Step::Activate(_) = run.step() else {
         panic!("the asker is offered")
     };
@@ -2164,7 +2400,7 @@ fn holds_exchanges() {
 
     let text = run.record(&source);
     let record: DocumentMut = text.parse().expect("a record is TOML");
-    assert_eq!(record["version"].as_str(), Some("2"));
+    assert_eq!(record["version"].as_str(), Some("3"));
     let events = events_of(&text);
     let kinds: Vec<&str> = events
         .iter()
@@ -2252,6 +2488,19 @@ fn version_one_refused() {
         }
     );
     assert_eq!((refused.line(), refused.column()), (1, 11));
+
+    // A record of version 2, as it was written before a binding declared its
+    // first context, refused alike.
+    let refused = fault(Run::<()>::resume(
+        &chain(2),
+        &written.replacen("\"1\"", "\"2\"", 1),
+    ));
+    assert_eq!(
+        refused.kind(),
+        &RecordFaultKind::Version {
+            found: "2".to_owned()
+        }
+    );
 }
 
 #[cfg(test)]
@@ -2259,7 +2508,7 @@ fn version_one_refused() {
 fn undeclared_call_refused() {
     let workflow = asking(1);
     let mut source = IdSource::new();
-    let mut run = Run::<()>::start(&workflow, Arguments::new(), 10).expect("sound");
+    let mut run = Run::<()>::start(&workflow, Arguments::new(), 10, &mut source).expect("sound");
     let Step::Activate(_) = run.step() else {
         panic!("the asker is offered")
     };
@@ -2326,7 +2575,7 @@ proptest! {
     ) {
         let workflow = asking(plans.len());
         let mut source = IdSource::new();
-        let mut run = Run::<()>::start(&workflow, Arguments::new(), 50).expect("sound");
+        let mut run = Run::<()>::start(&workflow, Arguments::new(), 50, &mut source).expect("sound");
         let mut records = Vec::new();
         let mut windows = Vec::new();
 

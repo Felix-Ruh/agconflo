@@ -700,15 +700,15 @@ use agconflo_lua::ScriptFailure;
 #[cfg(test)]
 use proptest::prelude::*;
 
-/// Every node type the tests' workflows use: one taking a brief, and four
-/// types taking what came before - one asking a
-/// model, one adding to it, one a person performs, and one whose script fails.
+/// Every node type the tests' workflows use: one taking a brief, and five
+/// types taking what came before - one asking a model, one adding to it, one a
+/// person performs, one whose script fails, and a router naming nothing.
 #[cfg(test)]
-const TYPES: &str = "[types.begin]\nrequired = { brief = \"note\" }\noutput = \"note\"\n\n[types.ask]\nrequired = { before = \"note\" }\noutput = \"note\"\n\n[types.add]\nrequired = { before = \"note\" }\noutput = \"note\"\n\n[types.review]\nrequired = { before = \"note\" }\noutput = \"note\"\n\n[types.broken]\nrequired = { before = \"note\" }\noutput = \"note\"\n";
+const TYPES: &str = "[types.begin]\nrequired = { brief = \"note\" }\noutput = \"note\"\n\n[types.ask]\nrequired = { before = \"note\" }\noutput = \"note\"\n\n[types.add]\nrequired = { before = \"note\" }\noutput = \"note\"\n\n[types.review]\nrequired = { before = \"note\" }\noutput = \"note\"\n\n[types.broken]\nrequired = { before = \"note\" }\noutput = \"note\"\n\n[types.stop]\nrequired = { before = \"note\" }\noutput = \"note\"\nroutes = true\n";
 
 /// The scripts, by file.
 #[cfg(test)]
-const SCRIPTS: [(&str, &str); 4] = [
+const SCRIPTS: [(&str, &str); 5] = [
     (
         "begin.lua",
         "local given, host = ...\nreturn host.text(host.output, given.brief:render() .. '+a')\n",
@@ -722,6 +722,10 @@ const SCRIPTS: [(&str, &str); 4] = [
         "local given, host = ...\nreturn host.text(host.output, given.before:render() .. '+c')\n",
     ),
     ("broken.lua", "error('broke here')\n"),
+    (
+        "stop.lua",
+        "local given, host = ...\nhost.route({})\nreturn host.text(host.output, 'none')\n",
+    ),
 ];
 
 /// A project in `scratch`: `first` begins, `second` is of `middle`, `third`
@@ -742,7 +746,7 @@ fn project(scratch: &Scratch, middle: &str, budget: usize) -> std::path::PathBuf
     scratch.write(
         "manifest.toml",
         format!(
-            "workflow = \"flow.toml\"\ntypes = [\"types.toml\"]\nbudget = {budget}\npersons = [\"review\"]\n\n[scripts]\nbegin = \"begin.lua\"\nask = \"ask.lua\"\nadd = \"add.lua\"\nbroken = \"broken.lua\"\n"
+            "workflow = \"flow.toml\"\ntypes = [\"types.toml\"]\nbudget = {budget}\npersons = [\"review\"]\n\n[scripts]\nbegin = \"begin.lua\"\nask = \"ask.lua\"\nadd = \"add.lua\"\nbroken = \"broken.lua\"\nstop = \"stop.lua\"\n"
         ),
     )
 }
@@ -913,7 +917,8 @@ fn unknown_argument_refused() {
     }
 
     // The control: a parameter a binding fills is declared, so the runner
-    // makes the context, and the run takes it before what the wire carries.
+    // makes the context and leaves the question to the run, which refuses it
+    // as no parameter of the workflow's.
     let arguments = [
         brief("x").remove(0),
         Argument {
@@ -922,8 +927,18 @@ fn unknown_argument_refused() {
             text: "given".to_owned(),
         },
     ];
-    let stopped = runtime().block_on(start(sources, &scratch.path("bound.toml"), &arguments));
-    assert_eq!(completed(stopped), "given+c+c");
+    match runtime().block_on(start(sources, &scratch.path("bound.toml"), &arguments)) {
+        Err(Refusal::Run(ScriptedRefusal::Start(agconflo_core::StartRefusal::Signature(
+            faults,
+        )))) => assert_eq!(
+            faults,
+            [agconflo_core::SignatureFault::ArgumentMatchesNothing {
+                instance: "second".to_owned(),
+                parameter: "before".to_owned(),
+            }]
+        ),
+        other => panic!("expected the run to refuse second.before, got {other:?}"),
+    }
 }
 
 #[cfg(test)]
@@ -1067,6 +1082,48 @@ fn answer_elsewhere_leaves_the_file() {
 
     assert_eq!(std::fs::read(&record).expect("the record"), before);
     RecordKeeper::resume(&record).expect("the file is free");
+}
+
+#[cfg(test)]
+#[test]
+fn check_finds_unstarted_loop() {
+    let scratch = Scratch::new("check_finds_unstarted_loop");
+    let manifest = project(&scratch, "add", 5);
+    let sources = Sources {
+        manifest: &manifest,
+        models: None,
+        grants: None,
+    };
+    // `second` and `third` read each other, no binding declaring a first
+    // context: found by the check, which runs nothing to find it.
+    let looping = |before: &str| {
+        format!(
+            "name = \"looping\"\noutput = \"third\"\n\n[instances.first]\nnode_type = \"begin\"\n\n[instances.second]\nnode_type = \"add\"\nbindings = {{ before = {before} }}\n\n[instances.third]\nnode_type = \"add\"\nbindings = {{ before = \"second\" }}\n"
+        )
+    };
+    scratch.write("flow.toml", looping("\"third\""));
+    let findings = check(sources);
+    match findings.as_slice() {
+        [Finding::Wiring(WiringDefect::CycleUnstarted { instances })] => {
+            assert_eq!(instances, &["second", "third"]);
+        }
+        other => panic!("expected the loop found, got {other:?}"),
+    }
+    assert!(
+        findings[0].to_string().contains("'second', 'third'"),
+        "{}",
+        findings[0]
+    );
+
+    // The control: the loop's binding declaring its first context, nothing is
+    // found.
+    scratch.write(
+        "flow.toml",
+        looping("{ from = \"third\", first = { text = \"start\" } }"),
+    );
+    let findings = check(sources);
+    assert!(findings.is_empty(), "{findings:?}");
+    assert!(!scratch.path("run.toml").exists());
 }
 
 #[cfg(test)]
@@ -1217,22 +1274,24 @@ fn endings_handed_back() {
         })
     ));
 
+    // A router naming nothing, the designated output on its branch.
+    project(&scratch, "add", 5);
     scratch.write(
         "flow.toml",
-        "name = \"cycle\"\noutput = \"c1\"\n\n[instances.c1]\nnode_type = \"add\"\nbindings = { before = \"c2\" }\n\n[instances.c2]\nnode_type = \"add\"\nbindings = { before = \"c1\" }\n",
+        "name = \"stopped\"\noutput = \"third\"\n\n[instances.first]\nnode_type = \"begin\"\n\n[instances.second]\nnode_type = \"stop\"\nbindings = { before = \"first\" }\nbranches = { on = [\"third\"] }\n\n[instances.third]\nnode_type = \"add\"\nbindings = { before = { from = \"second\", input = \"before\" } }\n",
     );
     let sources = Sources {
         manifest: &scratch.path("manifest.toml"),
         models: None,
         grants: None,
     };
-    match runtime().block_on(start(sources, &scratch.path("stuck.toml"), &[])) {
+    match runtime().block_on(start(sources, &scratch.path("stuck.toml"), &brief("x"))) {
         Ok(Stopped {
             outcome: Outcome::Ended(RunEnding::Quiescent { waiting }),
             unkept: None,
             engine: None,
             routes: _,
-        }) => assert_eq!(waiting, ["c1", "c2"]),
+        }) => assert_eq!(waiting, ["third"]),
         other => panic!("expected the run stuck, got {other:?}"),
     }
 

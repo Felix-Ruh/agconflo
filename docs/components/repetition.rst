@@ -2,16 +2,19 @@
 Components of a workflow repeating itself
 =========================================
 
-The requirements ``ARCH_REPETITION`` allocates to the two components it
-uses, each defined where its first feature put it: the run scheduler and the
-workflow run in ``components/run``. Each title is the grammatical subject of
+The requirements ``ARCH_REPETITION`` allocates to the components it uses,
+each defined where its first feature put it: the topology reader in
+``components/topology``, the wiring validator in ``components/wiring``, and
+the run scheduler and the workflow run in ``components/run``. Each title is
+the grammatical subject of
 the requirements allocated to it, and the gate in ``scripts/gates`` refuses a
 component requirement whose subject is anything else.
 
-An instance's passes follow from its wiring and the contexts the run is given
-(``DEC_PASS_CLOCKS``): the run's one pass, a router's passes on which it
-takes a branch naming the instance, a context the run gives followed by the
-passes of what the binding carries, or a cycle's own passes. One set of
+An instance's passes follow from its wiring and the first contexts its
+bindings declare (``DEC_PASS_CLOCKS``): the run's one pass, a router's passes
+on which it takes a branch naming the instance, a declared first context
+followed by the passes of what the binding carries, or a cycle's own passes.
+One set of
 passes encloses another when each pass of the other is part of one of its
 own. An input on the instance's own passes is taken pass by pass; one on
 passes enclosing them is read from the pass the activation belongs to.
@@ -82,12 +85,14 @@ passes enclosing them is read from the pass the activation belongs to.
    :ears_pattern: unwanted
    :statement: If the inputs of an instance share no pass, then Run scheduler shall report that instance with the passes each of its inputs comes on.
 
-   Passes are worked out from the wiring and the parameters the run gives a
-   first context to, before anything runs (``DEC_PAIRING_CHECKED_AT_START``).
+   Passes are worked out from the wiring and the first contexts its bindings
+   declare, before anything runs (``DEC_PASS_CLOCKS``), and the wiring
+   validator reports what this finds (``CREQ_VALIDATOR_REPORTS_UNPAIRED``).
    Inputs share a pass when one's passes are enclosed by all the others', or
    when they come from branches of one router a single branch names together.
-   An instance on a loop no given context starts runs on no pass, as before,
-   and is not reported.
+   An instance on a cycle no first context starts runs on no pass and is not
+   reported here: the validator reports the cycle
+   (``CREQ_VALIDATOR_CYCLE_STARTED``).
 
    Failure modes:
 
@@ -97,8 +102,49 @@ passes enclosing them is read from the pass the activation belongs to.
      pass's context or waiting for ever.
    - **A join of two branches a route takes together reported**, refusing a
      workflow whose node has a pass.
-   - **A loop given nothing reported**, refusing a workflow that ran, idle,
-     before.
+   - **A cycle nothing starts reported as unpaired**, beside its own
+     defect, and the one fault named twice in two ways.
+
+.. comp_req:: A cycle no first context starts is a defect
+   :id: CREQ_VALIDATOR_CYCLE_STARTED
+   :derived_from: FEAT_PASSES_PAIRED_BEFORE_RUN
+   :allocated_to: COMP_WIRING_VALIDATOR
+   :ears_pattern: unwanted
+   :statement: If instances of a workflow reach one another through bindings none of which declares its first context, then Wiring validator shall report a defect naming those instances.
+
+   ``DEC_CYCLE_STARTED_BY_A_FIRST``: every instance on such a cycle waits for
+   another on it, so none can be given contexts of any pass. The cycle is
+   reported once, its instances in the definition's order, and an instance
+   reading from it is not reported beside it. Asked of a definition carrying
+   no other defect, whose bindings all resolve.
+
+   Failure modes:
+
+   - **The cycle passed**, and part of a run done before it stops with no
+     node able to go on (``EVD_LOOP_FIRST_CONTEXT_UNCHECKED``).
+   - **A cycle passed because one binding on it declares a first context**,
+     where another edge back declares none and closes a cycle of its own.
+   - **Each instance on it reported**, or every instance reading from it,
+     and the one forgotten first context named many times.
+   - **A cycle a first context starts reported**, refusing a loop that runs.
+
+.. comp_req:: An instance whose inputs share no pass is a defect
+   :id: CREQ_VALIDATOR_REPORTS_UNPAIRED
+   :derived_from: FEAT_PASSES_PAIRED_BEFORE_RUN
+   :allocated_to: COMP_WIRING_VALIDATOR
+   :ears_pattern: unwanted
+   :statement: If the inputs of an instance of a workflow share no pass, then Wiring validator shall report a defect naming that instance and the passes each of its inputs comes on.
+
+   ``DEC_PAIRING_IS_WIRING``: the passes follow from the definition alone, so
+   the check is the validator's, and ``agconflo check`` reports it. Asked of
+   a definition carrying no other defect and no cycle nothing starts.
+
+   Failure modes:
+
+   - **The instance found only when a run starts**, and a check passing a
+     workflow every run of it refuses (``EVD_LOOP_FIRST_CONTEXT_UNCHECKED``).
+   - **Passes worked out from bindings that do not resolve**, and defects
+     beside a broken binding that are its echo.
 
 .. comp_req:: A run whose nodes cannot be given one pass's contexts is refused
    :id: CREQ_RUN_REFUSES_UNPAIRED
@@ -107,9 +153,12 @@ passes enclosing them is read from the pass the activation belongs to.
    :ears_pattern: unwanted
    :statement: If an instance of a workflow cannot be given contexts of one pass, then Workflow run shall refuse to start naming every such instance.
 
-   Asked after the wiring and the signature, before the arguments'
-   identifiers: a refusal names what the caller supplied or what the
-   definition says, and the passes are both.
+   An instance whose inputs share no pass is a defect of the wiring
+   (``DEC_PAIRING_IS_WIRING``), reported by the wiring validator
+   (``CREQ_VALIDATOR_REPORTS_UNPAIRED``), so the run refuses it as it refuses
+   every wiring defect, before its signature is asked
+   (``CREQ_RUN_REFUSES_DEFECTS``), naming each such instance with the passes
+   of its inputs.
 
    Failure modes:
 
@@ -134,24 +183,73 @@ passes enclosing them is read from the pass the activation belongs to.
    - **The output held for one reader of several**, and another waiting for
      a pass that went elsewhere.
 
-.. comp_req:: A context a run is given for a wired parameter is its edge's first
-   :id: CREQ_RUN_ARGUMENT_FIRST_ON_ITS_EDGE
-   :derived_from: FEAT_ARGUMENT_FIRST_ON_ITS_EDGE
-   :allocated_to: COMP_WORKFLOW_RUN
+.. comp_req:: A binding's declared first context is given on its first pass
+   :id: CREQ_SCHEDULER_GIVES_FIRST
+   :derived_from: FEAT_FIRST_CONTEXT_DECLARED
+   :allocated_to: COMP_RUN_SCHEDULER
    :ears_pattern: event
-   :statement: When a run is started with a context for a parameter a binding fills, Workflow run shall hold that context as the first that edge holds, before any context walked along it.
+   :statement: When a binding declares its first context, Run scheduler shall give that context to the binding's instance on the binding's first pass and what the binding carries on each pass after.
 
-   ``DEC_ARGUMENT_FIRST_ON_ITS_EDGE``. It is the binding's pass 0, and the
-   passes of what the binding carries are its passes 1 onward, whenever they
-   are made. Two contexts given for one parameter are refused as they are for
-   any (``CREQ_RUN_REFUSES_UNFILLED_SIGNATURE``).
+   ``DEC_FIRST_CONTEXT_DECLARED``: it is the binding's pass 0, and the passes
+   of what the binding carries are its passes 1 onward, whenever they are made
+   (``DEC_PASS_CLOCKS``).
 
    Failure modes:
 
-   - **The context refused as a second source**, which is what the run did,
-     and a loop given no way into its first pass.
    - **The context placed after what was walked first**, and what a pass is
      given turned on whether the binding's source happened to run before the
      instance.
    - **The context given for every pass**, as a parameter nothing binds is,
      and the wire's contexts never taken.
+   - **The context given to another binding of the instance**, or to the
+     same parameter of another instance.
+
+.. comp_req:: A run holds each first context its workflow declares
+   :id: CREQ_RUN_HOLDS_DECLARED_FIRST
+   :derived_from: FEAT_FIRST_CONTEXT_DECLARED
+   :allocated_to: COMP_WORKFLOW_RUN
+   :ears_pattern: event
+   :statement: When a run starts, Workflow run shall hold for each binding declaring its first context a context holding the declared text, of the type the binding's parameter is declared for.
+
+   ``DEC_FIRST_CONTEXT_DECLARED``: made when the run starts, after its wiring
+   and its signature are checked, from the identifier source its caller lends
+   it, and held as an argument is, so that its identifier is checked against
+   the arguments' (``CREQ_RUN_REFUSES_SHARED_ARGUMENT_IDENTIFIER``). A source
+   that has issued every identifier refuses the run.
+
+   Failure modes:
+
+   - **The context made from a source of its own**, and two contexts of the
+     run under one identifier.
+   - **Its type taken from elsewhere**, the source's output type or a
+     made-up one, and a node given a context its parameter is not declared
+     for.
+   - **A context made for every pass**, and the run's contexts growing with
+     nothing to say it.
+   - **An exhausted source passed over**, and a context with no identifier
+     of its own.
+
+.. comp_req:: A binding's first context is read as its text
+   :id: CREQ_READER_READS_FIRST
+   :derived_from: FEAT_FIRST_CONTEXT_DECLARED
+   :allocated_to: COMP_TOPOLOGY_READER
+   :ears_pattern: event
+   :statement: When a binding is written as a table holding first, Topology reader shall read the text first holds as the first context the binding declares.
+
+   ``DEC_FIRST_CONTEXT_DECLARED``: ``first`` is a table holding ``text``, a
+   string, and nothing else, in a binding table beside ``from`` and, for a
+   router's input, ``input``. A binding table declaring no ``first`` still
+   needs its ``input`` (``CREQ_READER_READS_ROUTED_INPUT``). A value of
+   another kind is refused where it is written
+   (``CREQ_READER_FAULT_LOCATED``).
+
+   Failure modes:
+
+   - **The key read past**, and a loop whose first context is declared
+     never started.
+   - **The text changed on the way**, trimmed or its line breaks dropped,
+     and a node given another first context than the one written.
+   - **A malformed first context read as none**, and a mistake in it found
+     only as a loop that never starts.
+   - **The input left optional for every binding table**, and a binding
+     meant to take a router's input read as taking its output.
