@@ -305,3 +305,82 @@ asked for.
    - **A record naming an instance the workflow no longer has resumed**,
      where resuming it would refuse as a divergence
      (``CREQ_RECORD_REFUSES_DIVERGENCE``).
+
+.. comp_req:: A router's instance may declare its branches
+   :id: CREQ_READER_READS_BRANCHES
+   :derived_from: FEAT_BRANCHES_CHECKED
+   :allocated_to: COMP_TOPOLOGY_READER
+   :ears_pattern: event
+   :statement: When an instance declares branches, Topology reader shall read each branch's name and the instances it names in the order written.
+
+   ``DEC_ROUTER_BRANCHES_DECLARED``: ``branches`` is a table keying an array
+   of instance names by the branch's name, in either of TOML's ways of writing
+   a table. A value of another kind is refused where it is written, as any
+   value of the wrong type is (``CREQ_READER_FAULT_LOCATED``).
+
+   Failure modes:
+
+   - **The key read past**, and every router refused for leaving its edges in
+     no branch.
+   - **A branch's instances read out of order or one dropped**, and a route
+     naming the branch as written refused.
+
+.. comp_req:: Branches that are not the branches after a router are defects
+   :id: CREQ_VALIDATOR_BRANCHES
+   :derived_from: FEAT_BRANCHES_CHECKED
+   :allocated_to: COMP_WIRING_VALIDATOR
+   :ears_pattern: unwanted
+   :statement: If an instance declares branches that leave out an instance its edges enter or name one they do not enter or repeat a branch or belong to no router, then Wiring validator shall report a defect naming the instance and what is at fault.
+
+   An edge is a binding whose source is the router, whether it carries the
+   router's output or one of its inputs. A branch repeats another when it
+   names the same instances, in whatever order and however often. An instance
+   named twice in one branch is reported once.
+
+   Failure modes:
+
+   - **An entered instance left in no branch passed**, and the instance
+     waiting for ever on an edge no route walks.
+   - **A branch naming an instance no edge enters passed**, and a route naming
+     it refused when the router runs.
+   - **A repeated branch passed**, and one route read as two branches.
+   - **Branches on a node that does not route passed**, a document saying
+     something its run never does.
+
+.. comp_req:: A router's naming that is no branch of its instance is refused
+   :id: CREQ_RUN_REFUSES_UNDECLARED_BRANCH
+   :derived_from: FEAT_ROUTE_IS_A_DECLARED_BRANCH
+   :allocated_to: COMP_WORKFLOW_RUN
+   :ears_pattern: unwanted
+   :statement: If the caller reports a router's output naming instances that are not those of one branch its instance declares, then Workflow run shall refuse that output naming the branches declared.
+
+   The same instances in another order, or one named twice, are that branch.
+   Naming none is not refused (``CREQ_RUN_REFUSES_BAD_ROUTE``). As every
+   refused output, it leaves the activation outstanding
+   (``CREQ_RUN_REFUSED_OUTPUT_OUTSTANDING``), and the refusal lists each
+   branch with its instances, so that whoever named it can name one.
+
+   Failure modes:
+
+   - **A set of instances that is no branch walked**, and a node on two
+     branches' passes given contexts of two passes.
+   - **A branch named in another order refused.**
+
+.. comp_req:: A person's route that is no branch of the router is refused
+   :id: CREQ_HOST_REFUSES_PERSON_ROUTE_NOT_A_BRANCH
+   :derived_from: FEAT_ROUTE_IS_A_DECLARED_BRANCH
+   :allocated_to: COMP_SCRIPT_HOST
+   :ears_pattern: unwanted
+   :statement: If a person's answer to a router's step names instances that are not those of one branch the router's instance declares, then Script host shall refuse it having run nothing.
+
+   As a name no edge enters is (``CREQ_HOST_REFUSES_BAD_PERSON_ROUTE``): a
+   person's route is typed, and the person answers again with a branch. A
+   router's script naming no branch fails its activation, as any output the
+   run refuses does.
+
+   Failure modes:
+
+   - **The whole run failed** for what the person can answer again, which is
+     what the host did before this.
+   - **The answer taken as given**, and the run walking a set of instances
+     that is no branch.

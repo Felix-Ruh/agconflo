@@ -957,7 +957,7 @@ fn person_routes() {
     }
     scratch.write(
         "flow.toml",
-        "name = \"routed\"\noutput = \"a\"\n\n[instances.first]\nnode_type = \"begin\"\n\n[instances.r]\nnode_type = \"route\"\nbindings = { before = \"first\" }\n\n[instances.a]\nnode_type = \"add\"\nbindings = { before = \"r\" }\n\n[instances.b]\nnode_type = \"add\"\nbindings = { before = \"r\" }\n",
+        "name = \"routed\"\noutput = \"a\"\n\n[instances.first]\nnode_type = \"begin\"\n\n[instances.r]\nnode_type = \"route\"\nbindings = { before = \"first\" }\nbranches = { a = [\"a\"], b = [\"b\"] }\n\n[instances.a]\nnode_type = \"add\"\nbindings = { before = \"r\" }\n\n[instances.b]\nnode_type = \"add\"\nbindings = { before = \"r\" }\n",
     );
     scratch.write(
         "manifest.toml",

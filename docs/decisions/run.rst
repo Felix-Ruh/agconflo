@@ -21,13 +21,18 @@ contradicts a declaration, once it has been shown to accept two kinds of them
 without a word. The tenth, last in the file, was taken the same day on two more
 such measurements: where a run's identifiers are kept unambiguous.
 
-The last two were taken by the maintainer on 2026-09-26, when a node became able
+Two more were taken by the maintainer on 2026-09-26, when a node became able
 to run more than once: how a run pairs the contexts on a node's edges pass by
 pass, and which contexts stay the same for every pass. They supersede the first
 decision below, which said no instance ran twice, and the one that waited for
 every bound parameter whether required or optional. The two after them follow
 from the first of those, and were taken while specifying it: a node runs again
 only on something new, and an instance that cannot run again leaves its output
+standing.
+
+The last three, taken on 2026-10-04 on measurements of those four, supersede
+all four: a pass is what the wiring says it is, a node whose inputs cannot
+share one is refused before the run starts, and no output is declared
 standing.
 
 What this slice does not settle is as load-bearing as what it does, so it is
@@ -426,7 +431,7 @@ to leave every one of them open.
 
 .. dec:: Every edge numbers the contexts walked along it, and a node takes the lowest of each
    :id: DEC_EDGE_GENERATIONS
-   :dec_status: accepted
+   :dec_status: superseded
    :decided_on: 2026-09-26
    :supersedes: DEC_ACTIVATION_ONCE_PER_RUN, DEC_BINDING_IS_AWAITED
    :statement: Agconflo shall number the contexts walked along each edge into an instance from 0 and activate the instance once every edge into it holds its next unprocessed generation, taking the lowest unprocessed generation from each.
@@ -457,7 +462,7 @@ to leave every one of them open.
 
 .. dec:: A node type declares an output standing, which serves every later generation
    :id: DEC_STANDING_OUTPUTS
-   :dec_status: accepted
+   :dec_status: superseded
    :decided_on: 2026-09-26
    :statement: Agconflo shall let a node type declare its output standing in its definition, so that each edge carrying it holds that context for every later generation until the node produces another.
 
@@ -479,7 +484,7 @@ to leave every one of them open.
 
 .. dec:: A node runs again only when one of its edges holds something new
    :id: DEC_RUN_AGAIN_ON_SOMETHING_NEW
-   :dec_status: accepted
+   :dec_status: superseded
    :decided_on: 2026-09-26
    :statement: Agconflo shall activate an instance that has run again only when at least one edge into it holds a context the instance has not taken, and an instance with no edge into it once.
 
@@ -493,7 +498,7 @@ to leave every one of them open.
 
 .. dec:: An instance that cannot run again leaves its output standing
    :id: DEC_ONCE_RUN_OUTPUTS_STAND
-   :dec_status: accepted
+   :dec_status: superseded
    :decided_on: 2026-09-26
    :statement: Agconflo shall hold the output of an instance with no edge into it that does not stand for every later activation reading it, as if its node type declared it standing.
 
@@ -504,3 +509,125 @@ to leave every one of them open.
    the repetition it feeds on its second round. Declaring every such node type
    standing was the alternative, and is a declaration every workflow would
    need and none would mean otherwise.
+
+.. dec:: An instance runs on the passes its wiring gives it, and is given each input from the pass it is on
+   :id: DEC_PASS_CLOCKS
+   :dec_status: accepted
+   :decided_on: 2026-10-04
+   :supersedes: DEC_EDGE_GENERATIONS, DEC_RUN_AGAIN_ON_SOMETHING_NEW, DEC_ONCE_RUN_OUTPUTS_STAND
+   :supported_by: EVD_PASSES_MISPAIRED_ACROSS_A_BRANCH, EVD_STANDING_BY_INSTANCE_ORDER, EVD_RECORD_GOALS_NEEDS_BRANCHES
+   :statement: Agconflo shall put each node instance on the passes its wiring gives it and give each of its activations, for every input, the context made on the pass that activation belongs to.
+
+   ``DEC_EDGE_GENERATIONS`` numbered each edge on its own and paired the
+   ``n``-th context of each, which pairs one pass's contexts only while every
+   edge into a node moves once a pass. An edge a router walks on some passes
+   does not, and a node joining it with one walked on every pass was given two
+   passes' contexts (``EVD_PASSES_MISPAIRED_ACROSS_A_BRANCH``). A counter per
+   edge cannot know which pass a context belongs to; the wiring can, before
+   anything runs. This is the clock calculus of synchronous dataflow languages
+   such as Lustre, whose problem this is: streams that tick at different rates,
+   joined pass by pass.
+
+   Each instance's passes - its clock - follow from what feeds it:
+
+   - **The run's one pass**, for an instance fed by nothing but the run's
+     contexts and instances on that pass. It runs once.
+   - **A branch's passes**: an instance a router's edges enter runs on the
+     passes on which the router takes a branch naming it, a part of the
+     router's own (``DEC_ROUTER_BRANCHES_DECLARED``).
+   - **Pass 0 given, then the passes inside**: a parameter a binding fills and
+     the run gives a first context to has that context on pass 0 and the
+     binding's on every pass after (``DEC_ARGUMENT_FIRST_ON_ITS_EDGE``). This
+     is how a loop starts.
+   - **A cycle's own passes**, for instances on a cycle no router is on that a
+     given context starts; they run until the budget stops them.
+   - **None**, for a cycle no given context starts. Nothing on it runs, as
+     nothing on it ran before; refusing such a workflow is a decision of its
+     own.
+
+   An instance runs on the passes all its inputs share: those of the input
+   that comes most often, when every other input comes on passes enclosing
+   them - the run's one pass encloses every other, and a router's passes
+   enclose its branches' - and, for inputs from different branches of one
+   router, the passes on which it takes a branch naming them all. An input on
+   the instance's own passes is taken pass by pass; one on passes enclosing
+   them is read from the enclosing pass the activation belongs to. So a node
+   on a branch reading what was made on every pass of the loop is given what
+   was made on the pass the branch was taken, and a brief made once reaches
+   every pass. An instance whose inputs share no pass has none to be given
+   them on, and is refused before the run starts
+   (``DEC_PAIRING_CHECKED_AT_START``). It runs once per pass, so it runs again
+   exactly when its next pass's inputs are there, which is what
+   ``DEC_RUN_AGAIN_ON_SOMETHING_NEW`` and ``DEC_ONCE_RUN_OUTPUTS_STAND`` each
+   had to say apart.
+
+   Every context an activation is given is a function of the outputs and the
+   routes the run accepted, never of the order instances are written in or
+   offered in (``EVD_STANDING_BY_INSTANCE_ORDER``), so a record replays to the
+   same passes and holds nothing more than it did.
+
+   Rejected:
+
+   - **A counter per edge with a check beside it.** A position in a queue is
+     a pass only where the clocks agree, so the check would be this decision
+     and the queues a second copy of the state.
+   - **Tagging contexts while the run goes.** Without a loop construct, which
+     ``DEC_REPETITION_BY_EDGES`` rules out, a context's lineage does not say
+     which edge took it back round: the drafter's next draft and the router's
+     verdict are both made from one draft, and only one starts a new pass. A
+     context left unmatched would also be dropped without a word.
+   - **Walking a context marking a branch not taken.** On a cycle the mark
+     goes round for ever unless the edges back are known, which is the loop
+     construct again.
+   - **Detecting a mispairing as it happens.** It needs the same notion of a
+     pass, and fails the run half way through instead of before it starts.
+
+.. dec:: A run is refused unless every node's inputs share a pass
+   :id: DEC_PAIRING_CHECKED_AT_START
+   :dec_status: accepted
+   :decided_on: 2026-10-04
+   :supported_by: EVD_PASSES_MISPAIRED_ACROSS_A_BRANCH
+   :statement: Agconflo shall refuse to start a run in which a node instance's inputs share no pass, naming the instance and the passes each of its inputs comes on.
+
+   ``STKH_WIRING_CHECKED`` rejects an invalid workflow before any node runs,
+   and a node that cannot be given one pass's contexts is that: its answer is
+   wrong however it is computed. The check is made where the run starts rather
+   than by the wiring validator, because a loop's passes depend on which
+   parameters the run gives a first context to, and those are the run's
+   arguments (``DEC_ARGUMENT_FIRST_ON_ITS_EDGE``). Were a first context to
+   become part of the workflow document, the same check would move to the
+   validator unchanged.
+
+   A node joining two branches of one router runs on the passes on which the
+   router takes a branch naming both, and is refused where no branch does:
+   the two then never share a pass, and there is no construct merging them.
+   That is a goal of its own if one is wanted. Two loops whose passes neither
+   encloses the other's - a loop inside another, re-started on each outer
+   pass - share none either, and are refused alike until a loop's first
+   context can come from the wiring rather than from the run.
+
+.. dec:: A node type declaring its output standing is refused
+   :id: DEC_STANDING_REFUSED
+   :dec_status: accepted
+   :decided_on: 2026-10-04
+   :supersedes: DEC_STANDING_OUTPUTS
+   :supported_by: EVD_STANDING_BY_INSTANCE_ORDER
+   :statement: Agconflo shall refuse a node type document that declares an output standing, at the key declaring it.
+
+   ``DEC_STANDING_OUTPUTS`` let a node type's output serve every later pass.
+   Under ``DEC_PASS_CLOCKS`` the two uses it had are met without it: a context
+   made once, a brief or a set of rules, is read from the run's one pass by
+   every pass enclosed in it, and a context made again on each pass is taken
+   pass by pass. The one use left, a standing output made again, served
+   whichever context was latest when its reader ran, which turned on the order
+   instances are written in (``EVD_STANDING_BY_INSTANCE_ORDER``).
+
+   Refusing the key at its place says which line to delete, as
+   ``DEC_OPTIONAL_PARAMETERS_REFUSED`` does for ``optional``; reading past it
+   would leave a document saying something its run does not do.
+
+   An input from passes a node's own enclose - a brief a person edits on some
+   passes, read on every one - is refused by ``DEC_PAIRING_CHECKED_AT_START``.
+   Holding the latest context made on an earlier pass, Lustre's ``current``,
+   declared on the binding that reads it, is how that would be met. No
+   workflow needs it yet, so it is not built.

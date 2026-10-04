@@ -1827,6 +1827,7 @@ node_type = "seed"
 [instances.r]
 node_type = "route"
 bindings = { input = "s" }
+branches = { a = ["a"], b = ["b"], both = ["a", "b"] }
 
 [instances.a]
 node_type = "take"

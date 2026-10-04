@@ -29,8 +29,9 @@ the derivation can be audited rather than taken on trust:
   character wider than one byte before the fault on its line.
 - ``CREQ_READER_FAULT_LOCATED``'s "an optional list read as nothing" is caught
   by ``TEST_READER_OPTIONAL_PARAMETERS_REFUSED``, which writes the list both
-  inline and as a header table, and "an entry mark read past" by
-  ``TEST_READER_ENTRY_MARK_REFUSED``, which writes it both ways too.
+  inline and as a header table, "an entry mark read past" by
+  ``TEST_READER_ENTRY_MARK_REFUSED``, which writes it both ways too, and "a
+  standing declaration read past" by ``TEST_READER_STANDING_REFUSED``.
 - ``CREQ_WRITER_KEEPS_UNREAD``'s "a changed value loses the comment beside it" is
   caught by ``TEST_WRITER_UNREAD_KEYS_SURVIVE_A_CHANGE``, whose repointed binding
   carries a comment of its own.
@@ -205,6 +206,22 @@ together.
    would drop the parameters it declares without a word
    (``DEC_OPTIONAL_PARAMETERS_REFUSED``). Catches: an optional list read as
    nothing; the fault placed anywhere but at the key.
+
+.. test_case:: A node type declaring its output standing is a fault in the text
+   :id: TEST_READER_STANDING_REFUSED
+   :verifies: CREQ_READER_FAULT_LOCATED
+   :test_kind: error_path
+   :coverage: partial
+
+   A node type document declaring ``standing`` is refused at the key, with
+   its line and column and a message saying to remove it - holding ``true``,
+   ``false``, and a string indented under the type. The same type without the
+   key reads - the control.
+
+   No output stands (``DEC_STANDING_REFUSED``), and a key read past would
+   leave a document saying something its run does not do. Catches: a
+   standing declaration read past; the fault placed anywhere but at the key;
+   ``standing = false`` read as harmless.
 
 .. test_case:: Any text is read or refused
    :id: TEST_READER_ANY_TEXT_IS_READ_OR_REFUSED

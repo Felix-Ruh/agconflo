@@ -11,7 +11,7 @@ use toml_edit::{Document, DocumentMut, Item, TableLike};
 
 use crate::catalogue::TypeCatalogue;
 use crate::context::{ContextType, InvalidTypeName};
-use crate::workflow::{Binding, NodeInstance, NodeType, Parameter, WorkflowDefinition};
+use crate::workflow::{Binding, Branch, NodeInstance, NodeType, Parameter, WorkflowDefinition};
 
 /// The node types one document declares, under the name its caller gave the
 /// document.
@@ -120,6 +120,13 @@ pub enum FaultKind {
         /// The key, from the top of the document down.
         key: Vec<String>,
     },
+    /// A node type declares its output standing, which no output is: an
+    /// instance reads a context made outside its passes from the pass it
+    /// belongs to. The place is the key declaring it.
+    StandingDeclared {
+        /// The key, from the top of the document down.
+        key: Vec<String>,
+    },
 }
 
 impl fmt::Display for ReadFault {
@@ -162,6 +169,11 @@ impl fmt::Display for FaultKind {
                 "'{}' marks an entry, and there are none: a run is given a context for each parameter nothing binds, on any instance; remove the key",
                 key.join(".")
             ),
+            Self::StandingDeclared { key } => write!(
+                f,
+                "'{}' declares a standing output, and no output stands: a node reads a context made outside its passes from the pass it belongs to; remove the key",
+                key.join(".")
+            ),
         }
     }
 }
@@ -174,11 +186,11 @@ impl std::error::Error for ReadFault {}
 /// Each type is a table under `types`, keyed by its name, holding `required`,
 /// a table keying a parameter's context type by the parameter's name,
 /// `globals`, an array of the context types read by declaration, and `output`,
-/// the one context type it produces; it may hold a `description` and
-/// `standing`, whether its output stands. Only `output` is needed; an absent
-/// list is an empty one, an absent description is empty, an absent `standing`
-/// is false, and a document without `types` declares none. An `optional` list
-/// is refused at its key.
+/// the one context type it produces; it may hold a `description` and `routes`,
+/// whether it is a router. Only `output` is needed; an absent list is an empty
+/// one, an absent description is empty, an absent `routes` is false, and a
+/// document without `types` declares none. An `optional` list and a
+/// `standing` key are refused at their keys.
 /// Parameters come back in the order they are written, in whichever TOML form.
 // @A node type document read in the order it is written,IMPL_READER_TYPES,impl,[CREQ_READER_TYPES],[DEC_NAMES_AS_KEYS, DEC_TYPES_IN_OWN_DOCUMENTS]
 pub fn read_node_types(document: &str, text: &str) -> Result<NodeTypeDocument, ReadFault> {
@@ -357,7 +369,41 @@ impl<'t> Reading<'t> {
             node_type,
             bindings,
             calls: self.calls(table, &key)?,
+            branches: self.branches(table, &key)?,
         })
+    }
+
+    /// The branches an instance declares under `branches`, a table keying the
+    /// instances each names by the branch's name, in the order written, or
+    /// none when it has no such key. A value of the wrong kind is refused where
+    /// it is written.
+    // @A router's branches read in the order written,IMPL_READER_BRANCHES,impl,[CREQ_READER_READS_BRANCHES],[DEC_ROUTER_BRANCHES_DECLARED]
+    fn branches(&self, table: &dyn TableLike, key: &[&str]) -> Result<Vec<Branch>, ReadFault> {
+        let Some(item) = table.get("branches") else {
+            return Ok(Vec::new());
+        };
+        let key = [key, &["branches"]].concat();
+        self.table(item, &key)?
+            .iter()
+            .map(|(name, named)| {
+                let at = [&key[..], &[name]].concat();
+                let Some(array) = named.as_array() else {
+                    return Err(self.wrong_type(named.span(), &at, "array", named.type_name()));
+                };
+                let instances = array
+                    .iter()
+                    .map(|instance| {
+                        instance.as_str().map(str::to_owned).ok_or_else(|| {
+                            self.wrong_type(instance.span(), &at, "string", instance.type_name())
+                        })
+                    })
+                    .collect::<Result<_, _>>()?;
+                Ok(Branch {
+                    name: name.to_owned(),
+                    instances,
+                })
+            })
+            .collect()
     }
 
     /// Nothing, or a fault for the `entry` key `instance` holds, placed at the
@@ -451,6 +497,7 @@ impl<'t> Reading<'t> {
         let declaration = self.table(item, &key)?;
         let output = self.needed(item, declaration, &key, "output")?;
         self.no_optional(declaration, &key)?;
+        self.no_standing(declaration, &key)?;
         let required = self.parameters(declaration, &key, "required")?;
 
         let description = match declaration.get("description") {
@@ -466,14 +513,13 @@ impl<'t> Reading<'t> {
             required,
             globals: self.globals(declaration, &key)?,
             output: self.context_type(output, &[&key[..], &["output"]].concat())?,
-            standing: self.flag(declaration, &key, "standing")?,
             routes: self.flag(declaration, &key, "routes")?,
         })
     }
 
-    /// What `declaration` says under `name`, `standing` or `routes`: a boolean,
-    /// or false when it has none.
-    // @Whether an output stands and whether a type routes read from its type,IMPL_READER_STANDING,impl,[CREQ_READER_READS_STANDING, CREQ_READER_READS_ROUTES],[DEC_STANDING_OUTPUTS, DEC_ROUTER_DECLARED]
+    /// What `declaration` says under `name`, a boolean, or false when it has
+    /// none.
+    // @Whether a type routes read from its type,IMPL_READER_ROUTES,impl,[CREQ_READER_READS_ROUTES],[DEC_ROUTER_DECLARED]
     fn flag(
         &self,
         declaration: &dyn TableLike,
@@ -533,6 +579,21 @@ impl<'t> Reading<'t> {
                     .to_owned(),
             ),
         })
+    }
+
+    /// Nothing, or a fault for the `standing` key `declaration` holds, placed
+    /// at the key.
+    // @A standing output refused at its key,IMPL_READER_NO_STANDING,impl,[CREQ_READER_FAULT_LOCATED],[DEC_STANDING_REFUSED]
+    fn no_standing(&self, declaration: &dyn TableLike, key: &[&str]) -> Result<(), ReadFault> {
+        match declaration.get_key_value("standing") {
+            None => Ok(()),
+            Some((written, _)) => Err(self.fault(
+                written.span(),
+                FaultKind::StandingDeclared {
+                    key: path(&[key, &["standing"]].concat()),
+                },
+            )),
+        }
     }
 
     /// Nothing, or a fault for the `optional` list `declaration` holds, placed
@@ -769,6 +830,7 @@ impl Written {
                         })
                         .collect(),
                     calls: written.calls.clone(),
+                    branches: Vec::new(),
                 })
                 .collect(),
             designated_outputs: self.output.iter().cloned().collect(),
@@ -1506,6 +1568,85 @@ fn routes_read() {
 }
 
 #[test]
+fn branches_read() {
+    // In either TOML form, each branch's instances in the order written, the
+    // branches in the order written.
+    for text in [
+        "name = \"w\"\n\n[instances.r]\nnode_type = \"source\"\nbranches = { again = [\"d\", \"r\"], done = [\"f\"], stop = [] }\n",
+        "name = \"w\"\n\n[instances.r]\nnode_type = \"source\"\n\n[instances.r.branches]\nagain = [\"d\", \"r\"]\ndone = [\"f\"]\nstop = []\n",
+    ] {
+        let (definition, _) = read_workflow("w.toml", text, &catalogue()).expect("it reads");
+        let branches: Vec<(&str, Vec<&str>)> = definition.instances[0]
+            .branches
+            .iter()
+            .map(|b| {
+                (
+                    b.name.as_str(),
+                    b.instances.iter().map(String::as_str).collect(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            branches,
+            [
+                ("again", vec!["d", "r"]),
+                ("done", vec!["f"]),
+                ("stop", vec![])
+            ],
+            "{text}"
+        );
+    }
+
+    // An instance declaring none has none.
+    let (definition, _) = read_workflow(
+        "w.toml",
+        "name = \"w\"\n\n[instances.r]\nnode_type = \"source\"\n",
+        &catalogue(),
+    )
+    .expect("it reads");
+    assert!(definition.instances[0].branches.is_empty());
+
+    // Each wrong kind is refused where it is written.
+    let key = |parts: &[&str]| parts.iter().map(|&p| p.to_owned()).collect::<Vec<_>>();
+    for (text, place, kind) in [
+        (
+            "name = \"w\"\n[instances.r]\nnode_type = \"source\"\nbranches = [\"d\"]\n",
+            (4, 12),
+            FaultKind::WrongType {
+                key: key(&["instances", "r", "branches"]),
+                expected: "table",
+                found: "array",
+            },
+        ),
+        (
+            "name = \"w\"\n[instances.r]\nnode_type = \"source\"\nbranches = { again = \"d\" }\n",
+            (4, 22),
+            FaultKind::WrongType {
+                key: key(&["instances", "r", "branches", "again"]),
+                expected: "array",
+                found: "string",
+            },
+        ),
+        (
+            "name = \"w\"\n[instances.r]\nnode_type = \"source\"\nbranches = { again = [\"d\", 1] }\n",
+            (4, 28),
+            FaultKind::WrongType {
+                key: key(&["instances", "r", "branches", "again"]),
+                expected: "string",
+                found: "integer",
+            },
+        ),
+    ] {
+        let fault = read_workflow("w.toml", text, &catalogue()).expect_err(text);
+        assert_eq!(
+            ((fault.line(), fault.column()), fault.kind()),
+            (place, &kind),
+            "{text}"
+        );
+    }
+}
+
+#[test]
 fn routed_input_read() {
     let key = |parts: &[&str]| {
         parts
@@ -1564,41 +1705,37 @@ fn routed_input_read() {
 }
 
 #[test]
-fn standing_read() {
-    let text = "[types.brief]\noutput = \"note\"\nstanding = true\n\n[types.draft]\noutput = \"note\"\nstanding = false\n\n[types.review]\noutput = \"note\"\n";
-    let read = read_node_types("types.toml", text).expect("it reads");
-    let standing: Vec<(&str, bool)> = read
-        .node_types()
-        .iter()
-        .map(|declared| (declared.name.as_str(), declared.standing))
-        .collect();
-    assert_eq!(
-        standing,
-        [("brief", true), ("draft", false), ("review", false)]
-    );
-
-    // A value that is not a boolean is refused where it is written.
-    let fault = read_node_types(
-        "wrong.toml",
-        "[types.brief]\noutput = \"note\"\nstanding = \"yes\"\n",
-    )
-    .expect_err("a string is not a boolean");
-    assert_eq!(
-        (fault.line(), fault.column(), fault.kind()),
+fn standing_refused() {
+    let key = |parts: &[&str]| parts.iter().map(|&part| part.to_owned()).collect();
+    // True, false and a value of the wrong kind alike: the key is refused
+    // where it is written, whatever it holds.
+    for (text, column) in [
+        ("[types.brief]\noutput = \"note\"\nstanding = true\n", 1),
+        ("[types.brief]\noutput = \"note\"\nstanding = false\n", 1),
         (
+            "[types.brief]\noutput = \"note\"\n  standing = \"yes\"\n",
             3,
-            12,
-            &FaultKind::WrongType {
-                key: vec![
-                    "types".to_owned(),
-                    "brief".to_owned(),
-                    "standing".to_owned()
-                ],
-                expected: "boolean",
-                found: "string",
-            }
-        )
-    );
+        ),
+    ] {
+        let fault = read_node_types("types.toml", text).expect_err(text);
+        assert_eq!(
+            (fault.line(), fault.column(), fault.kind()),
+            (
+                3,
+                column,
+                &FaultKind::StandingDeclared {
+                    key: key(&["types", "brief", "standing"])
+                }
+            ),
+            "{text}"
+        );
+        assert!(fault.to_string().contains("remove the key"), "{fault}");
+    }
+
+    // The control: the same type without the key reads.
+    let read =
+        read_node_types("types.toml", "[types.brief]\noutput = \"note\"\n").expect("it reads");
+    assert_eq!(read.node_types(), [node_type("brief", &[], "note")]);
 }
 
 #[test]

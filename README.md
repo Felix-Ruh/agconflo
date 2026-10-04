@@ -16,9 +16,10 @@ where did every byte come from?"* has an exact answer.
 ## Status
 
 **Pre-alpha. Nodes run as scripts, call models or wait for a person, a model can call another node
-type, a run survives an interruption, a person runs a workflow from its documents with the
-`agconflo` command, and a node type can be a tool — reading a file, writing one, running a
-command — kept in a container to what that person granted** — no loops, and no MCP yet. What exists is the
+type, a router chooses where a run goes and a loop repeats part of it, a run survives an
+interruption, a person runs a workflow from its documents with the `agconflo` command, and a node
+type can be a tool — reading a file, writing one, running a command — kept in a container to what
+that person granted** — no MCP yet. What exists is the
 development process around it and the first slices of code through it: a requirements project
 under `docs/` with a validated metamodel behind it, a commit gate, continuous integration, three
 library crates and a command.
@@ -111,6 +112,44 @@ step a run awaits, is all that goes to standard output. The exit status says how
 0 completed, 2 a command line it cannot read, 3 awaiting a person, 4 refused before anything ran,
 5 a node failed, 6 the budget ran out, 7 no node can make further progress, and 8 the record could
 not be kept, whatever else happened.
+
+### Routers
+
+A node type declaring `routes = true` is a **router**: its script decides which of the branches
+after it the run takes, with `host.route({"drafter"})`, and its output is the context its decision
+is held in. An edge out of a router carries that output, or one of the contexts it was given,
+bound by naming the router and the input: `draft = { from = "router", input = "draft" }`.
+
+The router's instance declares its **branches**, each naming the instances a route taking it goes
+on to, and a route names the instances of one branch, in any order, or none at all:
+
+```toml
+[instances.router]
+node_type = "route"
+bindings = { draft = "drafter", review = "reviewer" }
+branches = { again = ["drafter"], done = ["finisher"] }
+```
+
+Every instance an edge out of the router enters is in a branch, and no two branches name the same
+instances; a workflow breaking either is refused before anything runs. A router a person performs
+is answered with `--route` once for each instance of the branch, and a route that is no branch is
+refused, naming the branches, so that it can be answered again.
+
+### Repetition
+
+A workflow repeats part of itself by an edge going back: the drafter above reads the draft the
+router sends back. Each pass of a loop is started by what comes back round, so its first is given
+by the run, as a context for that bound parameter - `--arg drafter previous ""` - which the drafter
+reads on its first pass and the router's on every pass after.
+
+What each node is given is worked out from the wiring before the run starts. A node runs once for
+each pass of what feeds it, and is given every input from the pass it is on: a node on a branch
+reading the loop's draft is given the draft of the pass the branch was taken on, and a brief made
+once reaches every pass. A node whose inputs share no pass - one joining two branches no route
+takes together, or a loop's own node reading what a branch of it makes on some passes alone - has
+nothing it could be given, and the run is refused before anything runs, naming it and where each of
+its inputs comes from. A loop the run gives no first context to runs on no pass, and a repetition no
+router ends is stopped by the budget.
 
 ### Tools
 

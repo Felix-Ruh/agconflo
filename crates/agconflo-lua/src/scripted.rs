@@ -528,7 +528,7 @@ fn callees_of(definition: &WorkflowDefinition, activation: &Activation) -> Vec<N
 /// The outer error is the refusal. The inner one is the step's failure, when
 /// its output cannot be made or the run refuses it, and ends the run as a
 /// script's failure would.
-// @A person's text taken as the awaited step's output,IMPL_SCRIPTED_ANSWER,impl,[CREQ_HOST_TAKES_PERSON_TEXT, CREQ_HOST_REFUSES_ANSWER_ELSEWHERE, CREQ_HOST_TAKES_PERSON_ROUTE, CREQ_HOST_REFUSES_BAD_PERSON_ROUTE],[DEC_PERSON_ROUTE_IN_THE_ANSWER]
+// @A person's text taken as the awaited step's output,IMPL_SCRIPTED_ANSWER,impl,[CREQ_HOST_TAKES_PERSON_TEXT, CREQ_HOST_REFUSES_ANSWER_ELSEWHERE, CREQ_HOST_TAKES_PERSON_ROUTE, CREQ_HOST_REFUSES_BAD_PERSON_ROUTE, CREQ_HOST_REFUSES_PERSON_ROUTE_NOT_A_BRANCH],[DEC_PERSON_ROUTE_IN_THE_ANSWER, DEC_ROUTER_BRANCHES_DECLARED]
 fn answered(
     run: &mut Run<'_, ScriptFailure>,
     definition: &WorkflowDefinition,
@@ -587,7 +587,7 @@ fn answered(
     };
     Ok(match reported {
         Ok(()) => Ok(()),
-        Err(refusal @ OutputRefusal::NoEdgeTo { .. }) => {
+        Err(refusal @ (OutputRefusal::NoEdgeTo { .. } | OutputRefusal::NotABranch { .. })) => {
             return Err(ScriptedRefusal::RouteRefused(refusal));
         }
         Err(refusal) => Err(ScriptFailure::OutputRefused(refusal)),
@@ -2472,6 +2472,7 @@ bindings = { draft = "drafter" }
 [instances.router]
 node_type = "route"
 bindings = { draft = "drafter", review = "reviewer" }
+branches = { again = ["drafter"], done = ["finisher"] }
 
 [instances.finisher]
 node_type = "finish"
@@ -2482,7 +2483,21 @@ bindings = { draft = { from = "router", input = "draft" } }
 /// back until it has had three passes, then on - unless a person routes it.
 #[cfg(test)]
 fn loop_behaviours(person_routes: bool) -> Behaviours {
-    let behaviours = Behaviours::new()
+    if person_routes {
+        loop_scripts().person("route")
+    } else {
+        loop_scripts().define(
+            "route",
+            "route.lua",
+            "local given, host = ...\nlocal _, passes = given.draft:render():gsub('%[', '')\nif passes < 3 then host.route({'drafter'}) else host.route({'finisher'}) end\nreturn host.text(host.output, given.review:render())",
+        )
+    }
+}
+
+/// The review loop's scripts but the router's.
+#[cfg(test)]
+fn loop_scripts() -> Behaviours {
+    Behaviours::new()
         .define(
             "give",
             "give.lua",
@@ -2502,16 +2517,7 @@ fn loop_behaviours(person_routes: bool) -> Behaviours {
             "finish",
             "finish.lua",
             "local given, host = ...\nreturn host.text(host.output, 'final ' .. given.draft:render())",
-        );
-    if person_routes {
-        behaviours.person("route")
-    } else {
-        behaviours.define(
-            "route",
-            "route.lua",
-            "local given, host = ...\nlocal _, passes = given.draft:render():gsub('%[', '')\nif passes < 3 then host.route({'drafter'}) else host.route({'finisher'}) end\nreturn host.text(host.output, given.review:render())",
         )
-    }
 }
 
 /// The review loop started with the brief `B` and an empty first draft, and
@@ -2601,6 +2607,47 @@ fn person_routes() {
     let last = handed.last().expect("records were handed over");
     assert_eq!(last.matches("route = [\"drafter\"]").count(), 2, "{last}");
     assert_eq!(last.matches("route = [\"finisher\"]").count(), 1, "{last}");
+}
+
+#[cfg(test)]
+#[test]
+fn route_not_a_branch_refused() {
+    // A router's script naming both instances an edge enters, which together
+    // are no branch: the node fails with the run's refusal.
+    let behaviours = loop_scripts().define(
+        "route",
+        "route.lua",
+        "local given, host = ...\nhost.route({'drafter', 'finisher'})\nreturn host.text(host.output, 'both')",
+    );
+    let (ended, _) = loop_run(&behaviours);
+    assert!(
+        matches!(
+            ended,
+            Ok(Outcome::Ended(RunEnding::NodeFailed {
+                ref instance,
+                failure: ScriptFailure::OutputRefused(OutputRefusal::NotABranch { .. }),
+            })) if instance == "router"
+        ),
+        "{ended:?}"
+    );
+
+    // A person naming the same is refused with nothing run, and may answer
+    // again with a branch.
+    let (ended, records) = loop_run(&loop_behaviours(true));
+    assert!(matches!(ended, Ok(Outcome::Awaiting(_))), "{ended:?}");
+    let parked = records.last().expect("a record");
+    let both = ["drafter".to_owned(), "finisher".to_owned()];
+    let (answered, handed) = route_as_person(parked, Some(&both));
+    assert!(
+        matches!(
+            answered,
+            Err(ScriptedRefusal::RouteRefused(OutputRefusal::NotABranch { ref named, .. })) if named[..] == both[..]
+        ),
+        "{answered:?}"
+    );
+    assert!(handed.is_empty());
+    let (answered, _) = route_as_person(parked, Some(&["finisher".to_owned()]));
+    assert!(answered.is_ok(), "{answered:?}");
 }
 
 #[cfg(test)]

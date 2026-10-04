@@ -141,10 +141,13 @@ anything else.
      (``DEC_SIGNATURE_IS_WHAT_NOTHING_BINDS``), so a document still marking one
      says something untrue, and the writer would keep it there
      (``DEC_ENTRY_MARK_REFUSED``).
+   - **A standing declaration read past.** No output stands
+     (``DEC_STANDING_REFUSED``), so a type still declaring one says its output
+     serves later passes in a way its run no longer does.
 
    Must refuse, each with its place: text that is not TOML, a value of the wrong
-   type, a key the reader needs that is missing, an ``optional`` list on a node
-   type, at its key, and an empty context type name.
+   type, a key the reader needs that is missing, an ``optional`` list or a
+   ``standing`` key on a node type, at its key, and an empty context type name.
 
 .. comp_req:: Reading resolves no name
    :id: CREQ_READER_NAMES_UNRESOLVED

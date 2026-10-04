@@ -2,171 +2,180 @@
 //! and what has been produced so far, which instance may activate next and what
 //! that activation carries - the same answer however a run reached them.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
+use crate::clock::{Clock, Clocks, Unpaired};
 use crate::run::Arguments;
-use crate::workflow::{NodeInstance, WorkflowDefinition};
+use crate::workflow::{Binding, NodeInstance, WorkflowDefinition};
 use crate::{Context, ContextType};
 
-/// One edge into an instance: the instance, and the parameter of it the edge
-/// fills.
-type Edge = (String, String);
-
-/// What has been walked along each edge of a run and how far each instance has
-/// taken it: every context each edge holds in the order walked, its
-/// generation being its place there; how many of them the instance at its end
-/// has taken; how many activations of its own each instance has had; and the
-/// latest output of each.
+/// What each instance of a run has produced, pass by pass, and each router's
+/// inputs and the branch it took on each of its passes - with the passes each
+/// instance runs on, worked out when the run started.
 #[derive(Clone, Debug, Default)]
-pub(crate) struct Edges {
-    held: HashMap<Edge, Vec<Context>>,
-    taken: HashMap<Edge, usize>,
-    runs: HashMap<String, usize>,
-    latest: HashMap<String, Context>,
-    /// The instances whose output stands.
-    standing: HashSet<String>,
+pub(crate) struct Passes {
+    clocks: Clocks,
+    /// Each instance's own outputs, the output of its pass `k` at `k`.
+    outputs: HashMap<String, Vec<Context>>,
+    /// Each router's inputs on each of its passes.
+    given: HashMap<String, Vec<Vec<(String, Context)>>>,
+    /// The branch each router took on each of its passes, by its position
+    /// among the branches its instance declares, or none where it named
+    /// nothing.
+    routes: HashMap<String, Vec<Option<usize>>>,
 }
 
-impl Edges {
-    /// The edges of a run of `definition` given `arguments`, before anything has
-    /// run: empty but for a context the run was given for a parameter a binding
-    /// fills, which is the first that edge holds.
-    // @A context given for a bound parameter is its edge's first,IMPL_SCHEDULER_ARGUMENT_FIRST,impl,[CREQ_RUN_ARGUMENT_FIRST_ON_ITS_EDGE],[DEC_ARGUMENT_FIRST_ON_ITS_EDGE]
+impl Passes {
+    /// The passes of a run of `definition` given `arguments`, before anything
+    /// has run.
     pub(crate) fn new(definition: &WorkflowDefinition, arguments: &Arguments) -> Self {
-        let mut held = HashMap::new();
-        for instance in &definition.instances {
-            for binding in &instance.bindings {
-                if let Some(given) = arguments.context_for(&instance.name, &binding.parameter) {
-                    held.insert(
-                        (instance.name.clone(), binding.parameter.clone()),
-                        vec![given.clone()],
-                    );
-                }
-            }
-        }
         Self {
-            held,
-            standing: standing(definition),
+            clocks: Clocks::new(definition, arguments),
             ..Self::default()
         }
     }
 
-    /// Record that `activation`, an instance's own, produced `output`: what it
-    /// took, and `output` walked along every edge out of its instance - or for
-    /// a router, along its edges into the instances `route` names, each
-    /// carrying its output or the input of the router's it takes.
+    /// Every instance whose inputs cannot be given contexts of one pass.
+    pub(crate) fn unpaired(&self) -> &[Unpaired] {
+        self.clocks.unpaired()
+    }
+
+    /// Record that `activation`, an instance's own, produced `output` as its
+    /// instance's next pass - and for a router's, the inputs it was given and
+    /// the branch `route` names it took, none where it named nothing.
+    // @An output held as its instance's next pass,IMPL_RUN_WALKS_EVERY_EDGE,impl,[CREQ_RUN_WALKS_EVERY_EDGE, CREQ_RUN_WALKS_ROUTED],[DEC_PASS_CLOCKS, DEC_ONE_GRAPH]
     pub(crate) fn produced(
         &mut self,
-        definition: &WorkflowDefinition,
         activation: &Activation,
         output: &Context,
-        route: Option<&[String]>,
+        route: Option<Option<usize>>,
     ) {
-        for (parameter, generation) in &activation.taken {
-            let taken = self
-                .taken
-                .entry((activation.instance.clone(), parameter.clone()))
-                .or_default();
-            *taken = (*taken).max(generation + 1);
+        let instance = activation.instance.clone();
+        self.outputs
+            .entry(instance.clone())
+            .or_default()
+            .push(output.clone());
+        if let Some(branch) = route {
+            self.given
+                .entry(instance.clone())
+                .or_default()
+                .push(activation.inputs.clone());
+            self.routes.entry(instance).or_default().push(branch);
         }
-        *self.runs.entry(activation.instance.clone()).or_default() += 1;
-        match route {
-            None => self.walk(definition, &activation.instance, output),
-            Some(route) => self.walk_routed(definition, activation, output, route),
-        }
-    }
-
-    /// A router's `output` walked along each edge out of it into an instance
-    /// `route` names, and along no other: the output, or where the edge takes
-    /// one of the router's inputs, the context the activation was given for it.
-    // @A router's edges walked where it named,IMPL_RUN_WALKS_ROUTED,impl,[CREQ_RUN_WALKS_ROUTED],[DEC_ONE_GRAPH, DEC_ROUTER_OUTPUT_IS_ITS_DECISION]
-    fn walk_routed(
-        &mut self,
-        definition: &WorkflowDefinition,
-        activation: &Activation,
-        output: &Context,
-        route: &[String],
-    ) {
-        let router = &activation.instance;
-        for consumer in definition
-            .instances
-            .iter()
-            .filter(|consumer| route.contains(&consumer.name))
-        {
-            for binding in consumer.bindings.iter().filter(|b| &b.source == router) {
-                let walked = match &binding.input {
-                    None => Some(output),
-                    Some(input) => activation
-                        .inputs
-                        .iter()
-                        .find(|(parameter, _)| parameter == input)
-                        .map(|(_, given)| given),
-                };
-                if let Some(walked) = walked {
-                    self.held
-                        .entry((consumer.name.clone(), binding.parameter.clone()))
-                        .or_default()
-                        .push(walked.clone());
-                }
-            }
-        }
-        self.latest.insert(router.clone(), output.clone());
-    }
-
-    /// `output` walked along every edge out of `instance`, as the next context
-    /// each holds, and kept as that instance's latest.
-    // @An output walked along every edge out of its instance,IMPL_RUN_WALKS_EVERY_EDGE,impl,[CREQ_RUN_WALKS_EVERY_EDGE],[DEC_EDGE_GENERATIONS]
-    fn walk(&mut self, definition: &WorkflowDefinition, instance: &str, output: &Context) {
-        for consumer in &definition.instances {
-            for binding in consumer.bindings.iter().filter(|b| b.source == instance) {
-                self.held
-                    .entry((consumer.name.clone(), binding.parameter.clone()))
-                    .or_default()
-                    .push(output.clone());
-            }
-        }
-        self.latest.insert(instance.to_owned(), output.clone());
     }
 
     /// The latest output of `instance`, when it has produced one.
     pub(crate) fn latest(&self, instance: &str) -> Option<&Context> {
-        self.latest.get(instance)
+        self.outputs.get(instance).and_then(|made| made.last())
     }
 
     /// Whether `instance` has had an activation of its own accepted.
     pub(crate) fn has_run(&self, instance: &str) -> bool {
-        self.runs.contains_key(instance)
+        self.runs(instance) > 0
     }
-}
 
-/// The instances whose output stands: those whose node type declares it, and
-/// those with no edge into them that does not stand - found as the least set
-/// closed under both, so that a cycle of instances standing only on each other
-/// does not stand.
-// @Which outputs stand,IMPL_SCHEDULER_STANDING,impl,[CREQ_SCHEDULER_STANDING_SERVES],[DEC_STANDING_OUTPUTS, DEC_ONCE_RUN_OUTPUTS_STAND]
-fn standing(definition: &WorkflowDefinition) -> HashSet<String> {
-    let declared = |instance: &NodeInstance| {
-        definition
-            .node_types
+    /// How many passes `instance` has run.
+    fn runs(&self, instance: &str) -> usize {
+        self.outputs.get(instance).map_or(0, Vec::len)
+    }
+
+    /// The pass of `router` on which it took one of `branches` for the time
+    /// numbered `nth` from 0, once it has.
+    fn taking(&self, router: &str, branches: &[usize], nth: usize) -> Option<usize> {
+        self.routes
+            .get(router)?
             .iter()
-            .find(|declared| declared.name == instance.node_type)
-            .is_some_and(|declared| declared.standing)
-    };
-    let mut standing: HashSet<String> = HashSet::new();
-    loop {
-        let before = standing.len();
-        for instance in &definition.instances {
-            if declared(instance)
-                || instance
-                    .bindings
-                    .iter()
-                    .all(|binding| standing.contains(&binding.source))
-            {
-                standing.insert(instance.name.clone());
+            .enumerate()
+            .filter(|(_, took)| took.is_some_and(|branch| branches.contains(&branch)))
+            .map(|(pass, _)| pass)
+            .nth(nth)
+    }
+
+    /// Pass `pass` of `from` as the pass of `to` it is part of, `to` enclosing
+    /// `from`, or `None` while it cannot be told yet.
+    // @A pass found on the passes enclosing it,IMPL_SCHEDULER_ENCLOSING_PASS,impl,[CREQ_SCHEDULER_READS_ENCLOSING_PASS],[DEC_PASS_CLOCKS]
+    fn pass_of(&self, from: &Clock, pass: usize, to: &Clock) -> Option<usize> {
+        let mut at = from.clone();
+        let mut pass = pass;
+        loop {
+            if at == *to {
+                return Some(pass);
+            }
+            match &at {
+                Clock::Branch { router, branches } => {
+                    let taken = self.taking(router, branches, pass)?;
+                    if let Clock::Branch {
+                        router: outside,
+                        branches: more,
+                    } = to
+                        && outside == router
+                    {
+                        // The same router's passes on a set of branches this
+                        // one is part of: counted among them.
+                        return Some(
+                            self.routes[router][..taken]
+                                .iter()
+                                .filter(|took| took.is_some_and(|b| more.contains(&b)))
+                                .count(),
+                        );
+                    }
+                    at = self.clocks.of(router).clone();
+                    pass = taken;
+                }
+                Clock::Given(_) | Clock::Cycle(_) => {
+                    at = Clock::Once;
+                    pass = 0;
+                }
+                Clock::Once | Clock::Never => return None,
             }
         }
-        if standing.len() == before {
-            return standing;
+    }
+
+    /// The context `binding` gives `instance` on its pass `pass`, or `None`
+    /// while it has none: the context made on the same pass of what the binding
+    /// carries, or on the pass enclosing it - and where the run gave the
+    /// binding its first context, that on pass 0 and the binding's after.
+    // @A binding's context of the activation's own pass,IMPL_SCHEDULER_ONE_PASS,impl,[CREQ_SCHEDULER_GIVES_ONE_PASS, CREQ_RUN_ARGUMENT_FIRST_ON_ITS_EDGE],[DEC_PASS_CLOCKS, DEC_ARGUMENT_FIRST_ON_ITS_EDGE]
+    fn input<'p>(
+        &'p self,
+        arguments: &'p Arguments,
+        instance: &NodeInstance,
+        binding: &Binding,
+        pass: usize,
+    ) -> Option<&'p Context> {
+        let edge = self.clocks.edge(&instance.name, &binding.parameter);
+        let mine = self.clocks.of(&instance.name);
+        let mut carried = self.pass_of(mine, pass, edge)?;
+        if let Some(first) = arguments.context_for(&instance.name, &binding.parameter) {
+            if carried == 0 {
+                return Some(first);
+            }
+            carried -= 1;
+        }
+        let source = binding.source.as_str();
+        let branches = match edge {
+            Clock::Given(inner) => match inner.as_ref() {
+                Clock::Branch { router, branches } if router == source => Some(branches),
+                _ => None,
+            },
+            Clock::Branch { router, branches } if router == source => Some(branches),
+            _ => None,
+        };
+        match branches {
+            Some(branches) => {
+                let taken = self.taking(source, branches, carried)?;
+                match &binding.input {
+                    None => self.outputs.get(source)?.get(taken),
+                    Some(input) => self
+                        .given
+                        .get(source)?
+                        .get(taken)?
+                        .iter()
+                        .find(|(parameter, _)| parameter == input)
+                        .map(|(_, given)| given),
+                }
+            }
+            None => self.outputs.get(source)?.get(carried),
         }
     }
 }
@@ -176,7 +185,7 @@ fn standing(definition: &WorkflowDefinition) -> HashSet<String> {
 /// declared to produce - and, for a node type a model called, which call it
 /// performs. Held by value, and told apart by instance and call rather than by
 /// an identifier of its own.
-// @An activation told apart by instance and call,TRACE_SCHEDULER_ACTIVATION,trace,[],[DEC_RUN_IS_DRIVEN, DEC_EDGE_GENERATIONS, DEC_CALL_IS_AN_ACTIVATION]
+// @An activation told apart by instance and call,TRACE_SCHEDULER_ACTIVATION,trace,[],[DEC_RUN_IS_DRIVEN, DEC_PASS_CLOCKS, DEC_CALL_IS_AN_ACTIVATION]
 #[derive(Clone, Debug)]
 pub struct Activation {
     pub(crate) instance: String,
@@ -184,9 +193,6 @@ pub struct Activation {
     pub(crate) call: Option<String>,
     pub(crate) inputs: Vec<(String, Context)>,
     pub(crate) output: ContextType,
-    /// The generation taken from each edge that gave a context not taken
-    /// before, by parameter.
-    pub(crate) taken: Vec<(String, usize)>,
 }
 
 impl Activation {
@@ -229,47 +235,49 @@ impl Activation {
 pub(crate) fn next_activation(
     definition: &WorkflowDefinition,
     arguments: &Arguments,
-    edges: &Edges,
+    passes: &Passes,
 ) -> Option<Activation> {
     definition
         .instances
         .iter()
-        .find_map(|instance| activation_for(definition, arguments, edges, instance))
+        .find_map(|instance| activation_for(definition, arguments, passes, instance))
 }
 
 /// The activation `instance` may have now, or `None` when it may not activate.
 ///
-/// Every parameter its node type declares needs a context: a bound one the
-/// earliest its edge holds that the instance has not taken, or the latest when
-/// it has taken them all and its source's output stands; one nothing binds its
-/// argument. An instance that has run needs at least one of them to be one it
-/// has not taken, so an instance with no edge into it runs once.
-// @Readiness and the activation it carries,IMPL_SCHEDULER_READY,impl,[CREQ_SCHEDULER_READY_WHEN_BOUND, CREQ_SCHEDULER_ACTIVATION_CARRIES, CREQ_SCHEDULER_TAKES_EARLIEST, CREQ_SCHEDULER_OFFERS_AGAIN],[DEC_EVERY_INPUT_REQUIRED, DEC_SIGNATURE_IS_WHAT_NOTHING_BINDS, DEC_EDGE_GENERATIONS, DEC_RUN_AGAIN_ON_SOMETHING_NEW]
+/// It is offered for its next pass once every parameter its node type
+/// declares has a context of that pass: a bound one what its binding carries
+/// for the pass, one nothing binds its argument. An instance on no pass is
+/// never offered, and one on the run's one pass once.
+// @Readiness and the activation it carries,IMPL_SCHEDULER_READY,impl,[CREQ_SCHEDULER_READY_WHEN_BOUND, CREQ_SCHEDULER_ACTIVATION_CARRIES, CREQ_SCHEDULER_OFFERS_AGAIN],[DEC_EVERY_INPUT_REQUIRED, DEC_SIGNATURE_IS_WHAT_NOTHING_BINDS, DEC_PASS_CLOCKS]
 pub(crate) fn activation_for(
     definition: &WorkflowDefinition,
     arguments: &Arguments,
-    edges: &Edges,
+    passes: &Passes,
     instance: &NodeInstance,
 ) -> Option<Activation> {
     let declared = definition
         .node_types
         .iter()
         .find(|declared| declared.name == instance.node_type)?;
+    let pass = passes.runs(&instance.name);
+    match passes.clocks.of(&instance.name) {
+        Clock::Never => return None,
+        Clock::Once if pass > 0 => return None,
+        _ => {}
+    }
 
     let mut inputs = Vec::new();
-    let mut taken = Vec::new();
     for parameter in &declared.required {
-        match filling(arguments, edges, instance, &parameter.name) {
-            Filling::New(context, generation) => {
-                inputs.push((parameter.name.clone(), context.clone()));
-                taken.push((parameter.name.clone(), generation));
-            }
-            Filling::Held(context) => inputs.push((parameter.name.clone(), context.clone())),
-            Filling::Unwired | Filling::Waiting => return None,
-        }
-    }
-    if edges.has_run(&instance.name) && taken.is_empty() {
-        return None;
+        let context = match instance
+            .bindings
+            .iter()
+            .find(|b| b.parameter == parameter.name)
+        {
+            Some(binding) => passes.input(arguments, instance, binding, pass)?,
+            None => arguments.context_for(&instance.name, &parameter.name)?,
+        };
+        inputs.push((parameter.name.clone(), context.clone()));
     }
 
     Some(Activation {
@@ -278,51 +286,7 @@ pub(crate) fn activation_for(
         call: None,
         inputs,
         output: declared.output.clone(),
-        taken,
     })
-}
-
-/// What stands where one parameter's context would.
-enum Filling<'c> {
-    /// A context its edge holds that the instance has not taken, and its
-    /// generation.
-    New(&'c Context, usize),
-    /// A context it has been given before and is given again: a standing
-    /// output, or the argument filling a parameter nothing binds.
-    Held(&'c Context),
-    /// Something will fill it and has not yet.
-    Waiting,
-    /// Nothing ever will: the definition binds nothing to it and the run was
-    /// given nothing for it.
-    Unwired,
-}
-
-/// Where one parameter of one instance gets its context, and whether it has one.
-/// A requested global context type is not a parameter and never reaches here.
-// @The earliest context not taken or the one that stands,IMPL_SCHEDULER_TAKES_EARLIEST,impl,[CREQ_SCHEDULER_TAKES_EARLIEST, CREQ_SCHEDULER_STANDING_SERVES],[DEC_EDGE_GENERATIONS, DEC_STANDING_OUTPUTS]
-fn filling<'c>(
-    arguments: &'c Arguments,
-    edges: &'c Edges,
-    instance: &NodeInstance,
-    parameter: &str,
-) -> Filling<'c> {
-    let Some(binding) = instance.bindings.iter().find(|b| b.parameter == parameter) else {
-        return match arguments.context_for(&instance.name, parameter) {
-            Some(context) => Filling::Held(context),
-            None => Filling::Unwired,
-        };
-    };
-
-    let edge = (instance.name.clone(), parameter.to_owned());
-    let held = edges.held.get(&edge).map_or(&[][..], Vec::as_slice);
-    let taken = edges.taken.get(&edge).copied().unwrap_or(0);
-    match held.get(taken) {
-        Some(context) => Filling::New(context, taken),
-        None => match held.last() {
-            Some(context) if edges.standing.contains(&binding.source) => Filling::Held(context),
-            _ => Filling::Waiting,
-        },
-    }
 }
 
 #[cfg(test)]
@@ -345,26 +309,27 @@ fn ctx(source: &mut IdSource, type_name: &str) -> Context {
 type Produced = HashMap<String, Context>;
 
 #[cfg(test)]
-impl Edges {
-    /// `output` walked out of `instance` as its own activation's, having taken
-    /// nothing.
-    fn walked(&mut self, definition: &WorkflowDefinition, instance: &str, output: &Context) {
-        *self.runs.entry(instance.to_owned()).or_default() += 1;
-        self.walk(definition, instance, output);
+impl Passes {
+    /// `output` as the next pass of `instance`, which does not route.
+    fn walked(&mut self, instance: &str, output: &Context) {
+        self.outputs
+            .entry(instance.to_owned())
+            .or_default()
+            .push(output.clone());
     }
 }
 
-/// The edges of a run of `workflow` in which each instance `produced` names has
-/// produced its context once, in the definition's order.
+/// The passes of a run of `workflow` given no argument, in which each instance
+/// `produced` names has produced its context once, in the definition's order.
 #[cfg(test)]
-fn edges_of(workflow: &WorkflowDefinition, produced: &Produced) -> Edges {
-    let mut edges = Edges::new(workflow, &Arguments::new());
+fn passes_of(workflow: &WorkflowDefinition, produced: &Produced) -> Passes {
+    let mut passes = Passes::new(workflow, &Arguments::new());
     for node in &workflow.instances {
         if let Some(output) = produced.get(&node.name) {
-            edges.walked(workflow, &node.name, output);
+            passes.walked(&node.name, output);
         }
     }
-    edges
+    passes
 }
 
 /// What `names` have produced, a fresh context of `type_name` each.
@@ -379,8 +344,7 @@ fn produced_by(source: &mut IdSource, names: &[&str], type_name: &str) -> Produc
 
 /// Whether every edge of `workflow` is one edge: no two instances share a name,
 /// and no instance binds a parameter twice. A run refuses a definition in which
-/// either happens, and an edge is an instance's parameter by name, so where
-/// they do, two wires feed one queue.
+/// either happens.
 #[cfg(test)]
 fn each_edge_once(workflow: &WorkflowDefinition) -> bool {
     let unique = |mut names: Vec<&str>| {
@@ -417,10 +381,10 @@ fn given(activation: &Activation) -> Vec<&str> {
 fn answers(workflow: &WorkflowDefinition) -> Vec<String> {
     let mut source = IdSource::new();
     let arguments = Arguments::new();
-    let mut edges = Edges::new(workflow, &arguments);
+    let mut passes = Passes::new(workflow, &arguments);
     let mut answers = Vec::new();
 
-    while let Some(activation) = next_activation(workflow, &arguments, &edges) {
+    while let Some(activation) = next_activation(workflow, &arguments, &passes) {
         assert!(
             answers.len() < 1000,
             "a definition with no arguments never repeats"
@@ -431,7 +395,7 @@ fn answers(workflow: &WorkflowDefinition) -> Vec<String> {
             given(&activation).join(",")
         ));
         let context = ctx(&mut source, "note");
-        edges.produced(workflow, &activation, &context, None);
+        passes.produced(&activation, &context, None);
     }
 
     answers.sort();
@@ -458,15 +422,28 @@ fn every_input_is_awaited() {
     // The first parameter has arrived and the second has not, so it is
     // waited for.
     let mut produced = produced_by(&mut source, &["a"], "note");
-    assert!(activation_for(&workflow, &arguments, &edges_of(&workflow, &produced), sink).is_none());
+    assert!(
+        activation_for(
+            &workflow,
+            &arguments,
+            &passes_of(&workflow, &produced),
+            sink
+        )
+        .is_none()
+    );
 
     // Once it arrives the instance is offered, and the waiting was for
     // something: both contexts are carried, in declared order.
     let may = ctx(&mut source, "note");
     let may_id = may.id();
     produced.insert("b".to_owned(), may);
-    let activation = activation_for(&workflow, &arguments, &edges_of(&workflow, &produced), sink)
-        .expect("everything bound is there");
+    let activation = activation_for(
+        &workflow,
+        &arguments,
+        &passes_of(&workflow, &produced),
+        sink,
+    )
+    .expect("everything bound is there");
     assert_eq!(given(&activation), ["must", "may"]);
     assert_eq!(activation.inputs()[1].1.id(), may_id);
 }
@@ -494,7 +471,7 @@ fn unbound_parameter_never_ready() {
         activation_for(
             &workflow,
             &Arguments::new(),
-            &edges_of(&workflow, &produced),
+            &passes_of(&workflow, &produced),
             &workflow.instances[1]
         )
         .is_none()
@@ -503,7 +480,7 @@ fn unbound_parameter_never_ready() {
     let activation = activation_for(
         &workflow,
         &Arguments::new(),
-        &edges_of(&workflow, &produced),
+        &passes_of(&workflow, &produced),
         &workflow.instances[2],
     )
     .expect("every parameter bound and filled");
@@ -522,12 +499,8 @@ fn input_is_ready_at_once() {
     let seed_id = seed.id();
     let arguments = Arguments::new().supply("e", "seed", seed);
 
-    let activation = next_activation(
-        &workflow,
-        &arguments,
-        &edges_of(&workflow, &Produced::new()),
-    )
-    .expect("an instance given its inputs is ready before anything has run");
+    let activation = next_activation(&workflow, &arguments, &Passes::new(&workflow, &arguments))
+        .expect("an instance given its inputs is ready before anything has run");
     assert_eq!(activation.instance(), "e");
     assert_eq!(given(&activation), ["seed"]);
     assert_eq!(activation.inputs()[0].1.id(), seed_id);
@@ -554,7 +527,7 @@ fn unresolved_source_never_ready() {
         next_activation(
             &workflow,
             &Arguments::new(),
-            &edges_of(&workflow, &produced)
+            &passes_of(&workflow, &produced)
         )
         .is_none()
     );
@@ -574,7 +547,7 @@ fn produced_instance_not_offered() {
         next_activation(
             &workflow,
             &arguments,
-            &edges_of(&workflow, &Produced::new())
+            &passes_of(&workflow, &Produced::new())
         )
         .is_some()
     );
@@ -582,7 +555,7 @@ fn produced_instance_not_offered() {
     // Having produced, it is not offered again, and with nothing else to offer
     // the scheduler says so rather than cycling over it for ever.
     let produced = produced_by(&mut source, &["a"], "note");
-    assert!(next_activation(&workflow, &arguments, &edges_of(&workflow, &produced)).is_none());
+    assert!(next_activation(&workflow, &arguments, &passes_of(&workflow, &produced)).is_none());
 }
 
 #[cfg(test)]
@@ -615,7 +588,7 @@ fn inputs_in_declared_order() {
     let activation = activation_for(
         &workflow,
         &Arguments::new(),
-        &edges_of(&workflow, &produced),
+        &passes_of(&workflow, &produced),
         &workflow.instances[3],
     )
     .expect("every parameter is bound and produced");
@@ -644,7 +617,7 @@ fn each_parameter_gets_its_own() {
     let activation = activation_for(
         &workflow,
         &Arguments::new(),
-        &edges_of(&workflow, &produced),
+        &passes_of(&workflow, &produced),
         &workflow.instances[2],
     )
     .expect("both are there");
@@ -671,7 +644,7 @@ fn globals_are_not_given() {
     let activation = activation_for(
         &workflow,
         &Arguments::new(),
-        &edges_of(&workflow, &produced),
+        &passes_of(&workflow, &produced),
         &workflow.instances[1],
     )
     .expect("the bound parameter is there");
@@ -701,179 +674,286 @@ fn partial_inputs_still_quiescent() {
         next_activation(
             &workflow,
             &Arguments::new(),
-            &edges_of(&workflow, &produced)
+            &passes_of(&workflow, &produced)
         )
         .is_none()
     );
 }
 
-/// The activation `name` may have now in `workflow`, given no argument.
+/// The activation `name` may have now in `workflow`.
 #[cfg(test)]
-fn offered(workflow: &WorkflowDefinition, edges: &Edges, name: &str) -> Option<Activation> {
+fn offered(
+    workflow: &WorkflowDefinition,
+    arguments: &Arguments,
+    passes: &Passes,
+    name: &str,
+) -> Option<Activation> {
     let node = workflow
         .instances
         .iter()
         .find(|node| node.name == name)
         .expect("the instance is in the workflow");
-    activation_for(workflow, &Arguments::new(), edges, node)
-}
-
-/// The identifiers an activation was given, in declared order.
-#[cfg(test)]
-fn ids(activation: &Activation) -> Vec<crate::ContextId> {
-    activation
-        .inputs()
-        .iter()
-        .map(|(_, context)| context.id())
-        .collect()
+    activation_for(workflow, arguments, passes, node)
 }
 
 #[cfg(test)]
 #[test]
-fn takes_earliest() {
+fn offered_once_per_pass() {
     let mut source = IdSource::new();
-    // Each source reads its own output, so neither stands.
+    // `x` reads its own output, the run giving it the first; `c` reads `x` and
+    // `v`, which reads nothing and runs once.
     let types = vec![
-        node_type("Again", &[("input", "note")], "note"),
-        node_type("Pair", &[("left", "note"), ("right", "note")], "note"),
-    ];
-    let instances = vec![
-        instance("x", "Again", &[("input", "x")]),
-        instance("y", "Again", &[("input", "y")]),
-        instance("c", "Pair", &[("left", "x"), ("right", "y")]),
-    ];
-    let workflow = definition(types, instances, &["c"]);
-    let mut edges = Edges::new(&workflow, &Arguments::new());
-
-    // Three contexts along the left edge, one along the right.
-    let lefts: Vec<Context> = (0..3).map(|_| ctx(&mut source, "note")).collect();
-    for left in &lefts {
-        edges.walked(&workflow, "x", left);
-    }
-    let first_right = ctx(&mut source, "note");
-    edges.walked(&workflow, "y", &first_right);
-
-    // The earliest of each, not the latest of the left.
-    let first = offered(&workflow, &edges, "c").expect("both edges hold one");
-    assert_eq!(ids(&first), [lefts[0].id(), first_right.id()]);
-    edges.produced(&workflow, &first, &ctx(&mut source, "note"), None);
-
-    // The right edge holds nothing new, so the left edge's second waits.
-    assert!(offered(&workflow, &edges, "c").is_none());
-
-    // Given another on the right, the next of each: nothing taken twice.
-    let second_right = ctx(&mut source, "note");
-    edges.walked(&workflow, "y", &second_right);
-    let second = offered(&workflow, &edges, "c").expect("both edges hold a new one");
-    assert_eq!(ids(&second), [lefts[1].id(), second_right.id()]);
-}
-
-#[cfg(test)]
-#[test]
-fn offered_again_on_something_new() {
-    let mut source = IdSource::new();
-    let types = vec![
-        node_type("Brief", &[], "note").standing(),
         node_type("Src", &[], "note"),
+        node_type("Take", &[("seed", "note")], "note"),
         node_type("Pair", &[("left", "note"), ("right", "note")], "note"),
-        node_type("Take", &[("input", "note")], "note"),
     ];
     let instances = vec![
-        instance("s", "Brief", &[]),
         instance("v", "Src", &[]),
-        instance("c", "Pair", &[("left", "s"), ("right", "v")]),
-        instance("only", "Take", &[("input", "s")]),
+        instance("x", "Take", &[("seed", "x")]),
+        instance("c", "Pair", &[("left", "v"), ("right", "x")]),
     ];
     let workflow = definition(types, instances, &["c"]);
-    let mut edges = Edges::new(&workflow, &Arguments::new());
+    let seed = ctx(&mut source, "note");
+    let arguments = Arguments::new().supply("x", "seed", seed.clone());
+    let mut passes = Passes::new(&workflow, &arguments);
+    assert_eq!(passes.unpaired(), []);
 
     // An instance reading nothing is offered once, and never again.
-    let src = offered(&workflow, &edges, "v").expect("nothing to wait for");
-    edges.produced(&workflow, &src, &ctx(&mut source, "note"), None);
+    let v = offered(&workflow, &arguments, &passes, "v").expect("nothing to wait for");
+    let v0 = ctx(&mut source, "note");
+    passes.produced(&v, &v0, None);
     for _ in 0..3 {
-        assert!(offered(&workflow, &edges, "v").is_none());
+        assert!(offered(&workflow, &arguments, &passes, "v").is_none());
     }
 
-    let brief = offered(&workflow, &edges, "s").expect("nothing to wait for");
-    edges.produced(&workflow, &brief, &ctx(&mut source, "note"), None);
+    // `x` on its first pass is given what the run gave; `c` waits for it.
+    assert!(offered(&workflow, &arguments, &passes, "c").is_none());
+    let x = offered(&workflow, &arguments, &passes, "x").expect("given its first");
+    assert!(x.inputs()[0].1.is(&seed));
+    let x0 = ctx(&mut source, "note");
+    passes.produced(&x, &x0, None);
 
-    // Offered on a standing output and a new one; then, with nothing new on
-    // the changing edge, not offered however often it is asked.
-    let first = offered(&workflow, &edges, "c").expect("both edges hold one");
-    edges.produced(&workflow, &first, &ctx(&mut source, "note"), None);
+    // `c`'s first pass: then, with nothing of a second pass, not offered
+    // however often it is asked.
+    let c = offered(&workflow, &arguments, &passes, "c").expect("its first pass");
+    assert!(c.inputs()[0].1.is(&v0) && c.inputs()[1].1.is(&x0));
+    passes.produced(&c, &ctx(&mut source, "note"), None);
     for _ in 0..3 {
-        assert!(offered(&workflow, &edges, "c").is_none());
+        assert!(offered(&workflow, &arguments, &passes, "c").is_none());
     }
 
-    // Something new on the changing edge: offered again.
-    edges.walked(&workflow, "v", &ctx(&mut source, "note"));
-    assert!(offered(&workflow, &edges, "c").is_some());
+    // `x`'s second pass is given its first's output, and `c`'s second pass the
+    // same `v` and `x`'s second.
+    let x = offered(&workflow, &arguments, &passes, "x").expect("its second pass");
+    assert!(x.inputs()[0].1.is(&x0));
+    let x1 = ctx(&mut source, "note");
+    passes.produced(&x, &x1, None);
+    let c = offered(&workflow, &arguments, &passes, "c").expect("its second pass");
+    assert!(c.inputs()[0].1.is(&v0) && c.inputs()[1].1.is(&x1));
+}
 
-    // An instance reading only a standing output is offered once, and not
-    // again on the same output.
-    let only = offered(&workflow, &edges, "only").expect("the brief is there");
-    edges.produced(&workflow, &only, &ctx(&mut source, "note"), None);
-    for _ in 0..3 {
-        assert!(offered(&workflow, &edges, "only").is_none());
+/// The instances of `workflow` with the run giving `given` their first
+/// contexts, each paired with a description of the passes it runs on.
+#[cfg(test)]
+fn unpaired_of(workflow: &WorkflowDefinition, given: &[(&str, &str)]) -> Vec<Unpaired> {
+    let mut source = IdSource::new();
+    let mut arguments = Arguments::new();
+    for &(instance, parameter) in given {
+        arguments = arguments.supply(instance, parameter, ctx(&mut source, "note"));
     }
+    Clocks::new(workflow, &arguments).unpaired().to_vec()
+}
+
+/// A review loop: `d` reads a brief and what the router `r` sends back, the
+/// run giving it its first; `r` reads the draft and names `branches`; then
+/// whatever `more` adds.
+#[cfg(test)]
+fn looping(branches: &[(&str, &[&str])], more: Vec<NodeInstance>) -> WorkflowDefinition {
+    let types = vec![
+        node_type("Src", &[], "note"),
+        node_type("Draft", &[("brief", "note"), ("feedback", "note")], "note"),
+        node_type("Route", &[("draft", "note")], "note").routing(),
+        node_type("Take", &[("input", "note")], "note"),
+        node_type("Pair", &[("left", "note"), ("right", "note")], "note"),
+    ];
+    let mut instances = vec![
+        instance("b", "Src", &[]),
+        instance("d", "Draft", &[("brief", "b"), ("feedback", "r")]),
+        instance("r", "Route", &[("draft", "d")]).branching(branches),
+    ];
+    instances.extend(more);
+    definition(types, instances, &["b"])
 }
 
 #[cfg(test)]
 #[test]
-fn standing_serves_later() {
+fn unpaired_inputs_reported() {
+    // Sound, each: a review loop sending the draft on; a node on a branch
+    // reading one made on every pass, and one made once; two instances on one
+    // branch; an instance in two branches read beside one in one of them; a
+    // cycle no router is on, given its first context; a loop given nothing,
+    // whose instances run on no pass and are reported for nothing.
+    let sound = looping(
+        &[
+            ("back", &["d", "w"]),
+            ("both", &["d", "y", "w"]),
+            ("on", &["y", "f"]),
+        ],
+        vec![
+            instance("x", "Take", &[("input", "d")]),
+            instance("y", "Take", &[]).taking("input", "r", "draft"),
+            instance("f", "Take", &[]).taking("input", "r", "draft"),
+            instance("w", "Take", &[]).taking("input", "r", "draft"),
+            instance("j", "Pair", &[("left", "x"), ("right", "y")]),
+            instance("k", "Pair", &[("left", "b"), ("right", "y")]),
+            instance("l", "Pair", &[("left", "y"), ("right", "f")]),
+            instance("n", "Pair", &[("left", "w"), ("right", "y")]),
+            instance("z", "Take", &[("input", "z")]),
+        ],
+    );
+    assert_eq!(
+        unpaired_of(&sound, &[("d", "feedback"), ("z", "input")]),
+        []
+    );
     let mut source = IdSource::new();
+    let given = Arguments::new()
+        .supply("d", "feedback", ctx(&mut source, "note"))
+        .supply("z", "input", ctx(&mut source, "note"));
+    let clocks = Clocks::new(&sound, &given);
+    let on = |branches: &[usize]| Clock::Branch {
+        router: "r".to_owned(),
+        branches: branches.to_vec(),
+    };
+    // A branch's node reading one of every pass, and one made once, runs on
+    // the branch's passes; two sets of one router's branches, on the passes
+    // of the branch both name.
+    assert_eq!(clocks.of("j"), &on(&[1, 2]));
+    assert_eq!(clocks.of("k"), &on(&[1, 2]));
+    assert_eq!(clocks.of("l"), &on(&[2]));
+    assert_eq!(clocks.of("n"), &on(&[1]));
+    assert_eq!(clocks.of("z"), &Clock::Cycle("z".to_owned()));
+    let clocks = Clocks::new(&sound, &Arguments::new());
+    assert_eq!(clocks.of("d"), &Clock::Never);
+    assert_eq!(clocks.of("j"), &Clock::Never);
+    assert_eq!(unpaired_of(&sound, &[]), []);
+
+    // A node joining two branches of one router.
+    let siblings = looping(
+        &[("back", &["d"]), ("ya", &["d", "y"]), ("za", &["d", "z"])],
+        vec![
+            instance("y", "Take", &[]).taking("input", "r", "draft"),
+            instance("z", "Take", &[]).taking("input", "r", "draft"),
+            instance("j", "Pair", &[("left", "y"), ("right", "z")]),
+        ],
+    );
+    assert_eq!(
+        unpaired_of(&siblings, &[("d", "feedback")]),
+        [Unpaired {
+            instance: "j".to_owned(),
+            inputs: vec![
+                (
+                    "left".to_owned(),
+                    "the passes on which 'r' takes 'ya'".to_owned()
+                ),
+                (
+                    "right".to_owned(),
+                    "the passes on which 'r' takes 'za'".to_owned()
+                ),
+            ],
+        }]
+    );
+
+    // The loop's drafter, on every pass of the loop, also reading one made on
+    // a branch's passes alone.
+    let mut slower = looping(
+        &[("back", &["d"]), ("side", &["d", "s"])],
+        vec![instance("s", "Take", &[]).taking("input", "r", "draft")],
+    );
+    slower.node_types.push(node_type(
+        "Draft3",
+        &[("brief", "note"), ("feedback", "note"), ("aside", "note")],
+        "note",
+    ));
+    slower.instances[1] = instance(
+        "d",
+        "Draft3",
+        &[("brief", "b"), ("feedback", "r"), ("aside", "s")],
+    );
+    let found = unpaired_of(&slower, &[("d", "feedback")]);
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert_eq!(found[0].instance, "d");
+    assert_eq!(
+        found[0].inputs,
+        [
+            ("brief".to_owned(), "the run's one pass".to_owned()),
+            (
+                "feedback".to_owned(),
+                "a context the run gives, then the passes on which 'r' takes 'back' or 'side'"
+                    .to_owned()
+            ),
+            (
+                "aside".to_owned(),
+                "the passes on which 'r' takes 'side'".to_owned()
+            ),
+        ]
+    );
+    assert!(
+        found[0]
+            .to_string()
+            .starts_with("the inputs of 'd' come on passes no one of which"),
+        "{}",
+        found[0]
+    );
+
+    // Cycles no router is on: one of two instances, given its first context,
+    // read by a third, which runs on its passes; and two such cycles, each of
+    // one instance, joined, which share none.
     let types = vec![
-        node_type("Brief", &[], "note").standing(),
-        node_type("Src", &[], "note"),
-        node_type("Given", &[("seed", "note")], "note"),
+        node_type("Take", &[("input", "note")], "note"),
         node_type("Pair", &[("left", "note"), ("right", "note")], "note"),
     ];
-    let instances = vec![
-        instance("s", "Brief", &[]),
-        instance("v", "Src", &[]),
-        instance("g", "Given", &[]),
-        instance("c", "Pair", &[("left", "s"), ("right", "v")]),
-        instance("d", "Pair", &[("left", "g"), ("right", "v")]),
-    ];
-    let workflow = definition(types, instances, &["c"]);
-    let mut edges = Edges::new(&workflow, &Arguments::new());
-
-    let first_brief = ctx(&mut source, "note");
-    edges.walked(&workflow, "s", &first_brief);
-    // g is given its input by the run and runs once; its output stands though
-    // its node type does not say so.
-    let given = ctx(&mut source, "note");
-    edges.walked(&workflow, "g", &given);
-
-    let mut passes = Vec::new();
-    for pass in 0..3 {
-        if pass == 2 {
-            // The standing node produces again, before the third pass.
-            let second_brief = ctx(&mut source, "note");
-            edges.walked(&workflow, "s", &second_brief);
-            passes.push(second_brief.id());
-        }
-        edges.walked(&workflow, "v", &ctx(&mut source, "note"));
-        let c = offered(&workflow, &edges, "c").expect("a new context on the right");
-        let d = offered(&workflow, &edges, "d").expect("a new context on the right");
-        passes.push(c.inputs()[0].1.id());
-        passes.push(d.inputs()[0].1.id());
-        edges.produced(&workflow, &c, &ctx(&mut source, "note"), None);
-        edges.produced(&workflow, &d, &ctx(&mut source, "note"), None);
-    }
-
-    let second_brief = passes[4];
+    let cycle = definition(
+        types.clone(),
+        vec![
+            instance("a", "Take", &[("input", "b")]),
+            instance("b", "Take", &[("input", "a")]),
+            instance("c", "Pair", &[("left", "a"), ("right", "b")]),
+        ],
+        &["c"],
+    );
+    assert_eq!(unpaired_of(&cycle, &[("a", "input")]), []);
+    let mut source = IdSource::new();
+    let given = Arguments::new().supply("a", "input", ctx(&mut source, "note"));
+    let clocks = Clocks::new(&cycle, &given);
+    let through_a = Clock::Cycle("a".to_owned());
     assert_eq!(
-        passes,
-        [
-            first_brief.id(),
-            given.id(),
-            first_brief.id(),
-            given.id(),
-            second_brief,
-            second_brief,
-            given.id(),
-        ]
+        [clocks.of("a"), clocks.of("b"), clocks.of("c")],
+        [&through_a, &through_a, &through_a]
+    );
+    let two = definition(
+        types,
+        vec![
+            instance("x", "Take", &[("input", "x")]),
+            instance("y", "Take", &[("input", "y")]),
+            instance("j", "Pair", &[("left", "x"), ("right", "y")]),
+        ],
+        &["j"],
+    );
+    assert_eq!(
+        unpaired_of(&two, &[("x", "input"), ("y", "input")]),
+        [Unpaired {
+            instance: "j".to_owned(),
+            inputs: vec![
+                (
+                    "left".to_owned(),
+                    "the passes of the cycle through 'x'".to_owned()
+                ),
+                (
+                    "right".to_owned(),
+                    "the passes of the cycle through 'y'".to_owned()
+                ),
+            ],
+        }]
     );
 }
 
@@ -914,7 +994,7 @@ proptest! {
         }
 
         for node in &workflow.instances {
-            let Some(activation) = activation_for(&workflow, &Arguments::new(), &edges_of(&workflow, &produced), node)
+            let Some(activation) = activation_for(&workflow, &Arguments::new(), &passes_of(&workflow, &produced), node)
             else {
                 continue;
             };
@@ -954,11 +1034,11 @@ proptest! {
         }
         let arguments = Arguments::new();
 
-        let offered = next_activation(&workflow, &arguments, &edges_of(&workflow, &produced));
+        let offered = next_activation(&workflow, &arguments, &passes_of(&workflow, &produced));
         let any_offerable = workflow
             .instances
             .iter()
-            .any(|node| activation_for(&workflow, &arguments, &edges_of(&workflow, &produced), node).is_some());
+            .any(|node| activation_for(&workflow, &arguments, &passes_of(&workflow, &produced), node).is_some());
         prop_assert_eq!(offered.is_some(), any_offerable);
 
         if let Some(activation) = offered {
@@ -968,7 +1048,7 @@ proptest! {
                     .instances
                     .iter()
                     .filter(|node| node.name == activation.instance())
-                    .any(|node| activation_for(&workflow, &arguments, &edges_of(&workflow, &produced), node).is_some())
+                    .any(|node| activation_for(&workflow, &arguments, &passes_of(&workflow, &produced), node).is_some())
             );
         }
     }

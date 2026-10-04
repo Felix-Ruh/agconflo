@@ -79,8 +79,8 @@ component requirement whose subject is anything else.
      the instance with a parameter missing.
    - **An instance offered again with nothing new.** An instance that has
      produced still has a context for everything it binds, so offering it on
-     that alone is the shape that loops forever; it runs again only on
-     something new (``CREQ_SCHEDULER_OFFERS_AGAIN``).
+     that alone is the shape that loops forever; it runs again only on its
+     next pass (``CREQ_SCHEDULER_OFFERS_AGAIN``).
 
    Must pass unoffered and unreported: an instance with no parameter bound,
    which the run gives every input and which is ready from the start.
@@ -134,7 +134,7 @@ component requirement whose subject is anything else.
      cycles forever over instances that have already run on what they were
      already given, and the budget becomes the only thing that ends it - a sound
      run reported as a runaway. An instance that has run is offerable again
-     only on something new (``CREQ_SCHEDULER_OFFERS_AGAIN``).
+     only on its next pass (``CREQ_SCHEDULER_OFFERS_AGAIN``).
    - **Reported only when no instance has any context at all.** A cycle whose
      instances each hold some of their inputs is then never quiescent.
    - **Asked of the designated instance alone.** That is the run's question, not

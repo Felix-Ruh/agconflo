@@ -79,7 +79,14 @@ repository asserts that the files contradict.
   begins. What it could not do it names on standard error; a local clone skips it.
 - **Exit 126 from a binary is group policy, not a bad download.** `[ -x ]` returns true for a
   blocked binary, so probe by running it — and ask rather than working around a block.
-- Write commit messages through a Bash heredoc. A PowerShell here-string mangles the subject line.
+- **Never put multi-line text in a shell command: no heredoc, no here-string, no multi-line
+  `python -c`.** Write the text with the Write tool to a file in the scratchpad and hand the
+  shell the file: `git commit -F <file>` for a commit message, `python <file>` for a script, the
+  Write or Edit tool for anything going into the repository. Measured in one session: every
+  Bash heredoc carrying prose or code - a commit message, a script, an `.rst` section - failed
+  with `unexpected EOF while looking for matching '` before anything ran, and `\\n` inside a
+  quoted Python string arrived as a real newline, so a replacement silently matched nothing. A
+  PowerShell here-string mangles a commit's subject line. Do not try a heredoc first.
 - Keep throwaway scripts, probes and scratch clones in the scratchpad, never in the repository.
 - Files here are LF, pinned in `.gitattributes`. Writing from Windows tooling can produce CRLF, so
   check with `git ls-files --eol` before committing.

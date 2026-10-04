@@ -6,9 +6,10 @@ use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::marker::PhantomData;
 
+use crate::clock::Unpaired;
 use crate::defect::WiringDefect;
-use crate::scheduler::{Activation, Edges, next_activation};
-use crate::workflow::{NodeType, WorkflowDefinition};
+use crate::scheduler::{Activation, Passes, next_activation};
+use crate::workflow::{Branch, NodeType, WorkflowDefinition};
 use crate::{Context, ContextId, ContextType, validate_wiring};
 
 /// The contexts a run is given when it starts, each addressed by the instance
@@ -86,6 +87,9 @@ pub enum StartRefusal {
     /// Different contexts among the arguments, or among what they were composed
     /// from, share these identifiers, each named once in the order found.
     SharedIdentifiers(Vec<ContextId>),
+    /// The inputs of these instances come on passes no one of which encloses
+    /// the rest, each named once, in the definition's order.
+    Unpaired(Vec<Unpaired>),
 }
 
 impl fmt::Display for StartRefusal {
@@ -94,6 +98,7 @@ impl fmt::Display for StartRefusal {
             Self::Wiring(defects) => ("wiring defect", defects.len()),
             Self::Signature(faults) => ("signature fault", faults.len()),
             Self::SharedIdentifiers(ids) => ("shared identifier", ids.len()),
+            Self::Unpaired(instances) => ("node whose inputs cannot be paired", instances.len()),
         };
         write!(f, "the workflow carries {count} {what}")?;
         if count != 1 {
@@ -417,6 +422,16 @@ pub enum OutputRefusal {
         /// The instance it named.
         named: String,
     },
+    /// A router named instances that are not the instances of any one branch
+    /// its instance declares.
+    NotABranch {
+        /// The router.
+        instance: String,
+        /// The instances it named, in the order named.
+        named: Vec<String>,
+        /// The branches its instance declares.
+        branches: Vec<Branch>,
+    },
 }
 
 impl fmt::Display for OutputRefusal {
@@ -453,6 +468,22 @@ impl fmt::Display for OutputRefusal {
                 write!(
                     f,
                     "{instance} named {named}, which no edge out of it enters"
+                )
+            }
+            Self::NotABranch {
+                instance,
+                named,
+                branches,
+            } => {
+                let declared: Vec<String> = branches
+                    .iter()
+                    .map(|branch| format!("{} = {}", branch.name, branch.instances.join(", ")))
+                    .collect();
+                write!(
+                    f,
+                    "{instance} named {}, which is not one of its branches: {}",
+                    named.join(", "),
+                    declared.join("; ")
                 )
             }
         }
@@ -833,9 +864,9 @@ pub(crate) enum Event {
 pub struct Run<'a, F> {
     definition: &'a WorkflowDefinition,
     arguments: Arguments,
-    /// What has been walked along each edge, and how far each instance has
-    /// taken it.
-    edges: Edges,
+    /// What each instance has produced, pass by pass, and the passes it runs
+    /// on.
+    passes: Passes,
     /// Every context the run holds - its arguments, the outputs it has
     /// accepted, and everything any of them was composed from - each under its
     /// identifier.
@@ -861,7 +892,7 @@ impl<F> fmt::Debug for Run<'_, F> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Run")
             .field("definition", &self.definition.name)
-            .field("edges", &self.edges)
+            .field("passes", &self.passes)
             .field(
                 "outstanding",
                 &self
@@ -896,11 +927,17 @@ impl<'a, F> Run<'a, F> {
             return Err(StartRefusal::Signature(faults));
         }
 
+        // @A run whose nodes cannot be given one pass's contexts does not start,IMPL_RUN_REFUSES_UNPAIRED,impl,[CREQ_RUN_REFUSES_UNPAIRED],[DEC_PAIRING_CHECKED_AT_START]
+        let passes = Passes::new(definition, &arguments);
+        if !passes.unpaired().is_empty() {
+            return Err(StartRefusal::Unpaired(passes.unpaired().to_vec()));
+        }
+
         let held = held_arguments(&arguments).map_err(StartRefusal::SharedIdentifiers)?;
 
         Ok(Self {
             definition,
-            edges: Edges::new(definition, &arguments),
+            passes,
             arguments,
             held,
             log: Vec::new(),
@@ -942,7 +979,7 @@ impl<'a, F> Run<'a, F> {
             return Step::Activate(called);
         }
 
-        match next_activation(self.definition, &self.arguments, &self.edges) {
+        match next_activation(self.definition, &self.arguments, &self.passes) {
             Some(activation) => {
                 self.outstanding = Some(InProgress::new(activation.clone()));
                 self.activations += 1;
@@ -1009,6 +1046,31 @@ impl<'a, F> Run<'a, F> {
                 .any(|declared| declared.name == activation.node_type() && declared.routes)
     }
 
+    /// The branches `router`'s instance declares.
+    fn branches_of(&self, router: &str) -> &[Branch] {
+        self.definition
+            .instances
+            .iter()
+            .find(|node| node.name == router)
+            .map_or(&[], |node| &node.branches)
+    }
+
+    /// The position of the branch of `router` naming exactly the instances
+    /// `named` names, in whatever order and however often, or `None` when no
+    /// branch does.
+    // @A route is one of the router's branches,IMPL_RUN_ROUTE_IS_A_BRANCH,impl,[CREQ_RUN_REFUSES_UNDECLARED_BRANCH],[DEC_ROUTER_BRANCHES_DECLARED]
+    fn branch_named(&self, router: &str, named: &[String]) -> Option<usize> {
+        let named: HashSet<&str> = named.iter().map(String::as_str).collect();
+        self.branches_of(router).iter().position(|branch| {
+            branch
+                .instances
+                .iter()
+                .map(String::as_str)
+                .collect::<HashSet<_>>()
+                == named
+        })
+    }
+
     /// An output checked and accepted, with the route a router named.
     fn accept(
         &mut self,
@@ -1036,6 +1098,13 @@ impl<'a, F> Run<'a, F> {
                     return Err(OutputRefusal::NoEdgeTo {
                         instance,
                         named: named.clone(),
+                    });
+                }
+                if !named.is_empty() && self.branch_named(&instance, named).is_none() {
+                    return Err(OutputRefusal::NotABranch {
+                        instance: instance.clone(),
+                        named: named.clone(),
+                        branches: self.branches_of(&instance).to_vec(),
                     });
                 }
             }
@@ -1075,12 +1144,14 @@ impl<'a, F> Run<'a, F> {
         self.held.extend(done.contexts);
         self.held.extend(brought);
         if done.activation.call().is_none() {
-            self.edges.produced(
-                self.definition,
-                &done.activation,
-                &context,
-                route.as_deref(),
-            );
+            let branch = route.as_deref().map(|named| {
+                if named.is_empty() {
+                    None
+                } else {
+                    self.branch_named(&done.activation.instance, named)
+                }
+            });
+            self.passes.produced(&done.activation, &context, branch);
         }
         self.log.push(Event::Output {
             activation: done.activation,
@@ -1180,7 +1251,6 @@ impl<'a, F> Run<'a, F> {
             call: Some(call.id),
             inputs,
             output: declared.output.clone(),
-            taken: Vec::new(),
         };
 
         let Some(mut caller) = self.outstanding.take() else {
@@ -1305,7 +1375,7 @@ impl<'a, F> Run<'a, F> {
     // @Completion is the designated output alone,TRACE_RUN_RESULT,trace,[],[DEC_COMPLETION_IS_DESIGNATED_OUTPUT]
     fn result(&self) -> Option<Context> {
         let designated = self.definition.designated_outputs.first()?;
-        self.edges.latest(designated).cloned()
+        self.passes.latest(designated).cloned()
     }
 
     /// Every instance that has produced nothing, in the order the definition
@@ -1314,7 +1384,7 @@ impl<'a, F> Run<'a, F> {
         self.definition
             .instances
             .iter()
-            .filter(|node| !self.edges.has_run(&node.name))
+            .filter(|node| !self.passes.has_run(&node.name))
             .map(|node| node.name.clone())
             .collect()
     }
@@ -1963,7 +2033,8 @@ fn branching() -> WorkflowDefinition {
     let instances = vec![
         instance("d", "Src", &[]),
         instance("w", "Src", &[]),
-        instance("r", "route", &[("draft", "d"), ("review", "w")]),
+        instance("r", "route", &[("draft", "d"), ("review", "w")])
+            .branching(&[("revise", &["revise"]), ("both", &["close", "revise"])]),
         instance("revise", "revise", &[("verdict", "r")]).taking("draft", "r", "draft"),
         instance("close", "Take", &[]).taking("seed", "r", "review"),
         instance("never", "Take", &[("seed", "never")]),
@@ -2080,6 +2151,316 @@ fn bad_route_refused() {
         })
     );
     assert_eq!(offered(&mut run).instance(), "d");
+}
+
+#[cfg(test)]
+#[test]
+fn route_not_a_branch_refused() {
+    let workflow = branching();
+    let mut source = IdSource::new();
+    let (mut run, draft, _) = at_the_router(&workflow, &mut source);
+
+    // Each instance an edge enters, and together not a branch: refused naming
+    // what was named and the branches declared, and nothing walked.
+    let refused = run
+        .routed(ctx(&mut source, "note"), vec!["close".to_owned()])
+        .expect_err("close alone is no branch");
+    assert_eq!(
+        refused,
+        OutputRefusal::NotABranch {
+            instance: "r".to_owned(),
+            named: vec!["close".to_owned()],
+            branches: workflow.instances[2].branches.clone(),
+        }
+    );
+    assert_eq!(
+        refused.to_string(),
+        "r named close, which is not one of its branches: revise = revise; both = close, revise"
+    );
+    assert_eq!(offered(&mut run).instance(), "r");
+
+    // A branch named in another order, one instance twice, is that branch.
+    run.routed(
+        ctx(&mut source, "note"),
+        vec!["revise".to_owned(), "close".to_owned(), "revise".to_owned()],
+    )
+    .expect("the branch both");
+    let mut offered_next = Vec::new();
+    for _ in 0..2 {
+        let next = offered(&mut run);
+        offered_next.push(next.instance().to_owned());
+        if next.instance() == "revise" {
+            assert!(next.inputs()[1].1.is(&draft));
+        }
+        run.produced(ctx(&mut source, "note"))
+            .expect("of the declared type");
+    }
+    offered_next.sort();
+    assert_eq!(offered_next, ["close", "revise"]);
+}
+
+/// A review loop with a branch beside it: `d` drafts from a brief and what the
+/// router `r` sends back, the run giving it its first; `x` and `s` read every
+/// draft; `r` sends it `back` to `d`, `both` back and to `y`, or `on` to `f`
+/// and `y`; `j` joins `x` and `y`, `m` the draft and `s`, `g` the `y` and
+/// `f` of the pass the loop ends on; and `never` reads only itself, so a run
+/// ends quiescent once everything else is done.
+#[cfg(test)]
+fn branching_loop() -> WorkflowDefinition {
+    let types = vec![
+        node_type("Src", &[], "note"),
+        node_type("Draft", &[("brief", "note"), ("feedback", "note")], "note"),
+        node_type("Route", &[("draft", "note")], "note").routing(),
+        node_type("Take", &[("input", "note")], "note"),
+        node_type("Pair", &[("left", "note"), ("right", "note")], "note"),
+    ];
+    let instances = vec![
+        instance("b", "Src", &[]),
+        instance("d", "Draft", &[("brief", "b"), ("feedback", "r")]),
+        instance("x", "Take", &[("input", "d")]),
+        instance("s", "Take", &[("input", "d")]),
+        instance("r", "Route", &[("draft", "d")]).branching(&[
+            ("back", &["d"]),
+            ("both", &["d", "y"]),
+            ("on", &["f", "y"]),
+        ]),
+        instance("y", "Take", &[]).taking("input", "r", "draft"),
+        instance("f", "Take", &[]).taking("input", "r", "draft"),
+        instance("j", "Pair", &[("left", "x"), ("right", "y")]),
+        instance("m", "Pair", &[("left", "d"), ("right", "s")]),
+        instance("g", "Pair", &[("left", "y"), ("right", "f")]),
+        instance("never", "Take", &[("input", "never")]),
+    ];
+    definition(types, instances, &["never"])
+}
+
+/// What a run of `branching_loop` did: each activation's instance with, for
+/// each input, the pass of `d` it was made from, `None` for one made from no
+/// draft.
+#[cfg(test)]
+type Seen = Vec<(String, Vec<Option<usize>>)>;
+
+/// Where a drive of `branching_loop` stopped: what it saw, the record when it
+/// stopped short of the ending, the identifier source, and the pass of `d`
+/// each context was made from.
+#[cfg(test)]
+type Driven = (
+    Seen,
+    Option<String>,
+    IdSource,
+    HashMap<ContextId, Option<usize>>,
+);
+
+/// `branching_loop` run with the router choosing `routes`, one a pass -
+/// `back`, `both`, `on` or nothing, and nothing once they run out - to its
+/// ending, or until `stop_after` activations.
+#[cfg(test)]
+fn drive_loop(
+    workflow: &WorkflowDefinition,
+    routes: &[Option<&str>],
+    stop_after: Option<usize>,
+) -> Driven {
+    let mut source = IdSource::new();
+    let arguments = Arguments::new().supply("d", "feedback", ctx(&mut source, "note"));
+    let run = Run::<()>::start(workflow, arguments, 200).expect("it starts");
+    continue_loop(run, source, routes, stop_after, Vec::new(), HashMap::new())
+}
+
+/// `drive_loop` from a run already under way, having seen `seen`.
+#[cfg(test)]
+fn continue_loop(
+    mut run: Run<'_, ()>,
+    mut source: IdSource,
+    routes: &[Option<&str>],
+    stop_after: Option<usize>,
+    mut seen: Seen,
+    mut made_from: HashMap<ContextId, Option<usize>>,
+) -> Driven {
+    let branch = |name: &str| -> Vec<String> {
+        match name {
+            "back" => vec!["d".to_owned()],
+            "both" => vec!["y".to_owned(), "d".to_owned()],
+            _ => vec!["f".to_owned(), "y".to_owned()],
+        }
+    };
+    loop {
+        if stop_after.is_some_and(|stop| seen.len() == stop) {
+            let record = run.record(&source);
+            return (seen, Some(record), source, made_from);
+        }
+        match run.step() {
+            Step::Ended(_) => return (seen, None, source, made_from),
+            Step::Activate(activation) => {
+                let instance = activation.instance().to_owned();
+                let drafts: Vec<Option<usize>> = activation
+                    .inputs()
+                    .iter()
+                    .map(|(_, given)| made_from.get(&given.id()).copied().flatten())
+                    .collect();
+                let passes = seen.iter().filter(|(name, _)| *name == instance).count();
+                let output = ctx(&mut source, "note");
+                let from = match instance.as_str() {
+                    "d" => Some(passes),
+                    _ => drafts.iter().copied().flatten().next(),
+                };
+                made_from.insert(output.id(), from);
+                seen.push((instance.clone(), drafts));
+                if instance == "r" {
+                    let named = routes
+                        .get(passes)
+                        .copied()
+                        .flatten()
+                        .map_or(Vec::new(), branch);
+                    run.routed(output, named).expect("a branch");
+                } else {
+                    run.produced(output).expect("of the declared type");
+                }
+            }
+        }
+    }
+}
+
+/// What `name` was given on each of its passes, as the passes of `d` its
+/// inputs were made from.
+#[cfg(test)]
+fn passes_of_instance(seen: &Seen, name: &str) -> Vec<Vec<Option<usize>>> {
+    seen.iter()
+        .filter(|(instance, _)| instance == name)
+        .map(|(_, drafts)| drafts.clone())
+        .collect()
+}
+
+#[cfg(test)]
+#[test]
+fn branch_reads_its_own_pass() {
+    let workflow = branching_loop();
+    // Back, then back and to `y`, then nowhere: `y` runs on the second pass
+    // only, and `j` beside it is given the `x` of that pass, not the first.
+    let routes = [Some("back"), Some("both"), None];
+    let (seen, _, _, _) = drive_loop(&workflow, &routes, None);
+    assert_eq!(passes_of_instance(&seen, "y"), [vec![Some(1)]]);
+    assert_eq!(passes_of_instance(&seen, "j"), [vec![Some(1), Some(1)]]);
+    assert_eq!(
+        passes_of_instance(&seen, "x"),
+        [vec![Some(0)], vec![Some(1)], vec![Some(2)]]
+    );
+    assert!(passes_of_instance(&seen, "f").is_empty());
+
+    // Resumed from a record taken after `y` and before `j`, the run goes on
+    // exactly as it did.
+    let stop = seen
+        .iter()
+        .position(|(instance, _)| instance == "j")
+        .expect("j ran");
+    let (before, record, _, made_from) = drive_loop(&workflow, &routes, Some(stop));
+    let (resumed, source) =
+        Run::<()>::resume(&workflow, &record.expect("stopped short")).expect("it resumes");
+    let (after, _, _, _) = continue_loop(resumed, source, &routes, None, before, made_from);
+    assert_eq!(after, seen);
+}
+
+#[cfg(test)]
+#[test]
+fn unpaired_run_refused() {
+    // `j` joining `k`, sent the draft when it goes back alone, and `f`, sent
+    // it when the loop ends - two branches no route takes together: refused
+    // before anything runs, naming it and the passes of each of its inputs.
+    let mut workflow = branching_loop();
+    workflow.instances[4] = instance("r", "Route", &[("draft", "d")]).branching(&[
+        ("back", &["d", "k"]),
+        ("both", &["d", "y"]),
+        ("on", &["f", "y"]),
+    ]);
+    workflow.instances[7] = instance("j", "Pair", &[("left", "k"), ("right", "f")]);
+    workflow
+        .instances
+        .push(instance("k", "Take", &[]).taking("input", "r", "draft"));
+    let mut source = IdSource::new();
+    let arguments = Arguments::new().supply("d", "feedback", ctx(&mut source, "note"));
+    let refused = Run::<()>::start(&workflow, arguments, 200).expect_err("j has no pass");
+    assert_eq!(
+        refused,
+        StartRefusal::Unpaired(vec![crate::Unpaired {
+            instance: "j".to_owned(),
+            inputs: vec![
+                (
+                    "left".to_owned(),
+                    "the passes on which 'r' takes 'back'".to_owned()
+                ),
+                (
+                    "right".to_owned(),
+                    "the passes on which 'r' takes 'on'".to_owned()
+                ),
+            ],
+        }])
+    );
+    assert_eq!(
+        refused.to_string(),
+        "the workflow carries 1 node whose inputs cannot be paired"
+    );
+
+    // The control: the same workflow given nothing for the loop is not
+    // refused, its loop running on no pass, as before.
+    assert!(Run::<()>::start(&workflow, Arguments::new(), 200).is_ok());
+}
+
+#[cfg(test)]
+proptest! {
+    /// Whatever the router chooses, every activation of a node reading two
+    /// inputs is given both from one pass of the loop, and the order the
+    /// definition carries its instances in changes nothing any activation is
+    /// given.
+    #[test]
+    fn passes_ignore_instance_order(
+        choices in proptest::collection::vec(0..4usize, 0..5),
+        rotation in 0..10usize,
+    ) {
+        let routes: Vec<Option<&str>> = choices
+            .iter()
+            .map(|&choice| ["back", "both", "on"].get(choice).copied())
+            .collect();
+        let workflow = branching_loop();
+        let (seen, _, _, _) = drive_loop(&workflow, &routes, None);
+
+        // The loop goes round while the router sends the draft back, `j` runs
+        // once for each time it sent it to `y` as well, and `g` once if the
+        // loop ended sending it on: what follows is asked of every one of
+        // those passes, and of none that did not happen.
+        let looped = routes
+            .iter()
+            .take_while(|choice| matches!(choice, Some("back" | "both")));
+        let both = looped.filter(|choice| **choice == Some("both")).count();
+        let ended_on = routes
+            .iter()
+            .find(|choice| !matches!(choice, Some("back" | "both")))
+            == Some(&Some("on"));
+        prop_assert_eq!(
+            passes_of_instance(&seen, "j").len(),
+            both + usize::from(ended_on)
+        );
+        prop_assert_eq!(passes_of_instance(&seen, "g").len(), usize::from(ended_on));
+        prop_assert_eq!(
+            passes_of_instance(&seen, "m").len(),
+            passes_of_instance(&seen, "d").len()
+        );
+
+        for pair in ["j", "m", "g"] {
+            for drafts in passes_of_instance(&seen, pair) {
+                prop_assert_eq!(drafts[0], drafts[1], "{} given two passes", pair);
+            }
+        }
+
+        let mut reordered = workflow.clone();
+        reordered.instances.reverse();
+        let length = reordered.instances.len();
+        reordered.instances.rotate_left(rotation % length);
+        let (again, _, _, _) = drive_loop(&reordered, &routes, None);
+        let sorted = |mut seen: Seen| {
+            seen.sort();
+            seen
+        };
+        prop_assert_eq!(sorted(seen), sorted(again));
+    }
 }
 
 #[cfg(test)]
