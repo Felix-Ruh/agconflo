@@ -188,6 +188,23 @@ from.
    Catches: the context placed after what was walked first; the context given
    for every pass; its type taken from elsewhere.
 
+.. test_case:: A router reading its own output starts from the first context it declares
+   :id: TEST_RUN_ROUTER_READS_ITS_OWN_OUTPUT
+   :verifies: CREQ_SCHEDULER_GIVES_FIRST, FEAT_FIRST_CONTEXT_DECLARED
+   :test_kind: positive
+   :coverage: partial
+
+   The first development workflow's shape: a router reading a goal and its
+   own output, declaring ``start`` as its first context, going round by
+   naming itself and on by naming the output's instance. Its first pass is
+   given ``start``, each pass after the output of the pass before, and the
+   output's instance the goal once the router names it; the run completes.
+   The control: declaring no first context, the router alone is reported as
+   a cycle nothing starts.
+
+   Catches: the context placed after what was walked first, where what is
+   walked is the router's own output.
+
 .. test_case:: An argument for a parameter a binding fills is refused
    :id: TEST_RUN_ARGUMENT_FOR_BOUND_PARAMETER_REFUSED
    :verifies: CREQ_RUN_REFUSES_UNFILLED_SIGNATURE

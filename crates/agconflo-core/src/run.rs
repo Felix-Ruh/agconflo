@@ -2093,6 +2093,72 @@ fn argument_for_bound_parameter_refused() {
 
 #[cfg(test)]
 #[test]
+fn router_reads_its_own_output() {
+    let mut source = IdSource::new();
+    let types = vec![
+        node_type("Src", &[], "note"),
+        node_type("Judge", &[("goal", "note"), ("previous", "note")], "note").routing(),
+        node_type("Take", &[("input", "note")], "note"),
+    ];
+    // A router reading its own output, declaring its first context, going
+    // round again by naming itself and on by naming `out`.
+    let instances = vec![
+        instance("g", "Src", &[]),
+        instance("judge", "Judge", &[("goal", "g"), ("previous", "judge")])
+            .first("previous", "start")
+            .branching(&[("again", &["judge"]), ("done", &["out"])]),
+        instance("out", "Take", &[]).taking("input", "judge", "goal"),
+    ];
+    let workflow = definition(types, instances, &["out"]);
+    assert_eq!(validate_wiring(&workflow), Vec::new());
+
+    let mut run = Run::<Infallible>::start(&workflow, Arguments::new(), 20, &mut source)
+        .expect("a loop its first context starts");
+    let goal = ctx(&mut source, "note");
+    assert_eq!(offered(&mut run).instance(), "g");
+    run.produced(goal.clone()).expect("the goal");
+
+    // Each pass of the judge is given the goal and the judge's output of the
+    // pass before - the declared text on its first.
+    let mut made: Vec<Context> = Vec::new();
+    for pass in 0..3 {
+        let judged = offered(&mut run);
+        assert_eq!(judged.instance(), "judge");
+        assert!(judged.inputs()[0].1.is(&goal));
+        let previous = &judged.inputs()[1].1;
+        match pass {
+            0 => assert_eq!(previous.render(), "start"),
+            _ => assert!(previous.is(&made[pass - 1])),
+        }
+        let output = ctx(&mut source, "note");
+        made.push(output.clone());
+        let route = if pass < 2 { "judge" } else { "out" };
+        run.routed(output, vec![route.to_owned()])
+            .expect("a branch");
+    }
+
+    // Once it names `out`, `out` is given the goal the judge was given, and
+    // the run completes.
+    let last = offered(&mut run);
+    assert_eq!(last.instance(), "out");
+    assert!(last.inputs()[0].1.is(&goal));
+    run.produced(ctx(&mut source, "note")).expect("the result");
+    assert!(matches!(run.step(), Step::Ended(RunEnding::Completed(_))));
+
+    // The control: declaring no first context, the judge is a cycle nothing
+    // starts.
+    let mut unstarted = workflow.clone();
+    unstarted.instances[1].bindings[1].first = None;
+    assert_eq!(
+        validate_wiring(&unstarted),
+        vec![WiringDefect::CycleUnstarted {
+            instances: vec!["judge".to_owned()],
+        }]
+    );
+}
+
+#[cfg(test)]
+#[test]
 fn first_from_exhausted_source_refused() {
     let types = vec![node_type("Take", &[("seed", "note")], "note")];
     let declaring = definition(

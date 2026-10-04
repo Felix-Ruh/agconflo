@@ -2235,6 +2235,15 @@
           "title": "agconflo-core run::routed_walks_chosen",
           "type": "test_run"
         },
+        "RUN_RUN_ROUTER_READS_ITS_OWN_OUTPUT": {
+          "executes": [
+            "TEST_RUN_ROUTER_READS_ITS_OWN_OUTPUT"
+          ],
+          "id": "RUN_RUN_ROUTER_READS_ITS_OWN_OUTPUT",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::router_reads_its_own_output",
+          "type": "test_run"
+        },
         "RUN_RUN_ROUTE_NOT_A_BRANCH_REFUSED": {
           "executes": [
             "TEST_RUN_ROUTE_NOT_A_BRANCH_REFUSED"

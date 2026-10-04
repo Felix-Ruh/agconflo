@@ -920,7 +920,7 @@ fn unpaired_inputs_reported() {
         found[0]
     );
 
-    // Cycles no router is on: one of two instances, given its first context,
+    // Cycles no router is on: one of two instances, declaring its first context,
     // read by a third, which runs on its passes; and two such cycles, each of
     // one instance, joined, which share none.
     let types = vec![
