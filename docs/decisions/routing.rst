@@ -17,6 +17,10 @@ What they do not settle is named here: the score and yes-or-no questions the
 decisions model also answers, and a stuck run's report telling an instance on
 a branch not taken from one that cannot proceed.
 
+The last, taken on 2026-10-04, makes a router's branches part of its
+instance's declaration, so that the passes each branch runs on are known
+before a run starts.
+
 .. dec:: A decision is a model call, recorded as an exchange offering nothing
    :id: DEC_DECISION_IS_A_MODEL_CALL
    :dec_status: accepted
@@ -205,3 +209,35 @@ a branch not taken from one that cannot proceed.
    edges a router walked has to be there too. Beside its output, in the same
    entry, because the two are one act of the router's and a record holding
    one without the other is not a record of it.
+
+.. dec:: A router's instance declares its branches, and a route names one of them
+   :id: DEC_ROUTER_BRANCHES_DECLARED
+   :dec_status: accepted
+   :decided_on: 2026-10-04
+   :supported_by: EVD_RECORD_GOALS_NEEDS_BRANCHES
+   :statement: Agconflo shall have a router's instance declare its branches, each a named set of the instances its edges enter, and refuse a route naming instances that are not one of those sets.
+
+   Which instances a router names together decides which of them run on the
+   same passes (``DEC_PASS_CLOCKS``), and a script naming them while the run
+   goes says it too late for the run to be checked before it starts. Taken
+   one instance at a time, every instance a router names would run on passes
+   of its own, and a node reading two of them could be given no pass: the
+   first development workflow is refused that way, and accepted with its
+   router's two branches as its script names them
+   (``EVD_RECORD_GOALS_NEEDS_BRANCHES``).
+
+   They are declared in the workflow document, on the router's instance,
+   because the instances a branch names are that workflow's:
+   ``branches = { again = ["head", "judge"], done = ["approval"] }``. Every
+   instance an edge out of the router enters is in a branch, a branch names
+   no instance no edge out of it enters, and no two branches name the same
+   instances, so a route picks out one branch. Naming nothing is not a
+   branch, and stays allowed: the run goes nowhere from there.
+
+   A route still names instances, as ``FEAT_ROUTE_WALKS_CHOSEN_EDGES`` and
+   ``FEAT_PERSON_ROUTES`` have it, and the record keeps the names it always
+   did; the run refuses a set that is not a declared branch, as it refuses a
+   name no edge enters. Naming the branch instead, ``host.route('again')``,
+   was the alternative: shorter to write, and a change to two requirements
+   that are right for their own parents, to the record and to every script
+   and answer that routes, for a name the run can find from the instances.

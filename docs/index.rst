@@ -102,3 +102,4 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    evidence/tools
    evidence/yield
    evidence/routing
+   evidence/repetition
