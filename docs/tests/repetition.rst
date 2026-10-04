@@ -102,10 +102,11 @@ from.
 
    The review loop with its join reading two branches no route takes
    together: the run is refused before it starts, naming the join and the
-   passes of both its inputs. The same workflow given nothing for its loop,
-   whose nodes then run on no pass, starts - the control.
+   passes of both its inputs, in its message as well. The same workflow given
+   nothing for its loop, whose nodes then run on no pass, starts - the control.
 
-   Catches: the run started; the first such instance named and the rest left.
+   Catches: the run started; the first such instance named and the rest left;
+   the instances counted in the message and not named.
 
 .. test_case:: An output goes to every instance reading it, pass by pass
    :id: TEST_RUN_OUTPUT_WALKS_EVERY_EDGE

@@ -526,14 +526,16 @@ catches it.
    :test_kind: error_path
    :coverage: full
 
-   A manifest with a fault at line 3, column 5, and a run whose second node's
-   script raises an error after the first produced its output. Standard
-   output is empty for both; standard error names the manifest's file, line
-   and column for the first, and the failing instance and its message for the
-   second.
+   A manifest with a fault at line 3, column 5, a run whose second node's
+   script raises an error after the first produced its output, and a run given
+   nothing for its first node's parameter. Standard output is empty for all
+   three; standard error names the manifest's file, line and column for the
+   first, the failing instance and its message for the second, and the
+   instance and parameter for the third.
 
-   Catches: a refusal printed without where it is; a node's failure printed
-   without which node; part of a result printed before the failure.
+   Catches: a refusal printed without where it is; a refusal at the run's
+   start printed as a count; a node's failure printed without which node; part
+   of a result printed before the failure.
 
 .. test_case:: A record not kept is named on standard error beside the result
    :id: TEST_COMMAND_UNKEPT_RECORD_TOLD

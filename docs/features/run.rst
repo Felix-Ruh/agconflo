@@ -378,8 +378,9 @@ and names the components they are divided between, which are defined in
    - ``DEC_COMPLETION_IS_DESIGNATED_OUTPUT``: completion and quiescence are both
      questions about the designated output rather than about the graph.
    - ``DEC_ACTIVATION_ONCE_PER_RUN``, since superseded by
-     ``DEC_EDGE_GENERATIONS``: no instance activated twice, so the scheduler
-     needed no activation tag and the run no epoch.
+     ``DEC_EDGE_GENERATIONS`` and then by ``DEC_PASS_CLOCKS``: no instance
+     activated twice, so the scheduler needed no activation tag and the run
+     no epoch.
    - ``DEC_REFUSED_OUTPUT_OUTSTANDING``: an output the run refuses leaves its
      activation outstanding, so the four endings stay closed and the caller
      answers again or reports a failure of its own.

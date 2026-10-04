@@ -198,12 +198,18 @@ and what it turned down.
    :statement: Agconflo shall accept a workflow whose edges form a cycle and repeat part of a workflow only by walking its edges again, with no loop construct.
 
    What ``DEC_BACK_EDGES_ALLOWED`` decided stands: retrying a step until a test
-   passes is an ordinary pipeline, a cycle is legal, and reachability is asked
-   from the entry nodes. What it kept as a fallback does not: there is no loop,
-   no scope, and no iteration counter. An edge pointing back to a node that has
-   run is an edge like any other, and walking it again is all repetition is.
-   The counter a loop scope would have owned is the generation each edge keeps
-   (``DEC_EDGE_GENERATIONS``).
+   passes is an ordinary pipeline, and a cycle is legal. What it kept as a
+   fallback does not: there is no loop, no scope, and no iteration counter. An
+   edge pointing back to a node that has run is an edge like any other, and
+   walking it again is all repetition is. What a loop scope's counter would
+   have said - which pass a context belongs to - the wiring says instead,
+   before the run starts (``DEC_PASS_CLOCKS``); it was first said by a
+   generation each edge kept (``DEC_EDGE_GENERATIONS``).
+
+   Its predecessor also had reachability asked from the entry nodes. There are
+   no entry nodes (``DEC_SIGNATURE_IS_WHAT_NOTHING_BINDS``), and the wiring
+   validator asks no question of reachability: a cycle nothing outside it
+   feeds is legal, and which passes it runs on is ``DEC_PASS_CLOCKS``'s to say.
 
    Drawn, such a workflow shows its data flow and nothing else: every edge is a
    context's path. The maintainer chose it over the loop scope for the reason
@@ -220,8 +226,8 @@ and what it turned down.
    ``DEC_IMPLIED_CONTROL_EDGES`` kept explicit control edges for four cases and
    ``DEC_ROUTING_SEPARATE_FROM_CONTROL`` kept the path a context takes apart
    from the order nodes run in: two graphs over one definition. There is now
-   one. A node runs when its edges hold what it needs (``DEC_EDGE_GENERATIONS``),
-   and that is the whole of when.
+   one. A node runs when its edges hold what it needs for its next pass
+   (``DEC_PASS_CLOCKS``), and that is the whole of when.
 
    The four cases each need no graph of their own. An entry node is an
    instance with parameters nothing binds, which the run is given
@@ -234,7 +240,7 @@ and what it turned down.
    to walk, and the contexts walked along them are the ones it was given,
    unchanged, so a routed context's provenance is its producer's
    (``STKH_ONE_OUTPUT``: deciding where something goes is apart from producing
-   it). A branch no router walks receives no generation, and its nodes do not
+   it). A branch no router takes gives its nodes no pass, and they do not
    run; a run already completes whatever instances have not
    (``DEC_COMPLETION_IS_DESIGNATED_OUTPUT``).
 
@@ -254,7 +260,7 @@ and what it turned down.
 
    It also settles what ``DEC_BINDING_IS_AWAITED`` had to argue for: with
    nothing optional, every edge into a node is waited for without an
-   exception to reason about (``DEC_EDGE_GENERATIONS``). Optional parameters
+   exception to reason about (``DEC_PASS_CLOCKS``). Optional parameters
    were removed from the code, the readers and the requirements' bodies in a
    change of their own, which also refuses a document still declaring them
    (``DEC_OPTIONAL_PARAMETERS_REFUSED``).

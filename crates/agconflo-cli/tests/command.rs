@@ -516,6 +516,11 @@ fn failure_on_standard_error() {
         "{err}"
     );
 
+    // Refused at its start: the parameter given nothing is named.
+    let (status, out, err) = scratch.ran(&["run", "manifest.toml", "--record", "unfilled.toml"]);
+    assert_eq!((status, out.as_str()), (4, ""));
+    assert!(err.contains("first.brief"), "{err}");
+
     scratch.write(
         "manifest.toml",
         "workflow = \"flow.toml\"\nbudget = 2\n    = 1\n",

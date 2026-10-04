@@ -234,12 +234,15 @@ to leave every one of them open.
    repetition starts: a drafter reading the draft its router sends back has
    nothing on that edge before the router has run, which needs the drafter
    to have run first. Given an empty draft, the first pass has what it needs,
-   and each pass after takes what the router walked (``DEC_EDGE_GENERATIONS``).
+   and each pass after takes what the router walked.
 
-   Its place is fixed, not the order things happened in: it is generation 0
-   of that edge even when the binding's source produced before the instance
-   ran, so what a pass is given does not depend on the order of the
-   definition's instances.
+   Its place is fixed, not the order things happened in: it is the binding's
+   pass 0, and the passes of what the binding carries are its passes 1
+   onward (``DEC_PASS_CLOCKS``), even when the binding's source produced before
+   the instance ran, so what a pass is given does not depend on the order of
+   the definition's instances. It was first written against per-edge
+   generations (``DEC_EDGE_GENERATIONS``), where it was generation 0 of its
+   edge.
 
    A key on the binding naming an instance to take the first context from was
    the alternative the planning started with, and needs a node whose only
