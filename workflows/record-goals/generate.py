@@ -9,11 +9,12 @@ import json, os
 OUT = os.path.dirname(os.path.abspath(__file__))
 UBC_IMAGE = "@UBC_IMAGE@"
 
-types = {}      # name -> dict(req, desc, routes, standing)
+types = {}      # name -> dict(req, desc, routes)
 instances = []  # (name, node_type, bindings, calls, kind, stage)
 scripts = {}
 roles = set()
-arguments = []  # (instance, parameter, text): what a run is started with
+firsts = {}     # (instance, parameter) -> text: the first context a loop's binding declares
+branches = {}   # router instance -> {branch: [the instances a route taking it goes on to]}
 
 TOOLS = {
     "run_command": ({"command": "note"}, "Run a shell command with sh in /work: busybox tools and git. The repository is at repo/."),
@@ -70,9 +71,9 @@ def model(name, stage, instruction, inputs, calls=(), role="drafting", selfcheck
     instances.append((name, t, inputs, list(calls), "model", stage))
 
 
-def script(name, stage, lua_body, inputs, kind="check", standing=False):
+def script(name, stage, lua_body, inputs, kind="check"):
     t = "s_" + name
-    types[t] = dict(req=list(inputs), standing=standing)
+    types[t] = dict(req=list(inputs))
     scripts[t] = "local given, host = ...\n" + lua_body
     instances.append((name, t, dict(inputs), [], kind, stage))
 
@@ -198,7 +199,7 @@ local ws = lines(given.given_stakeholders:render())
 return host.text(host.output, "GOAL " .. k .. " OF " .. #ss .. "\nPASS " .. p .. "\nSTAGE " .. stage ..
   "\nSTATEMENT: " .. (ss[k] or "") .. "\nSTAKEHOLDER GIVEN: " .. trim(ws[k] or "unset") .. "\nFEEDBACK:\n" .. fb)
 ''', {"state": "judge", "statements": "statements", "given_stakeholders": "given_stakeholders"}, kind="head")
-arguments.append(("head", "state", "goal 1\npass 1\nstage no\nfeedback:\n"))
+firsts[("head", "state")] = "goal 1\npass 1\nstage no\nfeedback:\n"
 
 GOAL_OF = r'''local g = given.goal:render()
 local statement = g:match("STATEMENT: ([^\n]*)") or ""
@@ -606,7 +607,8 @@ return host.text(host.output, "accept goal " .. k .. " (pass " .. p .. "): " .. 
 ''', {"goal": "head", "previous": "judge", "ubc": "ubc", "closing": "closing", "claims": "claims", "relations": "relations",
       "diff": "diff", "brief": "brief", "rules": "rules", "note": "note"}, kind="router")
 types["s_judge"]["routes"] = True
-arguments.append(("judge", "previous", "start\nnotes:\n\nfeedback:\n"))
+firsts[("judge", "previous")] = "start\nnotes:\n\nfeedback:\n"
+branches["judge"] = {"again": ["head", "judge"], "done": ["cmd_fin", "describe", "approval"]}
 
 # ---- C: the whole change -------------------------------------------------------------------------
 command("fin", "final", 'return host.text(host.output, "git -C repo add -A && git -C repo status --porcelain")\n', {"verdict": "judge"})
@@ -646,7 +648,7 @@ for name, (params, desc) in TOOLS.items():
     types[name] = dict(req=list(params), desc=desc)
 types["approve"] = dict(req=["description", "final", "verdict"], desc="A person reads the proposed pull request and approves it or not. Nothing is published or merged: the run is a test.")
 
-with open(os.path.join(OUT, "types.toml"), "w") as f:
+with open(os.path.join(OUT, "types.toml"), "w", newline="\n") as f:
     for t, d in types.items():
         f.write("[types.%s]\n" % t)
         f.write("required = { %s }\n" % ", ".join('%s = "note"' % p for p in d["req"]))
@@ -655,45 +657,45 @@ with open(os.path.join(OUT, "types.toml"), "w") as f:
             f.write("description = %s\n" % json.dumps(d["desc"]))
         if d.get("routes"):
             f.write("routes = true\n")
-        if d.get("standing"):
-            f.write("standing = true\n")
         f.write("\n")
 
 
-def bound(p, src):
+def bound(name, p, src):
+    if (name, p) in firsts:
+        return '%s = { from = "%s", first = { text = %s } }' % (p, src, json.dumps(firsts[(name, p)]))
     if isinstance(src, tuple):
         return '%s = { from = "%s", input = "%s" }' % (p, src[0], src[1])
     return '%s = "%s"' % (p, src)
 
 
-with open(os.path.join(OUT, "flow.toml"), "w") as f:
+with open(os.path.join(OUT, "flow.toml"), "w", newline="\n") as f:
     f.write('name = "record-goals"\noutput = "approval"\n\n')
     for name, t, b, calls, kind, stage in instances:
         f.write("[instances.%s]\nnode_type = \"%s\"\n" % (name, t))
         b = {p: src for p, src in b.items() if src is not None}
         if b:
-            f.write("bindings = { %s }\n" % ", ".join(bound(p, src) for p, src in b.items()))
+            f.write("bindings = { %s }\n" % ", ".join(bound(name, p, src) for p, src in b.items()))
+        if name in branches:
+            f.write("branches = { %s }\n" % ", ".join(
+                '%s = [%s]' % (k, ", ".join('"%s"' % i for i in v)) for k, v in branches[name].items()))
         if calls:
             f.write("calls = [%s]\n" % ", ".join('"%s"' % c for c in calls))
         f.write("\n")
 for t, lua in scripts.items():
-    open(os.path.join(OUT, t + ".lua"), "w").write(lua)
+    open(os.path.join(OUT, t + ".lua"), "w", newline="\n").write(lua)
 M = '{ model = "openai::deepseek/deepseek-v4.1-flash", endpoint = "https://openrouter.ai/api/v1/", key_env = "OPEN_ROUTER_API_KEY" }'
 roles.add("judging")
-open(os.path.join(OUT, "models.toml"), "w").write("[roles]\n" + "".join("%s = %s\n" % (r, M) for r in sorted(roles)))
-with open(os.path.join(OUT, "manifest.toml"), "w") as f:
+open(os.path.join(OUT, "models.toml"), "w", newline="\n").write("[roles]\n" + "".join("%s = %s\n" % (r, M) for r in sorted(roles)))
+with open(os.path.join(OUT, "manifest.toml"), "w", newline="\n") as f:
     f.write('workflow = "flow.toml"\ntypes = ["types.toml"]\nbudget = 600\npersons = ["approve"]\n\n[scripts]\n')
     for t in scripts:
         f.write('%s = "%s.lua"\n' % (t, t))
     f.write('\n[tools]\nrun_command = "run"\nread_file = "read"\nwrite_file = "write"\nrun_ubc = { action = "run", image = "%s", container = "ubc" }\n\n[limits]\nmodel_calls = 15\n' % UBC_IMAGE)
-open(os.path.join(OUT, "grants.template.toml"), "w").write(
+open(os.path.join(OUT, "grants.template.toml"), "w", newline="\n").write(
     'image = "@GIT_IMAGE@"\nimages = ["@UBC_IMAGE@"]\nactions = ["read", "write", "run"]\nnetwork = true\n@TRUST@\n\n[folders.repo]\npath = "@WORK@"\nwritable = true\n\n[limits]\nseconds = 120\noutput = 32000\n')
-os.makedirs(os.path.join(OUT, "arguments"), exist_ok=True)
-for inst, param, text in arguments:
-    open(os.path.join(OUT, "arguments", "%s.%s.txt" % (inst, param)), "w").write(text)
 json.dump([dict(name=n, type=t, bindings=b, calls=c, kind=k, stage=s) for n, t, b, c, k, s in instances],
-          open(os.path.join(OUT, "graph.json"), "w"), indent=1)
+          open(os.path.join(OUT, "graph.json"), "w", newline="\n"), indent=1)
 kinds = {}
 for i in instances:
     kinds[i[4]] = kinds.get(i[4], 0) + 1
-print(len(instances), "instances", kinds, len(arguments), "arguments")
+print(len(instances), "instances", kinds, len(firsts), "first contexts")

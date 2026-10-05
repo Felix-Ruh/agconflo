@@ -19,10 +19,5 @@ brief=$(cd "$(dirname "$2")" && pwd)/$(basename "$2")
 agconflo=${AGCONFLO:-$(pwd)/target/debug/agconflo}
 
 cd "$run/workflow"
-# Each file arguments/<instance>.<parameter>.txt starts that parameter's edge.
-set -- --arg-file brief brief "$brief"
-for f in arguments/*.txt; do
-    name=$(basename "$f" .txt)
-    set -- "$@" --arg-file "${name%%.*}" "${name#*.}" "$f"
-done
-exec "$agconflo" run manifest.toml --models models.toml --grants ../grants.toml --record ../run.toml "$@"
+exec "$agconflo" run manifest.toml --models models.toml --grants ../grants.toml --record ../run.toml \
+    --arg-file brief brief "$brief"

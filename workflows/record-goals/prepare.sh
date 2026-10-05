@@ -48,7 +48,6 @@ git -C "$run/work" checkout -q "$commit"
 # The workflow, with what this machine decides filled in.
 mkdir "$run/workflow"
 cp "$here"/*.lua "$here"/flow.toml "$here"/types.toml "$here"/models.toml "$run/workflow/"
-cp -r "$here/arguments" "$run/workflow/"
 sed "s|@UBC_IMAGE@|$ubc_image|" "$here/manifest.toml" > "$run/workflow/manifest.toml"
 trust=""
 if [ -n "$certs" ]; then

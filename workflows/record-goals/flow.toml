@@ -70,7 +70,7 @@ bindings = { rules = "rules", example = "example", goals = "goals", stakeholders
 
 [instances.head]
 node_type = "s_head"
-bindings = { state = "judge", statements = "statements", given_stakeholders = "given_stakeholders" }
+bindings = { state = { from = "judge", first = { text = "goal 1\npass 1\nstage no\nfeedback:\n" } }, statements = "statements", given_stakeholders = "given_stakeholders" }
 
 [instances.cmd_prep]
 node_type = "s_cmd_prep"
@@ -182,7 +182,8 @@ bindings = { pairs = "pairs" }
 
 [instances.judge]
 node_type = "s_judge"
-bindings = { goal = "head", previous = "judge", ubc = "ubc", closing = "closing", claims = "claims", relations = "relations", diff = "diff", brief = "brief", rules = "rules", note = "note" }
+bindings = { goal = "head", previous = { from = "judge", first = { text = "start\nnotes:\n\nfeedback:\n" } }, ubc = "ubc", closing = "closing", claims = "claims", relations = "relations", diff = "diff", brief = "brief", rules = "rules", note = "note" }
+branches = { again = ["head", "judge"], done = ["cmd_fin", "describe", "approval"] }
 
 [instances.cmd_fin]
 node_type = "s_cmd_fin"
