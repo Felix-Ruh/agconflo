@@ -94,13 +94,15 @@ elsewhere, and none of these changes them.
    :statement: A model step inside a loop shall check its own answer and ask again with the reasons within its activation, at most three times, rather than being sent back by a router of its own.
 
    A step sent back by its own validator and by the loop's judge would take
-   feedback along two edges, and an instance that has run activates again
-   only when it has a context on every edge that does not stand
-   (``DEC_EDGE_GENERATIONS``). Feedback along one edge would find the other
-   empty, and the step would never run again. So a looped step keeps its
-   retries inside its activation, where the record still holds each attempt
-   as an exchange. Outside a loop a validator router with a holder standing
-   after it works, and versions 4 to 7 used that.
+   its goal on the passes the judge sends back on and its feedback on those
+   its validator does, and no one of them encloses the other. No activation
+   of it could be given one pass's contexts (``DEC_PASS_CLOCKS``), and
+   ``agconflo check`` refuses such a workflow before anything runs
+   (``DEC_PAIRING_IS_WIRING``). So a looped step keeps its retries inside its
+   activation, where the record still holds each attempt as an exchange.
+   Outside a loop a validator router sending its step back is accepted.
+   Versions 4 to 7 used that, with a holder standing after it, which a node
+   type can no longer declare (``DEC_STANDING_REFUSED``).
 
 .. dec:: What the judge can fault is inside the loop it sends back into
    :id: DEC_JUDGED_STEPS_IN_THE_LOOP
