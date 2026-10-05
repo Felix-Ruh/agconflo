@@ -127,10 +127,10 @@ where.
    :statement: Agconflo shall let a workflow repeat part of itself until a node decides it is done.
 
    Retrying a step until a test passes is an ordinary pipeline
-   (``DEC_REPETITION_BY_EDGES``), and so are drafting, reviewing and drafting
-   again, or fixing and building until the build passes. Without this the
-   repetition happens inside one node - a model's own calls within one
-   activation - or outside the run, and the workflow no longer shows the
+   (``DEC_CYCLE_STARTED_BY_A_FIRST``), and so are drafting, reviewing and
+   drafting again, or fixing and building until the build passes. Without
+   this the repetition happens inside one node - a model's own calls within
+   one activation - or outside the run, and the workflow no longer shows the
    step that was repeated or how often.
 
    The end of a repetition is a decision like any other: go round again or go
