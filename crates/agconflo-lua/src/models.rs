@@ -7,8 +7,8 @@ use std::fmt;
 use agconflo_core::{Call, Context};
 use genai::Client;
 use genai::chat::{
-    ChatMessage, ChatOptions, ChatRequest, ContentPart, MessageContent, Tool, ToolCall,
-    ToolResponse,
+    CacheControl, ChatMessage, ChatOptions, ChatRequest, ContentPart, MessageContent, Tool,
+    ToolCall, ToolResponse,
 };
 
 /// Which model plays each role, and the clients that reach them.
@@ -102,6 +102,11 @@ impl Roster {
     /// one user part is one user message holding its rendering. With nothing
     /// offered, no tools are sent.
     ///
+    /// With something offered, the window's last message and the one before
+    /// its last answer are marked for the provider's cache, where the
+    /// provider's format has a place for a mark; with nothing offered, no
+    /// message is marked.
+    ///
     /// The answer's text is the text the provider sent, which excludes any
     /// reasoning the model reports separately, and is empty when the response
     /// holds none - as it does beside a call in OpenAI's format. Its calls come
@@ -127,7 +132,7 @@ impl Roster {
             });
         };
         let mut request = ChatRequest::default();
-        for message in messages(window) {
+        for message in marked(messages(window), window, !offer.is_empty()) {
             request = request.append_message(message);
         }
         if !offer.is_empty() {
@@ -379,6 +384,34 @@ fn messages(window: &[Part]) -> Vec<ChatMessage> {
                 call.clone(),
                 output.render().into_owned(),
             )),
+        })
+        .collect()
+}
+
+/// `messages`, one for each part of `window`, with the last and the one before
+/// the window's last answer marked for the provider's cache when `offered`,
+/// and none marked otherwise. A window holding no answer has only its last
+/// message marked.
+// @A window that may be continued marked where it and the turn before end,IMPL_MODELS_CACHE_MARKS,impl,[CREQ_ROSTER_MARKS_CONTINUATION, CREQ_ROSTER_UNOFFERED_UNMARKED],[DEC_CACHE_MARKED_BEFORE_A_CONTINUATION, DEC_CACHE_MARKS_THROUGH_GENAI]
+fn marked(messages: Vec<ChatMessage>, window: &[Part], offered: bool) -> Vec<ChatMessage> {
+    if !offered {
+        return messages;
+    }
+    let last = messages.len().checked_sub(1);
+    // The message the turn before ended with: the one before the last answer.
+    let before = window
+        .iter()
+        .rposition(|part| matches!(part, Part::Answer { .. }))
+        .and_then(|answer| answer.checked_sub(1));
+    messages
+        .into_iter()
+        .enumerate()
+        .map(|(index, message)| {
+            if Some(index) == last || Some(index) == before {
+                message.with_options(CacheControl::Ephemeral)
+            } else {
+                message
+            }
         })
         .collect()
 }
@@ -1344,6 +1377,158 @@ proptest::proptest! {
             proptest::prop_assert!(carried.iter().any(|text| text == rendering), "{:?} was not carried: {}", rendering, body);
         }
     }
+}
+
+// --- cache marks ---------------------------------------------------------------
+
+/// The index of each message `request` carried that holds a mark for the
+/// provider's cache, in either format: `cache_control` on a block in
+/// Anthropic's, `prompt_cache_breakpoint` on a block in OpenAI's.
+#[cfg(test)]
+pub(crate) fn cache_marks(request: &serde_json::Value) -> Vec<usize> {
+    let messages = request["messages"].as_array().cloned().unwrap_or_default();
+    messages
+        .iter()
+        .enumerate()
+        .filter(|(_, message)| {
+            message["content"].as_array().is_some_and(|blocks| {
+                blocks.iter().any(|block| {
+                    block.get("cache_control").is_some()
+                        || block.get("prompt_cache_breakpoint").is_some()
+                })
+            })
+        })
+        .map(|(index, _)| index)
+        .collect()
+}
+
+/// A window of a prompt and then, for each of `turns`, an answer - with text
+/// or empty - making that many calls to `lookup`, and each call's result.
+#[cfg(test)]
+fn continued(source: &mut IdSource, turns: &[(bool, usize)]) -> Vec<Part> {
+    let mut window = vec![Part::User(note(source, "note", "What is amber-7?"))];
+    for (turn, &(text, calls)) in turns.iter().enumerate() {
+        let made: Vec<Call> = (0..calls)
+            .map(|call| {
+                Call::new(&format!("call_{turn}_{call}"), "lookup")
+                    .input("query", note(source, "note", "amber-7"))
+            })
+            .collect();
+        let ids: Vec<String> = made.iter().map(|call| call.id().to_owned()).collect();
+        let said = if text { "Let me look." } else { "" };
+        window.push(Part::Answer {
+            answer: note(source, "note", said),
+            calls: made,
+        });
+        for call in ids {
+            window.push(Part::Result {
+                call,
+                output: note(source, "note", "the harbour is closed"),
+            });
+        }
+    }
+    window
+}
+
+#[cfg(test)]
+proptest::proptest! {
+    #![proptest_config(proptest::prelude::ProptestConfig::with_cases(24))]
+
+    /// For any number of turns up to three, each answer with text or none and
+    /// making one to twelve calls: in Anthropic's format, offering a node type,
+    /// the marked messages are the last and the one before the last answer,
+    /// each on its last block alone; in OpenAI's, to a model caching by
+    /// itself, nothing about caching is sent.
+    #[test]
+    fn continuation_marked_for_cache(
+        turns in proptest::collection::vec((proptest::prelude::any::<bool>(), 1usize..=12), 0..=3),
+    ) {
+        let stub = Stub::answering(200, "done");
+        let roster = Roster::new(client_for(&stub.base))
+            .map("anthropic", "anthropic::m")
+            .map("openai", "openai::m");
+        let mut source = IdSource::new();
+        let window = continued(&mut source, &turns);
+        let offer = [lookup_offered(&mut source, "Looks a codeword up.")];
+        for role in ["anthropic", "openai"] {
+            proptest::prop_assert!(block(roster.send(role, &window, &offer)).is_ok());
+        }
+
+        // A turn is an answer and its results; the turn before ended where
+        // the last turn begins.
+        let length = |turn: &(bool, usize)| 1 + turn.1;
+        let last = turns.iter().map(length).sum::<usize>();
+        let mut expected = Vec::new();
+        if let Some((_, earlier)) = turns.split_last() {
+            expected.push(earlier.iter().map(length).sum::<usize>());
+        }
+        expected.push(last);
+
+        let (_, anthropic) = &stub.requests()[0];
+        proptest::prop_assert_eq!(cache_marks(anthropic), expected.clone(), "{}", anthropic);
+        for &index in &expected {
+            let blocks = anthropic["messages"][index]["content"].as_array().cloned().unwrap_or_default();
+            let marked: Vec<usize> = (0..blocks.len())
+                .filter(|&block| blocks[block].get("cache_control").is_some())
+                .collect();
+            proptest::prop_assert_eq!(marked, vec![blocks.len() - 1], "{}", anthropic);
+        }
+        let openai = &stub.raw_bodies()[1];
+        proptest::prop_assert!(!openai.contains("cache"), "{}", openai);
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn unoffered_window_unmarked() {
+    let stub = Stub::answering(200, "done");
+    let roster = Roster::new(client_for(&stub.base))
+        .map("anthropic", "anthropic::m")
+        .map("openai", "openai::m");
+    let mut source = IdSource::new();
+    let first = continued(&mut source, &[]);
+    let later = continued(&mut source, &[(true, 2)]);
+    for role in ["anthropic", "openai"] {
+        for window in [&first, &later] {
+            block(roster.send(role, window, &[])).expect("answered");
+        }
+    }
+    let bodies = stub.raw_bodies();
+    assert_eq!(bodies.len(), 4);
+    for body in &bodies {
+        assert!(!body.contains("cache"), "nothing about caching: {body}");
+    }
+
+    // The control: the later window offering a node type is marked.
+    let offer = [lookup_offered(&mut source, "Looks a codeword up.")];
+    block(roster.send("anthropic", &later, &offer)).expect("answered");
+    let (_, offered) = stub.requests().pop().expect("a request");
+    assert_eq!(cache_marks(&offered), [0, 3], "{offered}");
+}
+
+#[cfg(test)]
+#[test]
+fn explicit_openai_marks_the_prompt_only() {
+    let stub = Stub::answering(200, "done");
+    let roster = Roster::new(client_for(&stub.base)).map("asking", "openai::gpt-5.6");
+    let mut source = IdSource::new();
+    let offer = [lookup_offered(&mut source, "Looks a codeword up.")];
+    let windows = [
+        continued(&mut source, &[]),
+        continued(&mut source, &[(true, 1)]),
+        continued(&mut source, &[(true, 1), (true, 1)]),
+    ];
+    for window in &windows {
+        block(roster.send("asking", window, &offer)).expect("answered");
+    }
+    // The prompt's mark kept on the first two turns, a result's dropped: the
+    // third turn's marks both fall on results.
+    let marks: Vec<Vec<usize>> = stub
+        .requests()
+        .iter()
+        .map(|(_, body)| cache_marks(body))
+        .collect();
+    assert_eq!(marks, [vec![0], vec![0], vec![]]);
 }
 
 // --- decisions -----------------------------------------------------------------

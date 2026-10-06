@@ -99,6 +99,23 @@ and `confidence` by its name, so a router's script branches on `chosen.verdict.c
 is a model call: it counts against the limit, is recorded and replayed, and fails as a call does. It
 may be asked only by an instance that declares no calls.
 
+A provider can serve the part of a call that repeats an earlier one from its **cache**, for a
+fraction of the price. Some do it by themselves: DeepSeek through OpenRouter served 16,512 of 16,749
+prompt tokens of a second call from its cache with nothing asked. Others cache only what a request
+marks - Anthropic's models, and OpenAI's from `gpt-5.6`. On every turn of a model that may call node
+types, Agconflo marks where the turn ends and where the turn before ended, so the next turn reads
+the conversation so far from the cache; nothing in a workflow says anything about it. Two limits:
+
+- The marks reach Anthropic only through its own adapter, a model named `anthropic::claude-...`.
+  Named through OpenRouter, the model runs uncached.
+- For OpenAI's models, genai keeps a mark on the prompt and drops one on a call's result, so from
+  the third turn on a request carries none.
+
+What calls share from their first byte is what a cache can reuse across them, so a script that puts
+what stays the same - its instructions - before what changes gets the most from a provider that
+caches by itself. Marking where a prompt's instructions end, for a cache that needs marks, is not
+done yet.
+
 ```
 agconflo check  manifest.toml --models models.toml
 agconflo run    manifest.toml --record run.toml --models models.toml --arg subject brief "a lighthouse"

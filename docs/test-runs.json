@@ -876,6 +876,15 @@
           "title": "agconflo-lua models::calls_returned_as_sent",
           "type": "test_run"
         },
+        "RUN_MODELS_CONTINUATION_MARKED_FOR_CACHE": {
+          "executes": [
+            "TEST_MODELS_CONTINUATION_MARKED_FOR_CACHE"
+          ],
+          "id": "RUN_MODELS_CONTINUATION_MARKED_FOR_CACHE",
+          "test_outcome": "passed",
+          "title": "agconflo-lua models::continuation_marked_for_cache",
+          "type": "test_run"
+        },
         "RUN_MODELS_CONTINUATION_SENDS_CONTEXTS_WHOLE": {
           "executes": [
             "TEST_MODELS_CONTINUATION_SENDS_CONTEXTS_WHOLE"
@@ -901,6 +910,15 @@
           "id": "RUN_MODELS_DECISION_SENT_TO_ITS_ENDPOINT",
           "test_outcome": "passed",
           "title": "agconflo-lua models::decision_sent_to_its_endpoint",
+          "type": "test_run"
+        },
+        "RUN_MODELS_EXPLICIT_OPENAI_MARKS_THE_PROMPT_ONLY": {
+          "executes": [
+            "TEST_MODELS_EXPLICIT_OPENAI_MARKS_THE_PROMPT_ONLY"
+          ],
+          "id": "RUN_MODELS_EXPLICIT_OPENAI_MARKS_THE_PROMPT_ONLY",
+          "test_outcome": "passed",
+          "title": "agconflo-lua models::explicit_openai_marks_the_prompt_only",
           "type": "test_run"
         },
         "RUN_MODELS_KIND_MISMATCH_FAILS": {
@@ -955,6 +973,15 @@
           "id": "RUN_MODELS_UNMAPPED_ROLE_FAILS",
           "test_outcome": "passed",
           "title": "agconflo-lua models::unmapped_role_fails",
+          "type": "test_run"
+        },
+        "RUN_MODELS_UNOFFERED_WINDOW_UNMARKED": {
+          "executes": [
+            "TEST_MODELS_UNOFFERED_WINDOW_UNMARKED"
+          ],
+          "id": "RUN_MODELS_UNOFFERED_WINDOW_UNMARKED",
+          "test_outcome": "passed",
+          "title": "agconflo-lua models::unoffered_window_unmarked",
           "type": "test_run"
         },
         "RUN_MODELS_UNREACHABLE_PROVIDER_HAS_NO_STATUS": {
@@ -2665,6 +2692,15 @@
           "id": "RUN_SCRIPTED_CHANGED_SCRIPT_CHANGES_THE_RESULT",
           "test_outcome": "passed",
           "title": "agconflo-lua scripted::changed_script_changes_the_result",
+          "type": "test_run"
+        },
+        "RUN_SCRIPTED_CONTINUATION_BEGINS_WITH_THE_TURN_BEFORE": {
+          "executes": [
+            "TEST_SCRIPTED_CONTINUATION_BEGINS_WITH_THE_TURN_BEFORE"
+          ],
+          "id": "RUN_SCRIPTED_CONTINUATION_BEGINS_WITH_THE_TURN_BEFORE",
+          "test_outcome": "passed",
+          "title": "agconflo-lua scripted::continuation_begins_with_the_turn_before",
           "type": "test_run"
         },
         "RUN_SCRIPTED_CONTINUATION_COUNTS_AGAINST_THE_LIMIT": {

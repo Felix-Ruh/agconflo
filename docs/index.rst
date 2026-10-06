@@ -40,6 +40,7 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    features/environment
    features/routing
    features/repetition
+   features/caching
    components/context
    components/wiring
    components/topology
@@ -54,6 +55,7 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    components/environment
    components/routing
    components/repetition
+   components/caching
    tests/context
    tests/wiring
    tests/topology
@@ -68,6 +70,7 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    tests/environment
    tests/routing
    tests/repetition
+   tests/caching
    code/agconflo-core
    code/agconflo-lua
    code/agconflo-runner
@@ -85,6 +88,7 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    decisions/runner
    decisions/tools
    decisions/routing
+   decisions/caching
    decisions/code
    decisions/toolchain
    decisions/requirements
@@ -103,3 +107,4 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    evidence/yield
    evidence/routing
    evidence/repetition
+   evidence/caching
