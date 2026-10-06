@@ -12,6 +12,9 @@
 //! [scripts]                         # the script for each other node type
 //! draft = "draft.lua"
 //!
+//! [modules]                         # code a script requires by its name
+//! help = "lib/help.lua"
+//!
 //! [tools]                           # node types a tool performs, and how
 //! fetch = "read"                    # read, write or run
 //! test = { action = "run", image = "python@sha256:...", container = "py" }
@@ -36,12 +39,13 @@ use crate::grants::{Action, pinned};
 use crate::text::{FileFault, KeyFault, Place, Toml, path, read_text};
 
 /// Everything a manifest names, read: the workflow with every node type its
-/// documents declare, the scripts, the node types a person performs, the
-/// tools, the budget and the limits.
+/// documents declare, the scripts, the modules, the node types a person
+/// performs, the tools, the budget and the limits.
 #[derive(Clone, Debug)]
 pub struct Project {
     definition: WorkflowDefinition,
     scripts: Vec<Script>,
+    modules: Vec<Module>,
     persons: Vec<String>,
     tools: Vec<Tool>,
     budget: usize,
@@ -57,6 +61,11 @@ impl Project {
     /// The scripts, in the order the manifest lists them.
     pub fn scripts(&self) -> &[Script] {
         &self.scripts
+    }
+
+    /// The modules, in the order the manifest lists them.
+    pub fn modules(&self) -> &[Module] {
+        &self.modules
     }
 
     /// The node types a person performs, in the order the manifest lists them.
@@ -87,8 +96,9 @@ impl Project {
 
     /// What performs each node type: its script, named by the file it came
     /// from, or a person. A tool's node type is given as a person's: the
-    /// scripted run hands each of its steps back.
-    // @A tool's steps handed back as a person's,IMPL_PROJECT_TOOLS_AS_PERSONS,impl,[CREQ_PROJECT_READS_TOOLS],[DEC_TOOL_PERFORMED_BY_THE_RUNNER]
+    /// scripted run hands each of its steps back. The modules come with them,
+    /// each under its name and named by its file.
+    // @A tool's steps handed back as a person's,IMPL_PROJECT_TOOLS_AS_PERSONS,impl,[CREQ_PROJECT_READS_TOOLS, CREQ_PROJECT_READS_MODULES],[DEC_TOOL_PERFORMED_BY_THE_RUNNER, DEC_MODULES_IN_THE_MANIFEST]
     pub fn behaviours(&self) -> Behaviours {
         let scripted = self
             .scripts
@@ -96,6 +106,9 @@ impl Project {
             .fold(Behaviours::new(), |behaviours, script| {
                 behaviours.define(&script.node_type, &script.file, &script.text)
             });
+        let scripted = self.modules.iter().fold(scripted, |behaviours, module| {
+            behaviours.module(&module.name, &module.file, &module.text)
+        });
         self.persons
             .iter()
             .chain(self.tools.iter().map(|tool| &tool.node_type))
@@ -128,6 +141,18 @@ pub const SHARED_CONTAINER: &str = "tools";
 pub struct Script {
     /// The node type it performs.
     pub node_type: String,
+    /// Its file, as the manifest writes the path.
+    pub file: String,
+    /// Its text, byte for byte.
+    pub text: String,
+}
+
+/// One module: the name a script requires it by, its file as the manifest
+/// writes it, and its text as the file holds it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Module {
+    /// The name a script requires it by.
+    pub name: String,
     /// Its file, as the manifest writes the path.
     pub file: String,
     /// Its text, byte for byte.
@@ -264,8 +289,9 @@ impl std::error::Error for ProjectFault {}
 
 /// The project the manifest at `manifest` describes, or the first fault met
 /// reading it: the manifest, then the node type documents, the workflow
-/// document and the scripts, each in the order the manifest names them.
-// @A manifest and every file it names read beside it,IMPL_PROJECT_READ,impl,[CREQ_PROJECT_READS_THE_MANIFEST, CREQ_PROJECT_REFUSES_UNREADABLE],[DEC_RUN_FROM_A_MANIFEST]
+/// document, the scripts and the modules, each in the order the manifest names
+/// them.
+// @A manifest and every file it names read beside it,IMPL_PROJECT_READ,impl,[CREQ_PROJECT_READS_THE_MANIFEST, CREQ_PROJECT_REFUSES_UNREADABLE, CREQ_PROJECT_READS_MODULES],[DEC_RUN_FROM_A_MANIFEST, DEC_MODULES_IN_THE_MANIFEST]
 pub fn read_project(manifest: &Path) -> Result<Project, ProjectFault> {
     let named = manifest.display().to_string();
     let text = read_text(manifest, &named).map_err(ProjectFault::File)?;
@@ -296,10 +322,19 @@ pub fn read_project(manifest: &Path) -> Result<Project, ProjectFault> {
             })
         })
         .collect::<Result<_, ProjectFault>>()?;
+    let modules = written
+        .modules
+        .into_iter()
+        .map(|(name, file)| {
+            let text = beside(&file)?;
+            Ok(Module { name, file, text })
+        })
+        .collect::<Result<_, ProjectFault>>()?;
 
     Ok(Project {
         definition,
         scripts,
+        modules,
         persons: written.persons,
         tools,
         budget: written.budget,
@@ -445,6 +480,7 @@ struct Manifest {
     types: Vec<String>,
     budget: usize,
     scripts: Vec<(String, String)>,
+    modules: Vec<(String, String)>,
     persons: Vec<String>,
     named_scripts: Vec<(String, Place)>,
     named_persons: Vec<(String, Place)>,
@@ -463,7 +499,7 @@ impl Manifest {
             root,
             top,
             &[
-                "workflow", "types", "budget", "persons", "scripts", "tools", "limits",
+                "workflow", "types", "budget", "persons", "scripts", "modules", "tools", "limits",
             ],
         )?;
 
@@ -505,6 +541,15 @@ impl Manifest {
             }
         }
 
+        let mut modules = Vec::new();
+        if let Some(item) = root.get("modules") {
+            let table = toml.table(item, &key("modules"))?;
+            for (name, item) in table.iter() {
+                let file = toml.string(item, &path(&key("modules"), name))?;
+                modules.push((name.to_owned(), file.to_owned()));
+            }
+        }
+
         let mut tools = Vec::new();
         if let Some(item) = root.get("tools") {
             let table = toml.table(item, &key("tools"))?;
@@ -536,6 +581,7 @@ impl Manifest {
             types,
             budget: budget as usize,
             scripts,
+            modules,
             persons,
             named_scripts,
             named_persons,
@@ -725,6 +771,73 @@ fn reads_what_it_names() {
     );
     // The person's type has no script and needs none; the others have one each.
     assert_eq!(project.behaviours().faults(definition), []);
+}
+
+#[cfg(test)]
+#[test]
+fn reads_modules() {
+    let scratch = Scratch::new("reads_modules");
+    let manifest = written(
+        &scratch,
+        "\n[modules]\nhelp = \"help.lua\"\n\"lib.fmt\" = \"lib/fmt.lua\"\n",
+    );
+    // Neither compiles, so the behaviours' check names each as it carries it.
+    scratch.write("help.lua", "\u{feff}return (\r\n");
+    scratch.write("lib/fmt.lua", "return {");
+
+    let project = read_project(&manifest).expect("the project reads");
+    let module = |name: &str, file: &str, text: &str| Module {
+        name: name.to_owned(),
+        file: file.to_owned(),
+        text: text.to_owned(),
+    };
+    assert_eq!(
+        project.modules(),
+        [
+            module("help", "help.lua", "\u{feff}return (\r\n"),
+            module("lib.fmt", "lib/fmt.lua", "return {"),
+        ]
+    );
+    let faults = project.behaviours().faults(project.definition());
+    let named: Vec<(&str, &str)> = faults
+        .iter()
+        .map(|fault| match fault {
+            agconflo_lua::BehaviourFault::ModuleDoesNotCompile { name, document, .. } => {
+                (name.as_str(), document.as_str())
+            }
+            other => panic!("expected only module faults, got {other:?}"),
+        })
+        .collect();
+    assert_eq!(named, [("help", "help.lua"), ("lib.fmt", "lib/fmt.lua")]);
+
+    // A manifest naming none gives none.
+    let project = read_manifest(
+        &scratch,
+        "workflow = \"flow.toml\"\ntypes = [\"types.toml\", \"more/types.toml\"]\nbudget = 7\npersons = [\"review\"]\n\n[scripts]\ndraft = \"draft.lua\"\npolish = \"polish.lua\"\n",
+    )
+    .expect("the project reads");
+    assert_eq!(project.modules(), []);
+}
+
+#[cfg(test)]
+#[test]
+fn module_unreadable() {
+    let scratch = Scratch::new("module_unreadable");
+    written(&scratch, "\n[modules]\nhelp = \"lib/missing.lua\"\n");
+    match read_project(&scratch.path("manifest.toml")) {
+        Err(ProjectFault::File(FileFault::Unreadable { file, .. })) => {
+            assert_eq!(file, "lib/missing.lua");
+        }
+        other => panic!("expected the module's file refused, got {other:?}"),
+    }
+
+    written(&scratch, "\n[modules]\nhelp = 3\n");
+    let (place, fault) = manifest_fault(read_project(&scratch.path("manifest.toml")));
+    assert!(
+        fault.to_string().contains("modules.help"),
+        "the fault names the key: {fault}"
+    );
+    assert_eq!(place.line, 7, "the line the module is named on: {place:?}");
 }
 
 #[cfg(test)]

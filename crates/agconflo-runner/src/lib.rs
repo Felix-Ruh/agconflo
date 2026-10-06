@@ -28,7 +28,7 @@ pub use grants::{Action, CommandLimits, Folder, FolderFault, Grants, GrantsFault
 pub use keeper::{KeeperRefusal, RecordKeeper, Unkept};
 pub use model_map::{ModelMap, ModelsFault, read_models};
 pub use performer::{Container, parameters, perform};
-pub use project::{Project, ProjectFault, Script, Tool, read_project};
+pub use project::{Module, Project, ProjectFault, Script, Tool, read_project};
 pub use runner::{
     Argument, Finding, Refusal, Sources, Stopped, ToolFault, answer, check, resume, start,
 };

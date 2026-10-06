@@ -237,6 +237,24 @@
           "title": "agconflo-cli::command misuse_exits_2",
           "type": "test_run"
         },
+        "RUN_COMMAND_MODULE_FAULT_REFUSED": {
+          "executes": [
+            "TEST_COMMAND_MODULE_FAULT_REFUSED"
+          ],
+          "id": "RUN_COMMAND_MODULE_FAULT_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-cli::command module_fault_refused",
+          "type": "test_run"
+        },
+        "RUN_COMMAND_MODULE_SHARED": {
+          "executes": [
+            "TEST_COMMAND_MODULE_SHARED"
+          ],
+          "id": "RUN_COMMAND_MODULE_SHARED",
+          "test_outcome": "passed",
+          "title": "agconflo-cli::command module_shared",
+          "type": "test_run"
+        },
         "RUN_COMMAND_PERSON_ROUTES": {
           "executes": [
             "TEST_COMMAND_PERSON_ROUTES"
@@ -280,6 +298,15 @@
           "id": "RUN_COMMAND_UNKEPT_RECORD_TOLD",
           "test_outcome": "passed",
           "title": "agconflo-cli::command unkept_record_told",
+          "type": "test_run"
+        },
+        "RUN_COMMAND_UNSUPPLIED_MODULE_FAILS": {
+          "executes": [
+            "TEST_COMMAND_UNSUPPLIED_MODULE_FAILS"
+          ],
+          "id": "RUN_COMMAND_UNSUPPLIED_MODULE_FAILS",
+          "test_outcome": "passed",
+          "title": "agconflo-cli::command unsupplied_module_fails",
           "type": "test_run"
         },
         "RUN_CONTEXT_DEEP_NESTING_DROPS": {
@@ -1209,6 +1236,15 @@
           "title": "agconflo-runner project::missing_or_mistyped_key_refused",
           "type": "test_run"
         },
+        "RUN_PROJECT_MODULE_UNREADABLE": {
+          "executes": [
+            "TEST_PROJECT_MODULE_UNREADABLE"
+          ],
+          "id": "RUN_PROJECT_MODULE_UNREADABLE",
+          "test_outcome": "passed",
+          "title": "agconflo-runner project::module_unreadable",
+          "type": "test_run"
+        },
         "RUN_PROJECT_PATHS_FROM_THE_MANIFEST": {
           "executes": [
             "TEST_PROJECT_PATHS_FROM_THE_MANIFEST"
@@ -1216,6 +1252,15 @@
           "id": "RUN_PROJECT_PATHS_FROM_THE_MANIFEST",
           "test_outcome": "passed",
           "title": "agconflo-runner project::paths_from_the_manifest",
+          "type": "test_run"
+        },
+        "RUN_PROJECT_READS_MODULES": {
+          "executes": [
+            "TEST_PROJECT_READS_MODULES"
+          ],
+          "id": "RUN_PROJECT_READS_MODULES",
+          "test_outcome": "passed",
+          "title": "agconflo-runner project::reads_modules",
           "type": "test_run"
         },
         "RUN_PROJECT_READS_TOOLS": {
