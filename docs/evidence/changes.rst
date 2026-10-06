@@ -391,3 +391,153 @@ or keeps, on the commit named. Re-running one later shows what has moved since.
    every requirement of the run scheduler and the workflow run. In prose: the
    opening of ``components/repetition``, and fourteen lines of the change
    records and their evidence.
+
+.. evd:: The impact of one output not always being a context
+   :id: EVD_IMPACT_BEHAVIOUR_ONE_CONTEXT
+   :evd_kind: measurement
+   :observed_on: 2026-10-06
+   :observation: FEAT_BEHAVIOUR_ONE_CONTEXT answers to 1 need, has 13 below it by link, 35 requirements sharing a component with it and 6 sharing its architecture, and is named on no line of prose.
+
+   The thirteen analyses below were each run as ``sh scripts/impact.sh <ID>``
+   on ``cf97326``, for the router change. Above this one:
+   ``STKH_ONE_OUTPUT``. Below: ``CREQ_HOST_ONE_CONTEXT``,
+   ``CREQ_HOST_OUTPUT_REFUSAL_CARRIED``, ``IMPL_HOST_ONE_CONTEXT``,
+   ``IMPL_SCRIPTED_FAIL`` and four test cases with their runs. Beside it: the
+   script host's requirements, and the six other features of
+   ``ARCH_BEHAVIOUR``.
+
+.. evd:: The impact of a script's return being held to its declared output
+   :id: EVD_IMPACT_HOST_ONE_CONTEXT
+   :evd_kind: measurement
+   :observed_on: 2026-10-06
+   :observation: CREQ_HOST_ONE_CONTEXT answers to 2 needs, has 3 below it by link and 36 requirements sharing its component, and is named on 1 line outside its definition.
+
+   Above it: ``FEAT_BEHAVIOUR_ONE_CONTEXT`` and ``STKH_ONE_OUTPUT``. Below:
+   ``IMPL_HOST_ONE_CONTEXT``, ``TEST_HOST_NOT_ONE_CONTEXT_FAILS`` and its
+   run. Beside it: every requirement allocated to ``COMP_SCRIPT_HOST``. The
+   line is the implementation's marker.
+
+.. evd:: The impact of a person's text being the output of a step declaring one
+   :id: EVD_IMPACT_PERSON_TEXT_IS_THE_OUTPUT
+   :evd_kind: measurement
+   :observed_on: 2026-10-06
+   :observation: FEAT_PERSON_TEXT_IS_THE_OUTPUT answers to 1 need, has 11 below it by link, 36 requirements sharing a component with it and 3 sharing its architecture, and is named on 2 lines of prose.
+
+   Above it: ``STKH_HUMAN_IN_RUN``. Below: ``CREQ_HOST_TAKES_PERSON_TEXT``,
+   ``IMPL_SCRIPTED_ANSWER`` and four test cases with their runs. Beside it:
+   the script host's requirements and the three other features of
+   ``ARCH_PERSON``. The lines: the openings of ``features/runner`` and
+   ``features/tools``.
+
+.. evd:: The impact of the host taking a person's text for a step declaring an output
+   :id: EVD_IMPACT_HOST_TAKES_PERSON_TEXT
+   :evd_kind: measurement
+   :observed_on: 2026-10-06
+   :observation: CREQ_HOST_TAKES_PERSON_TEXT answers to 2 needs, has 5 below it by link and 36 requirements sharing its component, and is named on 2 lines outside its definition.
+
+   Above it: ``FEAT_PERSON_TEXT_IS_THE_OUTPUT`` and ``STKH_HUMAN_IN_RUN``.
+   Below: ``IMPL_SCRIPTED_ANSWER`` and two test cases with their runs. The
+   lines: that implementation's marker, and the body of
+   ``CREQ_HOST_TAKES_PERSON_ROUTE``.
+
+.. evd:: The impact of the runner taking a person's text for a step declaring an output
+   :id: EVD_IMPACT_RUNNER_TAKES_THE_ANSWER
+   :evd_kind: measurement
+   :observed_on: 2026-10-06
+   :observation: FEAT_RUNNER_TAKES_THE_ANSWER answers to 2 needs, has 13 below it by link, 25 requirements sharing a component with it and 10 sharing its architecture, and is named on no line of prose.
+
+   Above it: ``STKH_HUMAN_IN_RUN`` and ``STKH_RUN_FROM_DOCUMENTS``. Below:
+   ``CREQ_COMMAND_READS_THE_COMMAND``, ``CREQ_RUNNER_ANSWERS``, their
+   implementations and four test cases with their runs. Beside it: the
+   runner's and the command line's requirements, and the ten other features
+   of ``ARCH_RUNNER``.
+
+.. evd:: The impact of a router's script naming its route and no output
+   :id: EVD_IMPACT_HOST_ROUTE_NAMED
+   :evd_kind: measurement
+   :observed_on: 2026-10-06
+   :observation: CREQ_HOST_ROUTE_NAMED answers to 3 needs, has 3 below it by link and 36 requirements sharing its component, and is named on 2 lines outside its definition.
+
+   Above it: ``FEAT_ROUTE_WALKS_CHOSEN_EDGES``, ``STKH_ONE_OUTPUT`` and
+   ``STKH_ROUTING``. Below: ``IMPL_HOST_ROUTE``, ``TEST_HOST_ROUTE_NAMED``
+   and its run. The lines: that marker, and the body of
+   ``CREQ_HOST_TAKES_PERSON_ROUTE``.
+
+.. evd:: The impact of a person's route being a router's step's whole answer
+   :id: EVD_IMPACT_HOST_TAKES_PERSON_ROUTE
+   :evd_kind: measurement
+   :observed_on: 2026-10-06
+   :observation: CREQ_HOST_TAKES_PERSON_ROUTE answers to 3 needs, has 3 below it by link and 36 requirements sharing its component, and is named on 1 line outside its definition.
+
+   Above it: ``FEAT_PERSON_ROUTES``, ``STKH_HUMAN_IN_RUN`` and
+   ``STKH_ROUTING``. Below: ``IMPL_SCRIPTED_ANSWER``,
+   ``TEST_SCRIPTED_PERSON_ROUTES`` and its run. The line is that marker.
+
+.. evd:: The impact of refusing text for a router's step
+   :id: EVD_IMPACT_HOST_REFUSES_BAD_PERSON_ROUTE
+   :evd_kind: measurement
+   :observed_on: 2026-10-06
+   :observation: CREQ_HOST_REFUSES_BAD_PERSON_ROUTE answers to 3 needs, has 3 below it by link and 36 requirements sharing its component, and is named on 2 lines outside its definition.
+
+   Above it: ``FEAT_PERSON_ROUTES``, ``STKH_HUMAN_IN_RUN`` and
+   ``STKH_ROUTING``. Below: ``IMPL_SCRIPTED_ANSWER``,
+   ``TEST_SCRIPTED_PERSON_BAD_ROUTE_REFUSED`` and its run. The lines: that
+   marker, and the body of ``CREQ_HOST_REFUSES_PERSON_ROUTE_NOT_A_BRANCH``.
+
+.. evd:: The impact of the runner taking a route without text
+   :id: EVD_IMPACT_RUNNER_ANSWERS_WITH_ROUTE
+   :evd_kind: measurement
+   :observed_on: 2026-10-06
+   :observation: CREQ_RUNNER_ANSWERS_WITH_ROUTE answers to 3 needs, has 3 below it by link and 17 requirements sharing its component, and is named on 1 line outside its definition.
+
+   Above it: ``FEAT_PERSON_ROUTES``, ``STKH_HUMAN_IN_RUN`` and
+   ``STKH_ROUTING``. Below: ``IMPL_RUNNER_ANSWER``,
+   ``TEST_RUNNER_PERSON_ROUTES`` and its run. Beside it: every requirement
+   allocated to ``COMP_RUNNER``. The line is that marker.
+
+.. evd:: The impact of the record holding a router's names alone
+   :id: EVD_IMPACT_RECORD_HOLDS_ROUTES
+   :evd_kind: measurement
+   :observed_on: 2026-10-06
+   :observation: CREQ_RECORD_HOLDS_ROUTES answers to 3 needs, has 3 below it by link and 12 requirements sharing its component, and is named on 1 line outside its definition.
+
+   Above it: ``FEAT_ROUTE_RECORDED``, ``STKH_RESUMABLE_RUN`` and
+   ``STKH_ROUTING``. Below: ``IMPL_RECORD_ROUTES``,
+   ``TEST_RECORD_ROUTES_KEPT`` and its run. Beside it: every requirement
+   allocated to ``COMP_RUN_RECORD``. The line is that marker.
+
+.. evd:: The impact of the run refusing an output for a router
+   :id: EVD_IMPACT_RUN_REFUSES_BAD_ROUTE
+   :evd_kind: measurement
+   :observed_on: 2026-10-06
+   :observation: CREQ_RUN_REFUSES_BAD_ROUTE answers to 3 needs, has 3 below it by link and 23 requirements sharing its component, and is named on 4 lines outside its definition.
+
+   Above it: ``FEAT_ROUTE_WALKS_CHOSEN_EDGES``, ``STKH_ONE_OUTPUT`` and
+   ``STKH_ROUTING``. Below: ``IMPL_RUN_ROUTED``,
+   ``TEST_RUN_BAD_ROUTE_REFUSED`` and its run. Beside it: every requirement
+   allocated to ``COMP_WORKFLOW_RUN``. The lines: that marker, the body of
+   ``CREQ_RUN_REFUSES_UNDECLARED_BRANCH``, one line of an earlier record and
+   one of ``features/person``.
+
+.. evd:: The impact of a branch's refusal speaking of a route
+   :id: EVD_IMPACT_RUN_REFUSES_UNDECLARED_BRANCH
+   :evd_kind: measurement
+   :observed_on: 2026-10-06
+   :observation: CREQ_RUN_REFUSES_UNDECLARED_BRANCH answers to 3 needs, has 3 below it by link and 23 requirements sharing its component, and is named on 2 lines outside its definition.
+
+   Above it: ``FEAT_ROUTE_IS_A_DECLARED_BRANCH``, ``STKH_REPETITION`` and
+   ``STKH_ROUTING``. Below: ``IMPL_RUN_ROUTE_IS_A_BRANCH``,
+   ``TEST_RUN_ROUTE_NOT_A_BRANCH_REFUSED`` and its run. The lines: that marker
+   and one line of an earlier record.
+
+.. evd:: The impact of a router's edges carrying its inputs alone
+   :id: EVD_IMPACT_RUN_WALKS_ROUTED
+   :evd_kind: measurement
+   :observed_on: 2026-10-06
+   :observation: CREQ_RUN_WALKS_ROUTED answers to 3 needs, has 4 below it by link and 23 requirements sharing its component, and is named on 4 lines outside its definition.
+
+   Above it: ``FEAT_ROUTE_WALKS_CHOSEN_EDGES``, ``STKH_ONE_OUTPUT`` and
+   ``STKH_ROUTING``. Below: ``IMPL_RUN_ROUTED``,
+   ``IMPL_RUN_WALKS_EVERY_EDGE``, ``TEST_RUN_ROUTED_WALKS_CHOSEN`` and its
+   run. The lines: the two markers, one line of ``features/person`` and one
+   of ``tests/repetition``.

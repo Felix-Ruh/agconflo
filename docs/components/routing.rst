@@ -200,8 +200,8 @@ asked for.
 
    Failure modes:
 
-   - **The table read as the router's output**, and the branch given the
-     router's decision where it was bound to the draft.
+   - **The table read as a binding of the router's output**, which a router
+     does not make, and the binding refused where it was bound to the draft.
    - **``from`` and ``input`` swapped.**
 
 .. comp_req:: A binding taking an input a node does not route is a defect
@@ -211,7 +211,7 @@ asked for.
    :ears_pattern: unwanted
    :statement: If a binding takes an input of an instance whose node type does not route or does not declare that input, then Wiring validator shall report a defect naming that binding.
 
-   A router passes on what it was given (``DEC_ROUTER_OUTPUT_IS_ITS_DECISION``),
+   A router passes on what it was given (``DEC_ROUTER_PASSES_ON_ITS_INPUTS``),
    so an input taken from a node that is not one, or one its type does not
    declare, names an edge that will never carry anything. A context type
    disagreement on such a binding is compared against the input's declared
@@ -226,20 +226,27 @@ asked for.
 
 .. comp_req:: A router's script names where its run goes
    :id: CREQ_HOST_ROUTE_NAMED
-   :derived_from: FEAT_ROUTE_WALKS_CHOSEN_EDGES
+   :derived_from: FEAT_ROUTE_WALKS_CHOSEN_EDGES, FEAT_ROUTER_MAKES_NO_CONTEXT
    :allocated_to: COMP_SCRIPT_HOST
    :ears_pattern: event
-   :statement: When a router's script names the instances its run goes on to, Script host shall report those names with the activation's output.
+   :statement: When a router's script names the instances its run goes on to, Script host shall report those names as the activation's route and no output.
 
    ``DEC_ROUTER_DECLARED``: through ``host.route``, with none or several
    names, once in an activation. Naming none is a router deciding its run goes
-   nowhere from here.
+   nowhere from here. The script returns nothing
+   (``CREQ_HOST_ONE_CONTEXT``), and nothing is reported as its output
+   (``DEC_ROUTER_PASSES_ON_ITS_INPUTS``).
 
    Failure modes:
 
-   - **The names dropped**, and the router's edges walked as any node's are.
+   - **The names dropped**, and the router's step reported with no route.
    - **The names reported in another order than named**, which a record
      compared on resuming would take for a different route.
+   - **A context reported for the router all the same**, made by the host
+     where the script made none.
+
+   Revised under ``DEC_CHANGE_HOST_ROUTE_NAMED``: it had reported the names
+   beside the router's output.
 
 .. comp_req:: A route named where none may be, or not named where one must be, fails
    :id: CREQ_HOST_REFUSES_ROUTE
@@ -257,15 +264,17 @@ asked for.
    - **The second naming kept**, and a route a script meant to replace
      treated as its first.
 
-.. comp_req:: A router's output goes along its edges into the instances named
+.. comp_req:: A router's inputs go along its edges into the instances named
    :id: CREQ_RUN_WALKS_ROUTED
-   :derived_from: FEAT_ROUTE_WALKS_CHOSEN_EDGES
+   :derived_from: FEAT_ROUTE_WALKS_CHOSEN_EDGES, FEAT_ROUTER_MAKES_NO_CONTEXT
    :allocated_to: COMP_WORKFLOW_RUN
    :ears_pattern: event
-   :statement: When the caller reports a router's output with the instances named, Workflow run shall walk along each edge out of the router into those instances its output or the input the edge names and along no other edge.
+   :statement: When the caller reports a router's route, Workflow run shall walk along each edge out of the router into an instance named the input the edge names and along no other edge.
 
-   ``DEC_ROUTER_OUTPUT_IS_ITS_DECISION``. An input walked is the context the
+   ``DEC_ROUTER_PASSES_ON_ITS_INPUTS``. An input walked is the context the
    router's activation was given for it, by reference: the router makes none.
+   Revised under ``DEC_CHANGE_RUN_WALKS_ROUTED``: an edge had carried the
+   router's output where it took no input.
 
    Failure modes:
 
@@ -277,34 +286,47 @@ asked for.
 
 .. comp_req:: A route the run cannot take is refused
    :id: CREQ_RUN_REFUSES_BAD_ROUTE
-   :derived_from: FEAT_ROUTE_WALKS_CHOSEN_EDGES
+   :derived_from: FEAT_ROUTE_WALKS_CHOSEN_EDGES, FEAT_ROUTER_MAKES_NO_CONTEXT
    :allocated_to: COMP_WORKFLOW_RUN
    :ears_pattern: unwanted
-   :statement: If the caller reports a router's output without naming instances or names an instance no edge from it enters or names instances for a node that does not route, then Workflow run shall refuse that output.
+   :statement: If the caller reports an output for a router's activation or a route naming an instance no edge from the router enters or a route for a node that does not route, then Workflow run shall refuse that report.
+
+   ``DEC_ROUTER_PASSES_ON_ITS_INPUTS``: a router's activation is reported as
+   its route alone, and a node that does not route as its output alone.
 
    Failure modes:
 
+   - **A context taken for a router**, and a context the router made held by
+     the run.
    - **A name no edge enters ignored**, and a misspelt branch taken as no
      branch.
    - **A transform's output walked only where named**, a caller routing a
      node the workflow does not declare a router.
+
+   Revised under ``DEC_CHANGE_RUN_REFUSES_BAD_ROUTE``: it had refused a
+   router's output reported without a route, where a router's output is now
+   refused outright.
 
 .. comp_req:: A router's naming is kept and resumed
    :id: CREQ_RECORD_HOLDS_ROUTES
    :derived_from: FEAT_ROUTE_RECORDED
    :allocated_to: COMP_RUN_RECORD
    :ears_pattern: ubiquitous
-   :statement: Run record shall write each router's output with the instances its activation named and resume the run walking those names.
+   :statement: Run record shall write the instances each router's activation named as that activation's entry and resume the run walking those names.
 
-   ``DEC_ROUTE_RECORDED``: in the same entry as the output.
+   ``DEC_ROUTE_RECORDED_ALONE``: the names are the entry, which holds no
+   output.
 
    Failure modes:
 
-   - **The output resumed without its names**, and its edges walked as a
-     transform's are.
+   - **The entry resumed without its names**, and the router's step taken
+     for a node's output.
    - **A record naming an instance the workflow no longer has resumed**,
      where resuming it would refuse as a divergence
      (``CREQ_RECORD_REFUSES_DIVERGENCE``).
+
+   Revised under ``DEC_CHANGE_RECORD_HOLDS_ROUTES``: it had written the names
+   beside the router's output.
 
 .. comp_req:: A router's instance may declare its branches
    :id: CREQ_READER_READS_BRANCHES
@@ -332,8 +354,9 @@ asked for.
    :ears_pattern: unwanted
    :statement: If an instance declares branches that leave out an instance its edges enter or name one they do not enter or repeat a branch or belong to no router, then Wiring validator shall report a defect naming the instance and what is at fault.
 
-   An edge is a binding whose source is the router, whether it carries the
-   router's output or one of its inputs. A branch repeats another when it
+   An edge is a binding whose source is the router, carrying one of its
+   inputs; one taking the router's output is refused as a defect of its own
+   (``CREQ_VALIDATOR_ROUTER_GIVES_ONLY_INPUTS``). A branch repeats another when it
    names the same instances, in whatever order and however often. An instance
    named twice in one branch is reported once.
 
@@ -352,13 +375,15 @@ asked for.
    :derived_from: FEAT_ROUTE_IS_A_DECLARED_BRANCH
    :allocated_to: COMP_WORKFLOW_RUN
    :ears_pattern: unwanted
-   :statement: If the caller reports a router's output naming instances that are not those of one branch its instance declares, then Workflow run shall refuse that output naming the branches declared.
+   :statement: If the caller reports a router's route naming instances that are not those of one branch its instance declares, then Workflow run shall refuse that route naming the branches declared.
 
    The same instances in another order, or one named twice, are that branch.
    Naming none is not refused (``CREQ_RUN_REFUSES_BAD_ROUTE``). As every
    refused output, it leaves the activation outstanding
    (``CREQ_RUN_REFUSED_OUTPUT_OUTSTANDING``), and the refusal lists each
    branch with its instances, so that whoever named it can name one.
+   Revised under ``DEC_CHANGE_RUN_REFUSES_UNDECLARED_BRANCH``: it had
+   spoken of the route as a router's output.
 
    Failure modes:
 
@@ -384,3 +409,44 @@ asked for.
      what the host did before this.
    - **The answer taken as given**, and the run walking a set of instances
      that is no branch.
+
+.. comp_req:: A router's node type declaring an output is refused
+   :id: CREQ_READER_ROUTER_DECLARES_NO_OUTPUT
+   :derived_from: FEAT_ROUTER_MAKES_NO_CONTEXT, FEAT_TOPOLOGY_UNREADABLE_LOCATED
+   :allocated_to: COMP_TOPOLOGY_READER
+   :ears_pattern: unwanted
+   :statement: If a node type declares routes = true and an output or declares neither, then Topology reader shall refuse its document at that node type naming the key at fault.
+
+   ``DEC_ROUTER_DECLARES_NO_OUTPUT``. A node type that does not route still
+   declares its output, as it always has; the fault is placed as any value's
+   is (``CREQ_READER_FAULT_LOCATED``).
+
+   Failure modes:
+
+   - **The output read and ignored**, and a document claiming a router makes
+     a context of that type.
+   - **A router read as needing an output**, and every router refused.
+   - **A node type that does not route read without one**, and its output
+     typed by nothing.
+
+.. comp_req:: Taking from a router anything but its inputs is a defect
+   :id: CREQ_VALIDATOR_ROUTER_GIVES_ONLY_INPUTS
+   :derived_from: FEAT_ROUTER_OUTPUT_TAKEN_REJECTED
+   :allocated_to: COMP_WIRING_VALIDATOR
+   :ears_pattern: unwanted
+   :statement: If a binding takes a router's output or a definition designates a router as its output or an instance declares a call to a node type that routes, then Wiring validator shall report a defect naming that binding or definition or instance.
+
+   A binding written as an instance's name takes that instance's output
+   (``DEC_ROUTED_INPUT_BOUND_BY_TABLE``); from a router it takes nothing, and
+   the table naming one of the router's inputs is the binding to write.
+
+   Failure modes:
+
+   - **A binding of a router's output passed**, and its instance waiting for
+     ever on an edge nothing walks.
+   - **A router passed as the designated output**, and a run that can never
+     complete.
+   - **A call to a router passed**, and a model's call with nothing to come
+     back.
+   - **Only the first such fault reported**, where the validator reports
+     every defect at once (``CREQ_RUN_REFUSAL_NAMES_EVERY_DEFECT``).

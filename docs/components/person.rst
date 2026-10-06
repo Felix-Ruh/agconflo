@@ -67,11 +67,15 @@ and how an activation is performed.
    :derived_from: FEAT_PERSON_TEXT_IS_THE_OUTPUT
    :allocated_to: COMP_SCRIPT_HOST
    :ears_pattern: event
-   :statement: When a person's text is supplied for the activation a record's run awaits, Script host shall report as that activation's output a context of its declared type holding exactly the text from the source resumed with the record.
+   :statement: When a person's text is supplied for the awaited activation of a node type that declares an output, Script host shall report as its output a context of its declared type holding exactly that text from the source resumed with the record.
 
    The run then goes on as any scripted run does, handing its caller a record
    once the output is accepted (``CREQ_HOST_HANDS_RECORDS``) and returning at
-   the next person's step or at its ending.
+   the next person's step or at its ending. Text for a router's step is
+   refused (``CREQ_HOST_REFUSES_BAD_PERSON_ROUTE``).
+
+   Revised under ``DEC_CHANGE_HOST_TAKES_PERSON_TEXT``: it had made text the
+   output of any step a person answers, a router's included.
 
    Failure modes:
 
@@ -114,52 +118,67 @@ and how an activation is performed.
    :derived_from: FEAT_PERSON_ROUTES
    :allocated_to: COMP_SCRIPT_HOST
    :ears_pattern: event
-   :statement: When a person's answer to the router's step a record's run awaits names instances, Script host shall report the answer's text as that step's output with those names as its route.
+   :statement: When a person's answer to the router's step a record's run awaits names instances, Script host shall report those names as that step's route and no output.
 
-   ``DEC_PERSON_ROUTE_IN_THE_ANSWER``. The output is made as any person's
-   answer is (``CREQ_HOST_TAKES_PERSON_TEXT``); the names are reported with
-   it in the order given, none meaning nowhere, as a script's are
+   ``DEC_PERSON_ROUTE_IS_THE_ANSWER``. The names are reported in the order
+   given, none meaning nowhere, as a script's are
    (``CREQ_HOST_ROUTE_NAMED``).
 
    Failure modes:
 
-   - **The names dropped**, and the router's output refused by the run as
-     unrouted, which ends the run.
+   - **The names dropped**, and the router's step reported with no route,
+     which the run refuses.
    - **The names reported in another order than given.**
+   - **A context made for the step all the same**, which the run refuses for
+     a router.
+
+   Revised under ``DEC_CHANGE_HOST_TAKES_PERSON_ROUTE``: it had reported the
+   answer's text as the router's output beside the names.
 
 .. comp_req:: A person's answer with a route that does not fit its step is refused
    :id: CREQ_HOST_REFUSES_BAD_PERSON_ROUTE
    :derived_from: FEAT_PERSON_ROUTES
    :allocated_to: COMP_SCRIPT_HOST
    :ears_pattern: unwanted
-   :statement: If a person's answer gives no route for a router's step or gives one for any other step or names an instance no edge out of the router enters, then Script host shall refuse it having run nothing.
+   :statement: If a person's answer gives no route or gives text for a router's step or gives a route for any other step or names an instance no edge out of the router enters, then Script host shall refuse it having run nothing.
 
-   ``DEC_PERSON_ROUTE_IN_THE_ANSWER``: refused as an answer for another step
+   ``DEC_PERSON_ROUTE_IS_THE_ANSWER``: refused as an answer for another step
    is (``CREQ_HOST_REFUSES_ANSWER_ELSEWHERE``), so the person answers again.
-   A step that is not a router's own includes a call's activation of a node
-   type that routes: a call's output goes back to its caller alone
-   (``CREQ_RUN_CALL_OUTPUT_TO_CALLER``) and has nowhere to be walked.
+   A router is never a call's node type: a workflow declaring a call to one
+   is refused before it runs.
 
    Failure modes:
 
    - **A missing route read as every edge**, and a branch nobody chose.
+   - **Text for a router's step dropped**, and a person believing what they
+     wrote was passed on.
    - **A route on a step that is not a router's own ignored**, and a person
      believing they chose a branch that is not there.
    - **A misspelt name failing the run**, where the person could have
      answered again.
+
+   Revised under ``DEC_CHANGE_HOST_REFUSES_BAD_PERSON_ROUTE``: it had not
+   refused text for a router's step, which was the router's output.
 
 .. comp_req:: The runner carries a person's route with the answer
    :id: CREQ_RUNNER_ANSWERS_WITH_ROUTE
    :derived_from: FEAT_PERSON_ROUTES
    :allocated_to: COMP_RUNNER
    :ears_pattern: event
-   :statement: When text and a route are given for the step of an instance, Runner shall answer the record its file holds with that text and that route for that instance.
+   :statement: When a route is given for the step of an instance, Runner shall answer the record its file holds with that route for that instance.
 
-   What ``CREQ_RUNNER_ANSWERS`` does with the text, with the names beside it.
+   What ``CREQ_RUNNER_ANSWERS`` does with text, done with the names. Text
+   given beside them is handed on too, and refused for a router's step
+   (``CREQ_HOST_REFUSES_BAD_PERSON_ROUTE``).
 
    Failure modes:
 
    - **The route dropped between the person and the scripted run.**
+   - **Text required beside a route**, and a person made to write an answer
+     that is then refused.
+
+   Revised under ``DEC_CHANGE_RUNNER_ANSWERS_WITH_ROUTE``: it had given a
+   route only beside text.
 
 .. comp_req:: A router's awaited step is handed back with the instances it may name
    :id: CREQ_RUNNER_TELLS_ROUTES

@@ -1359,3 +1359,376 @@ changed.
    - Text: the opening of ``components/repetition``, rewritten for four
      components; fourteen lines of the records and their evidence, unchanged
      as history.
+
+.. dec:: Restated: one output asked of a script as its type declares it
+   :id: DEC_CHANGE_BEHAVIOUR_ONE_CONTEXT
+   :dec_status: accepted
+   :decided_on: 2026-10-06
+   :supported_by: EVD_IMPACT_BEHAVIOUR_ONE_CONTEXT
+   :statement: Agconflo's requirements project shall state FEAT_BEHAVIOUR_ONE_CONTEXT of a node whose type declares an output and of one whose type declares none because one output is not always a context.
+
+   Old: "If a node's script returns anything other than exactly one context
+   that the run accepts, then Agconflo shall fail that activation." New: "If
+   the script of a node whose type declares an output returns anything other
+   than exactly one context that the run accepts or the script of one whose
+   type declares none returns anything, then Agconflo shall fail that
+   activation."
+
+   Justification: wrong against its own parent. ``STKH_ONE_OUTPUT`` restricts
+   a node to one output and does not say every output is a context; asking a
+   context of every script claims more than that. The surplus is where it met
+   a node whose one output is of another kind: a router's is the instances it
+   names (``DEC_ROUTER_PASSES_ON_ITS_INPUTS``), and its type declares none
+   (``DEC_ROUTER_DECLARES_NO_OUTPUT``). The new statement speaks of what a
+   type declares, the parent's own terms.
+
+   Verdicts on the impact analysis (``EVD_IMPACT_BEHAVIOUR_ONE_CONTEXT``):
+
+   - Up, ``STKH_ONE_OUTPUT``: unchanged.
+   - Down: ``CREQ_HOST_ONE_CONTEXT`` changes under its own record;
+     ``CREQ_HOST_OUTPUT_REFUSAL_CARRIED`` and ``IMPL_SCRIPTED_FAIL`` are
+     unaffected, an output the run refuses still failing the activation;
+     ``TEST_HOST_NOT_ONE_CONTEXT_FAILS`` gains a router's case, and the other
+     three cases are unaffected.
+   - Sideways, the script host's requirements and ``ARCH_BEHAVIOUR``'s six
+     other features: unaffected but those whose records sit beside this.
+   - Text: none.
+
+.. dec:: Restated: the host holds a script's return to its type's declared output
+   :id: DEC_CHANGE_HOST_ONE_CONTEXT
+   :dec_status: accepted
+   :decided_on: 2026-10-06
+   :supported_by: EVD_IMPACT_HOST_ONE_CONTEXT
+   :statement: Agconflo's requirements project shall state CREQ_HOST_ONE_CONTEXT of a node type that declares an output and of one that declares none because its parent now does.
+
+   Old: "If a script returns anything other than exactly one context, then
+   Script host shall fail that activation naming what was returned." New:
+   "If the script of a node type that declares an output returns anything
+   other than exactly one context or the script of one that declares none
+   returns anything, then Script host shall fail that activation naming what
+   was returned."
+
+   Justification: its parent changed (``DEC_CHANGE_BEHAVIOUR_ONE_CONTEXT``).
+   Its four failure modes stand; a fifth is added, a context returned where
+   none is declared dropped without a word.
+
+   Verdicts on the impact analysis (``EVD_IMPACT_HOST_ONE_CONTEXT``):
+
+   - Up: changed above; ``STKH_ONE_OUTPUT`` unchanged.
+   - Down: ``IMPL_HOST_ONE_CONTEXT`` changes to tell the two kinds of type
+     apart; ``TEST_HOST_NOT_ONE_CONTEXT_FAILS`` gains a router's script
+     returning a context, and its run is taken again.
+   - Sideways, the script host's requirements: unaffected but those whose
+     records sit beside this.
+   - Text: the marker, unchanged.
+
+.. dec:: Restated: a person's text is the output of a step declaring one
+   :id: DEC_CHANGE_PERSON_TEXT_IS_THE_OUTPUT
+   :dec_status: accepted
+   :decided_on: 2026-10-06
+   :supported_by: EVD_IMPACT_PERSON_TEXT_IS_THE_OUTPUT
+   :statement: Agconflo's requirements project shall state FEAT_PERSON_TEXT_IS_THE_OUTPUT of an activation whose node type declares an output because its parent asks that a person can supply a context and not that every step makes one.
+
+   Old: "When a person's text is supplied for the activation a scripted
+   run's record awaits, Agconflo shall continue that run from the record with
+   a context holding that text as the activation's output." New: "When a
+   person's text is supplied for the activation a scripted run's record awaits
+   and its node type declares an output, Agconflo shall continue that run
+   from the record with a context holding that text as the activation's
+   output."
+
+   Justification: wrong against its own parent, claiming more than it.
+   ``STKH_HUMAN_IN_RUN`` lets a person supply a context; it does not make
+   every step a person performs one that takes text as its output. A step
+   whose type declares no output has no context for text to become.
+
+   Verdicts on the impact analysis (``EVD_IMPACT_PERSON_TEXT_IS_THE_OUTPUT``):
+
+   - Up, ``STKH_HUMAN_IN_RUN``: unchanged.
+   - Down: ``CREQ_HOST_TAKES_PERSON_TEXT`` changes under its own record;
+     ``IMPL_SCRIPTED_ANSWER`` changes with it; the four test cases are
+     unaffected, each answering a step that declares an output.
+   - Sideways: unaffected but those whose records sit beside this.
+   - Text: the openings of ``features/runner`` and ``features/tools``, which
+     cite it for a step that declares an output, unchanged.
+
+.. dec:: Restated: the host takes a person's text for a step declaring an output
+   :id: DEC_CHANGE_HOST_TAKES_PERSON_TEXT
+   :dec_status: accepted
+   :decided_on: 2026-10-06
+   :supported_by: EVD_IMPACT_HOST_TAKES_PERSON_TEXT
+   :statement: Agconflo's requirements project shall state CREQ_HOST_TAKES_PERSON_TEXT of an activation whose node type declares an output because its parent now does.
+
+   Old: "When a person's text is supplied for the activation a record's run
+   awaits, Script host shall report as that activation's output a context of
+   its declared type holding exactly the text from the source resumed with
+   the record." New: "When a person's text is supplied for the awaited
+   activation of a node type that declares an output, Script host shall
+   report as its output a context of its declared type holding exactly that
+   text from the source resumed with the record."
+
+   Justification: its parent changed
+   (``DEC_CHANGE_PERSON_TEXT_IS_THE_OUTPUT``). "The awaited activation" is the
+   activation a record's run awaits, shortened to stay within a statement's
+   length.
+
+   Verdicts on the impact analysis (``EVD_IMPACT_HOST_TAKES_PERSON_TEXT``):
+
+   - Up: changed above; ``STKH_HUMAN_IN_RUN`` unchanged.
+   - Down: ``IMPL_SCRIPTED_ANSWER`` changes; its two test cases are
+     unaffected.
+   - Sideways: unaffected but those whose records sit beside this.
+   - Text: the marker, and the body of ``CREQ_HOST_TAKES_PERSON_ROUTE``,
+     which no longer cites it.
+
+.. dec:: Restated: the runner takes a person's text for a step declaring an output
+   :id: DEC_CHANGE_RUNNER_TAKES_THE_ANSWER
+   :dec_status: accepted
+   :decided_on: 2026-10-06
+   :supported_by: EVD_IMPACT_RUNNER_TAKES_THE_ANSWER
+   :statement: Agconflo's requirements project shall state FEAT_RUNNER_TAKES_THE_ANSWER of a step whose node type declares an output because neither of its parents asks that every step take text as its output.
+
+   Old: "When a person gives text for the step the record in a file awaits,
+   Agconflo shall continue that run with the text as the step's output." New:
+   "When a person gives text for the step the record in a file awaits and its
+   node type declares an output, Agconflo shall continue that run with the
+   text as the step's output."
+
+   Justification: wrong against its own parents, claiming more than them, as
+   ``DEC_CHANGE_PERSON_TEXT_IS_THE_OUTPUT`` says of its sibling.
+   ``STKH_RUN_FROM_DOCUMENTS`` asks nothing of what an answer is.
+
+   Verdicts on the impact analysis (``EVD_IMPACT_RUNNER_TAKES_THE_ANSWER``):
+
+   - Up, ``STKH_HUMAN_IN_RUN`` and ``STKH_RUN_FROM_DOCUMENTS``: unchanged.
+   - Down: ``CREQ_COMMAND_READS_THE_COMMAND`` and ``CREQ_RUNNER_ANSWERS``
+     unaffected, each handing text on as given; their implementations change
+     only for a route given without text; the four test cases are unaffected.
+   - Sideways, the runner's and the command line's requirements and
+     ``ARCH_RUNNER``'s ten other features: unaffected.
+   - Text: none.
+
+.. dec:: Restated: a router's script names its route and no output
+   :id: DEC_CHANGE_HOST_ROUTE_NAMED
+   :dec_status: accepted
+   :decided_on: 2026-10-06
+   :supported_by: EVD_IMPACT_HOST_ROUTE_NAMED
+   :statement: Agconflo's requirements project shall state CREQ_HOST_ROUTE_NAMED as reporting a router's names as its route and no output and derive it from FEAT_ROUTER_MAKES_NO_CONTEXT too because a router makes no context.
+
+   Old: "When a router's script names the instances its run goes on to,
+   Script host shall report those names with the activation's output." New:
+   "When a router's script names the instances its run goes on to, Script
+   host shall report those names as the activation's route and no output."
+   Its parents gain ``FEAT_ROUTER_MAKES_NO_CONTEXT``.
+
+   Justification: wrong against its own parents. ``STKH_ROUTING``, under
+   ``FEAT_ROUTE_WALKS_CHOSEN_EDGES``, has a router pass on the contexts it was
+   given rather than make new ones, and an output reported beside the names
+   is a context the router made (``DEC_ROUTER_PASSES_ON_ITS_INPUTS``).
+
+   Verdicts on the impact analysis (``EVD_IMPACT_HOST_ROUTE_NAMED``):
+
+   - Up: unchanged, and the new feature added.
+   - Down: ``IMPL_HOST_ROUTE`` changes; ``TEST_HOST_ROUTE_NAMED`` changes to
+     a router's script returning nothing, and its run is taken again.
+   - Sideways: unaffected but those whose records sit beside this.
+   - Text: the marker, and the body of ``CREQ_HOST_TAKES_PERSON_ROUTE``,
+     which still cites it.
+
+.. dec:: Restated: a person's route is a router's step's whole answer
+   :id: DEC_CHANGE_HOST_TAKES_PERSON_ROUTE
+   :dec_status: accepted
+   :decided_on: 2026-10-06
+   :supported_by: EVD_IMPACT_HOST_TAKES_PERSON_ROUTE
+   :statement: Agconflo's requirements project shall state CREQ_HOST_TAKES_PERSON_ROUTE as reporting a person's names as the router's route and no output because a router makes no context.
+
+   Old: "When a person's answer to the router's step a record's run awaits
+   names instances, Script host shall report the answer's text as that step's
+   output with those names as its route." New: "When a person's answer to the
+   router's step a record's run awaits names instances, Script host shall
+   report those names as that step's route and no output."
+
+   Justification: wrong against its own parents. ``FEAT_PERSON_ROUTES``
+   answers to ``STKH_ROUTING`` as well as ``STKH_HUMAN_IN_RUN``, and a person
+   performing a router is the router: text reported as its output is a context
+   the router made (``DEC_PERSON_ROUTE_IS_THE_ANSWER``).
+
+   Verdicts on the impact analysis (``EVD_IMPACT_HOST_TAKES_PERSON_ROUTE``):
+
+   - Up: unchanged.
+   - Down: ``IMPL_SCRIPTED_ANSWER`` changes; ``TEST_SCRIPTED_PERSON_ROUTES``
+     answers with the route alone, and its run is taken again.
+   - Sideways: unaffected but those whose records sit beside this.
+   - Text: the marker.
+
+.. dec:: Restated: text for a router's step is refused
+   :id: DEC_CHANGE_HOST_REFUSES_BAD_PERSON_ROUTE
+   :dec_status: accepted
+   :decided_on: 2026-10-06
+   :supported_by: EVD_IMPACT_HOST_REFUSES_BAD_PERSON_ROUTE
+   :statement: Agconflo's requirements project shall state CREQ_HOST_REFUSES_BAD_PERSON_ROUTE as also refusing text for a router's step because a router makes no context.
+
+   Old: "If a person's answer gives no route for a router's step or gives one
+   for any other step or names an instance no edge out of the router enters,
+   then Script host shall refuse it having run nothing." New: "If a person's
+   answer gives no route or gives text for a router's step or gives a route
+   for any other step or names an instance no edge out of the router enters,
+   then Script host shall refuse it having run nothing."
+
+   Justification: wrong against its own parents, for the reason
+   ``DEC_CHANGE_HOST_TAKES_PERSON_ROUTE`` gives. Text kept would be a context
+   the router made; text dropped would be an answer lost without a word.
+
+   Verdicts on the impact analysis
+   (``EVD_IMPACT_HOST_REFUSES_BAD_PERSON_ROUTE``):
+
+   - Up: unchanged.
+   - Down: ``IMPL_SCRIPTED_ANSWER`` changes;
+     ``TEST_SCRIPTED_PERSON_BAD_ROUTE_REFUSED`` gains text given for a
+     router's step, and its run is taken again.
+   - Sideways: unaffected but those whose records sit beside this.
+   - Text: the marker, and the body of
+     ``CREQ_HOST_REFUSES_PERSON_ROUTE_NOT_A_BRANCH``, unchanged.
+
+.. dec:: Restated: the runner takes a route without text
+   :id: DEC_CHANGE_RUNNER_ANSWERS_WITH_ROUTE
+   :dec_status: accepted
+   :decided_on: 2026-10-06
+   :supported_by: EVD_IMPACT_RUNNER_ANSWERS_WITH_ROUTE
+   :statement: Agconflo's requirements project shall state CREQ_RUNNER_ANSWERS_WITH_ROUTE as answering with a route given alone because a router's step takes no text.
+
+   Old: "When text and a route are given for the step of an instance, Runner
+   shall answer the record its file holds with that text and that route for
+   that instance." New: "When a route is given for the step of an instance,
+   Runner shall answer the record its file holds with that route for that
+   instance."
+
+   Justification: wrong against its own parents, for the reason
+   ``DEC_CHANGE_HOST_TAKES_PERSON_ROUTE`` gives: requiring text beside the
+   route would make every person performing a router write an answer that is
+   then refused.
+
+   Verdicts on the impact analysis
+   (``EVD_IMPACT_RUNNER_ANSWERS_WITH_ROUTE``):
+
+   - Up: unchanged.
+   - Down: ``IMPL_RUNNER_ANSWER`` changes to take text as optional;
+     ``TEST_RUNNER_PERSON_ROUTES`` answers with the route alone, and its run
+     is taken again.
+   - Sideways, the runner's requirements: unaffected.
+   - Text: the marker.
+
+.. dec:: Restated: the record holds a router's names as its entry
+   :id: DEC_CHANGE_RECORD_HOLDS_ROUTES
+   :dec_status: accepted
+   :decided_on: 2026-10-06
+   :supported_by: EVD_IMPACT_RECORD_HOLDS_ROUTES
+   :statement: Agconflo's requirements project shall state CREQ_RECORD_HOLDS_ROUTES as writing a router's names as its activation's entry because a router's activation has no output to write them beside.
+
+   Old: "Run record shall write each router's output with the instances its
+   activation named and resume the run walking those names." New: "Run record
+   shall write the instances each router's activation named as that
+   activation's entry and resume the run walking those names."
+
+   Justification: wrong against its own parents. ``FEAT_ROUTE_RECORDED`` asks
+   that the names be held; ``STKH_ROUTING`` above it has a router make no
+   context, so there is no output for them to be written beside
+   (``DEC_ROUTE_RECORDED_ALONE``).
+
+   Verdicts on the impact analysis (``EVD_IMPACT_RECORD_HOLDS_ROUTES``):
+
+   - Up: unchanged.
+   - Down: ``IMPL_RECORD_ROUTES`` changes, and the record's version with it;
+     ``TEST_RECORD_ROUTES_KEPT`` reads a router's entry without an output, and
+     its run is taken again.
+   - Sideways, the run record's requirements: unaffected.
+   - Text: the marker.
+
+.. dec:: Restated: the run refuses an output for a router
+   :id: DEC_CHANGE_RUN_REFUSES_BAD_ROUTE
+   :dec_status: accepted
+   :decided_on: 2026-10-06
+   :supported_by: EVD_IMPACT_RUN_REFUSES_BAD_ROUTE
+   :statement: Agconflo's requirements project shall state CREQ_RUN_REFUSES_BAD_ROUTE as refusing an output reported for a router and derive it from FEAT_ROUTER_MAKES_NO_CONTEXT too because a router makes no context.
+
+   Old: "If the caller reports a router's output without naming instances or
+   names an instance no edge from it enters or names instances for a node that
+   does not route, then Workflow run shall refuse that output." New: "If the
+   caller reports an output for a router's activation or a route naming an
+   instance no edge from the router enters or a route for a node that does
+   not route, then Workflow run shall refuse that report." Its parents gain
+   ``FEAT_ROUTER_MAKES_NO_CONTEXT``.
+
+   Justification: wrong against its own parents, for the reason
+   ``DEC_CHANGE_HOST_ROUTE_NAMED`` gives. Refusing a router's output reported
+   without names took a router's output as something to accept.
+
+   Verdicts on the impact analysis (``EVD_IMPACT_RUN_REFUSES_BAD_ROUTE``):
+
+   - Up: unchanged, and the new feature added.
+   - Down: ``IMPL_RUN_ROUTED`` changes; ``TEST_RUN_BAD_ROUTE_REFUSED`` gains an
+     output reported for a router, and its run is taken again.
+   - Sideways, the workflow run's requirements: unaffected but those whose
+     records sit beside this.
+   - Text: the marker; the body of ``CREQ_RUN_REFUSES_UNDECLARED_BRANCH``;
+     one line of an earlier record, unchanged as history; one line of
+     ``features/person``, unchanged.
+
+.. dec:: Restated: a branch's refusal speaks of a router's route
+   :id: DEC_CHANGE_RUN_REFUSES_UNDECLARED_BRANCH
+   :dec_status: accepted
+   :decided_on: 2026-10-06
+   :supported_by: EVD_IMPACT_RUN_REFUSES_UNDECLARED_BRANCH
+   :statement: Agconflo's requirements project shall state CREQ_RUN_REFUSES_UNDECLARED_BRANCH of a router's route because a router has no output to refuse.
+
+   Old: "If the caller reports a router's output naming instances that are not
+   those of one branch its instance declares, then Workflow run shall refuse
+   that output naming the branches declared." New: "If the caller reports a
+   router's route naming instances that are not those of one branch its
+   instance declares, then Workflow run shall refuse that route naming the
+   branches declared."
+
+   Justification: wrong against its own parents, ``STKH_ROUTING`` among them,
+   in its wording only: what it refuses is unchanged.
+
+   Verdicts on the impact analysis
+   (``EVD_IMPACT_RUN_REFUSES_UNDECLARED_BRANCH``):
+
+   - Up: unchanged.
+   - Down: ``IMPL_RUN_ROUTE_IS_A_BRANCH`` unchanged;
+     ``TEST_RUN_ROUTE_NOT_A_BRANCH_REFUSED`` reports routes without outputs,
+     and its run is taken again.
+   - Sideways: unaffected.
+   - Text: the marker, and one line of an earlier record, unchanged as
+     history.
+
+.. dec:: Restated: a router's edges carry its inputs alone
+   :id: DEC_CHANGE_RUN_WALKS_ROUTED
+   :dec_status: accepted
+   :decided_on: 2026-10-06
+   :supported_by: EVD_IMPACT_RUN_WALKS_ROUTED
+   :statement: Agconflo's requirements project shall state CREQ_RUN_WALKS_ROUTED as walking a router's inputs alone and derive it from FEAT_ROUTER_MAKES_NO_CONTEXT too because a router makes no context.
+
+   Old: "When the caller reports a router's output with the instances named,
+   Workflow run shall walk along each edge out of the router into those
+   instances its output or the input the edge names and along no other edge."
+   New: "When the caller reports a router's route, Workflow run shall walk
+   along each edge out of the router into an instance named the input the
+   edge names and along no other edge." Its parents gain
+   ``FEAT_ROUTER_MAKES_NO_CONTEXT``.
+
+   Justification: wrong against its own parents, for the reason
+   ``DEC_CHANGE_HOST_ROUTE_NAMED`` gives: an edge carrying the router's
+   output carried a context the router made.
+
+   Verdicts on the impact analysis (``EVD_IMPACT_RUN_WALKS_ROUTED``):
+
+   - Up: unchanged, and the new feature added.
+   - Down: ``IMPL_RUN_ROUTED`` and ``IMPL_RUN_WALKS_EVERY_EDGE`` change, a
+     router's passes counted by its routes where they were counted by its
+     outputs; ``TEST_RUN_ROUTED_WALKS_CHOSEN`` walks inputs alone, and its run
+     is taken again.
+   - Sideways, the workflow run's requirements: unaffected but those whose
+     records sit beside this.
+   - Text: the two markers; one line of ``features/person`` and one of
+     ``tests/repetition``, unchanged.

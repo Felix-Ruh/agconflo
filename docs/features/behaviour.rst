@@ -67,7 +67,7 @@ already been looked at again for a feature with the same shape.
    :derived_from: STKH_ONE_OUTPUT
    :ears_pattern: unwanted
    :verification_method: test
-   :statement: If a node's script returns anything other than exactly one context that the run accepts, then Agconflo shall fail that activation.
+   :statement: If the script of a node whose type declares an output returns anything other than exactly one context that the run accepts or the script of one whose type declares none returns anything, then Agconflo shall fail that activation.
 
    The parent restricts a node to one output. A script is the first thing that
    can return any number of anything, and this is what the restriction means
@@ -84,6 +84,12 @@ already been looked at again for a feature with the same shape.
    (``CREQ_RUN_REFUSES_UNDECLARED_OUTPUT``, ``CREQ_RUN_REFUSES_HELD_IDENTIFIER``),
    and the script's activation then fails rather than being tried again, since a
    script run twice with the same inputs has no reason to answer differently.
+
+   One output is not always a context. A node whose type declares no output
+   has an output of another kind - a router's is the instances it names - so
+   its script returns nothing. Revised under
+   ``DEC_CHANGE_BEHAVIOUR_ONE_CONTEXT``: it had asked one context of every
+   script, which is more than one output asks.
 
 .. feat_req:: A script reads only what its activation carries
    :id: FEAT_BEHAVIOUR_READS_ONLY_ITS_INPUTS
