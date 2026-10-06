@@ -21,11 +21,12 @@ re-opening one means superseding it rather than quietly disagreeing with it.
    thrown away.
 
    Reordering for a provider's prompt cache needs fragment boundaries to reorder.
-   Caching is an exact byte-prefix match - measured at 14,848 cached tokens of
-   14,902 on a repeat call - so a flat string cannot be rearranged to maximise a
-   shared prefix. That measurement is deliberately not linked as evidence here: it
-   is about caching, which this project has deferred, and it travels with the
-   caching decision rather than this one.
+   Caching is an exact byte-prefix match, so a flat string cannot be rearranged
+   to maximise a shared prefix. Nothing reorders for a cache now
+   (``DEC_CACHE_MARKED_BEFORE_A_CONTINUATION``), and the boundaries are still
+   where a cache mark inside a prompt would go, were ``genai`` to allow one. The
+   measurement is deliberately not linked as evidence here: it travels with the
+   caching decision, as ``EVD_REPEATED_PREFIX_SERVED_FROM_CACHE``.
 
    Deduplication is *not* a reason, and was dismissed when it was raised. A third
    argument, that metadata would otherwise be lost, was raised and then answered
@@ -118,7 +119,7 @@ re-opening one means superseding it rather than quietly disagreeing with it.
 
 .. dec:: Contexts sent together before are sent first again, in the same order
    :id: DEC_PREFIX_STORE
-   :dec_status: accepted
+   :dec_status: superseded
    :decided_on: 2026-09-26
    :statement: Agconflo shall keep for each model within a run every list of contexts a call to it has sent, and send a later call's order-free contexts led by the longest such list they contain, recording the order sent.
 
