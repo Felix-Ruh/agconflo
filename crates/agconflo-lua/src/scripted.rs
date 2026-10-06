@@ -1575,7 +1575,7 @@ output = \"note\"
 // --- a model yielding ------------------------------------------------------------
 
 #[cfg(test)]
-use crate::models::{Reply, Stub, client_for, sent_messages, sent_tools};
+use crate::models::{Reply, Stub, cache_marks, client_for, sent_messages, sent_tools};
 
 /// Node types for a model yielding: `ask`, which asks; `lookup`, described,
 /// taking one parameter; and `search`, which nothing declares a call to.
@@ -1945,6 +1945,42 @@ fn next_window_composes_the_last() {
         carried.extend(message.results.into_iter().map(|(_, text)| text));
     }
     assert_eq!(carried, rendering);
+}
+
+#[cfg(test)]
+#[test]
+fn continuation_begins_with_the_turn_before() {
+    let stub = Stub::replying(vec![
+        looking_up("call_1", "first"),
+        looking_up("call_2", "second"),
+        Reply::text("done"),
+    ]);
+    let (outcome, _) = run_keeping(
+        &workflow(YIELD_TYPES, YIELDING),
+        &yielding_behaviours("What is amber-7?", LOOKUP),
+        &roster_at(&stub, "anthropic::m"),
+        CALLING,
+    );
+    assert_eq!(rendered(outcome), "done");
+
+    let requests = stub.requests();
+    assert_eq!(requests.len(), 3);
+    assert_eq!(cache_marks(&requests[0].1), [0], "a first turn at its end");
+    for pair in requests.windows(2) {
+        let before = sent_messages(&pair[0].1);
+        let after = sent_messages(&pair[1].1);
+        assert_eq!(
+            after[..before.len()],
+            before[..],
+            "each turn begins with the one before, text for text"
+        );
+        assert_eq!(
+            cache_marks(&pair[1].1),
+            [before.len() - 1, after.len() - 1],
+            "marked where the turn before ended and at its own end: {}",
+            pair[1].1
+        );
+    }
 }
 
 #[cfg(test)]
