@@ -89,6 +89,7 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    decisions/tools
    decisions/routing
    decisions/caching
+   decisions/modules
    decisions/code
    decisions/toolchain
    decisions/requirements
