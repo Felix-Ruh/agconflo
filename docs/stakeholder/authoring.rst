@@ -30,6 +30,34 @@ about how each is realised are recorded as decisions instead.
    experimentation expensive for everyone else. The engine is written in Rust;
    what a node does need not be.
 
+.. stkh_req:: A workflow's scripts share code written once
+   :id: STKH_SHARED_SCRIPT_CODE
+   :stakeholder: user
+   :statement: Agconflo shall let the scripts of a workflow share code that is written once.
+
+   The node types of one workflow do related work, and their scripts need the
+   same helpers: checking an answer and asking again, reading a model's reply
+   into its fields, saying what was wrong. Written into each script, every
+   copy has to be found and changed alike, and the copies drift. The first
+   development workflow, proposed in #71, worked around that by generating
+   its scripts from a program in another language, which put the source of
+   its behaviour outside its own documents and a second toolchain into the
+   repository.
+
+   Shared code is part of the behaviour, as a script is. It is supplied with
+   the workflow's documents and changes as they do, which is what
+   ``STKH_LIVE_BEHAVIOUR`` asks of a script. It is not an input: what a node
+   is given is still what was wired to it (``STKH_EXPLICIT_CONTEXT``), and
+   code shared by two scripts gives neither of them anything to read that the
+   other's activation could change.
+
+   It names no mechanism. How a script reaches code it shares is for the
+   decisions below it to say.
+
+   It is separate from ``STKH_LIVE_BEHAVIOUR`` because either can hold without
+   the other: scripts changed without a rebuild can each carry their own
+   copy, and shared code could be compiled into the engine.
+
 .. stkh_req:: Topology is data, not script
    :id: STKH_TOPOLOGY_AS_DATA
    :stakeholder: user

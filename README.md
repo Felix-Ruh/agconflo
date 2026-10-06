@@ -74,9 +74,20 @@ persons = ["review"]        # node types a person performs
 [scripts]
 draft = "draft.lua"
 
+[modules]                   # code the scripts share, by the name they require
+help = "lib/help.lua"
+
 [limits]                    # optional, each of the three
 model_calls = 2
 ```
+
+A script reaches a **module** with `local help = require('help')` and gets what the module's file
+returned - usually a table of functions - run once in its activation and kept for it. A module
+runs under the script's limits and is given nothing but its name: a helper that needs the host
+functions is handed `host` by the script calling it. `require` is not Lua's: it reaches the modules
+the manifest names and nothing else, no file and no library, and a name the manifest does not give
+fails the activation naming it. Every module is compiled before a run starts, whether a script
+requires it or not, and one that does not compile refuses the run.
 
 Which model plays each role is the machine's, so it is in a **model mapping** of its own. A model
 is always named with its provider, and a key is only ever taken from the variable the mapping

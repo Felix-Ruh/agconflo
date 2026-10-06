@@ -234,10 +234,15 @@ time a test is allowed.
    :test_kind: error_path
    :coverage: partial
 
-   A script listing which of ``io``, ``os``, ``require``, ``package``,
-   ``dofile``, ``loadfile``, ``load``, ``loadstring``, ``debug``,
-   ``math.random`` and ``math.randomseed`` it can see: none. And a script calling
-   ``io.open`` fails as a script error, rather than opening anything.
+   A script listing which of ``io``, ``os``, ``package``, ``dofile``,
+   ``loadfile``, ``load``, ``loadstring``, ``debug``, ``math.random`` and
+   ``math.randomseed`` it can see: none. And a script calling ``io.open``
+   fails as a script error, rather than opening anything.
+
+   ``require`` is there, and is not Lua's: it reaches only the modules
+   supplied with the run (``DEC_MODULES_REQUIRED_BY_NAME``), and
+   ``TEST_HOST_UNSUPPLIED_MODULE_FAILS`` shows it reaching no library, no
+   file and no text a script wrote.
 
    Catches: the default state; a compiler left in; the random source left in.
 

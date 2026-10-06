@@ -15,6 +15,8 @@ use crate::host;
 #[derive(Clone, Debug, Default)]
 pub struct Behaviours {
     scripts: Vec<Script>,
+    /// The modules a script may require, in the order they were supplied.
+    modules: Vec<Module>,
     /// The node types a person performs, each as often as it was named.
     people: Vec<String>,
 }
@@ -24,6 +26,15 @@ pub struct Behaviours {
 #[derive(Clone, Debug)]
 pub(crate) struct Script {
     pub(crate) node_type: String,
+    pub(crate) document: String,
+    pub(crate) source: String,
+}
+
+/// One module: the name a script requires it by, the document it came from,
+/// and its text.
+#[derive(Clone, Debug)]
+pub(crate) struct Module {
+    pub(crate) name: String,
     pub(crate) document: String,
     pub(crate) source: String,
 }
@@ -44,6 +55,23 @@ impl Behaviours {
             source: source.to_owned(),
         });
         self
+    }
+
+    /// The same behaviours, also supplying the module `source`, which came
+    /// from `document`, under `name`: what a script that requires `name` is
+    /// given. A fault in it, and the compiler's own messages, name `document`.
+    pub fn module(mut self, name: &str, document: &str, source: &str) -> Self {
+        self.modules.push(Module {
+            name: name.to_owned(),
+            document: document.to_owned(),
+            source: source.to_owned(),
+        });
+        self
+    }
+
+    /// Every module supplied, in the order supplied.
+    pub(crate) fn modules(&self) -> &[Module] {
+        &self.modules
     }
 
     /// The same behaviours, with `node_type` performed by a person rather than
@@ -71,11 +99,13 @@ impl Behaviours {
 
     /// Every fault in the scripts for the node types `definition`'s instances
     /// name, as their own or as ones they may call: at most one per type, in the
-    /// order the definition first names each type.
+    /// order the definition first names each type. Then every fault in the
+    /// modules, at most one per name, in the order the modules were supplied.
     ///
     /// A type no instance names is not asked about, and a script for a type the
     /// definition lacks is ignored. A type a person performs must have no script.
-    /// Scripts are compiled and none of them runs.
+    /// Every module supplied is asked about. Scripts and modules are compiled and
+    /// none of them runs.
     // @Every instantiated type has one script that compiles or a person,IMPL_BEHAVIOURS_CHECK,impl,[CREQ_BEHAVIOURS_REFUSE_MISSING, CREQ_BEHAVIOURS_REFUSE_TWICE, CREQ_BEHAVIOURS_EVERY_FAULT, CREQ_BEHAVIOURS_PERSON_OR_SCRIPT]
     pub fn faults(&self, definition: &WorkflowDefinition) -> Vec<BehaviourFault> {
         let mut asked: Vec<&str> = Vec::new();
@@ -107,7 +137,7 @@ impl Behaviours {
                     node_type: node_type.to_owned(),
                     documents: given.iter().map(|s| s.document.clone()).collect(),
                 }),
-                [script] => compile(script)
+                [script] => compile(&script.source, &script.document)
                     .err()
                     .map(|message| BehaviourFault::DoesNotCompile {
                         node_type: node_type.to_owned(),
@@ -122,18 +152,51 @@ impl Behaviours {
             faults.extend(fault);
         }
 
+        faults.extend(self.module_faults());
+        faults
+    }
+
+    /// Every fault in the modules supplied, in the order they were supplied: a
+    /// name given several modules, once, and each module that does not compile.
+    // @Every module compiled and none run,IMPL_BEHAVIOURS_MODULES_CHECKED,impl,[CREQ_BEHAVIOURS_REFUSE_MODULE_FAULTS],[DEC_MODULES_CHECKED_BEFORE_A_RUN]
+    fn module_faults(&self) -> Vec<BehaviourFault> {
+        let mut asked: Vec<&str> = Vec::new();
+        let mut faults = Vec::new();
+        for module in &self.modules {
+            if asked.contains(&module.name.as_str()) {
+                continue;
+            }
+            asked.push(&module.name);
+            let given: Vec<&Module> = self
+                .modules
+                .iter()
+                .filter(|other| other.name == module.name)
+                .collect();
+            if given.len() > 1 {
+                faults.push(BehaviourFault::ModuleSuppliedTwice {
+                    name: module.name.clone(),
+                    documents: given.iter().map(|m| m.document.clone()).collect(),
+                });
+            } else if let Err(message) = compile(&module.source, &module.document) {
+                faults.push(BehaviourFault::ModuleDoesNotCompile {
+                    name: module.name.clone(),
+                    document: module.document.clone(),
+                    message,
+                });
+            }
+        }
         faults
     }
 }
 
-/// Whether `script` compiles, and the compiler's own account when it does not,
-/// naming the document and the line as a failure at run time would. Nothing in
-/// the script runs, and a call to a function that exists nowhere compiles.
+/// Whether `source` compiles, and the compiler's own account when it does not,
+/// naming `document` and the line as a failure at run time would. Nothing in
+/// it runs, and a call to a function that exists nowhere compiles.
 // @Compiled and never called,IMPL_BEHAVIOURS_COMPILE,impl,[CREQ_BEHAVIOURS_REFUSE_UNCOMPILABLE, CREQ_BEHAVIOURS_NOTHING_RUN],[DEC_SCRIPT_IS_THE_BODY]
-fn compile(script: &Script) -> Result<(), String> {
+fn compile(source: &str, document: &str) -> Result<(), String> {
     let lua = host::sandbox().map_err(|error| error.to_string())?;
-    lua.load(&script.source)
-        .set_name(host::chunk_name(&script.document))
+    lua.load(source)
+        .set_name(host::chunk_name(document))
         .into_function()
         .map(drop)
         .map_err(|error| error.to_string())
@@ -176,6 +239,22 @@ pub enum BehaviourFault {
         /// supplied.
         documents: Vec<String>,
     },
+    /// The module supplied under this name does not compile.
+    ModuleDoesNotCompile {
+        /// The name the module is supplied under.
+        name: String,
+        /// The document the module came from.
+        document: String,
+        /// The compiler's own account, which names the document and the line.
+        message: String,
+    },
+    /// More than one module was supplied under this name.
+    ModuleSuppliedTwice {
+        /// The name given several modules.
+        name: String,
+        /// The documents they came from, in the order they were supplied.
+        documents: Vec<String>,
+    },
 }
 
 impl fmt::Display for BehaviourFault {
@@ -205,6 +284,20 @@ impl fmt::Display for BehaviourFault {
             } => write!(
                 f,
                 "{node_type} is performed by a person and was given a script too: {}",
+                documents.join(", ")
+            ),
+            Self::ModuleDoesNotCompile {
+                name,
+                document,
+                message,
+            } => write!(
+                f,
+                "the module {name} in {document} does not compile: {message}"
+            ),
+            Self::ModuleSuppliedTwice { name, documents } => write!(
+                f,
+                "the module {name} was supplied {} times: {}",
+                documents.len(),
                 documents.join(", ")
             ),
         }
@@ -529,6 +622,68 @@ fn person_and_script_refused() {
         matches!(&outcome, Ok(crate::Outcome::Awaiting(activation)) if activation.instance() == "c"),
         "{outcome:?}"
     );
+}
+
+#[cfg(test)]
+#[test]
+fn module_faults_refused() {
+    let definition = workflow(TWINS_TYPES, TWINS);
+    let scripts = Behaviours::new()
+        .define("twin", "twin.lua", MAKES)
+        .define("lone", "lone.lua", MAKES);
+
+    // Does not compile, and no script requires it.
+    let broken = scripts
+        .clone()
+        .module("help", "lib/help.lua", "local x = 1\nreturn (");
+    let faults = faults_of(run_with(&definition, &broken, None));
+    let [
+        BehaviourFault::ModuleDoesNotCompile {
+            name,
+            document,
+            message,
+        },
+    ] = faults.as_slice()
+    else {
+        panic!("expected one module fault, got {faults:?}")
+    };
+    assert_eq!((name.as_str(), document.as_str()), ("help", "lib/help.lua"));
+    assert!(
+        message.contains("lib/help.lua:2:"),
+        "the message names the document and line 2: {message}"
+    );
+
+    // Two under one name.
+    let twice = scripts
+        .clone()
+        .module("help", "one.lua", "return 1")
+        .module("help", "two.lua", "return 2");
+    assert_eq!(
+        faults_of(run_with(&definition, &twice, None)),
+        vec![BehaviourFault::ModuleSuppliedTwice {
+            name: "help".to_owned(),
+            documents: vec!["one.lua".to_owned(), "two.lua".to_owned()],
+        }]
+    );
+
+    // Beside a node type with no script: both in one refusal, the script's first.
+    let both = Behaviours::new()
+        .define("lone", "lone.lua", MAKES)
+        .module("help", "help.lua", "return (");
+    let faults = faults_of(run_with(&definition, &both, None));
+    assert!(
+        matches!(
+            faults.as_slice(),
+            [BehaviourFault::Missing { node_type }, BehaviourFault::ModuleDoesNotCompile { name, .. }]
+                if node_type == "twin" && name == "help"
+        ),
+        "{faults:?}"
+    );
+
+    // The control: a module raising an error when run passes the check, and
+    // the run, which requires it nowhere, completes.
+    let raising = scripts.module("help", "help.lua", "error('ran during the check')");
+    assert_eq!(rendered(run_with(&definition, &raising, None)), "made");
 }
 
 #[cfg(test)]

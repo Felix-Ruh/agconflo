@@ -298,6 +298,99 @@ fn commands_reach_the_runner() {
     );
 }
 
+/// A project of the chain through `add`, whose `begin` and `add` scripts both
+/// require the module `shout`, with `modules` appended to its manifest.
+fn shouting(scratch: &Scratch, modules: &str) {
+    scratch.project(&chain("add"), 5);
+    scratch.write(
+        "begin.lua",
+        "local given, host = ...\nlocal shout = require('shout')\nreturn host.text(host.output, shout.loud(given.brief:render()))\n",
+    );
+    scratch.write(
+        "add.lua",
+        "local given, host = ...\nreturn host.text(host.output, given.before:render() .. '+' .. require('shout').loud('c'))\n",
+    );
+    let manifest = std::fs::read_to_string(scratch.path("manifest.toml")).expect("the manifest");
+    scratch.write("manifest.toml", format!("{manifest}{modules}"));
+}
+
+#[test]
+fn module_shared() {
+    let scratch = Scratch::new("module_shared");
+    shouting(&scratch, "\n[modules]\nshout = \"lib/shout.lua\"\n");
+    scratch.write(
+        "lib/shout.lua",
+        "return { loud = function(text) return text:upper() .. '!' end }\n",
+    );
+
+    let (status, out, err) = scratch.ran(&["check", "manifest.toml"]);
+    assert_eq!((status, out.as_str()), (0, ""), "{err}");
+    let (status, out, err) = scratch.ran(&[
+        "run",
+        "manifest.toml",
+        "--record",
+        "run.toml",
+        "--arg",
+        "first",
+        "brief",
+        "a b",
+    ]);
+    assert_eq!((status, out.as_str()), (0, "A B!+C!+C!"), "{err}");
+}
+
+#[test]
+fn unsupplied_module_fails() {
+    let scratch = Scratch::new("unsupplied_module_fails");
+    shouting(&scratch, "");
+
+    let (status, out, err) = scratch.ran(&[
+        "run",
+        "manifest.toml",
+        "--record",
+        "run.toml",
+        "--arg",
+        "first",
+        "brief",
+        "a b",
+    ]);
+    assert_eq!((status, out.as_str()), (5, ""), "{err}");
+    assert!(
+        err.contains("no module is supplied under the name \"shout\""),
+        "{err}"
+    );
+}
+
+#[test]
+fn module_fault_refused() {
+    let scratch = Scratch::new("module_fault_refused");
+    shouting(&scratch, "\n[modules]\nshout = \"lib/shout.lua\"\n");
+    scratch.write("lib/shout.lua", "return {\n  loud = function(text)\n");
+
+    let (status, _, err) = scratch.ran(&["check", "manifest.toml"]);
+    assert_eq!(status, 4, "{err}");
+    assert!(
+        err.contains("the module shout in lib/shout.lua does not compile")
+            && err.contains("lib/shout.lua:"),
+        "{err}"
+    );
+    let (status, out, err) = scratch.ran(&[
+        "run",
+        "manifest.toml",
+        "--record",
+        "run.toml",
+        "--arg",
+        "first",
+        "brief",
+        "a b",
+    ]);
+    assert_eq!((status, out.as_str()), (4, ""), "{err}");
+    assert!(
+        err.contains("the module shout in lib/shout.lua does not compile"),
+        "{err}"
+    );
+    assert!(!scratch.path("run.toml").exists(), "no record is left");
+}
+
 #[test]
 fn resumed_after_a_kill() {
     let scratch = Scratch::new("resumed_after_a_kill");

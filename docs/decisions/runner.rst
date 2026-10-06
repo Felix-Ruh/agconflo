@@ -67,6 +67,24 @@ arguments other than text are given.
    person happens to be, which answers the "relative to what" that made the
    library refuse to resolve paths at all.
 
+.. dec:: A run's modules are named in its manifest beside its scripts
+   :id: DEC_MODULES_IN_THE_MANIFEST
+   :dec_status: accepted
+   :decided_on: 2026-10-06
+   :statement: Agconflo shall read a run's modules from the files its manifest names under modules, each under the name its key gives.
+
+   ``[modules]`` beside ``[scripts]``: a module is behaviour supplied with the
+   run as a script is (``DEC_MODULES_REQUIRED_BY_NAME``), and the manifest is
+   what names a run's documents. A key is the name a script requires the
+   module by, any key TOML allows as a script's node type is
+   (``DEC_NAMES_AS_KEYS``), and its value a path relative to the manifest's
+   directory, read as a script's is.
+
+   Requiring a module by its file instead - ``require('lib/help.lua')`` - was
+   the other way. It ties every script to where the module happens to be
+   kept, and a file moved means every script changed; a name in the manifest
+   moves with one line.
+
 .. dec:: A key the runner does not read is refused
    :id: DEC_UNKNOWN_KEYS_REFUSED
    :dec_status: accepted

@@ -405,6 +405,7 @@ fn perform_activation<'f>(
         }
         let mailbox = Rc::new(host::Mailbox::default());
         let performing = host::Performing {
+            modules: env.behaviours.modules().to_vec(),
             callees,
             replay,
             mailbox: mailbox.clone(),

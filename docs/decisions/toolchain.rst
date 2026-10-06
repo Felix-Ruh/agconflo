@@ -10,7 +10,7 @@ body, and every rule needs a fixture because the tool ignores a malformed one.
 
 .. dec:: The toolchain is ubc alone
    :id: DEC_NO_PYTHON
-   :dec_status: accepted
+   :dec_status: superseded
    :decided_on: 2026-08-16
    :supported_by: EVD_UBC_REPLACES_STACK
    :statement: Agconflo's requirements project shall be built with ubc alone and no Python toolchain.
@@ -22,6 +22,35 @@ body, and every rule needs a fixture because the tool ignores a malformed one.
 
    The known cost is accepted rather than hidden. There is no equivalent of the
    test-report importer, so importing test results will mean writing one.
+
+.. dec:: The repository holds no Python and needs none
+   :id: DEC_NO_PYTHON_IN_THE_REPOSITORY
+   :dec_status: accepted
+   :decided_on: 2026-10-06
+   :supersedes: DEC_NO_PYTHON
+   :supported_by: EVD_UBC_REPLACES_STACK
+   :statement: Agconflo's repository shall hold no Python and need none to build, check, run or change anything it holds.
+
+   The maintainer's decision of 2026-10-06. ``DEC_NO_PYTHON`` covered the
+   requirements project alone, and #71 read that as leaving room for a Python
+   generator of a workflow's documents and a Python script reading a run's
+   record. The repository's toolchain is Rust, ``ubc`` and POSIX ``sh``; a
+   fourth is one more thing every clone installs and every contributor
+   knows, for work the three already do.
+
+   What ``DEC_NO_PYTHON`` said of the requirements project still holds and
+   moves here: it is built with ``ubc`` alone, its configuration format is
+   sphinx-needs' own, and the test-report importer it said would have to be
+   written is ``crates/junit-to-needs``.
+
+   It is about what the repository holds and needs. An image a test runs a
+   command in may carry Python, as ``python:3.14-slim`` does for the tool
+   tests, and a throwaway probe an agent writes outside the repository is the
+   agent's own. Neither is anything a clone needs Python for.
+
+   Code a workflow's scripts share is reached through modules
+   (``DEC_MODULES_REQUIRED_BY_NAME``), which is what a generator stood in
+   for.
 
 .. dec:: Requirements are authored in reStructuredText
    :id: DEC_MARKUP_RST
@@ -341,12 +370,12 @@ body, and every rule needs a fixture because the tool ignores a malformed one.
 
    How ``STKH_GRAPH_QUERIED_FIRST`` is met today. ``ubc query cypher`` is how
    the toolchain's gates and reports already ask the graph, ubc being the
-   whole toolchain (``DEC_NO_PYTHON``), and of ubc's three query commands the
-   one that follows links from need to need. A query follows links, which the
-   files show only as text: of six lines naming one decision, one was a link,
-   and which cases verify a component's requirements, and how each last ran,
-   was one query where the files needed a script
-   (``EVD_GRAPH_TELLS_LINK_FROM_MENTION``).
+   whole toolchain (``DEC_NO_PYTHON_IN_THE_REPOSITORY``), and of ubc's three
+   query commands the one that follows links from need to need. A query
+   follows links, which the files show only as text: of six lines naming one
+   decision, one was a link, and which cases verify a component's
+   requirements, and how each last ran, was one query where the files needed
+   a script (``EVD_GRAPH_TELLS_LINK_FROM_MENTION``).
 
    Reading a need and finding needs are questions too. A need's body is its
    ``content``, exactly as written (``EVD_CONTENT_IS_THE_BODY``), so a need is
