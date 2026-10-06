@@ -185,6 +185,7 @@ impl std::error::Error for ScriptFailure {}
 
 /// The globals every state has that a script is not given: those that read a
 /// file or compile text, those that catch an error, `collectgarbage` and `print`.
+/// The `require` a script has is not Lua's but the host's, set by [`perform`].
 // @The globals left out of every state,TRACE_HOST_LEFT_OUT,trace,[],[DEC_ENVIRONMENT_BY_NAME, DEC_NO_PRINT_OR_COLLECTOR]
 const LEFT_OUT: [&str; 8] = [
     "dofile",
