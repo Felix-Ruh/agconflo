@@ -170,7 +170,7 @@ before a run starts.
 
 .. dec:: A router's one output is its decision, and its inputs go on by name
    :id: DEC_ROUTER_OUTPUT_IS_ITS_DECISION
-   :dec_status: accepted
+   :dec_status: superseded
    :decided_on: 2026-09-26
    :statement: Agconflo shall take a router's output as its decision, and walk along each of its edges either that output or the one of its inputs the edge names.
 
@@ -200,7 +200,7 @@ before a run starts.
 
 .. dec:: A router's naming is held in the record beside its output
    :id: DEC_ROUTE_RECORDED
-   :dec_status: accepted
+   :dec_status: superseded
    :decided_on: 2026-09-26
    :statement: Agconflo shall write the instances a router's activation named beside that activation's output in the run's record, and resume a run walking the recorded names.
 
@@ -241,3 +241,64 @@ before a run starts.
    was the alternative: shorter to write, and a change to two requirements
    that are right for their own parents, to the record and to every script
    and answer that routes, for a name the run can find from the instances.
+
+.. dec:: A router makes no context, and its edges carry what it was given
+   :id: DEC_ROUTER_PASSES_ON_ITS_INPUTS
+   :dec_status: accepted
+   :decided_on: 2026-10-06
+   :supersedes: DEC_ROUTER_OUTPUT_IS_ITS_DECISION
+   :statement: Agconflo shall take a router's activation as the instances it names and no context, and walk along each edge out of the router into an instance named the one of its inputs the edge names.
+
+   ``STKH_ROUTING`` says a router "passes on the contexts it was given rather
+   than making new ones", and ``DEC_ONE_GRAPH`` that "a router creates no
+   content". ``DEC_ROUTER_OUTPUT_IS_ITS_DECISION`` made a router's output the
+   context its decision is held in - "a decisions model's answer, or text its
+   script wrote" - and that is a context a router made: the judge of the
+   workflow proposed in #71 wrote its loop's whole state into it, which is
+   producing content in a router. The maintainer's word of 2026-10-06 is the one the
+   goal already says: a route gives no text, and routes its inputs onward.
+
+   So a router's one output is the decision itself, the instances named
+   (``STKH_ONE_OUTPUT``), and every edge out of it carries one of its inputs,
+   bound by name (``DEC_ROUTED_INPUT_BOUND_BY_TABLE``). A context a router
+   would have written - a verdict, a state, a note on why - is a node of its
+   own before the router, whose output the router is given and passes on.
+   What a decisions model answered stays where every model call's answer is,
+   in the activation's exchange, and the script still reads its choices.
+
+   Following from it: the run refuses an output reported for a router's
+   activation; a router's node type declares no output
+   (``DEC_ROUTER_DECLARES_NO_OUTPUT``); a workflow binding a router's output,
+   designating a router as its output or declaring a call to a router is
+   refused before it runs, since each takes from a router something it does
+   not make; and a person performing a router answers with the route alone
+   (``DEC_PERSON_ROUTE_IS_THE_ANSWER``).
+
+.. dec:: A router's node type declares no output
+   :id: DEC_ROUTER_DECLARES_NO_OUTPUT
+   :dec_status: accepted
+   :decided_on: 2026-10-06
+   :statement: Agconflo shall refuse a node type document declaring an output for a node type that routes or none for any other node type.
+
+   A declared output type says what a node of the type produces, and a router
+   produces no context (``DEC_ROUTER_PASSES_ON_ITS_INPUTS``). Declared anyway,
+   it would be a type nothing can ever be of, and a reader of the document
+   would take the router for a node that writes one. Refused at reading, the
+   mistake is found where it is written, with its line.
+
+   Leaving it optional for a router and ignoring it was the other way, and
+   keeps a declaration that says something untrue.
+
+.. dec:: A router's naming is the whole of its entry in the record
+   :id: DEC_ROUTE_RECORDED_ALONE
+   :dec_status: accepted
+   :decided_on: 2026-10-06
+   :supersedes: DEC_ROUTE_RECORDED
+   :statement: Agconflo shall write the instances a router's activation named as that activation's entry in the run's record, and resume a run walking the recorded names.
+
+   What ``DEC_ROUTE_RECORDED`` decided, without the output it was written
+   beside: a router's activation produces none
+   (``DEC_ROUTER_PASSES_ON_ITS_INPUTS``). Resuming runs no script again
+   (``CREQ_RECORD_CONTINUES_THE_RUN``), so the names are what a resumed run
+   walks. The record's format changes with it, and its version with the
+   format.

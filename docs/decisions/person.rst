@@ -167,7 +167,7 @@ it is an activation, and ``DEC_BUDGET_COUNTS_ACTIVATIONS`` counts those.
 
 .. dec:: A person routes a router's step by naming instances with the answer
    :id: DEC_PERSON_ROUTE_IN_THE_ANSWER
-   :dec_status: accepted
+   :dec_status: superseded
    :decided_on: 2026-09-26
    :statement: Agconflo shall take the instances a person's answer to a router's step names as that router's route, given beside the answer's text, and refuse an answer that names none for a router's step or names some for any other.
 
@@ -184,3 +184,18 @@ it is an activation, and ``DEC_BUDGET_COUNTS_ACTIVATIONS`` counts those.
    cannot give. A name the run refuses - one no edge out of the router enters
    - refuses the answer rather than failing the run, as an answer for a step
    the run does not await is refused: a typo costs an answer, not the run.
+
+.. dec:: A person's answer to a router's step is the route alone
+   :id: DEC_PERSON_ROUTE_IS_THE_ANSWER
+   :dec_status: accepted
+   :decided_on: 2026-10-06
+   :supersedes: DEC_PERSON_ROUTE_IN_THE_ANSWER
+   :statement: Agconflo shall take a person's answer to a router's step as the instances it names and nothing else, and refuse an answer that gives text for a router's step or names instances for any other.
+
+   A router makes no context (``DEC_ROUTER_PASSES_ON_ITS_INPUTS``), so a
+   person performing one gives what a router's script gives: the instances
+   the run goes on to, with ``--route`` once for each and ``--route ""`` for
+   none. Text given for a router's step has nowhere to go, and is refused
+   rather than dropped, so that a person who meant it for the router learns
+   it was not kept. What ``DEC_PERSON_ROUTE_IN_THE_ANSWER`` decided of names
+   the run refuses holds: a misspelt name refuses the answer, not the run.
