@@ -3,10 +3,10 @@ Running a workflow
 ==================
 
 What happens when a workflow actually runs: what it can be made of, which way
-it goes and how often it goes round, what it may integrate with, the ways a run
-is allowed to end, and what a person needs to run one. Several of these
-constrain each other, or a goal in ``stakeholder/context``, and the bodies say
-where.
+it goes and how often it goes round, what it may integrate with, what a model
+call may reuse, the ways a run is allowed to end, and what a person needs to
+run one. Several of these constrain each other, or a goal in
+``stakeholder/context``, and the bodies say where.
 
 .. stkh_req:: The provider is not baked in
    :id: STKH_PROVIDER_CHOICE
@@ -20,6 +20,33 @@ where.
    Providers do differ in ways that matter - caching regimes and tool-call
    protocols among them. The requirement is not that those differences vanish,
    but that they stop at the engine rather than reaching the workflow.
+
+.. stkh_req:: A model call reuses what its provider cached for an earlier one
+   :id: STKH_PROMPT_CACHE_REUSED
+   :stakeholder: user
+   :statement: Agconflo shall let a model call reuse what the provider cached for an earlier call that began the same way.
+
+   A workflow sends a model the same beginning again and again: a node type's
+   instructions on every pass of a loop, and, while a model calls node types
+   and goes on, the whole of its window so far at every turn. A provider
+   keeps what it has read for some minutes and charges a fraction of the
+   price to read it again. A workflow that never gets that pays in full, and
+   waits in full, for text the provider already holds - most of all in the
+   steps that call the most.
+
+   Providers reach their caches differently: some match a repeated beginning
+   by themselves, others cache only where a request marks it. That is a
+   difference of the kind ``STKH_PROVIDER_CHOICE`` keeps at the engine, so a
+   workflow gets this without saying anything about caching, on whichever
+   provider it runs against.
+
+   It does not ask Agconflo to change what a call is made with so that more
+   of it repeats. What a node is given is what was wired to it
+   (``STKH_EXPLICIT_CONTEXT``), and the order it puts that in is its own. What
+   is reused is what a call already shares with an earlier one.
+
+   It names no mechanism. Whether a call is marked, and where, is for the
+   decisions below it to say.
 
 .. stkh_req:: A person can take part in a run
    :id: STKH_HUMAN_IN_RUN
