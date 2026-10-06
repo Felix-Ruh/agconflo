@@ -39,6 +39,15 @@
           "title": "agconflo-lua behaviours::missing_script_is_refused",
           "type": "test_run"
         },
+        "RUN_BEHAVIOURS_MODULE_FAULTS_REFUSED": {
+          "executes": [
+            "TEST_BEHAVIOURS_MODULE_FAULTS_REFUSED"
+          ],
+          "id": "RUN_BEHAVIOURS_MODULE_FAULTS_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-lua behaviours::module_faults_refused",
+          "type": "test_run"
+        },
         "RUN_BEHAVIOURS_PERSON_AND_SCRIPT_REFUSED": {
           "executes": [
             "TEST_BEHAVIOURS_PERSON_AND_SCRIPT_REFUSED"
@@ -633,6 +642,42 @@
           "title": "agconflo-lua host::model_failure_ends_the_activation",
           "type": "test_run"
         },
+        "RUN_HOST_MODULE_PER_ACTIVATION": {
+          "executes": [
+            "TEST_HOST_MODULE_PER_ACTIVATION"
+          ],
+          "id": "RUN_HOST_MODULE_PER_ACTIVATION",
+          "test_outcome": "passed",
+          "title": "agconflo-lua host::module_per_activation",
+          "type": "test_run"
+        },
+        "RUN_HOST_MODULE_REQUIRED": {
+          "executes": [
+            "TEST_HOST_MODULE_REQUIRED"
+          ],
+          "id": "RUN_HOST_MODULE_REQUIRED",
+          "test_outcome": "passed",
+          "title": "agconflo-lua host::module_required",
+          "type": "test_run"
+        },
+        "RUN_HOST_MODULE_UNDER_THE_LIMITS": {
+          "executes": [
+            "TEST_HOST_MODULE_UNDER_THE_LIMITS"
+          ],
+          "id": "RUN_HOST_MODULE_UNDER_THE_LIMITS",
+          "test_outcome": "passed",
+          "title": "agconflo-lua host::module_under_the_limits",
+          "type": "test_run"
+        },
+        "RUN_HOST_MODULE_WHILE_RUNNING_FAILS": {
+          "executes": [
+            "TEST_HOST_MODULE_WHILE_RUNNING_FAILS"
+          ],
+          "id": "RUN_HOST_MODULE_WHILE_RUNNING_FAILS",
+          "test_outcome": "passed",
+          "title": "agconflo-lua host::module_while_running_fails",
+          "type": "test_run"
+        },
         "RUN_HOST_NON_STRING_ERROR_IS_RAISED": {
           "executes": [
             "TEST_HOST_NON_STRING_ERROR_IS_RAISED"
@@ -730,6 +775,15 @@
           "id": "RUN_HOST_RUNAWAY_SCRIPT_IS_STOPPED",
           "test_outcome": "passed",
           "title": "agconflo-lua host::runaway_script_is_stopped",
+          "type": "test_run"
+        },
+        "RUN_HOST_UNSUPPLIED_MODULE_FAILS": {
+          "executes": [
+            "TEST_HOST_UNSUPPLIED_MODULE_FAILS"
+          ],
+          "id": "RUN_HOST_UNSUPPLIED_MODULE_FAILS",
+          "test_outcome": "passed",
+          "title": "agconflo-lua host::unsupplied_module_fails",
           "type": "test_run"
         },
         "RUN_ID_CANNOT_BE_FORGED": {

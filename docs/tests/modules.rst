@@ -86,7 +86,7 @@ the network.
    A module requiring itself, and two requiring each other, each fail the
    activation as a script error naming the module required while it ran.
 
-   Catches: recursion until the stack runs out, nothing given back.
+   Catches: recursion until something else ends it, nothing given back.
 
 .. test_case:: A manifest gives each module it names, read beside it
    :id: TEST_PROJECT_READS_MODULES

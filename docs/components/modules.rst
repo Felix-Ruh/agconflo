@@ -83,7 +83,8 @@ component requirement whose subject is anything else.
 
    Failure modes:
 
-   - **Recursion until the stack runs out**, and an error about the stack
+   - **Recursion until something else ends it** - the instruction limit,
+     measured, under the limits the tests run with - reported as that limit,
      naming no module.
    - **Nothing given back** while the module runs, and the script failing
      where it uses that, naming no module.

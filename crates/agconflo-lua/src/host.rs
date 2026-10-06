@@ -14,7 +14,7 @@ use agconflo_core::{
 };
 use mlua::prelude::*;
 
-use crate::behaviours::Script;
+use crate::behaviours::{Module, Script};
 use crate::models::{Asked, Chosen, ModelFailure, Offered, Part, Question, Roster, chosen};
 
 /// What one activation's script may spend: instructions executed, bytes
@@ -310,9 +310,10 @@ pub(crate) struct Replay {
 }
 
 /// What an activation is performed with besides its script and its limits:
-/// the node types its model may call, what its record holds for it, and the
-/// mailbox the run answers through.
+/// the modules its script may require, the node types its model may call,
+/// what its record holds for it, and the mailbox the run answers through.
 pub(crate) struct Performing {
+    pub(crate) modules: Vec<Module>,
     pub(crate) callees: Vec<NodeType>,
     pub(crate) replay: Replay,
     pub(crate) mailbox: Rc<Mailbox>,
@@ -333,7 +334,8 @@ pub(crate) type Produced = (Context, Option<Vec<String>>);
 /// `host.text(type, text)`, `host.compose(type, parts, separator)`,
 /// `host.complete(role, prompt, type)`, `host.decide(role, state, questions,
 /// type)`, `host.route(names)`, which a router's script calls once, and
-/// `host.output`, the type the output is declared as.
+/// `host.output`, the type the output is declared as. A global `require(name)`
+/// gives it the module supplied under `name`, as [`require_function`] says.
 ///
 /// Contexts the script makes are issued identifiers from `source`, which must be
 /// the source the run's arguments came from; the run refuses another's.
@@ -351,6 +353,8 @@ pub(crate) async fn perform(
     let calls = Rc::new(Calls::default());
     let routes = performing.routes;
     let route: Rc<RefCell<Option<Vec<String>>>> = Rc::default();
+    let require = require_function(&lua, performing.modules.clone()).map_err(raised)?;
+    lua.globals().raw_set("require", require).map_err(raised)?;
 
     let host = host_functions(&lua, activation, source, roster, &calls, limits, performing)
         .map_err(raised)?;
@@ -385,6 +389,53 @@ pub(crate) async fn perform(
         return Err(ScriptFailure::NoRoute);
     }
     Ok((output, route))
+}
+
+/// The Lua half of `require`, given the function compiling the module supplied
+/// under a name: it keeps what each module returned, and marks each while it
+/// runs.
+const REQUIRE: &str = r#"
+local compile = ...
+local loaded, running = {}, {}
+return function(name)
+  if type(name) ~= "string" then
+    error("require takes a module's name, which is a string, and was given a " .. type(name), 2)
+  end
+  local value = loaded[name]
+  if value ~= nil then return value end
+  if running[name] then
+    error("the module " .. name .. " is required while it is running", 2)
+  end
+  running[name] = true
+  value = compile(name)(name)
+  running[name] = nil
+  if value == nil then value = true end
+  loaded[name] = value
+  return value
+end
+"#;
+
+/// `require(name)`: the module supplied under `name` among `modules`, run the
+/// first time with its name as its one argument, and what it returned given
+/// back every time - `true` when it returned nothing.
+///
+/// An error is raised in the script for anything but a string, for a name no
+/// module is supplied under, and for a module required while it runs. Only
+/// compiling a module's text is done here; the module itself runs from Lua, on
+/// the thread the script runs on.
+// @A module required by name run once on the script's thread,IMPL_HOST_REQUIRE,impl,[CREQ_HOST_REQUIRE_RUNS_MODULE, CREQ_HOST_REQUIRE_UNSUPPLIED, CREQ_HOST_REQUIRE_WHILE_RUNNING],[DEC_MODULES_REQUIRED_BY_NAME, DEC_HOOK_ON_THE_THREAD]
+fn require_function(lua: &Lua, modules: Vec<Module>) -> LuaResult<LuaFunction> {
+    let compile = lua.create_function(move |lua, name: String| {
+        let Some(module) = modules.iter().find(|module| module.name == name) else {
+            return Err(LuaError::external(format!(
+                "no module is supplied under the name {name:?}"
+            )));
+        };
+        lua.load(&module.source)
+            .set_name(chunk_name(&module.document))
+            .into_function()
+    })?;
+    lua.load(REQUIRE).set_name("=require").call(compile)
 }
 
 /// `host.route(names)`: in a router's script, the instances its run goes on
@@ -1342,7 +1393,7 @@ fn nothing_reads_outside() {
     let listing = r#"
 local given, host = ...
 local seen = {}
-for _, name in ipairs({'io', 'os', 'require', 'package', 'dofile', 'loadfile', 'load', 'loadstring', 'debug'}) do
+for _, name in ipairs({'io', 'os', 'package', 'dofile', 'loadfile', 'load', 'loadstring', 'debug'}) do
   if _G[name] ~= nil then seen[#seen + 1] = name end
 end
 if math.random ~= nil then seen[#seen + 1] = 'math.random' end
@@ -1355,6 +1406,177 @@ return host.text(host.output, 'reachable:' .. table.concat(seen, ','))
     match first_fails_with("local f = io.open('anything')") {
         ScriptFailure::Raised { message } => assert!(message.contains("'io'"), "{message}"),
         other => panic!("expected a script error, got {other:?}"),
+    }
+}
+
+/// Run `first_renders`' pair with `modules` supplied, each a name and its
+/// text, from a document named after it.
+#[cfg(test)]
+fn run_with_modules(
+    first: &str,
+    pass: &str,
+    modules: &[(&str, &str)],
+) -> Result<crate::Outcome, crate::scripted::ScriptedRefusal> {
+    let flow = r#"
+name = "pair"
+output = "b"
+
+[instances.a]
+node_type = "first"
+
+[instances.b]
+node_type = "pass"
+bindings = { input = "a" }
+"#;
+    let behaviours = modules.iter().fold(
+        Behaviours::new()
+            .define("first", "first.lua", first)
+            .define("pass", "pass.lua", pass),
+        |behaviours, (name, text)| behaviours.module(name, &format!("{name}.lua"), text),
+    );
+    run_with(&workflow(PAIR_TYPES, flow), &behaviours, None)
+}
+
+/// `pass`'s script when it requires nothing: its input passed on.
+#[cfg(test)]
+const PASSES: &str = "local given, host = ...\nreturn host.compose(host.output, {given.input}, '')";
+
+/// How `a` failed, its script `first`, with `modules` supplied.
+#[cfg(test)]
+fn first_fails_with_modules(first: &str, modules: &[(&str, &str)]) -> ScriptFailure {
+    let (instance, failure) = failed(run_with_modules(first, PASSES, modules));
+    assert_eq!(instance, "a", "the run ended on the failing instance");
+    failure
+}
+
+#[cfg(test)]
+#[test]
+fn module_required() {
+    // Required twice: one table, the module run once, given its name alone.
+    let help = "ran = (ran or 0) + 1\nlocal name = ...\nreturn { shout = function(text) return text:upper() .. '!' end, name = name, count = select('#', ...) }";
+    let script = "local given, host = ...\nlocal a = require('help')\nlocal b = require('help')\nreturn host.text(host.output, a.shout('hi') .. ' ' .. tostring(a == b) .. ' ' .. ran .. ' ' .. a.name .. ' ' .. a.count)";
+    assert_eq!(
+        rendered(run_with_modules(script, PASSES, &[("help", help)])),
+        "HI! true 1 help 1"
+    );
+
+    // Nothing returned is true; a module requiring another gives that one's value.
+    let script = "local given, host = ...\nreturn host.text(host.output, tostring(require('quiet')) .. ' ' .. require('outer'))";
+    let modules = [
+        ("quiet", "local x = 1"),
+        ("outer", "return require('inner') .. '+outer'"),
+        ("inner", "return 'inner'"),
+    ];
+    assert_eq!(
+        rendered(run_with_modules(script, PASSES, &modules)),
+        "true inner+outer"
+    );
+}
+
+#[cfg(test)]
+#[test]
+fn module_under_the_limits() {
+    let requiring = |module: &str| {
+        format!(
+            "local given, host = ...\nrequire('{module}')\nreturn host.text(host.output, 'ran')"
+        )
+    };
+    let started = std::time::Instant::now();
+    assert_eq!(
+        first_fails_with_modules(&requiring("spin"), &[("spin", "while true do end")]),
+        ScriptFailure::InstructionLimit
+    );
+    assert_eq!(
+        first_fails_with_modules(
+            &requiring("hog"),
+            &[("hog", "local s = 'x'\nwhile true do s = s .. s end")]
+        ),
+        ScriptFailure::MemoryLimit
+    );
+    assert!(
+        started.elapsed() < std::time::Duration::from_secs(5),
+        "stopped by the limits, not by the clock: {:?}",
+        started.elapsed()
+    );
+
+    // The control: a module that ends lets the script go on.
+    assert_eq!(
+        rendered(run_with_modules(
+            &requiring("ends"),
+            PASSES,
+            &[("ends", "return 1")]
+        )),
+        "ran"
+    );
+}
+
+#[cfg(test)]
+#[test]
+fn module_per_activation() {
+    // Both instances require `counter`, which counts in a global how often it
+    // ran; each activation finds it ran once.
+    let counter = "count = (count or 0) + 1\nlocal seen = count\nreturn function() return seen end";
+    let first =
+        "local given, host = ...\nreturn host.text(host.output, tostring(require('counter')()))";
+    let pass = "local given, host = ...\nreturn host.text(host.output, given.input:render() .. ' ' .. require('counter')())";
+    assert_eq!(
+        rendered(run_with_modules(first, pass, &[("counter", counter)])),
+        "1 1"
+    );
+}
+
+#[cfg(test)]
+#[test]
+fn unsupplied_module_fails() {
+    let requiring = |what: &str| {
+        format!(
+            "local given, host = ...\nlocal got = require({what})\nreturn host.text(host.output, 'given ' .. type(got))"
+        )
+    };
+    let help = [("help", "return {}")];
+    for (what, named) in [
+        ("'absent'", "absent"),
+        ("'io'", "io"),
+        ("'os'", "os"),
+        ("'return 1'", "return 1"),
+    ] {
+        match first_fails_with_modules(&requiring(what), &help) {
+            ScriptFailure::Raised { message } => assert!(
+                message.contains(&format!("no module is supplied under the name {named:?}")),
+                "{what}: {message}"
+            ),
+            other => panic!("{what}: expected a script error, got {other:?}"),
+        }
+    }
+    match first_fails_with_modules(&requiring("42"), &help) {
+        ScriptFailure::Raised { message } => assert!(
+            message.contains("which is a string, and was given a number"),
+            "{message}"
+        ),
+        other => panic!("expected a script error, got {other:?}"),
+    }
+
+    // The control: the supplied module, required the same way.
+    assert_eq!(
+        rendered(run_with_modules(&requiring("'help'"), PASSES, &help)),
+        "given table"
+    );
+}
+
+#[cfg(test)]
+#[test]
+fn module_while_running_fails() {
+    let script = "local given, host = ...\nrequire('a')\nreturn host.text(host.output, 'ran')";
+    let itself = [("a", "return require('a')")];
+    let each_other = [("a", "return require('b')"), ("b", "return require('a')")];
+    for modules in [&itself[..], &each_other[..]] {
+        match first_fails_with_modules(script, modules) {
+            ScriptFailure::Raised { message } => assert!(
+                message.contains("the module a is required while it is running"),
+                "{modules:?}: {message}"
+            ),
+            other => panic!("{modules:?}: expected a script error, got {other:?}"),
+        }
     }
 }
 
