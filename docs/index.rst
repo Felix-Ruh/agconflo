@@ -25,6 +25,7 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    stakeholder/context
    stakeholder/authoring
    stakeholder/execution
+   stakeholder/interface
    stakeholder/process
    features/context
    features/wiring
