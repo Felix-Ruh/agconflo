@@ -205,3 +205,30 @@ was taken, with the model named in it.
    byte, went back eight times and on once, and stopped at ``approval`` with
    the same step and the same change; 286 activations, and 295 with the
    router's nine.
+
+.. evd:: Rewritten, the workflow recorded both pull requests' goals on the weak model
+   :id: EVD_REWRITE_ON_THE_WEAK_MODEL
+   :evd_kind: measurement
+   :observed_on: 2026-10-08
+   :observation: On deepseek-v4.1-flash, the hand-written workflow recorded all 5 goals of #55 and #29 with the statement, stakeholder and file their merged pull requests have, its final check passed both, and each kept one goal at the pass limit.
+
+   Run with ``prepare.sh`` and ``run.sh`` as the README says, on the engine
+   and scripts at ``de25d76``, each brief from its parent commit, every role
+   played by ``deepseek/deepseek-v4.1-flash`` through OpenRouter with a key
+   the maintainer allowed for these runs. Both stopped at ``approval``,
+   exit 3.
+
+   #55, from ``1f67ee4``: 28 minutes and 175 activations. Goal 1 was sent
+   back twice and went on after pass 3 with one closing word upheld, "every
+   branch that follows"; goal 2 was accepted on pass 2. Version 10 had
+   accepted both on their first pass in 9 minutes.
+
+   #29, from ``437f302``: 47 minutes and 235 activations. Goals 1 and 2 were
+   accepted on pass 2, goal 3 went on after pass 3 with 1 of 9 findings
+   upheld, and the final check found every need the brief names cited,
+   where version 10 left one uncited (``EVD_BRIEF_NEED_LEFT_UNCITED``).
+
+   The prompts are the generated scripts' byte for byte
+   (``EVD_SCRIPTS_REWRITTEN_ALIKE``), so where these runs differ from
+   version 10's they differ as one run of the model differs from the next.
+   One run of each brief says nothing of which outcome is the usual one.
