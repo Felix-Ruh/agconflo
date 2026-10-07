@@ -1,0 +1,58 @@
+workflow = "flow.toml"
+types = ["types.toml"]
+budget = 600
+persons = ["approve"]
+
+[scripts]
+s_brief = "s_brief.lua"
+s_statements = "s_statements.lua"
+s_given_stakeholders = "s_given_stakeholders.lua"
+s_v_statements = "s_v_statements.lua"
+s_cmd_listing = "s_cmd_listing.lua"
+s_cmd_goals = "s_cmd_goals.lua"
+s_cmd_named = "s_cmd_named.lua"
+s_cmd_rules = "s_cmd_rules.lua"
+s_cmd_stakeholders = "s_cmd_stakeholders.lua"
+s_cmd_example = "s_cmd_example.lua"
+s_v_read = "s_v_read.lua"
+s_head = "s_head.lua"
+s_cmd_prep = "s_cmd_prep.lua"
+m_pick_file = "m_pick_file.lua"
+s_cmd_current = "s_cmd_current.lua"
+s_file_goals = "s_file_goals.lua"
+m_keywords = "m_keywords.lua"
+s_cmd_decs = "s_cmd_decs.lua"
+m_neighbours = "m_neighbours.lua"
+m_naming = "m_naming.lua"
+m_place = "m_place.lua"
+s_intro0 = "s_intro0.lua"
+m_intro = "m_intro.lua"
+m_draft = "m_draft.lua"
+s_splice = "s_splice.lua"
+s_path = "s_path.lua"
+s_cmd_ubc = "s_cmd_ubc.lua"
+s_cmd_diff = "s_cmd_diff.lua"
+s_closing = "s_closing.lua"
+m_claims = "m_claims.lua"
+m_note = "m_note.lua"
+s_pairs = "s_pairs.lua"
+m_relations = "m_relations.lua"
+s_judge = "s_judge.lua"
+s_next = "s_next.lua"
+s_cmd_fin = "s_cmd_fin.lua"
+s_cmd_fdiff = "s_cmd_fdiff.lua"
+s_cmd_fubc = "s_cmd_fubc.lua"
+s_v_final = "s_v_final.lua"
+m_describe = "m_describe.lua"
+
+[modules]
+help = "lib/help.lua"
+
+[tools]
+run_command = "run"
+read_file = "read"
+write_file = "write"
+run_ubc = { action = "run", image = "@UBC_IMAGE@", container = "ubc" }
+
+[limits]
+model_calls = 15

@@ -1,0 +1,13 @@
+image = "@GIT_IMAGE@"
+images = ["@UBC_IMAGE@"]
+actions = ["read", "write", "run"]
+network = true
+@TRUST@
+
+[folders.repo]
+path = "@WORK@"
+writable = true
+
+[limits]
+seconds = 120
+output = 32000

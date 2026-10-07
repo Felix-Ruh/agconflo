@@ -1,0 +1,5 @@
+[roles]
+describing = { model = "openai::deepseek/deepseek-v4.1-flash", endpoint = "https://openrouter.ai/api/v1/", key_env = "OPEN_ROUTER_API_KEY" }
+drafting = { model = "openai::deepseek/deepseek-v4.1-flash", endpoint = "https://openrouter.ai/api/v1/", key_env = "OPEN_ROUTER_API_KEY" }
+judging = { model = "openai::deepseek/deepseek-v4.1-flash", endpoint = "https://openrouter.ai/api/v1/", key_env = "OPEN_ROUTER_API_KEY" }
+reviewing = { model = "openai::deepseek/deepseek-v4.1-flash", endpoint = "https://openrouter.ai/api/v1/", key_env = "OPEN_ROUTER_API_KEY" }

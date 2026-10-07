@@ -97,6 +97,7 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    decisions/code
    decisions/toolchain
    decisions/requirements
+   decisions/workflows
    decisions/changes
    evidence/toolchain
    evidence/requirements
@@ -113,3 +114,4 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    evidence/routing
    evidence/repetition
    evidence/caching
+   evidence/workflows

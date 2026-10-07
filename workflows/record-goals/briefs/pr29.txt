@@ -1,0 +1,9 @@
+You are working on the Agconflo repository, checked out at repo/ at its current main. Your task is one pull request: record the stakeholder requirements the maintainer has approved below, with exactly these statements, each as one stkh_req directive in the right file under repo/docs/stakeholder/.
+
+1. "Agconflo shall give a model one defined interface through which it can discover, inspect, call and edit the workflows and node types available to it." (stakeholder: agent)
+2. "Agconflo shall let a model yield during its node's activation to a node or workflow that node is declared to call and continue with the context that call produces." (stakeholder: user)
+3. "Agconflo shall let a model reach an external tool or MCP server only through a node or workflow that wraps it." (stakeholder: user)
+
+Maintainer's note: the yield is to be a step of the run rather than a tool loop inside the node, because work inside an activation is lost on interruption (EVD_WORK_INSIDE_AN_ACTIVATION_REPEATS); it owes an agreement to STKH_EXPLICIT_CONTEXT. The interface widens STKH_MACHINE_AUTHORING.
+
+Write each in the form the requirements already there use: a title, an :id: beginning STKH_, a :stakeholder:, the :statement:, and a body saying why the goal exists, what it deliberately does not say, and how it stands beside the other needs. Read what repo/AGENTS.md and repo/README.md say about requirements first. Change nothing outside repo/docs/stakeholder/.

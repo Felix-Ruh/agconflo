@@ -1,0 +1,8 @@
+You are working on the Agconflo repository, checked out at repo/ at its current main. Your task is one pull request: record the stakeholder requirements the maintainer has approved below, with exactly these statements, each as one stkh_req directive in the right file under repo/docs/stakeholder/.
+
+1. "Agconflo shall let a node decide which of the branches after it a run takes." (stakeholder: user)
+2. "Agconflo shall let a workflow repeat part of itself until a node decides it is done." (stakeholder: user)
+
+Maintainer's note: existing decisions already discuss loops and routers: DEC_BACK_EDGES_ALLOWED, DEC_IMPLIED_CONTROL_EDGES and DEC_ACTIVATION_ONCE_PER_RUN.
+
+Write each in the form the requirements already there use: a title, an :id: beginning STKH_, a :stakeholder:, the :statement:, and a body saying why the goal exists, what it deliberately does not say, and how it stands beside the other needs. Read what repo/AGENTS.md and repo/README.md say about requirements first. Change nothing outside repo/docs/stakeholder/.
