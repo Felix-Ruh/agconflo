@@ -20,14 +20,14 @@ use crate::context::{Context, ContextType, InvalidTypeName};
 use crate::id::{ContextId, IdSource};
 use crate::reader::line_and_column;
 use crate::run::{
-    Arguments, Call, CallRefusal, Event, Exchange, OutputRefusal, Run, StartRefusal, Step,
-    declared_firsts,
+    Arguments, Call, CallRefusal, Event, Exchange, OutputRefusal, RefusedCall, Run, StartRefusal,
+    Step, declared_firsts,
 };
 use crate::workflow::WorkflowDefinition;
 
 /// The version of the record this module writes, and the only one it reads.
-// @Records at version 4,TRACE_RECORD_VERSION,trace,[],[DEC_RECORD_HOLDS_EXCHANGES, DEC_RECORD_IN_TOML, DEC_RECORD_IN_CORE, DEC_FIRST_CONTEXT_DECLARED, DEC_ROUTE_RECORDED_ALONE]
-const VERSION: &str = "4";
+// @Records at version 5,TRACE_RECORD_VERSION,trace,[],[DEC_RECORD_HOLDS_EXCHANGES, DEC_RECORD_HOLDS_REFUSED_CALLS, DEC_RECORD_IN_TOML, DEC_RECORD_IN_CORE, DEC_FIRST_CONTEXT_DECLARED, DEC_ROUTE_RECORDED_ALONE]
+const VERSION: &str = "5";
 
 /// What a record says of a source that has issued every identifier it has.
 const EXHAUSTED: &str = "exhausted";
@@ -605,7 +605,7 @@ impl<F> Run<'_, F> {
 /// with its activation's inputs, an exchange, or a call - every context by
 /// identifier, a window included, and a call's identifier as the provider issued
 /// it.
-// @Exchanges and calls and outputs written in the order accepted,IMPL_RECORD_EVENTS,impl,[CREQ_RECORD_HOLDS_EXCHANGES, CREQ_RECORD_HOLDS_THE_RUN],[NOTE_RUN_ONE_EVENT_LIST]
+// @Exchanges and calls and outputs written in the order accepted,IMPL_RECORD_EVENTS,impl,[CREQ_RECORD_HOLDS_EXCHANGES, CREQ_RECORD_WRITES_REFUSED_CALLS, CREQ_RECORD_HOLDS_THE_RUN],[NOTE_RUN_ONE_EVENT_LIST]
 fn written_event(event: &Event) -> Table {
     let id = |context: &Context| context.id().value().to_string();
     let inputs = |given: &[(String, Context)]| {
@@ -652,6 +652,18 @@ fn written_event(event: &Event) -> Table {
                 calls.push(written_call(call));
             }
             written.insert("calls", calls.into());
+            if !exchange.refused().is_empty() {
+                let mut refused = toml_edit::Array::new();
+                for call in exchange.refused() {
+                    let mut entry = InlineTable::new();
+                    entry.insert("id", call.id().into());
+                    entry.insert("node_type", call.node_type().into());
+                    entry.insert("arguments", id(call.arguments()).into());
+                    entry.insert("answer", id(call.answer()).into());
+                    refused.push(entry);
+                }
+                written.insert("refused", refused.into());
+            }
             entry["exchange"] = value(written);
         }
         Event::Call { instance, call } => {
@@ -934,7 +946,11 @@ impl<'t> Reading<'t> {
             )?;
             let key = ["event", at, "exchange"];
             let fields = self.table(written, &key)?;
-            self.only(fields, &key, &["offer", "window", "answer", "calls"])?;
+            self.only(
+                fields,
+                &key,
+                &["offer", "window", "answer", "calls", "refused"],
+            )?;
             let window =
                 self.needed(fields, written.span(), &["event", at, "exchange", "window"])?;
             let answer =
@@ -958,6 +974,13 @@ impl<'t> Reading<'t> {
                 let position = position.to_string();
                 let key = ["event", at, "exchange", "calls", position.as_str()];
                 exchange = exchange.calling(self.call(&item, &key, known, contexts)?);
+            }
+            for (position, item) in
+                self.strings(fields.get("refused"), &["event", at, "exchange", "refused"])?
+            {
+                let position = position.to_string();
+                let key = ["event", at, "exchange", "refused", position.as_str()];
+                exchange = exchange.refusing(self.refused(&item, &key, known, contexts)?);
             }
             Happened::Exchange(exchange)
         } else if let Some(written) = event.get("call") {
@@ -1004,6 +1027,31 @@ impl<'t> Reading<'t> {
             call = call.input(parameter, contexts[&known(given, &at)?].clone());
         }
         Ok(call)
+    }
+
+    /// One refused call written under `key`: its identifier, the node type it
+    /// named, and its arguments and answer.
+    // @A refused call read back as written,IMPL_RECORD_REFUSED_CALL,impl,[CREQ_RECORD_KEEPS_REFUSED_CALLS],[DEC_RECORD_HOLDS_REFUSED_CALLS]
+    fn refused(
+        &self,
+        written: &Item,
+        key: &[&str],
+        known: &Known<'_>,
+        contexts: &HashMap<ContextId, Context>,
+    ) -> Result<RefusedCall, RecordFault> {
+        let fields = self.table(written, key)?;
+        self.only(fields, key, &["id", "node_type", "arguments", "answer"])?;
+        let under = |name: &'static str| [key, &[name]].concat();
+        let id = self.needed(fields, written.span(), &under("id"))?;
+        let node_type = self.needed(fields, written.span(), &under("node_type"))?;
+        let arguments = self.needed(fields, written.span(), &under("arguments"))?;
+        let answer = self.needed(fields, written.span(), &under("answer"))?;
+        Ok(RefusedCall::new(
+            self.string(id, &under("id"))?,
+            self.string(node_type, &under("node_type"))?,
+            contexts[&known(arguments, &under("arguments"))?].clone(),
+            contexts[&known(answer, &under("answer"))?].clone(),
+        ))
     }
 
     /// The items of an array the record may leave out, each with its place.
@@ -1492,7 +1540,7 @@ fn holds_the_run() {
     // the text holds and not what a reader makes of it.
     let text = run.record(&source);
     let record: DocumentMut = text.parse().expect("a record is TOML");
-    assert_eq!(record["version"].as_str(), Some("4"));
+    assert_eq!(record["version"].as_str(), Some("5"));
     assert_eq!(record["budget"].as_str(), Some("7"));
     // Two outputs and one activation outstanding.
     assert_eq!(record["spent"].as_str(), Some("3"));
@@ -2249,9 +2297,9 @@ fn unreadable_refused() {
     assert_eq!(not_toml.line(), 2);
 
     assert_eq!(
-        damaged("version = \"4\"", "version = \"5\"").kind(),
+        damaged("version = \"5\"", "version = \"6\"").kind(),
         &RecordFaultKind::Version {
-            found: "5".to_owned()
+            found: "6".to_owned()
         }
     );
     assert_eq!(
@@ -2443,7 +2491,7 @@ fn holds_exchanges() {
 
     let text = run.record(&source);
     let record: DocumentMut = text.parse().expect("a record is TOML");
-    assert_eq!(record["version"].as_str(), Some("4"));
+    assert_eq!(record["version"].as_str(), Some("5"));
     let events = events_of(&text);
     let kinds: Vec<&str> = events
         .iter()
@@ -2675,5 +2723,80 @@ proptest! {
             let resumed_held: Vec<u64> = resumed.exchanges().iter().map(|e| e.window().id().value()).collect();
             prop_assert_eq!(&resumed_held, held);
         }
+    }
+}
+
+/// Each refused call of `exchange`: its identifier, its node type, and its
+/// arguments' and its answer's identifiers and renderings.
+#[cfg(test)]
+fn refused_of(exchange: &Exchange) -> Vec<[String; 6]> {
+    exchange
+        .refused()
+        .iter()
+        .map(|refused| {
+            [
+                refused.id().to_owned(),
+                refused.node_type().to_owned(),
+                refused.arguments().id().value().to_string(),
+                refused.arguments().render().into_owned(),
+                refused.answer().id().value().to_string(),
+                refused.answer().render().into_owned(),
+            ]
+        })
+        .collect()
+}
+
+#[cfg(test)]
+proptest! {
+    /// For any exchanges an activation makes, each with any number of refused
+    /// calls whose arguments and answers are any text, the record resumes a run
+    /// holding each refused call with its exchange, in order, with the same
+    /// identifier, node type, arguments and answer, and is written again as the
+    /// same text; a record of version 4 is refused naming its version.
+    #[test]
+    fn refused_calls_kept(
+        exchanges in proptest::collection::vec(
+            proptest::collection::vec((awkward_text(), awkward_text()), 0..=3),
+            1..=3,
+        ),
+    ) {
+        let workflow = asking(1);
+        let mut source = IdSource::new();
+        let mut run = Run::<()>::start(&workflow, Arguments::new(), 10, &mut source).expect("sound");
+        let Step::Activate(_) = run.step() else {
+            return Err(TestCaseError::fail("the asker is offered"));
+        };
+        let mut expected = Vec::new();
+        for (exchange, refused) in exchanges.iter().enumerate() {
+            let mut made = Exchange::new(note(&mut source, "window"), note(&mut source, "answer"));
+            for (call, (arguments, answer)) in refused.iter().enumerate() {
+                let id = format!("call_{exchange}_{call}");
+                let refused = RefusedCall::new(
+                    &id,
+                    "bash",
+                    note(&mut source, arguments),
+                    note(&mut source, answer),
+                );
+                made = made.refusing(refused);
+            }
+            run.exchange(made).expect("held");
+        }
+        for exchange in run.exchanges() {
+            expected.push(refused_of(exchange));
+        }
+        let record = run.record(&source);
+
+        let (resumed, _) = Run::<()>::resume(&workflow, &record).expect("resumes");
+        let kept: Vec<_> = resumed.exchanges().iter().map(refused_of).collect();
+        prop_assert_eq!(&kept, &expected);
+        let (again, source_again) = Run::<()>::resume(&workflow, &record).expect("resumes");
+        prop_assert_eq!(again.record(&source_again), record.clone(), "written again byte for byte");
+
+        let older = record.replacen("version = \"5\"", "version = \"4\"", 1);
+        let refused = fault(Run::<()>::resume(&workflow, &older));
+        prop_assert_eq!(
+            refused.kind(),
+            &RecordFaultKind::Version { found: "4".to_owned() }
+        );
     }
 }

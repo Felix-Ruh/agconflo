@@ -1614,6 +1614,15 @@
           "title": "agconflo-core record::outstanding_not_charged_again",
           "type": "test_run"
         },
+        "RUN_RECORD_REFUSED_CALLS_KEPT": {
+          "executes": [
+            "TEST_RECORD_REFUSED_CALLS_KEPT"
+          ],
+          "id": "RUN_RECORD_REFUSED_CALLS_KEPT",
+          "test_outcome": "passed",
+          "title": "agconflo-core record::refused_calls_kept",
+          "type": "test_run"
+        },
         "RUN_RECORD_RESUMED_RUN_ENDS_ALIKE": {
           "executes": [
             "TEST_RECORD_RESUMED_RUN_ENDS_ALIKE"
@@ -2350,6 +2359,15 @@
           "id": "RUN_RUN_REFUSAL_DOES_NOT_SPEND_THE_BUDGET",
           "test_outcome": "passed",
           "title": "agconflo-core run::refusal_does_not_spend_the_budget",
+          "type": "test_run"
+        },
+        "RUN_RUN_REFUSED_CALLS_HELD": {
+          "executes": [
+            "TEST_RUN_REFUSED_CALLS_HELD"
+          ],
+          "id": "RUN_RUN_REFUSED_CALLS_HELD",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::refused_calls_held",
           "type": "test_run"
         },
         "RUN_RUN_REFUSED_OUTPUT_CAN_BE_FAILED": {
