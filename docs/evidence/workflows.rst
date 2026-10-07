@@ -187,3 +187,15 @@ was taken, with the model named in it.
    It does not reach the judge's model, which is asked only of findings once
    ``ubc`` passes, and it says nothing of a real model's answers, which a
    stub cannot stand in for.
+
+.. evd:: With a router passing the judge's state on, the run went as before
+   :id: EVD_JUDGE_STATE_PASSED_ON_ALIKE
+   :evd_kind: measurement
+   :observed_on: 2026-10-07
+   :observation: With the judge a step and a router after it passing its output on, the run of EVD_SCRIPTS_REWRITTEN_ALIKE on the engine at a3f676d sent the same 115 prompts, took the same routes and stopped at approval with the same step and change.
+
+   The same clone, brief, stub and images as ``EVD_SCRIPTS_REWRITTEN_ALIKE``.
+   It spent 205 activations where that spent 199: the router's six. What
+   ``approval`` was given, the judge's last verdict among it, printed byte
+   for byte as before, and ``agconflo check`` refused the judge as a router
+   with an output on this engine, at its declared output.

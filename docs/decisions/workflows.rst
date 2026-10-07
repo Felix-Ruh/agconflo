@@ -121,7 +121,7 @@ elsewhere, and none of these changes them.
    :id: DEC_ONE_GOAL_PER_PASS
    :dec_status: accepted
    :decided_on: 2026-09-27
-   :supported_by: EVD_RECORD_GOALS_ON_TWO_PULL_REQUESTS
+   :supported_by: EVD_RECORD_GOALS_ON_TWO_PULL_REQUESTS, EVD_JUDGE_STATE_PASSED_ON_ALIKE
    :statement: The record-goals workflow shall record its brief's goals one at a time in a single loop whose judge's output is the loop's state.
 
    A workflow's instances are fixed when it is written, and a brief may hold
@@ -131,6 +131,11 @@ elsewhere, and none of these changes them.
    else. Each accepted goal is staged in git's index, and each attempt starts
    from the index, so a rejected attempt leaves nothing behind and the
    accepted ones are on disk for the next goal to be placed beside.
+
+   The judge was the loop's router until routers stopped making contexts
+   (``DEC_ROUTER_PASSES_ON_ITS_INPUTS``). It is now a step like any other,
+   and a router after it passes its output back round or on, which changed
+   nothing any step was given (``EVD_JUDGE_STATE_PASSED_ON_ALIKE``).
 
 .. dec:: The review asks one kind of finding per step
    :id: DEC_REVIEW_ONE_KIND_PER_STEP

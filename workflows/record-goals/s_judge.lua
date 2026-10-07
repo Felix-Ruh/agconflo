@@ -71,7 +71,6 @@ else
 end
 local state
 if #defects > 0 and p < 3 then
-  host.route({ "head", "judge" })
   state = "goal " .. k .. "\npass " .. (p + 1) .. "\nstage no"
   local out = { "revise goal " .. k .. " (pass " .. p .. "): " .. how, state, "notes:\n" .. notes, "feedback:" }
   for _, d in ipairs(defects) do out[#out+1] = "- " .. d end
@@ -79,8 +78,6 @@ if #defects > 0 and p < 3 then
 end
 if #defects > 0 then notes = notes .. "goal " .. k .. " kept after pass " .. p .. " with open defects: " .. table.concat(defects, " | ") .. "\n" end
 if k < n then
-  host.route({ "head", "judge" })
   return host.text(host.output, "accept goal " .. k .. " (pass " .. p .. "): " .. how .. "\ngoal " .. (k + 1) .. "\npass 1\nstage yes\nnotes:\n" .. notes .. "\nfeedback:\n")
 end
-host.route({ "cmd_fin", "describe", "approval" })
 return host.text(host.output, "accept goal " .. k .. " (pass " .. p .. "): " .. how .. ", the last goal\nnotes:\n" .. notes .. "\nfeedback:\n")

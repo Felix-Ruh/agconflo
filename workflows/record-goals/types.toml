@@ -143,6 +143,9 @@ description = "Step: Each pair below is a sentence from a new requirement's body
 [types.s_judge]
 required = { goal = "note", previous = "note", ubc = "note", closing = "note", claims = "note", relations = "note", diff = "note", brief = "note", rules = "note", note = "note" }
 output = "note"
+
+[types.s_next]
+required = { verdict = "note" }
 routes = true
 
 [types.s_cmd_fin]

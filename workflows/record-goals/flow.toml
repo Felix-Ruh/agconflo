@@ -70,7 +70,7 @@ bindings = { rules = "rules", example = "example", goals = "goals", stakeholders
 
 [instances.head]
 node_type = "s_head"
-bindings = { state = { from = "judge", first = { text = "goal 1\npass 1\nstage no\nfeedback:\n" } }, statements = "statements", given_stakeholders = "given_stakeholders" }
+bindings = { state = { from = "next", input = "verdict", first ={ text = "goal 1\npass 1\nstage no\nfeedback:\n" } }, statements = "statements", given_stakeholders = "given_stakeholders" }
 
 [instances.cmd_prep]
 node_type = "s_cmd_prep"
@@ -182,12 +182,16 @@ bindings = { pairs = "pairs" }
 
 [instances.judge]
 node_type = "s_judge"
-bindings = { goal = "head", previous = { from = "judge", first = { text = "start\nnotes:\n\nfeedback:\n" } }, ubc = "ubc", closing = "closing", claims = "claims", relations = "relations", diff = "diff", brief = "brief", rules = "rules", note = "note" }
+bindings = { goal = "head", previous = { from = "next", input = "verdict", first = { text = "start\nnotes:\n\nfeedback:\n" } }, ubc = "ubc", closing = "closing", claims = "claims", relations = "relations", diff = "diff", brief = "brief", rules = "rules", note = "note" }
+
+[instances.next]
+node_type = "s_next"
+bindings = { verdict = "judge" }
 branches = { again = ["head", "judge"], done = ["cmd_fin", "describe", "approval"] }
 
 [instances.cmd_fin]
 node_type = "s_cmd_fin"
-bindings = { verdict = "judge" }
+bindings = { verdict = { from = "next", input = "verdict" } }
 
 [instances.fin]
 node_type = "run_command"
@@ -215,9 +219,9 @@ bindings = { fdiff = "fdiff", fubc = "fubc", statements = "statements", given_st
 
 [instances.describe]
 node_type = "m_describe"
-bindings = { brief = "brief", diff = "fdiff", final = "v_final", verdict = "judge" }
+bindings = { brief = "brief", diff = "fdiff", final = "v_final", verdict = { from = "next", input = "verdict" } }
 
 [instances.approval]
 node_type = "approve"
-bindings = { description = "describe", final = "v_final", verdict = "judge" }
+bindings = { description = "describe", final = "v_final", verdict = { from = "next", input = "verdict" } }
 

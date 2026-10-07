@@ -66,10 +66,12 @@ requirements; the repository's definition of the stakeholders; an example
 goal.
 
 **Per goal, in one loop.** The judge's output is the loop's state: which goal,
-which pass, and the feedback. What comes before the judge's first output is
-declared in `flow.toml` on the two edges it sends back along: to `head`, goal 1
-on pass 1, and to the judge itself, a start with no notes. The judge's branches
-go round again or on to the final check. Each attempt starts from git's index,
+which pass, and the feedback. The router after it, `next`, passes that state
+back round, to `head` and to the judge, while it names a goal and a pass, and
+on to the final check once it names none; a router makes nothing of its own.
+What comes before the judge's first output is declared in `flow.toml` on the
+two edges back: to `head`, goal 1 on pass 1, and to the judge, a start with no
+notes. Each attempt starts from git's index,
 where the accepted goals are staged. One step per question, each checking its
 own answer and asking again with the reasons, at most three times:
 
