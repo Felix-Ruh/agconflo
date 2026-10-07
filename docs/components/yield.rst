@@ -165,7 +165,7 @@ The run
    :ears_pattern: unwanted
    :statement: If its caller reports a call to a node type the outstanding activation's instance does not declare a call to, then Workflow run shall refuse that call naming the instance and that node type.
 
-   The last line: the script host checks every call before reporting any
+   The last line: the script host checks each call before reporting it
    (``CREQ_HOST_REFUSES_MALFORMED_CALL``), and the run checks what it is told
    whoever tells it, as it does outputs.
 
@@ -366,41 +366,50 @@ The script host
    - **A separator between the parts.** The window's rendering holds text that
      was never sent.
 
-.. comp_req:: A malformed call fails its activation before any call is reported
+.. comp_req:: A malformed call is refused naming its fault, and not reported as a call
    :id: CREQ_HOST_REFUSES_MALFORMED_CALL
    :derived_from: FEAT_YIELD_UNDECLARED_REFUSED
    :allocated_to: COMP_SCRIPT_HOST
    :ears_pattern: unwanted
-   :statement: If a model's call is to a node type not offered or has arguments that are not an object of strings filling its parameters, then Script host shall fail the activation naming the node type and the fault, reporting none of that answer's calls.
+   :statement: If a model's call is to a node type not offered or has arguments that are not an object of strings filling its parameters, then Script host shall refuse that call naming the node type and the fault, not reporting it to the run.
 
    ``genai`` passes each of these through (``EVD_GENAI_PASSES_MALFORMED_CALLS``);
-   the faults are the five ``DEC_MALFORMED_CALL_FAILS`` names.
+   the faults are the five ``DEC_REFUSED_CALL_ANSWERED`` names. What the model
+   is told of it is ``CREQ_HOST_ANSWERS_REFUSAL``'s. Changed by
+   ``DEC_CHANGE_HOST_REFUSES_MALFORMED_CALL``: it failed the activation, which
+   its parent does not ask.
 
    Failure modes:
 
    - **A number or an object passed on as text.** It has no text to be a
      context of, and ``genai``'s rendering of it is not what the model wrote.
-   - **The calls before the malformed one performed.** Paid for, and then
-     thrown away with the activation.
+   - **Reported to the run as a call**, its arguments made to fit, so that a
+     call the model did not make is performed.
    - **Reported as a script error.** A caller cannot tell a model's bad call
      from a script that broke.
-   - **The fault sent back to the model.** Text the host wrote, in the window,
-     with no context behind it.
+   - **The node type or the fault not named**, so the model cannot be told
+     what it did.
 
-.. comp_req:: A call the run refuses fails the activation
+.. comp_req:: A call the run refuses is not performed, its refusal kept
    :id: CREQ_HOST_CALL_REFUSAL_CARRIED
    :derived_from: FEAT_YIELD_UNDECLARED_REFUSED
    :allocated_to: COMP_SCRIPT_HOST
    :ears_pattern: unwanted
-   :statement: If the run refuses a call the script host reports, then Script host shall fail that activation carrying the run's refusal.
+   :statement: If the run refuses a call the script host reports, then Script host shall perform nothing for that call, keeping the run's refusal as its fault.
 
-   As an output the run refuses does (``CREQ_HOST_OUTPUT_REFUSAL_CARRIED``).
+   The refusal is then answered to the model (``CREQ_HOST_ANSWERS_REFUSAL``),
+   where an output the run refuses still fails its activation
+   (``CREQ_HOST_OUTPUT_REFUSAL_CARRIED``). Changed by
+   ``DEC_CHANGE_HOST_CALL_REFUSAL_CARRIED``: it failed the activation, which
+   its parent does not ask.
 
    Failure modes:
 
    - **The refusal swallowed.** The model is asked again with a call that has no
      result.
    - **Reported as a script error.** The run's refusal, a value, becomes prose.
+   - **The refused call performed anyway**, by a performer that did not wait
+     for the run's answer.
 
 .. comp_req:: Every answer is reported to the run before its calls
    :id: CREQ_HOST_REPORTS_EXCHANGES

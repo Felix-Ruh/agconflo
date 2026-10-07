@@ -626,3 +626,31 @@ or keeps, on the commit named. Re-running one later shows what has moved since.
    ``TEST_RUN_QUIESCENT_NAMES_ONLY_UNPRODUCED``. Beside it: every requirement
    allocated to ``COMP_WORKFLOW_RUN``. The lines: that marker, and one line
    each of ``components/run`` and ``features/behaviour``.
+
+.. evd:: The impact of a malformed call refused rather than failing its activation
+   :id: EVD_IMPACT_HOST_REFUSES_MALFORMED_CALL
+   :evd_kind: measurement
+   :observed_on: 2026-10-08
+   :observation: CREQ_HOST_REFUSES_MALFORMED_CALL answers to 2 needs, has 4 below it by link and 40 requirements sharing its component, and is named on 5 lines outside its definition.
+
+   ``sh scripts/impact.sh CREQ_HOST_REFUSES_MALFORMED_CALL``, at the commit
+   specifying the refusal answered. Above it: ``FEAT_YIELD_UNDECLARED_REFUSED``
+   and ``STKH_MODEL_YIELDS``. Below: ``IMPL_HOST_CHECK_CALLS``,
+   ``IMPL_HOST_YIELD``, and ``TEST_SCRIPTED_MALFORMED_CALL_FAILS`` with its
+   run. Beside it: every other requirement allocated to
+   ``COMP_SCRIPT_HOST``, the three of ``components/reflection`` among them.
+   The lines: the two markers in ``host.rs``, two in ``components/yield``
+   and one in ``components/reflection``.
+
+.. evd:: The impact of a call the run refuses not failing its activation
+   :id: EVD_IMPACT_HOST_CALL_REFUSAL_CARRIED
+   :evd_kind: measurement
+   :observed_on: 2026-10-08
+   :observation: CREQ_HOST_CALL_REFUSAL_CARRIED answers to 2 needs, has 3 below it by link and 40 requirements sharing its component, and is named on 1 line outside its definition.
+
+   ``sh scripts/impact.sh CREQ_HOST_CALL_REFUSAL_CARRIED``, at the same
+   commit. Above it: as for ``EVD_IMPACT_HOST_REFUSES_MALFORMED_CALL``.
+   Below: ``IMPL_SCRIPTED_YIELD``, and
+   ``TEST_SCRIPTED_REFUSED_CALL_FAILS_WITH_THE_REFUSAL`` with its run.
+   Beside it: every other requirement allocated to ``COMP_SCRIPT_HOST``.
+   The line: the marker in ``scripted.rs``.

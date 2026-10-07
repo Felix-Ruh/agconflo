@@ -1944,3 +1944,94 @@ changed.
      records sit beside this.
    - Text: the marker; one line each of ``components/run`` and
      ``features/behaviour``, citing it for quiescence, unchanged.
+
+.. dec:: Restated: a malformed call is refused, not its activation failed
+   :id: DEC_CHANGE_HOST_REFUSES_MALFORMED_CALL
+   :dec_status: accepted
+   :decided_on: 2026-10-08
+   :supported_by: EVD_IMPACT_HOST_REFUSES_MALFORMED_CALL
+   :statement: Agconflo's requirements project shall state CREQ_HOST_REFUSES_MALFORMED_CALL as refusing a malformed call because failing the activation is a mechanism its parent does not ask for.
+
+   Old: "If a model's call is to a node type not offered or has arguments that
+   are not an object of strings filling its parameters, then Script host
+   shall fail the activation naming the node type and the fault, reporting
+   none of that answer's calls." New: "If a model's call is to a node type
+   not offered or has arguments that are not an object of strings filling
+   its parameters, then Script host shall refuse that call naming the node
+   type and the fault, not reporting it to the run."
+
+   Raised by the first slice of ``STKH_REFLECTION``, which answers a refused
+   call where this ended the activation. The justification is the second:
+   wrong against its own parent. ``FEAT_YIELD_UNDECLARED_REFUSED`` asks that
+   Agconflo "refuse that call", and its body says so of itself: "'Refuse' is
+   the whole of it. That a refused call ends the activation is a decision,
+   and sending the refusal back to the model would meet this as well." The
+   parent holds whether the activation fails or goes on, so a requirement
+   saying it fails claims more than the parent needs - the mechanism of
+   ``DEC_MALFORMED_CALL_FAILS``, written into a statement. "Reporting none of
+   that answer's calls" is the same decision's every-call-before-any, and
+   the parent asks nothing of a call that is not refused.
+
+   The new statement is the one its parent asks for, with what this
+   component adds: which faults it finds, that it names them, and that a
+   call it could not make is not reported as one. It says nothing of what
+   the model is told, which is ``CREQ_HOST_ANSWERS_REFUSAL``'s, and would
+   read the same had that never been written.
+
+   Verdicts on the impact analysis (``EVD_IMPACT_HOST_REFUSES_MALFORMED_CALL``):
+
+   - Up: ``FEAT_YIELD_UNDECLARED_REFUSED`` and ``STKH_MODEL_YIELDS``
+     unchanged; the change brings the requirement back within them.
+   - Down: ``IMPL_HOST_CHECK_CALLS`` changes, checking each call apart where
+     it refused them all on the first fault; ``IMPL_HOST_YIELD`` changes,
+     answering a refused call rather than failing;
+     ``TEST_SCRIPTED_MALFORMED_CALL_FAILS`` and its run change, the test now
+     asserting each fault refused and the activation going on, with the
+     code in this pull request.
+   - Sideways, the script host's 40 other requirements: unaffected but
+     three. ``CREQ_HOST_PERFORMS_CALLS`` reports and performs "each" call;
+     a refused call is not one it can report, which this statement's
+     unwanted case says, and the rest are performed
+     (``DEC_UNREFUSED_CALLS_PERFORMED``). ``CREQ_HOST_REPORTS_EXCHANGES``
+     reports the exchange whole, its refused calls with it
+     (``CREQ_RUN_HOLDS_REFUSED_CALLS``). ``CREQ_HOST_NEXT_WINDOW`` is
+     unchanged, with ``CREQ_HOST_WINDOW_WITH_REFUSALS`` beside it.
+   - Text: the two code markers, changing with the code; in
+     ``components/yield``, ``CREQ_RUN_REFUSES_UNDECLARED_CALL``'s body said
+     the host checks every call before reporting any, and now says each
+     before reporting it; ``CREQ_ROSTER_CALLS_RETURNED``'s body is right as
+     it stands; ``components/reflection`` names it as one of two refusers,
+     unchanged.
+
+.. dec:: Restated: a call the run refuses is not performed, not its activation failed
+   :id: DEC_CHANGE_HOST_CALL_REFUSAL_CARRIED
+   :dec_status: accepted
+   :decided_on: 2026-10-08
+   :supported_by: EVD_IMPACT_HOST_CALL_REFUSAL_CARRIED
+   :statement: Agconflo's requirements project shall state CREQ_HOST_CALL_REFUSAL_CARRIED as performing nothing for a call the run refuses because failing the activation is a mechanism its parent does not ask for.
+
+   Old: "If the run refuses a call the script host reports, then Script host
+   shall fail that activation carrying the run's refusal." New: "If the run
+   refuses a call the script host reports, then Script host shall perform
+   nothing for that call, keeping the run's refusal as its fault."
+
+   Raised with ``DEC_CHANGE_HOST_REFUSES_MALFORMED_CALL``, on the same
+   ground: wrong against its own parent, ``FEAT_YIELD_UNDECLARED_REFUSED``,
+   which asks that the call be refused and leaves what becomes of the
+   activation to a decision. Failing the activation was
+   ``DEC_MALFORMED_CALL_FAILS`` again, written into a statement. The new
+   statement keeps what the component owes the parent - nothing is done for
+   a refused call - and that the run's refusal, a value, is kept as the
+   fault rather than turned into prose.
+
+   Verdicts on the impact analysis (``EVD_IMPACT_HOST_CALL_REFUSAL_CARRIED``):
+
+   - Up: unchanged, as above.
+   - Down: ``IMPL_SCRIPTED_YIELD`` changes, handing the run's refusal back
+     to the host to be answered; ``TEST_SCRIPTED_REFUSED_CALL_FAILS_WITH_THE_REFUSAL``
+     and its run change with the code, the case becoming the refusal
+     answered and the activation going on.
+   - Sideways: as for ``DEC_CHANGE_HOST_REFUSES_MALFORMED_CALL``, and
+     ``CREQ_HOST_OUTPUT_REFUSAL_CARRIED`` unaffected: an output the run
+     refuses still fails its activation, since no model asked for it.
+   - Text: the code marker, changing with the code.
