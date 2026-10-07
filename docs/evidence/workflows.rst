@@ -169,3 +169,21 @@ was taken, with the model named in it.
    final step caught the uncited need, as it is there to. Choosing which of
    the brief's needs concern a goal is one more question for a step of its
    own.
+
+.. evd:: Rewritten to share a module, the scripts ran as the generated ones did
+   :id: EVD_SCRIPTS_REWRITTEN_ALIKE
+   :evd_kind: measurement
+   :observed_on: 2026-10-07
+   :observation: From 1f67ee4 on #55's brief, against a stub model answering from the prompt alone, the hand-written scripts sent the generated ones' 115 prompts byte for byte and left the same record, 2,158,208 bytes over 199 activations.
+
+   Both runs were on the engine at ``cf97326``, with the same images and a
+   fresh clone each. The stub chose a stakeholder file and the first goal in
+   it to follow, wrote a directive ``ubc`` refuses, and answered everything
+   else ``NONE``, so most checks failed and asked again, and every pass
+   failed ``ubc``. The judge sent each goal back twice, went on to the second
+   goal, and then on to the final steps; both runs stopped at ``approval``,
+   exit 3, in 42 and 41 seconds, with the same change staged.
+
+   It does not reach the judge's model, which is asked only of findings once
+   ``ubc`` passes, and it says nothing of a real model's answers, which a
+   stub cannot stand in for.

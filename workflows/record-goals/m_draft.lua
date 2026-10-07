@@ -1,31 +1,8 @@
 local given, host = ...
-
-local function lines(s) local t = {} for l in (s .. "\n"):gmatch("(.-)\n") do t[#t+1] = l end return t end
-local function trim(s) return (s:gsub("^%s+", ""):gsub("%s+$", "")) end
-local fails = {}
-local function need(ok, what) if not ok then fails[#fails+1] = what end end
-local function clean(s, what)
-  need(not (s:find("DSML", 1, true) or s:find("<invoke", 1, true) or s:find("<\239\189\156", 1, true)),
-       what .. " is tool-call markup, not the plain text asked for")
-  need(trim(s) ~= "", what .. " is empty")
-end
-local function suggest(id, goals)
-  local words, best, bid, btitle = {}, 0, nil, nil
-  for w in id:lower():gmatch("[a-z]+") do if #w > 2 and w ~= "stkh" then words[#words+1] = w end end
-  for gid, title in (goals or ""):gmatch("\n(STKH_[A-Z0-9_]+)%s+(.-)%s%s+") do
-    local score, t = 0, title:lower()
-    for _, w in ipairs(words) do if t:find(w, 1, true) then score = score + 1 end end
-    if score > best then best, bid, btitle = score, gid, title end
-  end
-  if bid then return " (did you mean " .. bid .. ', "' .. btitle .. '"?)' end
-  return ""
-end
-local function report(name)
-  if #fails == 0 then return host.text(host.output, "PASS " .. name) end
-  return host.text(host.output, "FAIL " .. name .. ": " .. table.concat(fails, "; "))
-end
+local help = require('help')
+local lines, trim, suggest = help.lines, help.trim, help.suggest
 local base = table.concat({
-  "You have no tools in this step. Do not call a tool and do not write out a tool call in any syntax: answer in plain text only, in exactly the form asked for below.\n\nWrite one stkh_req directive for the goal below and nothing else: no fences, no commentary. Follow the example goal's form exactly: '.. stkh_req:: <title>', then the options indented three spaces (:id:, :stakeholder:, :statement: with the goal's statement copied exactly), a blank line, and a body indented three spaces, wrapped at 79 columns, in three paragraphs: why the goal exists; what it deliberately does not say; and how it stands beside each need in the neighbours list, naming each by its id in double backquotes and saying for each in a sentence or two how the two differ or depend - what either could hold without the other - rather than listing them. Use exactly the id, title and stakeholder the naming gives. Name no need that is not in the neighbours list. Follow the rules below. The goal below says which goal of how many this is and which pass. If its FEEDBACK is not 'none', a reviewer found what it says wrong with the last attempt at this goal: correct whatever of it concerns your answer.",
+  help.NO_TOOLS .. "Write one stkh_req directive for the goal below and nothing else: no fences, no commentary. Follow the example goal's form exactly: '.. stkh_req:: <title>', then the options indented three spaces (:id:, :stakeholder:, :statement: with the goal's statement copied exactly), a blank line, and a body indented three spaces, wrapped at 79 columns, in three paragraphs: why the goal exists; what it deliberately does not say; and how it stands beside each need in the neighbours list, naming each by its id in double backquotes and saying for each in a sentence or two how the two differ or depend - what either could hold without the other - rather than listing them. Use exactly the id, title and stakeholder the naming gives. Name no need that is not in the neighbours list. Follow the rules below." .. help.GOAL_NOTE,
   "\n\n## goal\n\n" .. given.goal:render(),
   "\n\n## naming\n\n" .. given.naming:render(),
   "\n\n## neighbours\n\n" .. given.neighbours:render(),
@@ -35,15 +12,9 @@ local base = table.concat({
   "\n\n## decs\n\n" .. given.decs:render(),
   "\n\n## current\n\n" .. given.current:render()
 })
-local out, why = nil, nil
-for attempt = 1, 3 do
-  local text = base
-  if out then text = text .. "\n\n## your previous answer\n\n" .. out .. "\n\n## why it was refused\n\n" .. why .. "\n\nWrite the whole answer again, correcting every point." end
-  out = host.complete('drafting', host.text(host.output, text)):render()
-  fails = {}
+return help.ask(host, 'drafting', base, function(out, need, clean)
   local g = given.goal:render()
-local statement = g:match("STATEMENT: ([^\n]*)") or ""
-
+  local statement = g:match("STATEMENT: ([^\n]*)") or ""
   local d = out
   clean(d, "the draft")
   local ls = lines(trim(d))
@@ -72,8 +43,4 @@ local statement = g:match("STATEMENT: ([^\n]*)") or ""
     end
   end
   for id in nb:gmatch("([A-Z][A-Z0-9]*_[A-Z0-9_]+)%W*:") do need(seen[id], "the body does not name " .. id .. ", which the neighbours list gives") end
-
-  if #fails == 0 then break end
-  why = table.concat(fails, "\n")
-end
-return host.text(host.output, out)
+end)

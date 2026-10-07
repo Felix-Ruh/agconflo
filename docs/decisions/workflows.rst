@@ -167,7 +167,7 @@ elsewhere, and none of these changes them.
 
 .. dec:: The workflow's documents are written by its generator
    :id: DEC_WORKFLOW_DOCUMENTS_GENERATED
-   :dec_status: accepted
+   :dec_status: superseded
    :decided_on: 2026-09-27
    :statement: The record-goals workflow's documents shall be changed by changing its generator and committed as the generator writes them.
 
@@ -178,6 +178,31 @@ elsewhere, and none of these changes them.
    ``sh``, Docker and ``agconflo`` alone; Python is needed only to change it.
    ``DEC_NO_PYTHON`` is about building the requirements project, which this
    does not touch.
+
+   Superseded by ``DEC_WORKFLOW_SCRIPTS_SHARE_A_MODULE``: versions 1 to 10
+   were written by this generator.
+
+.. dec:: The workflow's scripts share their helpers through a module
+   :id: DEC_WORKFLOW_SCRIPTS_SHARE_A_MODULE
+   :dec_status: accepted
+   :decided_on: 2026-10-07
+   :supersedes: DEC_WORKFLOW_DOCUMENTS_GENERATED
+   :supported_by: EVD_SCRIPTS_REWRITTEN_ALIKE
+   :statement: The record-goals workflow's documents shall be written by hand, the helpers its scripts share kept once in a module its scripts require.
+
+   The generator stood in for what scripts could not do: load one another.
+   A manifest now names modules its scripts require by name
+   (``DEC_MODULES_REQUIRED_BY_NAME``), and the repository holds no Python
+   (``DEC_NO_PYTHON_IN_THE_REPOSITORY``), so the generator's one reason is
+   gone and its language is ruled out. Its run tracer goes with it: reading a
+   run's record is the planned viewer's, not a workflow's.
+
+   ``lib/help.lua`` holds the checks, the step that asks a model and asks
+   again with the reasons, and the text every prompt shares - the tool
+   preamble and the note on the goal's feedback - so a change to any of them
+   reaches every step at once. The scripts were rewritten from what the
+   generator wrote, and ran as it did, prompt for prompt
+   (``EVD_SCRIPTS_REWRITTEN_ALIKE``).
 
 .. dec:: The brief gives each goal's stakeholder
    :id: DEC_STAKEHOLDER_IN_THE_BRIEF

@@ -44,6 +44,9 @@ s_cmd_fubc = "s_cmd_fubc.lua"
 s_v_final = "s_v_final.lua"
 m_describe = "m_describe.lua"
 
+[modules]
+help = "lib/help.lua"
+
 [tools]
 run_command = "run"
 read_file = "read"

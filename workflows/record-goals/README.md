@@ -50,11 +50,11 @@ proxy that intercepts TLS, pass its certificates as the third argument.
 stops; exit 3 is the approval step. Then:
 
     git -C ../run-55/work diff --cached                    # the change
-    python3 workflows/record-goals/trace.py ../run-55/run.toml workflows/record-goals/graph.json ../run-55/trace.json
 
-The trace lists each step's passes, what each model was shown and answered,
-and the judge's verdicts. #55 was measured from `1f67ee4` and #29 from
-`437f302`; compare each with what it merged, `git show a3a4066` and
+The record is the run's trace: each step's passes in order, what each model
+was shown and answered, each output with the inputs it was made from, and
+where the loop went after each verdict. #55 was measured from `1f67ee4` and
+#29 from `437f302`; compare each with what it merged, `git show a3a4066` and
 `git show 3778551`.
 
 ## What it does
@@ -99,11 +99,14 @@ run waits at `approval` for a person.
 
 ## Changing it
 
-The documents are written by `generate.py`; change it and run
-`python3 workflows/record-goals/generate.py`, then commit what it wrote
-(`DEC_WORKFLOW_DOCUMENTS_GENERATED`). Two values stay placeholders in the
-committed files, `@UBC_IMAGE@` and the ones in `grants.template.toml`, which
-`prepare.sh` fills. Run a change on both briefs before relying on it
+The documents are written by hand (`DEC_WORKFLOW_SCRIPTS_SHARE_A_MODULE`).
+What the scripts share - the checks, the step that asks a model and asks
+again with the reasons, and the text every prompt shares - is
+`lib/help.lua`, which a script reaches with `require('help')`. A model step
+is `m_<name>.lua`, a script step `s_<name>.lua`, and a script writing a
+command for a tool step `s_cmd_<name>.lua`. Two values stay placeholders in
+the committed files, `@UBC_IMAGE@` and the ones in `grants.template.toml`,
+which `prepare.sh` fills. Run a change on both briefs before relying on it
 (`DEC_WORKFLOW_PER_KIND_OF_CHANGE`), and against a stub model first: a local
 server answering `/v1/chat/completions` in the OpenAI shape, named in the run's
 `models.toml` in place of the provider, costs nothing and finds wiring faults.
