@@ -199,3 +199,9 @@ was taken, with the model named in it.
    ``approval`` was given, the judge's last verdict among it, printed byte
    for byte as before, and ``agconflo check`` refused the judge as a router
    with an output on this engine, at its declared output.
+
+   On #29's brief, three goals, from ``437f302``, the generated scripts on
+   ``cf97326`` and these on ``a3f676d`` sent the same 169 prompts byte for
+   byte, went back eight times and on once, and stopped at ``approval`` with
+   the same step and the same change; 286 activations, and 295 with the
+   router's nine.
