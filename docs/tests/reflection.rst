@@ -30,7 +30,7 @@ provider, a container or the network: a model is the loopback stub.
 
 .. test_case:: Each fault of a call is answered naming it, and nothing is performed for it
    :id: TEST_SCRIPTED_EACH_FAULT_ANSWERED
-   :verifies: CREQ_HOST_ANSWERS_REFUSAL
+   :verifies: CREQ_HOST_ANSWERS_REFUSAL, CREQ_HOST_REFUSES_MALFORMED_CALL
    :test_kind: error_path
    :coverage: full
 
@@ -53,11 +53,13 @@ provider, a container or the network: a model is the loopback stub.
 
    One answer makes three calls, the second to a node type not offered. The
    first and third are performed, in that order; the window after them
-   holds the three in the answer's order, the second's refusal where its
-   output would be.
+   composes the one before and the answer, the two performed calls'
+   contexts, the refused call's arguments, the two outputs, and the refused
+   call's answer - the same order whether composed live or from a record,
+   which holds performed and refused calls apart.
 
    Catches: no call performed when one is refused, as before; the calls
-   reordered; the refused call left out of the turn sent back.
+   reordered; the refusal left out of the window.
 
 .. test_case:: A model that keeps making refused calls stops at its model call limit
    :id: TEST_SCRIPTED_REFUSALS_END_AT_THE_LIMIT
@@ -75,15 +77,18 @@ provider, a container or the network: a model is the loopback stub.
 
 .. test_case:: A call the run refuses is answered as the host's are
    :id: TEST_SCRIPTED_RUN_REFUSAL_ANSWERED
-   :verifies: CREQ_HOST_ANSWERS_REFUSAL
+   :verifies: CREQ_HOST_ANSWERS_REFUSAL, CREQ_HOST_CALL_REFUSAL_CARRIED
    :test_kind: error_path
-   :coverage: full
+   :coverage: partial
 
-   A node type performed as a call makes a call of its own, which the run
-   refuses because calls go one deep. The calling model is answered with a
-   text naming that fault, and the run completes.
+   The host's own check makes a call the run would refuse unreachable from a
+   model, so the case makes one on purpose: the host's offer is built from a
+   declaration the run is not given, the one way the two can disagree. The
+   model is answered with a text naming the run's refusal and what may be
+   called, is asked once more, and the activation completes.
 
-   Catches: the run's refusal ending the activation, as before.
+   Catches: the run's refusal ending the activation, as before; the refusal
+   swallowed.
 
 .. test_case:: A resumed activation is given the refusal its record holds, asking nothing
    :id: TEST_SCRIPTED_REFUSAL_REPLAYED

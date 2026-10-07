@@ -377,39 +377,6 @@ The script host
    Catches: only the call's output sent; a new window built from copies; a
    separator between the parts.
 
-.. test_case:: A malformed call fails its activation, and no call of its answer runs
-   :id: TEST_SCRIPTED_MALFORMED_CALL_FAILS
-   :verifies: CREQ_HOST_REFUSES_MALFORMED_CALL
-   :test_kind: error_path
-   :coverage: full
-
-   Five answers, each with a well-formed call first and then one of: a call to
-   a node type not offered; arguments that are a bare string; a parameter the
-   node type does not declare; a required parameter missing; a number where a
-   string belongs. Each fails the activation with the malformed-call failure,
-   naming the node type and which of the five faults it was, as values. In each,
-   the well-formed call's node type - whose script would fail the test if run -
-   never runs, the run offers no called activation and spends nothing for one,
-   and the stub receives no further request.
-
-   Catches: a number or an object passed on as text; the calls before the
-   malformed one performed; reported as a script error; the fault sent back to
-   the model.
-
-.. test_case:: A call the run refuses fails the activation with the refusal
-   :id: TEST_SCRIPTED_REFUSED_CALL_FAILS_WITH_THE_REFUSAL
-   :verifies: CREQ_HOST_CALL_REFUSAL_CARRIED
-   :test_kind: error_path
-   :coverage: partial
-
-   The host's own check makes a call the run would refuse unreachable from a
-   model, so the case makes one on purpose: the host's offer is built from a
-   declaration the run is not given, the one way the two can disagree. The
-   activation fails carrying the run's refusal as a value, and the stub
-   receives no further request.
-
-   Catches: the refusal swallowed; reported as a script error.
-
 .. test_case:: Every answer is reported before its calls run
    :id: TEST_SCRIPTED_EXCHANGES_REPORTED_BEFORE_CALLS
    :verifies: CREQ_HOST_REPORTS_EXCHANGES

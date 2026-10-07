@@ -10,7 +10,7 @@ use std::collections::HashMap;
 
 use agconflo_core::{
     Activation, Call, CallRefusal, Context, ContextType, Exchange, ExchangeRefusal, IdSource,
-    NodeType, OutputRefusal, SourceExhausted,
+    NodeType, OutputRefusal, Parameter, RefusedCall, SourceExhausted,
 };
 use mlua::prelude::*;
 
@@ -89,16 +89,6 @@ pub enum ScriptFailure {
     /// script meeting the same source raises an error from the function it
     /// called, which is carried as [`ScriptFailure::Raised`].
     SourceExhausted(SourceExhausted),
-    /// A model's answer made a call Agconflo refuses, and none of that answer's
-    /// calls was performed.
-    MalformedCall {
-        /// The name the model called.
-        node_type: String,
-        /// Which fault it was.
-        fault: ModelCallFault,
-    },
-    /// The run refused a call the model made, and this is the run's refusal.
-    CallRefused(CallRefusal),
     /// The run refused an exchange the model made, and this is the run's
     /// refusal. Every context of an exchange is issued by the run's own source
     /// or read from its record, so nothing here is expected to produce one.
@@ -115,7 +105,7 @@ pub enum ScriptFailure {
 }
 
 /// What is wrong with a call a model made.
-// @The five faults of a call,TRACE_HOST_CALL_FAULT,trace,[],[DEC_MALFORMED_CALL_FAILS, DEC_FAILURES_NON_EXHAUSTIVE]
+// @The five faults of a call,TRACE_HOST_CALL_FAULT,trace,[],[DEC_REFUSED_CALL_ANSWERED, DEC_FAILURES_NON_EXHAUSTIVE]
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ModelCallFault {
@@ -176,10 +166,6 @@ impl fmt::Display for ScriptFailure {
             Self::SourceExhausted(exhausted) => {
                 write!(f, "the person's answer could not be kept: {exhausted}")
             }
-            Self::MalformedCall { node_type, fault } => {
-                write!(f, "the model's call to {node_type} is refused: {fault}")
-            }
-            Self::CallRefused(refusal) => write!(f, "the run refused a call: {refusal}"),
             Self::ExchangeRefused(refusal) => {
                 write!(f, "the run refused an exchange: {refusal}")
             }
@@ -284,6 +270,8 @@ pub(crate) enum Given {
     Held,
     /// The call's output.
     Output(Context),
+    /// The run refused the call, and performed nothing for it.
+    Refused(CallRefusal),
     /// The run stopped here - a refusal, a failure, a person's step, its budget
     /// - and the script is to end; its caller knows which.
     Stop,
@@ -638,21 +626,24 @@ impl Completing {
 ///
 /// The model is offered the node types the activation's instance declares calls
 /// to, as contexts of the prompt's type made from their declarations. Every
-/// request counts against the model call limit, checked before it is sent. Every
-/// call of an answer is checked, and one that is malformed fails the activation
-/// with none reported; otherwise the answer is reported to the run - window,
-/// offer, answer and every call - and the run hands its caller a record holding
-/// it. The calls are then performed by the run in the order the answer gives
-/// them, and the model is sent a window composing the last one, the answer, each
-/// call's contexts and each call's output, until it answers without calling.
+/// request counts against the model call limit, checked before it is sent. Each
+/// call of an answer is checked, and one that is malformed is refused: its
+/// arguments and what it is answered with are contexts of the prompt's type. The
+/// answer is reported to the run - window, offer, answer, every call and every
+/// refused one - and the run hands its caller a record holding it. The calls are
+/// then performed by the run in the order the answer gives them, a call the run
+/// refuses answered as a malformed one is, and the model is sent a window
+/// composing the last one, the answer, each call's contexts, each refused call's
+/// arguments, each call's output and each refused call's answer, until it
+/// answers without calling.
 ///
 /// An activation resumed from its record answers each request its record holds
-/// from the record instead, counted all the same, and each call the record holds
-/// an output for from that output - once the window and the offer are seen to be
-/// the ones recorded, by type and content. A difference fails the activation
-/// before anything is sent. When they agree the activation goes on with the
-/// recorded contexts.
-// @A model's calls performed and the next window composed,IMPL_HOST_YIELD,impl,[CREQ_HOST_OFFERS_DECLARED, CREQ_HOST_PERFORMS_CALLS, CREQ_HOST_NEXT_WINDOW, CREQ_HOST_REFUSES_MALFORMED_CALL, CREQ_HOST_REPORTS_EXCHANGES, CREQ_HOST_ANSWERS_FROM_RECORD, CREQ_HOST_REPLAY_DIVERGED, CREQ_HOST_MODEL_CALL_LIMIT],[DEC_EVERY_TURN_COUNTED, DEC_CALL_IS_AN_ACTIVATION, DEC_WINDOW_IS_A_CONTEXT, DEC_MALFORMED_CALL_FAILS, DEC_CALLS_IN_ORDER, DEC_RECORD_AFTER_EACH_ANSWER, DEC_SCRIPT_REPLAYED_FROM_ITS_RECORD]
+/// from the record instead, counted all the same, each call the record holds an
+/// output for from that output, and each refused call with the answer the record
+/// holds - once the window and the offer are seen to be the ones recorded, by
+/// type and content. A difference fails the activation before anything is sent.
+/// When they agree the activation goes on with the recorded contexts.
+// @A model's calls performed or refused and the next window composed,IMPL_HOST_YIELD,impl,[CREQ_HOST_OFFERS_DECLARED, CREQ_HOST_PERFORMS_CALLS, CREQ_HOST_NEXT_WINDOW, CREQ_HOST_WINDOW_WITH_REFUSALS, CREQ_HOST_ANSWERS_REFUSAL, CREQ_HOST_REFUSES_MALFORMED_CALL, CREQ_HOST_REPORTS_EXCHANGES, CREQ_HOST_ANSWERS_FROM_RECORD, CREQ_HOST_REFUSAL_FROM_RECORD, CREQ_HOST_REPLAY_DIVERGED, CREQ_HOST_MODEL_CALL_LIMIT],[DEC_EVERY_TURN_COUNTED, DEC_CALL_IS_AN_ACTIVATION, DEC_WINDOW_IS_A_CONTEXT, DEC_REFUSED_CALL_ANSWERED, DEC_UNREFUSED_CALLS_PERFORMED, DEC_CALLS_IN_ORDER, DEC_RECORD_AFTER_EACH_ANSWER, DEC_SCRIPT_REPLAYED_FROM_ITS_RECORD, DEC_RECORD_HOLDS_REFUSED_CALLS]
 async fn complete(
     completing: &Completing,
     role: &str,
@@ -674,7 +665,9 @@ async fn complete(
         calls.made.set(calls.made.get() + 1);
 
         let cursor = calls.replayed.get();
-        let (answer, made) = if let Some(recorded) = completing.replay.exchanges.get(cursor) {
+        let (answer, made, refused) = if let Some(recorded) =
+            completing.replay.exchanges.get(cursor)
+        {
             calls.replayed.set(cursor + 1);
             if !same(recorded.window(), &window) {
                 return Err(completing.fail(ScriptFailure::Diverged {
@@ -692,24 +685,48 @@ async fn complete(
                 }));
             }
             window = recorded.window().clone();
-            (recorded.answer().clone(), recorded.calls().to_vec())
+            (
+                recorded.answer().clone(),
+                recorded.calls().to_vec(),
+                recorded.refused().to_vec(),
+            )
         } else {
             let answered = match completing.roster.send(role, &parts, &offered).await {
                 Ok(answered) => answered,
                 Err(failure) => return Err(completing.fail(ScriptFailure::ModelFailed(failure))),
             };
-            let made = match checked(&answered.calls, &completing.callees, issuing) {
-                Ok(made) => made?,
-                Err((node_type, fault)) => {
-                    return Err(completing.fail(ScriptFailure::MalformedCall { node_type, fault }));
-                }
-            };
+            let checked = checked(&answered.calls, &completing.callees, issuing)?;
             let answer = Context::text(&mut issuing.borrow_mut(), declared.clone(), answered.text)
                 .map_err(LuaError::external)?;
+            let mut made = Vec::new();
+            let mut refused = Vec::new();
+            for call in checked {
+                match call {
+                    Checked::Made(call) => made.push(call),
+                    Checked::Refused { asked, fault } => {
+                        let mut source = issuing.borrow_mut();
+                        let arguments =
+                            Context::text(&mut source, kind.clone(), asked.arguments.to_string())
+                                .map_err(LuaError::external)?;
+                        let text = refusal_text(&asked.name, &fault, &completing.callees);
+                        let answered_with = Context::text(&mut source, kind.clone(), text)
+                            .map_err(LuaError::external)?;
+                        refused.push(RefusedCall::new(
+                            &asked.id,
+                            &asked.name,
+                            arguments,
+                            answered_with,
+                        ));
+                    }
+                }
+            }
             let mut exchange =
                 Exchange::new(window.clone(), answer.clone()).offering(offer.clone());
             for call in &made {
                 exchange = exchange.calling(call.clone());
+            }
+            for call in &refused {
+                exchange = exchange.refusing(call.clone());
             }
             if !matches!(
                 ask(&completing.mailbox, Asking::Exchange(exchange)).await,
@@ -717,10 +734,10 @@ async fn complete(
             ) {
                 return Err(stopped());
             }
-            (answer, made)
+            (answer, made, refused)
         };
 
-        if made.is_empty() {
+        if made.is_empty() && refused.is_empty() {
             return Ok(answer);
         }
 
@@ -730,7 +747,14 @@ async fn complete(
                 Some(output) => output.clone(),
                 None => match ask(&completing.mailbox, Asking::Call(call.clone())).await {
                     Given::Output(output) => output,
-                    _ => return Err(stopped()),
+                    // The run performed nothing for it; the model is told why.
+                    Given::Refused(refusal) => Context::text(
+                        &mut issuing.borrow_mut(),
+                        kind.clone(),
+                        refusal_text(call.node_type(), &refusal, &completing.callees),
+                    )
+                    .map_err(LuaError::external)?,
+                    Given::Held | Given::Stop => return Err(stopped()),
                 },
             };
             outputs.push((call.id().to_owned(), output));
@@ -740,15 +764,22 @@ async fn complete(
         for call in &made {
             composed.extend(call.inputs().iter().map(|(_, given)| given));
         }
+        composed.extend(refused.iter().map(RefusedCall::arguments));
         composed.extend(outputs.iter().map(|(_, output)| output));
+        composed.extend(refused.iter().map(RefusedCall::answer));
         let next = Context::compose(&mut issuing.borrow_mut(), kind.clone(), composed, "")
             .map_err(LuaError::external)?;
 
+        let answering: Vec<(String, Context)> = refused
+            .iter()
+            .map(|call| (call.id().to_owned(), call.answer().clone()))
+            .collect();
         parts.push(Part::Answer {
             answer,
             calls: made,
+            refused,
         });
-        for (call, output) in outputs {
+        for (call, output) in outputs.into_iter().chain(answering) {
             parts.push(Part::Result { call, output });
         }
         window = next;
@@ -994,69 +1025,103 @@ fn offer_for(
     Ok((offered, offer))
 }
 
-/// Every call of an answer checked against what was offered, and only then made
-/// into calls: each argument a text context of the type its parameter is
-/// declared for, in the order the model gave them. The first fault found is the
-/// one reported, and no call is made when there is one.
-// @Every call checked before any is made,IMPL_HOST_CHECK_CALLS,impl,[CREQ_HOST_REFUSES_MALFORMED_CALL],[DEC_CALL_CARRIES_STRING_VALUES, DEC_MALFORMED_CALL_FAILS]
-#[allow(clippy::type_complexity)]
+/// One call of a model's answer once checked: made into a call, or refused for
+/// its fault as the model made it.
+enum Checked {
+    Made(Call),
+    Refused { asked: Asked, fault: ModelCallFault },
+}
+
+/// Each call of an answer checked against what was offered, in the order the
+/// model made them. One naming a node type offered and filling its parameters
+/// with strings is made into a call, each argument a text context of the type
+/// its parameter is declared for, in the order the model gave them; any other is
+/// refused with the first fault found in it.
+// @Each call checked on its own and a malformed one refused,IMPL_HOST_CHECK_CALLS,impl,[CREQ_HOST_REFUSES_MALFORMED_CALL],[DEC_CALL_CARRIES_STRING_VALUES, DEC_REFUSED_CALL_ANSWERED]
 fn checked(
     asked: &[Asked],
     callees: &[NodeType],
     issuing: &Rc<RefCell<IdSource>>,
-) -> Result<LuaResult<Vec<Call>>, (String, ModelCallFault)> {
-    let mut filled = Vec::new();
+) -> LuaResult<Vec<Checked>> {
+    let mut checked = Vec::new();
     for call in asked {
-        let fault = |fault| (call.name.clone(), fault);
-        let Some(callee) = callees.iter().find(|callee| callee.name == call.name) else {
-            return Err(fault(ModelCallFault::NotOffered));
-        };
-        let Some(arguments) = call.arguments.as_object() else {
-            return Err(fault(ModelCallFault::NotAnObject));
-        };
-        let mut inputs = Vec::new();
-        for (parameter, value) in arguments {
-            let Some(declared) = callee
-                .required
-                .iter()
-                .find(|declared| declared.name == *parameter)
-            else {
-                return Err(fault(ModelCallFault::UndeclaredParameter {
-                    parameter: parameter.clone(),
-                }));
-            };
-            let Some(text) = value.as_str() else {
-                return Err(fault(ModelCallFault::NotAString {
-                    parameter: parameter.clone(),
-                }));
-            };
-            inputs.push((declared.clone(), text.to_owned()));
+        match filled(call, callees) {
+            Err(fault) => checked.push(Checked::Refused {
+                asked: call.clone(),
+                fault,
+            }),
+            Ok((node_type, inputs)) => {
+                let mut source = issuing.borrow_mut();
+                let mut made = Call::new(&call.id, node_type);
+                for (parameter, text) in inputs {
+                    let given = Context::text(&mut source, parameter.context_type.clone(), text)
+                        .map_err(LuaError::external)?;
+                    made = made.input(&parameter.name, given);
+                }
+                checked.push(Checked::Made(made));
+            }
         }
-        if let Some(missing) = callee
+    }
+    Ok(checked)
+}
+
+/// A call as filled: the node type it names, and each parameter it fills with
+/// the text given for it.
+type Filled<'c> = (&'c str, Vec<(&'c Parameter, String)>);
+
+/// The node type `call` names and the text for each parameter it fills, in the
+/// order the model gave them - or the first fault found in it.
+fn filled<'c>(call: &Asked, callees: &'c [NodeType]) -> Result<Filled<'c>, ModelCallFault> {
+    let Some(callee) = callees.iter().find(|callee| callee.name == call.name) else {
+        return Err(ModelCallFault::NotOffered);
+    };
+    let Some(arguments) = call.arguments.as_object() else {
+        return Err(ModelCallFault::NotAnObject);
+    };
+    let mut inputs = Vec::new();
+    for (parameter, value) in arguments {
+        let Some(declared) = callee
             .required
             .iter()
-            .find(|required| !arguments.contains_key(&required.name))
-        {
-            return Err(fault(ModelCallFault::RequiredMissing {
-                parameter: missing.name.clone(),
-            }));
-        }
-        filled.push((call.id.clone(), callee.name.clone(), inputs));
+            .find(|declared| declared.name == *parameter)
+        else {
+            return Err(ModelCallFault::UndeclaredParameter {
+                parameter: parameter.clone(),
+            });
+        };
+        let Some(text) = value.as_str() else {
+            return Err(ModelCallFault::NotAString {
+                parameter: parameter.clone(),
+            });
+        };
+        inputs.push((declared, text.to_owned()));
     }
+    if let Some(missing) = callee
+        .required
+        .iter()
+        .find(|required| !arguments.contains_key(&required.name))
+    {
+        return Err(ModelCallFault::RequiredMissing {
+            parameter: missing.name.clone(),
+        });
+    }
+    Ok((callee.name.as_str(), inputs))
+}
 
-    let mut source = issuing.borrow_mut();
-    Ok(filled
-        .into_iter()
-        .map(|(id, node_type, inputs)| {
-            let mut made = Call::new(&id, &node_type);
-            for (parameter, text) in inputs {
-                let given = Context::text(&mut source, parameter.context_type, text)
-                    .map_err(LuaError::external)?;
-                made = made.input(&parameter.name, given);
-            }
-            Ok(made)
-        })
-        .collect())
+/// What a model is told of its call to `node_type`, refused for `fault`: the
+/// node type, the fault, and the node types the step may call.
+// @A refusal naming the node type the fault and what may be called,IMPL_HOST_REFUSAL_TEXT,impl,[CREQ_HOST_ANSWERS_REFUSAL],[DEC_REFUSED_CALL_ANSWERED]
+fn refusal_text(node_type: &str, fault: &dyn fmt::Display, callees: &[NodeType]) -> String {
+    let may = if callees.is_empty() {
+        "nothing".to_owned()
+    } else {
+        callees
+            .iter()
+            .map(|callee| callee.name.as_str())
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    format!("Agconflo refused this call to {node_type}: {fault}. This step may call {may}.")
 }
 
 /// Take the coroutine library, which `mlua` loads with the first asynchronous

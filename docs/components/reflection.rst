@@ -43,11 +43,12 @@ component requirement whose subject is anything else.
 
    ``CREQ_HOST_NEXT_WINDOW`` says what follows an answer whose calls all
    have outputs; this says what follows one whose calls were not all made.
-   A refused call stands where a performed one would, its arguments in
-   place of its contexts and its answer in place of its output, so the
-   refusal is part of what the model was sent, by reference, as any output
-   is (``DEC_WINDOW_IS_A_CONTEXT``). The calls beside it are performed
-   (``DEC_UNREFUSED_CALLS_PERFORMED``).
+   Each refused call's arguments follow the performed calls' contexts, and
+   its answer follows their outputs: a record holds performed and refused
+   calls apart, so this is the order a window is composed in again on
+   resume. The refusal is part of what the model was sent, by reference, as
+   any output is (``DEC_WINDOW_IS_A_CONTEXT``). The calls beside it are
+   performed (``DEC_UNREFUSED_CALLS_PERFORMED``).
 
    Failure modes:
 

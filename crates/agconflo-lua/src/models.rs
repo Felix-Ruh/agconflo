@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 use std::fmt;
 
-use agconflo_core::{Call, Context};
+use agconflo_core::{Call, Context, RefusedCall};
 use genai::Client;
 use genai::chat::{
     CacheControl, ChatMessage, ChatOptions, ChatRequest, ContentPart, MessageContent, Tool,
@@ -310,8 +310,13 @@ pub(crate) enum Part {
     /// as the user's.
     User(Context),
     /// A model's answer, sent as the model's turn with the calls it made: each
-    /// named by its node type and filled with its contexts' renderings.
-    Answer { answer: Context, calls: Vec<Call> },
+    /// named by its node type and filled with its contexts' renderings, then
+    /// each refused call as the model made it.
+    Answer {
+        answer: Context,
+        calls: Vec<Call>,
+        refused: Vec<RefusedCall>,
+    },
     /// A call's output, sent as that call's result, paired with it by the
     /// provider's identifier.
     Result { call: String, output: Context },
@@ -350,14 +355,19 @@ pub(crate) struct Asked {
 /// part when its answer is empty, which sends the whole of an empty rendering.
 /// A call's arguments are an object of its contexts' renderings under their
 /// parameters' names, in the order the call gave them; `genai` writes the JSON
-/// around them.
-// @Each part of a window sent as the message it is,IMPL_MODELS_MESSAGES,impl,[CREQ_ROSTER_PARTS_AS_MESSAGES, CREQ_ROSTER_CONTEXTS_WHOLE],[DEC_WINDOW_IS_A_CONTEXT, DEC_CALL_CARRIES_STRING_VALUES]
+/// around them. A refused call's arguments are the JSON the model sent, whatever
+/// its shape.
+// @Each part of a window sent as the message it is,IMPL_MODELS_MESSAGES,impl,[CREQ_ROSTER_PARTS_AS_MESSAGES, CREQ_ROSTER_CONTEXTS_WHOLE, CREQ_ROSTER_REFUSED_CALL_AS_MADE],[DEC_WINDOW_IS_A_CONTEXT, DEC_CALL_CARRIES_STRING_VALUES, DEC_REFUSED_CALL_ANSWERED]
 fn messages(window: &[Part]) -> Vec<ChatMessage> {
     window
         .iter()
         .map(|part| match part {
             Part::User(context) => ChatMessage::user(context.render().into_owned()),
-            Part::Answer { answer, calls } => {
+            Part::Answer {
+                answer,
+                calls,
+                refused,
+            } => {
                 let mut content = Vec::new();
                 let text = answer.render();
                 if !text.is_empty() {
@@ -375,6 +385,17 @@ fn messages(window: &[Part]) -> Vec<ChatMessage> {
                         call_id: call.id().to_owned(),
                         fn_name: call.node_type().to_owned(),
                         fn_arguments: serde_json::Value::Object(arguments),
+                        thought_signatures: None,
+                    }));
+                }
+                for call in refused {
+                    let sent = call.arguments().render();
+                    let arguments = serde_json::from_str(&sent)
+                        .unwrap_or_else(|_| serde_json::Value::String(sent.into_owned()));
+                    content.push(ContentPart::ToolCall(ToolCall {
+                        call_id: call.id().to_owned(),
+                        fn_name: call.node_type().to_owned(),
+                        fn_arguments: arguments,
                         thought_signatures: None,
                     }));
                 }
@@ -1189,6 +1210,7 @@ fn window_parts_as_messages() {
         Part::Answer {
             answer,
             calls: vec![Call::new("call_7", "lookup").input("query", query)],
+            refused: Vec::new(),
         },
         Part::Result {
             call: "call_7".to_owned(),
@@ -1340,6 +1362,7 @@ proptest::proptest! {
             Part::Answer {
                 answer: note(&mut source, "note", &answer),
                 calls: vec![Call::new("call_1", "lookup").input("query", note(&mut source, "note", &argument))],
+                refused: Vec::new(),
             },
             Part::Result { call: "call_1".to_owned(), output: note(&mut source, "note", &output) },
         ];
@@ -1419,6 +1442,7 @@ fn continued(source: &mut IdSource, turns: &[(bool, usize)]) -> Vec<Part> {
         window.push(Part::Answer {
             answer: note(source, "note", said),
             calls: made,
+            refused: Vec::new(),
         });
         for call in ids {
             window.push(Part::Result {
@@ -1667,6 +1691,63 @@ fn decision_refusal_carried() {
                 status: Some(status),
                 message: body.to_owned(),
             })
+        );
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn refused_call_sent_as_made() {
+    let stub = Stub::answering(200, "done");
+    let roster = Roster::new(client_for(&stub.base))
+        .map("openai", "openai::m")
+        .map("anthropic", "anthropic::m");
+    let refusal =
+        "Agconflo refused this call to bash: it was not offered. This step may call lookup.";
+    let shapes = ["\"ls -la\"", "42", "[\"ls\",\"-la\"]", "{\"path\":7}"];
+    for shape in shapes {
+        let mut source = IdSource::new();
+        let answered_with = note(&mut source, "note", refusal);
+        let window = [
+            Part::User(note(&mut source, "note", "Fix the tests.")),
+            Part::Answer {
+                answer: note(&mut source, "note", "Running it."),
+                calls: Vec::new(),
+                refused: vec![RefusedCall::new(
+                    "call_1",
+                    "bash",
+                    note(&mut source, "note", shape),
+                    answered_with.clone(),
+                )],
+            },
+            Part::Result {
+                call: "call_1".to_owned(),
+                output: answered_with,
+            },
+        ];
+        for role in ["openai", "anthropic"] {
+            block(roster.send(role, &window, &[])).expect("answered");
+        }
+    }
+
+    let requests = stub.requests();
+    assert_eq!(requests.len(), 8);
+    for (index, (_, body)) in requests.iter().enumerate() {
+        // The model's turn holds the refused call under its identifier, with its
+        // arguments as the model sent them, whatever their shape; its answer is
+        // that call's result.
+        let expected: serde_json::Value =
+            serde_json::from_str(shapes[index / 2]).expect("each shape is JSON");
+        let sent = sent_messages(body);
+        assert_eq!(
+            sent[1].calls,
+            [("call_1".to_owned(), "bash".to_owned(), expected)],
+            "{body}"
+        );
+        assert_eq!(
+            sent[2].results,
+            [("call_1".to_owned(), refusal.to_owned())],
+            "{body}"
         );
     }
 }

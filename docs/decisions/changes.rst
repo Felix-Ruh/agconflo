@@ -1985,9 +1985,9 @@ changed.
    - Down: ``IMPL_HOST_CHECK_CALLS`` changes, checking each call apart where
      it refused them all on the first fault; ``IMPL_HOST_YIELD`` changes,
      answering a refused call rather than failing;
-     ``TEST_SCRIPTED_MALFORMED_CALL_FAILS`` and its run change, the test now
-     asserting each fault refused and the activation going on, with the
-     code in this pull request.
+     ``TEST_SCRIPTED_MALFORMED_CALL_FAILS`` and its run are replaced by
+     ``TEST_SCRIPTED_EACH_FAULT_ANSWERED``, which asserts each fault refused
+     and the activation going on, with the code in this pull request.
    - Sideways, the script host's 40 other requirements: unaffected but
      three. ``CREQ_HOST_PERFORMS_CALLS`` reports and performs "each" call;
      a refused call is not one it can report, which this statement's
@@ -2029,8 +2029,9 @@ changed.
    - Up: unchanged, as above.
    - Down: ``IMPL_SCRIPTED_YIELD`` changes, handing the run's refusal back
      to the host to be answered; ``TEST_SCRIPTED_REFUSED_CALL_FAILS_WITH_THE_REFUSAL``
-     and its run change with the code, the case becoming the refusal
-     answered and the activation going on.
+     and its run are replaced with the code by
+     ``TEST_SCRIPTED_RUN_REFUSAL_ANSWERED``, the refusal answered and the
+     activation going on.
    - Sideways: as for ``DEC_CHANGE_HOST_REFUSES_MALFORMED_CALL``, and
      ``CREQ_HOST_OUTPUT_REFUSAL_CARRIED`` unaffected: an output the run
      refuses still fails its activation, since no model asked for it.

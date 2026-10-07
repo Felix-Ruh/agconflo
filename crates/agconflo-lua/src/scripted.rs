@@ -401,7 +401,7 @@ enum Stop {
 /// for a call's own activation.
 ///
 /// Boxed, because performing a call's activation is this function again.
-// @A script's questions answered from the run it is performed for,IMPL_SCRIPTED_YIELD,impl,[CREQ_HOST_PERFORMS_CALLS, CREQ_HOST_RECORD_AFTER_ANSWER, CREQ_HOST_CALL_REFUSAL_CARRIED, CREQ_HOST_HANDS_OVER_PERSON_STEP],[DEC_CALL_IS_AN_ACTIVATION, DEC_SCRIPT_REPLAYED_FROM_ITS_RECORD]
+// @A script's questions answered from the run it is performed for,IMPL_SCRIPTED_YIELD,impl,[CREQ_HOST_PERFORMS_CALLS, CREQ_HOST_RECORD_AFTER_ANSWER, CREQ_HOST_CALL_REFUSAL_CARRIED, CREQ_HOST_HANDS_OVER_PERSON_STEP],[DEC_CALL_IS_AN_ACTIVATION, DEC_SCRIPT_REPLAYED_FROM_ITS_RECORD, DEC_REFUSED_CALL_ANSWERED]
 fn perform_activation<'f>(
     run: &'f mut Run<'_, ScriptFailure>,
     activation: &'f Activation,
@@ -499,7 +499,7 @@ async fn serve(
         },
         host::Asking::Call(call) => {
             if let Err(refusal) = run.call(call) {
-                return stopping(Stop::Failed(ScriptFailure::CallRefused(refusal)));
+                return host::Given::Refused(refusal);
             }
             let called = match run.step() {
                 Step::Ended(ending) => return stopping(Stop::Ended(ending)),
@@ -2011,69 +2011,287 @@ fn continuation_begins_with_the_turn_before() {
     }
 }
 
+/// The refused calls a record's exchange event holds, each as its identifier,
+/// the node type it named and the identifiers of its arguments and its answer.
+#[cfg(test)]
+fn refused_in(event: &toml_edit::Table) -> Vec<[String; 4]> {
+    event["exchange"]
+        .get("refused")
+        .and_then(toml_edit::Item::as_array)
+        .map(|refused| {
+            refused
+                .iter()
+                .filter_map(toml_edit::Value::as_inline_table)
+                .map(|entry| {
+                    ["id", "node_type", "arguments", "answer"]
+                        .map(|key| entry[key].as_str().expect("a string").to_owned())
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// The identifiers of the parts of a record's composed context `id`.
+#[cfg(test)]
+fn parts_of(record: &str, id: &str) -> Vec<String> {
+    record_toml(record)["context"][id]["parts"]
+        .as_array()
+        .unwrap_or_else(|| panic!("context {id} is composed"))
+        .iter()
+        .filter_map(|part| part.as_str().map(str::to_owned))
+        .collect()
+}
+
 #[cfg(test)]
 #[test]
-fn malformed_call_fails() {
-    use crate::host::ModelCallFault;
-    let never = "error('lookup must not run')";
-    let cases = [
-        ("search", "{\"query\": \"x\"}", ModelCallFault::NotOffered),
-        ("lookup", "\"amber-7\"", ModelCallFault::NotAnObject),
-        (
-            "lookup",
-            "{\"query\": \"x\", \"extra\": \"y\"}",
-            ModelCallFault::UndeclaredParameter {
-                parameter: "extra".to_owned(),
-            },
-        ),
-        (
-            "lookup",
-            "{}",
-            ModelCallFault::RequiredMissing {
-                parameter: "query".to_owned(),
-            },
-        ),
-        (
-            "lookup",
-            "{\"query\": 7}",
-            ModelCallFault::NotAString {
-                parameter: "query".to_owned(),
-            },
-        ),
-    ];
-    for (name, arguments, fault) in cases {
+fn refused_call_answered() {
+    let definition = workflow(YIELD_TYPES, YIELDING);
+    let refusal =
+        "Agconflo refused this call to bash: it was not offered. This step may call lookup.";
+    for model in ["openai::m", "anthropic::m"] {
         let stub = Stub::replying(vec![
-            looking_up("call_1", "fine").call("call_2", name, arguments),
-            Reply::text("never asked"),
+            Reply::text("").call("call_1", "bash", "{\"command\": \"ls\"}"),
+            looking_up("call_2", "amber-7"),
+            Reply::text("done"),
         ]);
         let (outcome, records) = run_keeping(
-            &workflow(YIELD_TYPES, YIELDING),
-            &yielding_behaviours("q", never),
-            &roster_at(&stub, "openai::m"),
+            &definition,
+            &yielding_behaviours("q", LOOKUP),
+            &roster_at(&stub, model),
             CALLING,
         );
+        assert_eq!(rendered(outcome), "done", "{model}");
+        let last = records.last().expect("records");
+        let events = record_events(last);
+        let exchanges: Vec<&toml_edit::Table> = events
+            .iter()
+            .filter(|(kind, _)| kind == "exchange")
+            .map(|(_, event)| event)
+            .collect();
+        assert_eq!(exchanges.len(), 3, "{model}: {last}");
         assert_eq!(
-            failed(outcome),
-            (
-                "asker".to_owned(),
-                ScriptFailure::MalformedCall {
-                    node_type: name.to_owned(),
-                    fault: fault.clone(),
-                }
-            ),
-            "{arguments}"
+            events.iter().filter(|(kind, _)| kind == "call").count(),
+            1,
+            "{model}: lookup performed once, bash never"
         );
-        // Nothing reported, performed or spent for the well-formed call before
-        // it, no record after the one at the start, and the model not asked again.
-        assert_eq!(stub.requests().len(), 1, "{arguments}");
-        assert_eq!(records.len(), 1, "{arguments}: {records:?}");
-        assert!(kinds(&records[0]).is_empty());
+
+        // The refused call is held with its exchange, answered with a text of
+        // the prompt's type naming the node type, the fault and what may be
+        // called.
+        let refused = refused_in(exchanges[0]);
+        assert_eq!(refused.len(), 1, "{model}");
+        assert_eq!(
+            (refused[0][0].as_str(), refused[0][1].as_str()),
+            ("call_1", "bash")
+        );
+        assert_eq!(text_of(last, &refused[0][2]), "{\"command\":\"ls\"}");
+        assert_eq!(text_of(last, &refused[0][3]), refusal, "{model}");
+        assert_eq!(
+            record_toml(last)["context"][refused[0][3].as_str()]["type"].as_str(),
+            Some("note")
+        );
+
+        // The window sent next composes the one before, the answer, the
+        // refused call's arguments and its answer, in that order.
+        let window = exchanges[1]["exchange"]["window"]
+            .as_str()
+            .expect("a window");
+        let first_window = exchanges[0]["exchange"]["window"]
+            .as_str()
+            .expect("a window");
+        let first_answer = exchanges[0]["exchange"]["answer"]
+            .as_str()
+            .expect("an answer");
+        assert_eq!(
+            parts_of(last, window),
+            [first_window, first_answer, &refused[0][2], &refused[0][3]],
+            "{model}"
+        );
+
+        // The second request carried the refused call and its answer as its
+        // result, so the model saw why.
+        let requests = stub.requests();
+        assert_eq!(requests.len(), 3, "{model}");
+        let sent = crate::models::sent_messages(&requests[1].1);
+        assert!(
+            sent.iter().any(|message| message
+                .calls
+                .iter()
+                .any(|(id, name, _)| id == "call_1" && name == "bash")),
+            "{model}: {}",
+            requests[1].1
+        );
+        assert!(
+            sent.iter().any(|message| message
+                .results
+                .contains(&("call_1".to_owned(), refusal.to_owned()))),
+            "{model}: {}",
+            requests[1].1
+        );
     }
 }
 
 #[cfg(test)]
 #[test]
-fn refused_call_fails_with_the_refusal() {
+fn each_fault_answered() {
+    let cases = [
+        ("search", "{\"query\": \"x\"}", "it was not offered"),
+        ("lookup", "\"amber-7\"", "its arguments are not an object"),
+        (
+            "lookup",
+            "{\"query\": \"x\", \"extra\": \"y\"}",
+            "it declares no parameter extra",
+        ),
+        ("lookup", "{}", "query is required"),
+        ("lookup", "{\"query\": 7}", "query is not a string"),
+    ];
+    for (name, arguments, fault) in cases {
+        let mut answers = Vec::new();
+        // Twice, so that one refusal of a call is seen to read as the other.
+        for _ in 0..2 {
+            let stub = Stub::replying(vec![
+                looking_up("call_1", "fine").call("call_2", name, arguments),
+                Reply::text("done"),
+            ]);
+            let (outcome, records) = run_keeping(
+                &workflow(YIELD_TYPES, YIELDING),
+                &yielding_behaviours("q", LOOKUP),
+                &roster_at(&stub, "openai::m"),
+                CALLING,
+            );
+            assert_eq!(rendered(outcome), "done", "{arguments}");
+            assert_eq!(stub.requests().len(), 2, "{arguments}");
+            let last = records.last().expect("records");
+            let events = record_events(last);
+            // The well-formed call beside it performed, the refused one not.
+            let performed: Vec<&str> = events
+                .iter()
+                .filter(|(kind, _)| kind == "call")
+                .map(|(_, event)| event["call"]["id"].as_str().expect("an identifier"))
+                .collect();
+            assert_eq!(performed, ["call_1"], "{arguments}");
+            let refused = refused_in(&events[0].1);
+            assert_eq!(refused.len(), 1, "{arguments}");
+            assert_eq!(
+                (refused[0][0].as_str(), refused[0][1].as_str()),
+                ("call_2", name)
+            );
+            answers.push(text_of(last, &refused[0][3]));
+        }
+        assert_eq!(
+            answers[0],
+            format!("Agconflo refused this call to {name}: {fault}. This step may call lookup."),
+            "{arguments}"
+        );
+        assert_eq!(answers[0], answers[1], "{arguments}: the same each time");
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn unrefused_calls_performed() {
+    let stub = Stub::replying(vec![
+        looking_up("c1", "one").call("c2", "search", "{}").call(
+            "c3",
+            "lookup",
+            "{\"query\": \"three\"}",
+        ),
+        Reply::text("done"),
+    ]);
+    let (outcome, records) = run_keeping(
+        &workflow(YIELD_TYPES, YIELDING),
+        &yielding_behaviours("q", LOOKUP),
+        &roster_at(&stub, "openai::m"),
+        CALLING,
+    );
+    assert_eq!(rendered(outcome), "done");
+    let last = records.last().expect("records");
+    let events = record_events(last);
+    let performed: Vec<&str> = events
+        .iter()
+        .filter(|(kind, _)| kind == "call")
+        .map(|(_, event)| event["call"]["id"].as_str().expect("an identifier"))
+        .collect();
+    assert_eq!(
+        performed,
+        ["c1", "c3"],
+        "in the answer's order, the refused one not"
+    );
+
+    // The next window: the one before and the answer, each performed call's
+    // contexts, the refused call's arguments, each output, then its answer.
+    let exchanges: Vec<&toml_edit::Table> = events
+        .iter()
+        .filter(|(kind, _)| kind == "exchange")
+        .map(|(_, event)| event)
+        .collect();
+    let refused = refused_in(exchanges[0]);
+    let calls = exchanges[0]["exchange"]["calls"].as_array().expect("calls");
+    let query = |at: usize| {
+        calls
+            .get(at)
+            .and_then(toml_edit::Value::as_inline_table)
+            .and_then(|call| call.get("inputs"))
+            .and_then(toml_edit::Value::as_inline_table)
+            .and_then(|inputs| inputs.get("query"))
+            .and_then(toml_edit::Value::as_str)
+            .expect("a call's query")
+            .to_owned()
+    };
+    let outputs: Vec<String> = events
+        .iter()
+        .filter(|(kind, event)| kind == "output" && event.contains_key("performing"))
+        .map(|(_, event)| event["output"].as_str().expect("an output").to_owned())
+        .collect();
+    let window = exchanges[1]["exchange"]["window"]
+        .as_str()
+        .expect("a window");
+    let parts = parts_of(last, window);
+    assert_eq!(
+        parts[2..],
+        [
+            query(0),
+            query(1),
+            refused[0][2].clone(),
+            outputs[0].clone(),
+            outputs[1].clone(),
+            refused[0][3].clone()
+        ]
+    );
+}
+
+#[cfg(test)]
+#[test]
+fn refusals_end_at_the_limit() {
+    let bash = || Reply::text("").call("call_1", "bash", "{}");
+    let stub = Stub::replying(vec![bash(), bash(), bash(), bash()]);
+    let limits = Limits {
+        model_calls: 3,
+        ..CALLING
+    };
+    let (outcome, records) = run_keeping(
+        &workflow(YIELD_TYPES, YIELDING),
+        &yielding_behaviours("q", LOOKUP),
+        &roster_at(&stub, "openai::m"),
+        limits,
+    );
+    assert_eq!(
+        failed(outcome),
+        ("asker".to_owned(), ScriptFailure::ModelCallLimit)
+    );
+    assert_eq!(stub.requests().len(), 3);
+    let last = records.last().expect("records");
+    let refused: Vec<usize> = record_events(last)
+        .iter()
+        .filter(|(kind, _)| kind == "exchange")
+        .map(|(_, event)| refused_in(event).len())
+        .collect();
+    assert_eq!(refused, [1, 1, 1], "each exchange holding its refused call");
+}
+
+#[cfg(test)]
+#[test]
+fn run_refusal_answered() {
     // The host's offer comes from a workflow that declares the call, and the
     // run's from one that does not.
     let declaring = workflow(YIELD_TYPES, YIELDING);
@@ -2087,7 +2305,7 @@ fn refused_call_fails_with_the_refusal() {
     let Step::Activate(activation) = run.step() else {
         panic!("the asker is offered")
     };
-    let stub = Stub::replying(vec![looking_up("call_1", "amber-7")]);
+    let stub = Stub::replying(vec![looking_up("call_1", "amber-7"), Reply::text("done")]);
     let behaviours = yielding_behaviours("q", LOOKUP);
     let roster = roster_at(&stub, "openai::m");
     let mut keep = |_: String| {};
@@ -2100,18 +2318,71 @@ fn refused_call_fails_with_the_refusal() {
         keep: &mut keep,
     };
     match block(perform_activation(&mut run, &activation, &mut env)) {
-        Performed::Stopped(Stop::Failed(ScriptFailure::CallRefused(refusal))) => assert_eq!(
-            refusal,
-            agconflo_core::CallRefusal::Undeclared {
-                instance: "asker".to_owned(),
-                node_type: "lookup".to_owned(),
-            }
-        ),
-        Performed::Output(output) => panic!("expected the call refused, got {output:?}"),
-        Performed::Routed(route) => panic!("expected the call refused, got {route:?}"),
-        Performed::Stopped(_) => panic!("expected the call refused, and it stopped otherwise"),
+        Performed::Output(output) => assert_eq!(output.render(), "done"),
+        Performed::Routed(route) => panic!("expected the run to go on, got {route:?}"),
+        Performed::Stopped(_) => panic!("expected the run to go on, and it stopped"),
     }
-    assert_eq!(stub.requests().len(), 1, "not asked again");
+    let requests = stub.requests();
+    assert_eq!(requests.len(), 2, "the model asked again, once");
+    let sent = crate::models::sent_messages(&requests[1].1);
+    let refusal = "Agconflo refused this call to lookup: asker does not declare a call to lookup. This step may call lookup.";
+    assert!(
+        sent.iter().any(|message| message
+            .results
+            .contains(&("call_1".to_owned(), refusal.to_owned()))),
+        "{}",
+        requests[1].1
+    );
+}
+
+#[cfg(test)]
+#[test]
+fn refusal_replayed() {
+    let definition = workflow(YIELD_TYPES, YIELDING);
+    let behaviours = yielding_behaviours("q", LOOKUP);
+    let replies = vec![
+        Reply::text("").call("call_1", "bash", "[\"ls\"]"),
+        looking_up("call_2", "amber-7"),
+        Reply::text("done"),
+    ];
+    let stub = Stub::replying(replies.clone());
+    let (outcome, records) = run_keeping(
+        &definition,
+        &behaviours,
+        &roster_at(&stub, "openai::m"),
+        CALLING,
+    );
+    assert_eq!(rendered(outcome), "done");
+    let finished = records.last().expect("records").clone();
+    let refused = refused_in(&record_events(&finished)[0].1);
+
+    for record in &records {
+        let answered = kinds(record)
+            .iter()
+            .filter(|kind| *kind == "exchange")
+            .count();
+        let remaining = Stub::replying(replies[answered..].to_vec());
+        let mut again = vec![record.clone()];
+        let resumed = block(resume_scripted(
+            &definition,
+            &behaviours,
+            &roster_at(&remaining, "openai::m"),
+            record,
+            CALLING,
+            |record| again.push(record),
+        ))
+        .map(|(outcome, _)| outcome);
+        assert_eq!(rendered(resumed), "done", "{record}");
+        assert_eq!(
+            remaining.requests().len(),
+            replies.len() - answered,
+            "no recorded exchange asked again: {record}"
+        );
+        // The refusal given is the one recorded, identifier included.
+        let last = again.last().expect("records");
+        assert_eq!(refused_in(&record_events(last)[0].1), refused, "{record}");
+        assert_eq!(kinds(last), kinds(&finished), "{record}");
+    }
 }
 
 #[cfg(test)]
