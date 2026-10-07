@@ -31,8 +31,8 @@ for #55 and #29, the two past pull requests the workflow is measured on.
 
 ## Running it
 
-From the repository root, with `tools/ubc` installed (`sh scripts/get-ubc.sh`),
-Docker running and `cargo build` done:
+From the repository root, with Docker running and `cargo build` done, on
+Linux or on Windows under Git Bash:
 
     sh workflows/record-goals/prepare.sh ../run-55 1f67ee4 [certificates]
     sh workflows/record-goals/run.sh ../run-55 workflows/record-goals/briefs/pr55.txt
@@ -40,11 +40,13 @@ Docker running and `cargo build` done:
 `run.sh` needs `OPEN_ROUTER_API_KEY` in its environment; give it to that one
 command rather than exporting it to the shell.
 
-`prepare.sh` builds the two images the tool steps run in, clones the
-repository from GitHub at the given commit into `<run>/work` - ubc grants its
-licence by the remote, so a clone of a local checkout will not do - and fills
-in what this machine decides: the image ids and the work folder. Behind a
-proxy that intercepts TLS, pass its certificates as the third argument.
+`prepare.sh` builds the two images the tool steps run in - the ubc one with
+ubc's Linux build, downloaded at the version and checksum
+`scripts/get-ubc.sh` pins - clones the repository from GitHub at the given
+commit into `<run>/work` - ubc grants its licence by the remote, so a clone of
+a local checkout will not do - and fills in what this machine decides: the
+image ids and the work folder. Behind a proxy that intercepts TLS, pass its
+certificates as the third argument.
 
 `run.sh` keeps the record in `<run>/run.toml` and stops where `agconflo`
 stops; exit 3 is the approval step. Then:

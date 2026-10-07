@@ -7,7 +7,8 @@
 # from GitHub at <commit> into <run folder>/work, and copies the workflow there
 # with its placeholders filled: the ubc image in manifest.toml, and the images,
 # the work folder and, when given, the certificates a step trusts in grants.toml.
-# Run from the repository root, with tools/ubc installed and Docker running.
+# Run from the repository root, with Docker running, on any machine: the ubc
+# image is given ubc's Linux build, pinned as scripts/get-ubc.sh pins it.
 set -eu
 
 if [ $# -lt 2 ]; then
@@ -24,11 +25,26 @@ if [ -e "$run" ]; then
     exit 2
 fi
 mkdir -p "$run"
-run=$(cd "$run" && pwd)
+# The current folder as the native agconflo reads it: Git Bash's own form of a
+# Windows path, /c/..., is not one Windows opens.
+native() { pwd -W 2>/dev/null || pwd; }
+run=$(cd "$run" && native)
 
-# The images. A proxy that intercepts TLS needs its certificates at build time.
+# The images. ubc's Linux build, at the version and checksum get-ubc.sh pins,
+# whatever this machine runs. A proxy that intercepts TLS needs its
+# certificates at build time.
+pin() { sed -n "s/^$1='\([^']*\)'.*/\1/p" scripts/get-ubc.sh; }
+version=$(pin VERSION)
+pinned=$(pin SHA256_LINUX_X64)
 context=$(mktemp -d)
-cp tools/ubc "$context/ubc"
+curl --fail --silent --show-error --location --retry 3 --output "$context/ubc" \
+    "$(pin BASE_URL)/$version/ubc-linux-x64-$version"
+if [ "$(sha256sum "$context/ubc" | cut -d' ' -f1)" != "$pinned" ]; then
+    echo "prepare: ubc $version for Linux does not match its pinned checksum" >&2
+    rm -rf "$context"
+    exit 1
+fi
+chmod +x "$context/ubc"
 docker build -q --network host -t agconflo-record-goals-ubc -f "$here/images/ubc/Dockerfile" "$context" >/dev/null
 rm -rf "$context"
 if [ -n "$certs" ]; then
@@ -51,7 +67,7 @@ cp -r "$here"/*.lua "$here"/lib "$here"/flow.toml "$here"/types.toml "$here"/mod
 sed "s|@UBC_IMAGE@|$ubc_image|" "$here/manifest.toml" > "$run/workflow/manifest.toml"
 trust=""
 if [ -n "$certs" ]; then
-    trust="trust = \"$(cd "$(dirname "$certs")" && pwd)/$(basename "$certs")\""
+    trust="trust = \"$(cd "$(dirname "$certs")" && native)/$(basename "$certs")\""
 fi
 sed -e "s|@GIT_IMAGE@|$git_image|" -e "s|@UBC_IMAGE@|$ubc_image|" -e "s|@WORK@|$run/work|" -e "s|@TRUST@|$trust|" \
     "$here/grants.template.toml" > "$run/grants.toml"
