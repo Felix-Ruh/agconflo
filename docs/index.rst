@@ -115,3 +115,4 @@ because a wrongly shaped rule can be silently ignored rather than rejected.
    evidence/repetition
    evidence/caching
    evidence/workflows
+   evidence/reflection
