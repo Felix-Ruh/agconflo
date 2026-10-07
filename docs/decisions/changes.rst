@@ -1415,9 +1415,11 @@ changed.
    Verdicts on the impact analysis (``EVD_IMPACT_HOST_ONE_CONTEXT``):
 
    - Up: changed above; ``STKH_ONE_OUTPUT`` unchanged.
-   - Down: ``IMPL_HOST_ONE_CONTEXT`` changes to tell the two kinds of type
-     apart; ``TEST_HOST_NOT_ONE_CONTEXT_FAILS`` gains a router's script
-     returning a context, and its run is taken again.
+   - Down: ``IMPL_HOST_ONE_CONTEXT`` unchanged, asked now only of a script
+     whose type declares an output; a new marker,
+     ``IMPL_HOST_ROUTER_RETURNS_NOTHING``, holds a router's script to
+     returning nothing; ``TEST_HOST_NOT_ONE_CONTEXT_FAILS`` gains a router's
+     script returning a context, and its run is taken again.
    - Sideways, the script host's requirements: unaffected but those whose
      records sit beside this.
    - Text: the marker, unchanged.
@@ -1529,8 +1531,11 @@ changed.
    Verdicts on the impact analysis (``EVD_IMPACT_HOST_ROUTE_NAMED``):
 
    - Up: unchanged, and the new feature added.
-   - Down: ``IMPL_HOST_ROUTE`` changes; ``TEST_HOST_ROUTE_NAMED`` changes to
-     a router's script returning nothing, and its run is taken again.
+   - Down: ``IMPL_HOST_ROUTE`` unchanged, still taking the names; they are
+     reported with no output where the script is run, and
+     ``IMPL_HOST_ROUTER_RETURNS_NOTHING``, new, fails a router's script that
+     returns anything; ``TEST_HOST_ROUTE_NAMED`` changes to a router's script
+     returning nothing, and its run is taken again.
    - Sideways: unaffected but those whose records sit beside this.
    - Text: the marker, and the body of ``CREQ_HOST_TAKES_PERSON_ROUTE``,
      which still cites it.
@@ -1759,9 +1764,10 @@ changed.
 
    - Up, ``STKH_RESUMABLE_RUN``: unchanged.
    - Down: ``CREQ_RECORD_CONTINUES_THE_RUN`` changes under its own record;
-     ``ARCH_RESUME`` unaffected; ``IMPL_RECORD_RESUME`` unchanged, handing
-     the run a router's recorded route as it hands an output; the five test
-     cases unaffected, each resuming activations that gave an output.
+     ``ARCH_RESUME`` unaffected; ``IMPL_RECORD_RESUME`` needs nothing more
+     for it, handing the run a router's recorded route as it hands an output
+     since ``DEC_CHANGE_RECORD_HOLDS_ROUTES``; the five test cases
+     unaffected, each resuming activations that gave an output.
    - Sideways, the run record's requirements and ``ARCH_RESUME``'s four
      other features: unaffected but those whose records sit beside this.
    - Text: the openings of ``features/runner`` and ``features/tools`` and
@@ -1791,7 +1797,8 @@ changed.
    Verdicts on the impact analysis (``EVD_IMPACT_RECORD_CONTINUES_THE_RUN``):
 
    - Up: changed above; ``STKH_RESUMABLE_RUN`` unchanged.
-   - Down: ``IMPL_RECORD_RESUME`` unchanged; its three test cases unaffected.
+   - Down: ``IMPL_RECORD_RESUME`` needs nothing more for it, as the record
+     above says; its three test cases unaffected.
    - Sideways, the run record's requirements: unaffected but those whose
      records sit beside this.
    - Text: the marker; two lines of ``decisions/routing``, each citing it for
@@ -1825,8 +1832,9 @@ changed.
    Verdicts on the impact analysis (``EVD_IMPACT_RECORD_HOLDS_THE_RUN``):
 
    - Up, ``FEAT_RUN_RECORDED`` and ``STKH_RESUMABLE_RUN``: unchanged.
-   - Down: ``IMPL_RECORD_WRITE`` and ``IMPL_RECORD_EVENTS`` unchanged, each
-     writing a router's entry with its inputs in its place;
+   - Down: ``IMPL_RECORD_WRITE`` unchanged; ``IMPL_RECORD_EVENTS`` needs
+     nothing more for it, writing a router's entry with its inputs in its
+     place since ``DEC_CHANGE_RECORD_HOLDS_ROUTES``;
      ``TEST_RECORD_HOLDS_THE_RUN`` unaffected.
    - Sideways, the run record's requirements: unaffected but those whose
      records sit beside this.
@@ -1927,8 +1935,9 @@ changed.
    Verdicts on the impact analysis (``EVD_IMPACT_RUN_ENDS_QUIESCENT``):
 
    - Up: unchanged.
-   - Down: ``IMPL_RUN_STEP`` unchanged, already naming an instance by whether
-     it ran; ``TEST_RUN_QUIESCENT_NAMES_ONLY_UNPRODUCED``, whose router names
+   - Down: ``IMPL_RUN_STEP`` already named an instance by whether it ran,
+     and changes only in the name of what it asks that of;
+     ``TEST_RUN_QUIESCENT_NAMES_ONLY_UNPRODUCED``, whose router names
      nothing and is not named, unchanged but for its body, which says so;
      ``TEST_RUN_IDLE_INSTANCE_DOES_NOT_MAKE_IT_STUCK`` unaffected.
    - Sideways, the workflow run's requirements: unaffected but those whose

@@ -181,7 +181,7 @@ closes the file.
    ``DEC_ROUTER_PASSES_ON_ITS_INPUTS``, ``DEC_ROUTED_INPUT_BOUND_BY_TABLE``,
    ``DEC_ROUTE_RECORDED_ALONE`` and ``DEC_ROUTER_BRANCHES_DECLARED``.
    ``DEC_ROUTER_OUTPUT_IS_ITS_DECISION`` and ``DEC_ROUTE_RECORDED``, which it
-   was first built against, are superseded by the second and the fifth.
+   was first built against, are superseded by the third and the fifth.
 
 .. feat_req:: Nothing goes along a router's edges but what the router was given
    :id: FEAT_ROUTER_MAKES_NO_CONTEXT
