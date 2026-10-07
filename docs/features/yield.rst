@@ -81,9 +81,9 @@ the requirements this feature allocates to them.
    (``EVD_GENAI_PASSES_MALFORMED_CALLS``), so an engine that performs what comes
    back has let the model reach whatever it names.
 
-   "Refuse" is the whole of it. That a refused call ends the activation is a
-   decision (``DEC_MALFORMED_CALL_FAILS``), and sending the refusal back to the
-   model would meet this as well.
+   "Refuse" is the whole of it. What becomes of the activation, and what the
+   model is told, is a decision's (``DEC_REFUSED_CALL_ANSWERED``, which
+   superseded ending the activation).
 
 .. feat_req:: A model is offered no tool but the node types its node may call
    :id: FEAT_YIELD_OFFERS_DECLARED
@@ -232,8 +232,9 @@ the requirements this feature allocates to them.
    - ``DEC_TOOLS_OFFERED_AS_CONTEXTS``: the offer is contexts made from the
      declaration.
    - ``DEC_TOOL_NAMES_PORTABLE``: the name rule both providers accept.
-   - ``DEC_MALFORMED_CALL_FAILS`` and ``DEC_CALLS_IN_ORDER``: what is refused,
-     and how several calls go.
+   - ``DEC_REFUSED_CALL_ANSWERED``, ``DEC_UNREFUSED_CALLS_PERFORMED`` and
+     ``DEC_CALLS_IN_ORDER``: what a refused call is answered with, and how
+     several calls go.
    - ``DEC_EVERY_TURN_COUNTED``: every request counts against the limit.
    - ``DEC_RECORD_HOLDS_EXCHANGES``, ``DEC_RESUME_REPLAYS_CALLS``,
      ``DEC_SCRIPT_REPLAYED_FROM_ITS_RECORD`` and
