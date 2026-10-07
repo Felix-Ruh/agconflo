@@ -142,7 +142,7 @@ impl<'d> Work<'d> {
                 definition
                     .node_types
                     .iter()
-                    .any(|declared| declared.name == instance.node_type && declared.routes)
+                    .any(|declared| declared.name == instance.node_type && declared.routes())
             })
             .map(|instance| instance.name.as_str())
             .collect();

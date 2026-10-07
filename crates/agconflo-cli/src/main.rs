@@ -98,9 +98,10 @@ impl Files {
     }
 }
 
-/// The answer's text, given on the command line or in a file.
+/// The answer's text, given on the command line or in a file - or neither, for
+/// a router's step answered with `--route`.
 #[derive(Args)]
-#[group(required = true, multiple = false)]
+#[group(required = false, multiple = false)]
 struct Text {
     /// The answer.
     #[arg(long)]
@@ -172,17 +173,27 @@ async fn perform(command: Command) -> u8 {
         } => {
             let route = named(&route);
             let text = match (text.text, text.text_file) {
-                (Some(text), _) => text,
-                (None, file) => match read(&file.unwrap_or_default()) {
-                    Ok(text) => text,
+                (Some(text), _) => Some(text),
+                (None, Some(file)) => match read(&file) {
+                    Ok(text) => Some(text),
                     Err(message) => return refused(&message),
                 },
+                (None, None) if route.is_some() => None,
+                (None, None) => {
+                    use clap::CommandFactory;
+                    Line::command()
+                        .error(
+                            clap::error::ErrorKind::MissingRequiredArgument,
+                            "an answer needs --text or --text-file, or --route for a router's step",
+                        )
+                        .exit()
+                }
             };
             agconflo_runner::answer(
                 files.sources(),
                 &files.record,
                 &instance,
-                &text,
+                text.as_deref(),
                 route.as_deref(),
             )
             .await
@@ -198,7 +209,7 @@ async fn perform(command: Command) -> u8 {
 /// The route `--route` gave: none when it was not given, and the names given
 /// otherwise, an empty one naming nothing so that `--route ""` is a route to
 /// nowhere.
-// @A person's route read from the command,IMPL_MAIN_ROUTE,impl,[CREQ_COMMAND_READS_ROUTE],[DEC_PERSON_ROUTE_IN_THE_ANSWER]
+// @A person's route read from the command,IMPL_MAIN_ROUTE,impl,[CREQ_COMMAND_READS_ROUTE],[DEC_PERSON_ROUTE_IS_THE_ANSWER]
 fn named(route: &[String]) -> Option<Vec<String>> {
     (!route.is_empty()).then(|| {
         route
@@ -313,15 +324,14 @@ fn status(stopped: &Stopped) -> u8 {
 }
 
 /// The step a run awaits, as a person is shown it: the instance, the type of
-/// context it produces, for a router's step the instances it may name, and
-/// each input by parameter with its rendering.
-// @A router's choices printed with its awaited step,IMPL_MAIN_ROUTES_SHOWN,impl,[CREQ_COMMAND_READS_ROUTE],[DEC_PERSON_ROUTE_IN_THE_ANSWER]
+/// context it produces - none for a router's step, which shows the instances
+/// it may name instead - and each input by parameter with its rendering.
+// @A router's choices printed with its awaited step,IMPL_MAIN_ROUTES_SHOWN,impl,[CREQ_COMMAND_READS_ROUTE],[DEC_PERSON_ROUTE_IS_THE_ANSWER]
 fn awaited(activation: &Activation, routes: Option<&[String]>) -> String {
-    let mut shown = format!(
-        "instance: {}\nproduces: {}\n",
-        activation.instance(),
-        activation.output().as_str()
-    );
+    let mut shown = format!("instance: {}\n", activation.instance());
+    if let Some(declared) = activation.output() {
+        shown.push_str(&format!("produces: {}\n", declared.as_str()));
+    }
     if let Some(routes) = routes {
         shown.push_str(&format!("routes to: {}\n", routes.join(" ")));
     }

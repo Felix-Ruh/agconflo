@@ -58,7 +58,7 @@ feature allocates to them.
    :derived_from: STKH_HUMAN_IN_RUN
    :ears_pattern: event
    :verification_method: test
-   :statement: When a person's text is supplied for the activation a scripted run's record awaits, Agconflo shall continue that run from the record with a context holding that text as the activation's output.
+   :statement: When a person's text is supplied for the activation a scripted run's record awaits and its node type declares an output, Agconflo shall continue that run from the record with a context holding that text as the activation's output.
 
    The parent's context, supplied into the run rather than beside it. From the
    record, because a person's answer arrives on no schedule the run keeps, and
@@ -71,6 +71,13 @@ feature allocates to them.
    fragmented provenance chain the parent's own body refuses. So can a person's
    text given to the process that handed the step over and to no other, which
    holds only for as long as that process does.
+
+   The parent asks that a person can supply a context, not that every step a
+   person performs makes one: a step whose node type declares no output has
+   no context to supply, and a router's is answered with the instances the run
+   goes on to (``FEAT_PERSON_ROUTES``). Revised under
+   ``DEC_CHANGE_PERSON_TEXT_IS_THE_OUTPUT``: it had made text the output of
+   every step a person answers, which is more than the parent asks.
 
 .. feat_req:: An answer for a step the run does not await is refused
    :id: FEAT_PERSON_ANSWER_ELSEWHERE_REFUSED
@@ -194,5 +201,7 @@ feature allocates to them.
    ``CREQ_RUN_REFUSES_BAD_ROUTE``).
 
    The decisions this is built against are named here rather than linked:
-   ``DEC_PERSON_ROUTE_IN_THE_ANSWER``, ``DEC_PERSON_SUPPLIES_TEXT`` and
-   ``DEC_ROUTER_OUTPUT_IS_ITS_DECISION``.
+   ``DEC_PERSON_ROUTE_IS_THE_ANSWER``, ``DEC_PERSON_SUPPLIES_TEXT`` and
+   ``DEC_ROUTER_PASSES_ON_ITS_INPUTS``, which superseded the
+   ``DEC_PERSON_ROUTE_IN_THE_ANSWER`` and ``DEC_ROUTER_OUTPUT_IS_ITS_DECISION``
+   it was first built against.

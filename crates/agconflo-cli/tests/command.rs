@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 const BINARY: &str = env!("CARGO_BIN_EXE_agconflo");
 
 /// Every node type the tests' workflows use.
-const TYPES: &str = "[types.begin]\nrequired = { brief = \"note\" }\noutput = \"note\"\n\n[types.ask]\nrequired = { before = \"note\" }\noutput = \"note\"\n\n[types.count]\nrequired = { before = \"note\" }\noutput = \"note\"\n\n[types.review]\nrequired = { before = \"note\" }\noutput = \"note\"\n\n[types.join]\nrequired = { before = \"note\", start = \"note\" }\noutput = \"note\"\n\n[types.add]\nrequired = { before = \"note\" }\noutput = \"note\"\n\n[types.broken]\nrequired = { before = \"note\" }\noutput = \"note\"\n\n[types.stop]\nrequired = { before = \"note\" }\noutput = \"note\"\nroutes = true\n";
+const TYPES: &str = "[types.begin]\nrequired = { brief = \"note\" }\noutput = \"note\"\n\n[types.ask]\nrequired = { before = \"note\" }\noutput = \"note\"\n\n[types.count]\nrequired = { before = \"note\" }\noutput = \"note\"\n\n[types.review]\nrequired = { before = \"note\" }\noutput = \"note\"\n\n[types.join]\nrequired = { before = \"note\", start = \"note\" }\noutput = \"note\"\n\n[types.add]\nrequired = { before = \"note\" }\noutput = \"note\"\n\n[types.broken]\nrequired = { before = \"note\" }\noutput = \"note\"\n\n[types.stop]\nrequired = { before = \"note\" }\nroutes = true\n";
 
 /// The scripts, by file: `begin` passes its brief on, `ask` and
 /// `count` put what came before to the roles `helping` and `counting`, `join`
@@ -39,10 +39,7 @@ const SCRIPTS: [(&str, &str); 7] = [
         "local given, host = ...\nreturn host.text(host.output, given.before:render() .. '+c')\n",
     ),
     ("broken.lua", "error('broke here')\n"),
-    (
-        "stop.lua",
-        "local given, host = ...\nhost.route({})\nreturn host.text(host.output, 'none')\n",
-    ),
+    ("stop.lua", "local given, host = ...\nhost.route({})\n"),
 ];
 
 /// A directory for one test's files, removed when it is dropped.
@@ -1051,14 +1048,14 @@ fn person_routes() {
     // A router a person performs, with two branches after it.
     scratch.write(
         "types.toml",
-        "[types.begin]\nrequired = { brief = \"note\" }\noutput = \"note\"\n\n[types.route]\nrequired = { before = \"note\" }\noutput = \"note\"\nroutes = true\n\n[types.add]\nrequired = { before = \"note\" }\noutput = \"note\"\n",
+        "[types.begin]\nrequired = { brief = \"note\" }\noutput = \"note\"\n\n[types.route]\nrequired = { before = \"note\" }\nroutes = true\n\n[types.add]\nrequired = { before = \"note\" }\noutput = \"note\"\n",
     );
     for (file, text) in SCRIPTS {
         scratch.write(file, text);
     }
     scratch.write(
         "flow.toml",
-        "name = \"routed\"\noutput = \"a\"\n\n[instances.first]\nnode_type = \"begin\"\n\n[instances.r]\nnode_type = \"route\"\nbindings = { before = \"first\" }\nbranches = { a = [\"a\"], b = [\"b\"] }\n\n[instances.a]\nnode_type = \"add\"\nbindings = { before = \"r\" }\n\n[instances.b]\nnode_type = \"add\"\nbindings = { before = \"r\" }\n",
+        "name = \"routed\"\noutput = \"a\"\n\n[instances.first]\nnode_type = \"begin\"\n\n[instances.r]\nnode_type = \"route\"\nbindings = { before = \"first\" }\nbranches = { a = [\"a\"], b = [\"b\"] }\n\n[instances.a]\nnode_type = \"add\"\nbindings = { before = { from = \"r\", input = \"before\" } }\n\n[instances.b]\nnode_type = \"add\"\nbindings = { before = { from = \"r\", input = \"before\" } }\n",
     );
     scratch.write(
         "manifest.toml",
@@ -1078,33 +1075,49 @@ fn person_routes() {
         assert_eq!(status, 3, "{err}");
         out
     };
-    let answered = |record: &str, route: &str| {
-        scratch.ran(&[
+    let answered = |record: &str, answer: &[&str]| {
+        let mut args = vec![
             "answer",
             "manifest.toml",
             "--record",
             record,
             "--instance",
             "r",
-            "--text",
-            "ok",
-            "--route",
-            route,
-        ])
+        ];
+        args.extend_from_slice(answer);
+        scratch.ran(&args)
     };
 
-    // The step is printed with the instances it may name, on standard output.
+    // The step is printed with the instances it may name, and no type of
+    // context, on standard output.
     let out = started("run.toml");
     assert!(out.contains("instance: r\n"), "{out}");
     assert!(out.contains("routes to: a b\n"), "{out}");
+    assert!(!out.contains("produces:"), "{out}");
 
-    // Named for a, the run goes on to a and completes.
-    let (status, out, err) = answered("run.toml", "a");
-    assert_eq!((status, out.as_str()), (0, "ok+c"), "{err}");
+    // Text for the router's step is refused, and so is an answer of nothing;
+    // the step is still awaited after both.
+    let (status, out, err) = answered("run.toml", &["--text", "ok", "--route", "a"]);
+    assert_eq!((status, out.as_str()), (4, ""), "{err}");
+    assert!(
+        err.contains("r is a router, which makes no context: answer with the instances its run goes on to and no text"),
+        "{err}"
+    );
+    let (status, out, err) = answered("run.toml", &[]);
+    assert_eq!((status, out.as_str()), (2, ""), "{err}");
+    assert!(
+        err.contains("an answer needs --text or --text-file, or --route for a router's step"),
+        "{err}"
+    );
+
+    // Named for a with no text, the run goes on to a with what the router was
+    // given, and completes.
+    let (status, out, err) = answered("run.toml", &["--route", "a"]);
+    assert_eq!((status, out.as_str()), (0, "x+c"), "{err}");
 
     // `--route ""` names nothing: the run goes nowhere and ends stuck, rather
     // than refusing an empty name.
     started("nowhere.toml");
-    let (status, out, err) = answered("nowhere.toml", "");
+    let (status, out, err) = answered("nowhere.toml", &["--route", ""]);
     assert_eq!((status, out.as_str()), (7, ""), "{err}");
 }

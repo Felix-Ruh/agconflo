@@ -81,9 +81,8 @@ closes the file.
    The parent lets a node decide which branch a run takes, and a branch is
    the edges out of the node (``DEC_ONE_GRAPH``). A router creates no content:
    what goes along an edge into the branch it chose is one of the contexts it
-   was given, or its own output, which is its decision
-   (``DEC_ROUTER_OUTPUT_IS_ITS_DECISION``), so ``STKH_ONE_OUTPUT`` holds and
-   deciding stays apart from producing.
+   was given (``DEC_ROUTER_PASSES_ON_ITS_INPUTS``), so ``STKH_ONE_OUTPUT``
+   holds and deciding stays apart from producing.
 
    It can be false while the parent holds. A node deciding in its output text,
    with every branch run and each discarding what it was not meant for, meets
@@ -99,11 +98,11 @@ closes the file.
 
    A run resumed from its record goes on from where it stopped, and where it
    stopped depends on every branch taken before. Resuming runs no finished
-   activation again: its output comes from the record
-   (``CREQ_RECORD_CONTINUES_THE_RUN``). Which edges a finished router walked is
-   not in that output - its decision may be a model's text that a script read
-   - so without the names the resumed run cannot say which contexts each edge
-   holds.
+   activation again: what it gave comes from the record
+   (``CREQ_RECORD_CONTINUES_THE_RUN``). A router gives no output, only the
+   instances it named (``DEC_ROUTER_PASSES_ON_ITS_INPUTS``) - its decision may
+   be a model's text that a script read and kept nowhere - so without the
+   names the resumed run cannot say which contexts each edge holds.
 
    It can be false while the parents hold only by running every finished
    router again on resuming and trusting it to choose as it did, which a
@@ -179,5 +178,63 @@ closes the file.
 
    The decisions it is built against are named here rather than linked:
    ``DEC_ONE_GRAPH``, ``DEC_ROUTER_DECLARED``,
-   ``DEC_ROUTER_OUTPUT_IS_ITS_DECISION``, ``DEC_ROUTED_INPUT_BOUND_BY_TABLE``,
-   ``DEC_ROUTE_RECORDED`` and ``DEC_ROUTER_BRANCHES_DECLARED``.
+   ``DEC_ROUTER_PASSES_ON_ITS_INPUTS``, ``DEC_ROUTED_INPUT_BOUND_BY_TABLE``,
+   ``DEC_ROUTE_RECORDED_ALONE`` and ``DEC_ROUTER_BRANCHES_DECLARED``.
+   ``DEC_ROUTER_OUTPUT_IS_ITS_DECISION`` and ``DEC_ROUTE_RECORDED``, which it
+   was first built against, are superseded by the third and the fifth.
+
+.. feat_req:: Nothing goes along a router's edges but what the router was given
+   :id: FEAT_ROUTER_MAKES_NO_CONTEXT
+   :derived_from: STKH_ROUTING, STKH_ONE_OUTPUT
+   :ears_pattern: ubiquitous
+   :verification_method: test
+   :statement: Agconflo shall carry along an edge out of a router no context but one that router's activation was given.
+
+   ``STKH_ROUTING`` has a router pass on the contexts it was given rather
+   than make new ones, and ``STKH_ONE_OUTPUT`` keeps deciding apart from
+   producing. This is the two together at the level of an edge: whatever a
+   router's branch is given, its provenance is that of the node that made it,
+   never the router's.
+
+   It can be false while both parents hold. A router whose script writes its
+   verdict as text, walked along an edge as the router's output, decides
+   which branches run - routing, in the letter of the first parent - and has
+   made a context, which every node after it then reads as if something other
+   than a router had produced it. That is what a router's output was until
+   ``DEC_ROUTER_PASSES_ON_ITS_INPUTS``.
+
+.. feat_req:: A workflow taking from a router what it does not make is rejected
+   :id: FEAT_ROUTER_OUTPUT_TAKEN_REJECTED
+   :derived_from: STKH_WIRING_CHECKED, STKH_ROUTING
+   :ears_pattern: unwanted
+   :verification_method: test
+   :statement: If a workflow binds a router's output or designates a router as its output or declares a call to a router, then Agconflo shall reject that workflow.
+
+   A router makes no context (``FEAT_ROUTER_MAKES_NO_CONTEXT``), so each of
+   the three asks a router for something it never gives: an edge that would
+   carry nothing, a run with no result to end on, a call with nothing to give
+   back. ``STKH_WIRING_CHECKED`` rejects such a workflow before any node in it
+   runs, rather than leaving it to wait for ever on what never comes.
+
+   It can be false while both parents hold. A run that started such a
+   workflow and waited at the edge would never run a node that could not
+   proceed, and would report the run stuck - checked, in a sense, but after
+   every node before the edge was paid for.
+
+.. feat_arch:: A router making no context is held by the reader, the validator, the script host and the run
+   :id: ARCH_ROUTER_NO_CONTEXT
+   :realises: FEAT_ROUTER_MAKES_NO_CONTEXT, FEAT_ROUTER_OUTPUT_TAKEN_REJECTED
+   :uses: COMP_TOPOLOGY_READER, COMP_WIRING_VALIDATOR, COMP_SCRIPT_HOST, COMP_WORKFLOW_RUN
+   :statement: Agconflo shall allocate a router making no context to the topology reader, the wiring validator, the script host and the workflow run.
+
+   - The topology reader refuses a router's node type that declares an
+     output (``DEC_ROUTER_DECLARES_NO_OUTPUT``).
+   - The wiring validator reports a binding of a router's output, a router
+     designated as a workflow's output, and a call declared to a router.
+   - The script host reports a router's route and no output.
+   - The workflow run refuses an output reported for a router, and walks a
+     router's edges with its inputs alone.
+
+   The last two were already ``ARCH_ROUTING``'s, through requirements whose
+   statements change under ``DEC_ROUTER_PASSES_ON_ITS_INPUTS`` and which now
+   answer to this feature as well.

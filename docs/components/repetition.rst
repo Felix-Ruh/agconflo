@@ -26,9 +26,9 @@ passes enclosing them is read from the pass the activation belongs to.
    :ears_pattern: event
    :statement: When an instance reads an output made on its own passes, Run scheduler shall give each of its activations the context made on the same pass.
 
-   A router's output, or an input it passes on, is made on the pass of the
-   router on which it takes a branch naming the instance; another output on
-   the pass of the instance that made it.
+   An input a router passes on is made on the pass of the router on which it
+   takes a branch naming the instance; an output on the pass of the instance
+   that made it.
 
    Failure modes:
 

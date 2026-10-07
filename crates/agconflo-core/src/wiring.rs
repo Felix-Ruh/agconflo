@@ -40,6 +40,7 @@ pub fn validate_wiring(definition: &WorkflowDefinition) -> Vec<WiringDefect> {
     }
     check_signature(definition, &mut defects);
     check_output_resolves(definition, &instances, &mut defects);
+    check_output_not_a_router(definition, &instances, &declarations, &mut defects);
 
     // Passes are worked out from bindings that resolve, so they are asked of
     // a definition whose wiring is otherwise sound, and pairing of one whose
@@ -236,13 +237,58 @@ fn check_binding_type(
     let Some(producer) = declarations.get(source.node_type.as_str()) else {
         return;
     };
+    // A router declares no output.
+    let Some(output) = producer.output() else {
+        push_router_output_taken(instance, binding, source, defects);
+        return;
+    };
 
-    if producer.output != parameter.context_type {
+    if *output != parameter.context_type {
         defects.push(WiringDefect::ContextTypeDisagreement {
             instance: instance.name.clone(),
             parameter: binding.parameter.clone(),
             expected: parameter.context_type.clone(),
-            produced: producer.output.clone(),
+            produced: output.clone(),
+        });
+    }
+}
+
+/// The defect of `binding` taking the output of `router`, which makes none.
+// @A binding of a router's output a defect,IMPL_WIRING_ROUTER_OUTPUT_TAKEN,impl,[CREQ_VALIDATOR_ROUTER_GIVES_ONLY_INPUTS],[DEC_ROUTER_PASSES_ON_ITS_INPUTS]
+fn push_router_output_taken(
+    instance: &NodeInstance,
+    binding: &Binding,
+    router: &NodeInstance,
+    defects: &mut Vec<WiringDefect>,
+) {
+    defects.push(WiringDefect::RouterOutputTaken {
+        instance: instance.name.clone(),
+        parameter: binding.parameter.clone(),
+        router: router.name.clone(),
+    });
+}
+
+/// The one output a definition designates is not a router's, which makes
+/// none; checked only when it resolves to an instance of a type the definition
+/// carries.
+// @A router designated as the output a defect,IMPL_WIRING_ROUTER_DESIGNATED,impl,[CREQ_VALIDATOR_ROUTER_GIVES_ONLY_INPUTS],[DEC_ROUTER_PASSES_ON_ITS_INPUTS]
+fn check_output_not_a_router(
+    definition: &WorkflowDefinition,
+    instances: &HashMap<&str, &NodeInstance>,
+    declarations: &HashMap<&str, &NodeType>,
+    defects: &mut Vec<WiringDefect>,
+) {
+    let [output] = definition.designated_outputs.as_slice() else {
+        return;
+    };
+    let routes = instances
+        .get(output.as_str())
+        .and_then(|instance| declarations.get(instance.node_type.as_str()))
+        .is_some_and(|declared| declared.routes());
+    if routes {
+        defects.push(WiringDefect::RouterDesignated {
+            definition: definition.name.clone(),
+            router: output.clone(),
         });
     }
 }
@@ -250,7 +296,7 @@ fn check_binding_type(
 /// A binding taking `input` of `source` takes one a router declares, and the
 /// parameter it fills is declared for that input's type. A source of a node
 /// type the definition does not carry is never compared.
-// @A routed input taken from a router declaring it,IMPL_WIRING_ROUTED_INPUT,impl,[CREQ_VALIDATOR_ROUTED_INPUT, CREQ_VALIDATOR_TYPES_AGREE],[DEC_ROUTER_OUTPUT_IS_ITS_DECISION]
+// @A routed input taken from a router declaring it,IMPL_WIRING_ROUTED_INPUT,impl,[CREQ_VALIDATOR_ROUTED_INPUT, CREQ_VALIDATOR_TYPES_AGREE],[DEC_ROUTER_PASSES_ON_ITS_INPUTS]
 fn check_routed_input(
     instance: &NodeInstance,
     parameter: &Parameter,
@@ -267,7 +313,7 @@ fn check_routed_input(
         .required
         .iter()
         .find(|declared| declared.name == input)
-        .filter(|_| router.routes);
+        .filter(|_| router.routes());
     let Some(declared) = declared else {
         defects.push(WiringDefect::UnroutedInput {
             instance: instance.name.clone(),
@@ -303,11 +349,17 @@ fn check_calls(
         if !looked_at.insert(call.as_str()) {
             continue;
         }
-        if !declarations.contains_key(call.as_str()) {
-            defects.push(WiringDefect::UnresolvedCall {
+        match declarations.get(call.as_str()) {
+            None => defects.push(WiringDefect::UnresolvedCall {
                 instance: instance.name.clone(),
                 unresolved: call.clone(),
-            });
+            }),
+            // @A call to a router a defect,IMPL_WIRING_ROUTER_CALLED,impl,[CREQ_VALIDATOR_ROUTER_GIVES_ONLY_INPUTS],[DEC_ROUTER_PASSES_ON_ITS_INPUTS]
+            Some(declared) if declared.routes() => defects.push(WiringDefect::RouterCalled {
+                instance: instance.name.clone(),
+                router: call.clone(),
+            }),
+            Some(_) => {}
         }
         if !portable(call) {
             defects.push(WiringDefect::UnportableCallName {
@@ -333,7 +385,7 @@ fn check_branches(
     let Some(declaration) = declarations.get(instance.node_type.as_str()) else {
         return;
     };
-    if !declaration.routes {
+    if !declaration.routes() {
         if !instance.branches.is_empty() {
             defects.push(WiringDefect::BranchesNotRouted {
                 instance: instance.name.clone(),
@@ -1060,9 +1112,10 @@ fn cycle_unstarted_reported() {
     let cycle = |instances: &[&str]| WiringDefect::CycleUnstarted {
         instances: instances.iter().map(|&name| name.to_owned()).collect(),
     };
-    // A review loop: the drafter reads the router's input and its output back.
+    // A review loop: the drafter reads the router's input back twice.
     let review = |previous: Option<&str>, feedback: Option<&str>| {
-        let mut drafter = instance("d", "draft", &[("brief", "b"), ("feedback", "r")])
+        let mut drafter = instance("d", "draft", &[("brief", "b")])
+            .taking("feedback", "r", "draft")
             .taking("previous", "r", "draft");
         drafter.bindings[1].first = feedback.map(str::to_owned);
         drafter.bindings[2].first = previous.map(str::to_owned);
@@ -1144,7 +1197,9 @@ fn unpaired_reported() {
             types.clone(),
             vec![
                 instance("b", "source", &[]),
-                instance("d", "draft", &[("brief", "b"), ("feedback", "r")]).first("feedback", ""),
+                instance("d", "draft", &[("brief", "b")])
+                    .taking("feedback", "r", "draft")
+                    .first("feedback", ""),
                 instance("r", "route", &[("draft", "d")])
                     .branching(&[("back", &back), ("on", &["z"])]),
                 instance("y", "pass", &[]).taking("input", "r", "draft"),
@@ -1559,6 +1614,76 @@ fn routed_input_checked() {
 }
 
 #[test]
+fn router_gives_only_inputs() {
+    let types = vec![
+        node_type("source", &[], "note"),
+        node_type("route", &[("draft", "note")], "note").routing(),
+        node_type("take", &[("input", "note")], "note"),
+    ];
+    let instances = |a: NodeInstance| {
+        vec![
+            instance("s", "source", &[]),
+            instance("r", "route", &[("draft", "s")]).branching(&[("on", &["a"])]),
+            a,
+        ]
+    };
+
+    // Each way of taking from a router what it does not make, every one
+    // reported at once: a binding of its output, the router designated as
+    // the output, and a call declared to it.
+    let mut taking_all = definition(
+        types.clone(),
+        instances(instance("a", "take", &[("input", "r")])),
+        &["r"],
+    );
+    taking_all.instances[0].calls = vec!["route".to_owned()];
+    let defects = validate_wiring(&taking_all);
+    assert_eq!(
+        defects,
+        vec![
+            WiringDefect::RouterCalled {
+                instance: "s".to_owned(),
+                router: "route".to_owned(),
+            },
+            WiringDefect::RouterOutputTaken {
+                instance: "a".to_owned(),
+                parameter: "input".to_owned(),
+                router: "r".to_owned(),
+            },
+            WiringDefect::RouterDesignated {
+                definition: DEFINITION_NAME.to_owned(),
+                router: "r".to_owned(),
+            },
+        ]
+    );
+    let places: Vec<(Option<&str>, Option<&str>, Option<&str>)> = defects
+        .iter()
+        .map(|defect| (defect.instance(), defect.parameter(), defect.call()))
+        .collect();
+    assert_eq!(
+        places,
+        [
+            (Some("s"), None, Some("route")),
+            (Some("a"), Some("input"), None),
+            (None, None, None),
+        ]
+    );
+    assert!(
+        defects[1].to_string().contains("which makes no output"),
+        "{}",
+        defects[1]
+    );
+
+    // The control: the router's input taken, and another instance designated.
+    let sound = definition(
+        types,
+        instances(instance("a", "take", &[]).taking("input", "r", "draft")),
+        &["a"],
+    );
+    assert_eq!(validate_wiring(&sound), Vec::new());
+}
+
+#[test]
 fn branches_checked() {
     let types = vec![
         node_type("source", &[], "note"),
@@ -1569,7 +1694,7 @@ fn branches_checked() {
         vec![
             instance("s", "source", &[]),
             instance(router, "route", &[("draft", "s")]).branching(branches),
-            instance("a", "take", &[("input", router)]),
+            instance("a", "take", &[]).taking("input", router, "draft"),
             instance("b", "take", &[]).taking("input", router, "draft"),
             instance("c", "take", &[("input", "a")]),
         ]

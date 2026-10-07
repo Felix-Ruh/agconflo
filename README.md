@@ -6,8 +6,9 @@
 is **context management**.
 
 Nodes are wired into a graph. Each node consumes zero or more immutable `Context` values and produces
-exactly one output. Context is a first-class, immutable, addressable value, and **a node sees exactly
-what was wired to it — nothing else**.
+exactly one output: a context, or, for a router, the branch its run goes on to. Context is a
+first-class, immutable, addressable value, and **a node sees exactly what was wired to it — nothing
+else**.
 
 That is the deliberate opposite of frameworks where state is one mutable shared blob and what actually
 lands in an LLM's context window is emergent. Here, *"what was in this call's context window, and
@@ -47,7 +48,7 @@ scripted run hands its caller a record when it starts, after every output and af
 so a run interrupted mid-call is resumed without asking again for any answer its record holds. A
 node type can instead be performed by a person: the run stops at that step and hands it to
 its caller, who answers later - from the run's record, in another process if need be - with text that
-becomes the step's output.
+becomes the step's output, or, for a router's step, with the instances the run goes on to.
 
 `agconflo-runner` is the caller a person does not have to write. It reads a manifest naming a
 workflow's documents and scripts, and a model mapping naming the model each role is played by,
@@ -144,9 +145,21 @@ not be kept, whatever else happened.
 ### Routers
 
 A node type declaring `routes = true` is a **router**: its script decides which of the branches
-after it the run takes, with `host.route({"drafter"})`, and its output is the context its decision
-is held in. An edge out of a router carries that output, or one of the contexts it was given,
-bound by naming the router and the input: `draft = { from = "router", input = "draft" }`.
+after it the run takes, with `host.route({"drafter"})`, and makes no context of its own. Its node
+type declares no `output`, its script returns nothing, and an edge out of it carries one of the
+contexts it was given, bound by naming the router and the input:
+`draft = { from = "router", input = "draft" }`. Whatever comes after a router reads what came
+before it, made by the node that made it.
+
+```toml
+[types.route]
+required = { draft = "note", review = "note" }
+routes = true                # and no output
+```
+
+A router's script has no `host.output` to type a model's answer by, so it names the type:
+`host.complete('judging', prompt, 'verdict')`. A verdict the steps after it should read is a
+node's output, made before the router and passed on by it.
 
 The router's instance declares its **branches**, each naming the instances a route taking it goes
 on to, and a route names the instances of one branch, in any order, or none at all:
@@ -159,9 +172,11 @@ branches = { again = ["drafter"], done = ["finisher"] }
 ```
 
 Every instance an edge out of the router enters is in a branch, and no two branches name the same
-instances; a workflow breaking either is refused before anything runs. A router a person performs
-is answered with `--route` once for each instance of the branch, and a route that is no branch is
-refused, naming the branches, so that it can be answered again.
+instances; a workflow breaking either is refused before anything runs, and so is one binding a
+router's output, designating a router as its output or declaring a call to one. A router a person
+performs is answered with `--route` once for each instance of the branch and no text, `--route ""`
+for none; a route that is no branch is refused, naming the branches, and so is text, so that it can
+be answered again.
 
 ### Repetition
 

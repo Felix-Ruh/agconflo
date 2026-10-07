@@ -183,13 +183,13 @@ the reader's in ``reader``, the writer's in ``writer``, the validator's in
    :test_kind: positive
    :coverage: full
 
-   ``draft = { from = "router", input = "draft" }`` reads as the edge carrying
-   ``router``'s input ``draft``, and ``verdict = "router"`` beside it as the
-   edge carrying its output; a table missing ``input``, and one holding a key
-   besides the two, are each refused at their place.
+   ``input = { from = "router", input = "draft" }`` reads as the edge
+   carrying ``router``'s input ``draft``, and ``hint = "writer"`` beside it as
+   the edge carrying ``writer``'s output; a table missing ``input``, and one
+   holding a key besides the two, are each refused at their place.
 
-   Catches: the table read as the router's output; ``from`` and ``input``
-   swapped.
+   Catches: the table read as an output of the instance it names; ``from``
+   and ``input`` swapped.
 
 .. test_case:: A binding taking an input a node does not route is reported
    :id: TEST_WIRING_ROUTED_INPUT_CHECKED
@@ -204,17 +204,53 @@ the reader's in ``reader``, the writer's in ``writer``, the validator's in
 
    Catches: the binding passed; the input's type not compared.
 
+.. test_case:: A router's node type declaring an output is refused
+   :id: TEST_READER_ROUTER_OUTPUT_REFUSED
+   :verifies: CREQ_READER_ROUTER_DECLARES_NO_OUTPUT
+   :test_kind: error_path
+   :coverage: full
+
+   A node type declaring ``routes = true`` and an output is refused at the
+   ``output`` key's line and column, its message saying a router makes none;
+   one declaring ``routes = false`` and no output is refused for the missing
+   key. The controls: a router declaring none reads with no output, and a
+   node type that does not route reads the output it declares.
+
+   Catches: the output read and ignored; a router read as needing an output;
+   a node type that does not route read without one.
+
+.. test_case:: Taking from a router anything but its inputs is a defect
+   :id: TEST_WIRING_ROUTER_GIVES_ONLY_INPUTS
+   :verifies: CREQ_VALIDATOR_ROUTER_GIVES_ONLY_INPUTS
+   :test_kind: error_path
+   :coverage: full
+
+   One definition holding all three faults: a binding of a router's output,
+   the router designated as the definition's output, and an instance
+   declaring a call to the router's node type. All three are reported at
+   once, each naming its place - the binding's instance and parameter, the
+   call's instance and node type, the definition - and the binding's message
+   says the router makes no output. The control: the router's input taken
+   and another instance designated, no defect.
+
+   Catches: a binding of a router's output passed; a router passed as the
+   designated output; a call to a router passed; only the first such fault
+   reported.
+
 .. test_case:: A router's script names where its run goes
    :id: TEST_HOST_ROUTE_NAMED
    :verifies: CREQ_HOST_ROUTE_NAMED
    :test_kind: positive
    :coverage: full
 
-   A router's script naming two instances, and one naming none: each
-   activation's output is reported with those names in the order named, and
-   with none.
+   A router's script naming two instances and returning nothing, and one
+   naming none: each activation is reported as the names in the order named,
+   or none, and the run accepts it, which it would not with an output beside
+   them. Named for both, both branches run, each given the input the router
+   was given; named for none, the run goes nowhere from it.
 
-   Catches: the names dropped; the names reported in another order.
+   Catches: the names dropped; the names reported in another order; a
+   context reported for the router all the same.
 
 .. test_case:: A route named where none may be, or not named where one must be, fails
    :id: TEST_HOST_ROUTE_REFUSED
@@ -229,17 +265,17 @@ the reader's in ``reader``, the writer's in ``writer``, the validator's in
    Catches: a transform's script routing; a router ending without a route read
    as every edge; the second naming kept.
 
-.. test_case:: A router's output goes only into the instances named
+.. test_case:: A router's inputs go only into the instances named
    :id: TEST_RUN_ROUTED_WALKS_CHOSEN
    :verifies: CREQ_RUN_WALKS_ROUTED
    :test_kind: positive
    :coverage: full
 
    A router given a draft and a review, bound by two branches - one taking its
-   output and its input ``draft``, the other its input ``review`` - and named
-   for the first: that branch is given the router's output and the very draft
-   context the router was given, by identifier, and the other is given
-   nothing. Named for both, both are given theirs.
+   inputs ``review`` and ``draft``, the other its input ``review`` - and
+   routed to the first: that branch is given the very review and draft
+   contexts the router was given, by identifier, and the other is given
+   nothing. Routed to both, both are given theirs.
 
    Catches: every edge walked; an input walked as a copy; the input of another
    pass walked.
@@ -250,26 +286,32 @@ the reader's in ``reader``, the writer's in ``writer``, the validator's in
    :test_kind: error_path
    :coverage: full
 
-   A router's output reported without names, one naming an instance no edge
-   from it enters, and a transform's output reported with names: each is
-   refused, and nothing is walked.
+   An output reported for a router, a route naming an instance no edge from
+   the router enters, and a route reported for a transform: each is refused
+   naming the instance, nothing is walked, and the same activation is still
+   outstanding. A route naming nothing is taken, and the run goes nowhere.
 
-   Catches: a name no edge enters ignored; a transform's output walked only
-   where named.
+   Catches: a context taken for a router; a name no edge enters ignored; a
+   transform's output walked only where named.
 
 .. test_case:: A router's naming is kept and resumed
    :id: TEST_RECORD_ROUTES_KEPT
-   :verifies: CREQ_RECORD_HOLDS_ROUTES
+   :verifies: CREQ_RECORD_HOLDS_ROUTES, CREQ_RECORD_REFUSES_DIVERGENCE
    :test_kind: positive
    :coverage: full
 
-   A run whose router named one of two branches, written after the router's
-   output and resumed: the resumed run offers the branch named and not the
-   other, and a record naming an instance the workflow no longer has is
-   refused as diverging.
+   A run whose router named one of two branches, written once it has: the
+   router's entry holds its instance, its route and its inputs, and no
+   output. Resumed, the run offers the branch named and not the other. A
+   record whose router's entry holds an output beside its route is refused
+   as unreadable, at the entry; one naming an instance the workflow no longer
+   has is refused as diverging at the router's report; and one recording one
+   activation spent for its output and its route is refused, counting two
+   reports.
 
-   Catches: the output resumed without its names; a record naming an instance
-   the workflow no longer has resumed.
+   Catches: the entry resumed without its names; an output written for the
+   router; a record naming an instance the workflow no longer has resumed;
+   a route left out of the reports the activations spent are held to.
 
 .. test_case:: A router's instance declares its branches
    :id: TEST_READER_BRANCHES_READ
@@ -305,9 +347,9 @@ the reader's in ``reader``, the writer's in ``writer``, the validator's in
    :test_kind: error_path
    :coverage: full
 
-   A router whose edges enter two instances, one through its output and one
-   through its input, declaring a branch for one, a branch for both and an
-   empty branch: no defect. The same router with one entered instance in no
+   A router whose edges enter two instances, each through its input,
+   declaring a branch for one, a branch for both and an empty branch: no
+   defect. The same router with one entered instance in no
    branch, a branch naming an instance no edge enters twice, a second branch
    naming the same instances in another order, and branches on an instance
    that does not route: each reported once, naming the router and what is at

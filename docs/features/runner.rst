@@ -104,7 +104,7 @@ defined in ``components/runner`` with the requirements allocated to them.
    :derived_from: STKH_HUMAN_IN_RUN, STKH_RUN_FROM_DOCUMENTS
    :ears_pattern: event
    :verification_method: test
-   :statement: When a person gives text for the step the record in a file awaits, Agconflo shall continue that run with the text as the step's output.
+   :statement: When a person gives text for the step the record in a file awaits and its node type declares an output, Agconflo shall continue that run with the text as the step's output.
 
    ``STKH_HUMAN_IN_RUN`` has a person supply a context while a run is in
    progress. Hosted from documents, the run the person answers is the one a
@@ -114,6 +114,11 @@ defined in ``components/runner`` with the requirements allocated to them.
    person's step to a caller the person must write meets ``STKH_HUMAN_IN_RUN``
    through that caller, and stops being runnable from its documents at the
    first step a person performs.
+
+   A step whose node type declares no output has no context for text to be;
+   a router's is answered with a route (``FEAT_PERSON_ROUTES``). Revised
+   under ``DEC_CHANGE_RUNNER_TAKES_THE_ANSWER``: it had made text the output
+   of every step, which is more than its parents ask.
 
 .. feat_req:: A record file is continued by one run at a time
    :id: FEAT_RUNNER_ONE_RUN_PER_FILE

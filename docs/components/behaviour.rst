@@ -192,7 +192,7 @@ nothing to it (``DEC_BEHAVIOUR_OWN_CRATE``).
    :derived_from: FEAT_BEHAVIOUR_ONE_CONTEXT
    :allocated_to: COMP_SCRIPT_HOST
    :ears_pattern: unwanted
-   :statement: If a script returns anything other than exactly one context, then Script host shall fail that activation naming what was returned.
+   :statement: If the script of a node type that declares an output returns anything other than exactly one context or the script of one that declares none returns anything, then Script host shall fail that activation naming what was returned.
 
    Failure modes, each one a script's author would otherwise not hear about:
 
@@ -205,6 +205,13 @@ nothing to it (``DEC_BEHAVIOUR_OWN_CRATE``).
    - **Failed without saying what came back.** ``nil``, a table and two contexts
      are three different mistakes, and "not a context" sends the author to guess
      which.
+   - **A context returned where the type declares no output dropped without a
+     word**, and its author believing it was passed on.
+
+   A router's node type declares no output (``DEC_ROUTER_DECLARES_NO_OUTPUT``),
+   and its script names its route through ``host.route`` and returns nothing.
+   Revised under ``DEC_CHANGE_HOST_ONE_CONTEXT``: it had asked one context of
+   every script.
 
 .. comp_req:: An output the run refuses fails the activation
    :id: CREQ_HOST_OUTPUT_REFUSAL_CARRIED

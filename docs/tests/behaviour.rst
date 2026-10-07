@@ -170,10 +170,15 @@ time a test is allowed.
    Five scripts, one run each: returning ``nil``, returning nothing, returning
    two contexts, returning a string and returning a table. Each run ends with
    that activation failed, naming what was returned - five different answers -
-   and no instance after it performed.
+   and no instance after it performed. Then a router's script, whose node type
+   declares no output, naming its route and returning a context, a string or
+   two values: each fails the router's activation as having returned
+   something, naming it. One making its context with ``host.output`` fails as
+   a script error, a router having no declared type to make one of.
 
    Catches: the first of several taken; nothing taken as success; a string
-   turned into a context; failed without saying what came back.
+   turned into a context; failed without saying what came back; a router's
+   returned context dropped without a word.
 
 .. test_case:: An output the run refuses fails the activation with the refusal
    :id: TEST_HOST_REFUSED_OUTPUT_FAILS_WITH_THE_REFUSAL

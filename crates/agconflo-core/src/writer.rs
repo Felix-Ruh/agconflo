@@ -890,9 +890,10 @@ fn routed_input_written() {
         vec![
             node_type("route", &[("draft", "note")], "note").routing(),
             node_type("sink", &[("input", "note")], "note"),
+            node_type("source", &[], "note"),
         ],
     )])
-    .expect("two distinct types gather");
+    .expect("three distinct types gather");
     let text = "\
 name = \"w\"
 output = \"b\"
@@ -903,6 +904,9 @@ node_type = \"route\"
 [instances.b]
 node_type = \"sink\"
 bindings = { input = { from = \"r\", input = \"draft\" } }   # the draft, sent on
+
+[instances.s]
+node_type = \"source\"
 ";
     let (mut definition, mut document) =
         read_workflow("w.toml", text, &catalogue).expect("it reads");
@@ -912,15 +916,17 @@ bindings = { input = { from = \"r\", input = \"draft\" } }   # the draft, sent o
     assert_eq!(document.to_string(), text);
 
     // A new instance taking the router's input, and the old one repointed to
-    // its output: each written as the definition holds it, and read back.
+    // the output of `s`: each written as the definition holds it, and read
+    // back.
     definition
         .instances
         .push(instance("c", "sink", &[]).taking("input", "r", "draft"));
+    definition.instances[1].bindings[0].source = "s".to_owned();
     definition.instances[1].bindings[0].input = None;
     write_workflow(&mut document, &definition).expect("it writes");
     let written = document.to_string();
     assert!(
-        written.contains("bindings = { input = \"r\" }"),
+        written.contains("bindings = { input = \"s\" }"),
         "{written}"
     );
     assert!(

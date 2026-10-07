@@ -99,6 +99,22 @@ unless they are set where the script runs (``EVD_LUA_HOOK_PER_THREAD``).
    Catches: the answer returned as a string; its type chosen by the host; its
    text altered.
 
+.. test_case:: A router asking a model with no type fails before the call
+   :id: TEST_HOST_UNTYPED_ANSWER_IN_ROUTER_FAILS
+   :verifies: CREQ_HOST_MODEL_ANSWER
+   :test_kind: error_path
+   :coverage: partial
+
+   A router's script, its node type declaring no output, asking a model and
+   naming no type for the answer: the router's activation fails as a script
+   error saying there is no output to type the answer by and asking for the
+   type, and the stub receives nothing. The control: the same call naming
+   ``verdict`` is answered with a context of that type, the router routes and
+   the run completes, the stub having received one request.
+
+   Catches: the answer's type chosen by the host; the call sent when it can
+   only fail.
+
 .. test_case:: A prompt that is not a context is refused before the call
    :id: TEST_HOST_PROMPT_MUST_BE_A_CONTEXT
    :verifies: CREQ_HOST_PROMPT_IS_A_CONTEXT

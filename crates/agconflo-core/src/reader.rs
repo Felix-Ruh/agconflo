@@ -11,7 +11,9 @@ use toml_edit::{Document, DocumentMut, Item, TableLike};
 
 use crate::catalogue::TypeCatalogue;
 use crate::context::{ContextType, InvalidTypeName};
-use crate::workflow::{Binding, Branch, NodeInstance, NodeType, Parameter, WorkflowDefinition};
+use crate::workflow::{
+    Binding, Branch, NodeInstance, NodeType, Parameter, Produces, WorkflowDefinition,
+};
 
 /// The node types one document declares, under the name its caller gave the
 /// document.
@@ -127,6 +129,13 @@ pub enum FaultKind {
         /// The key, from the top of the document down.
         key: Vec<String>,
     },
+    /// A node type that routes declares an output, which a router does not
+    /// make: what goes along its edges is what it was given. The place is the
+    /// key declaring it.
+    RouterOutput {
+        /// The key, from the top of the document down.
+        key: Vec<String>,
+    },
 }
 
 impl fmt::Display for ReadFault {
@@ -174,6 +183,11 @@ impl fmt::Display for FaultKind {
                 "'{}' declares a standing output, and no output stands: a node reads a context made outside its passes from the pass it belongs to; remove the key",
                 key.join(".")
             ),
+            Self::RouterOutput { key } => write!(
+                f,
+                "'{}' declares an output for a router, which makes none: what goes along a router's edges is what it was given; remove the key",
+                key.join(".")
+            ),
         }
     }
 }
@@ -187,9 +201,10 @@ impl std::error::Error for ReadFault {}
 /// a table keying a parameter's context type by the parameter's name,
 /// `globals`, an array of the context types read by declaration, and `output`,
 /// the one context type it produces; it may hold a `description` and `routes`,
-/// whether it is a router. Only `output` is needed; an absent list is an empty
-/// one, an absent description is empty, an absent `routes` is false, and a
-/// document without `types` declares none. An `optional` list and a
+/// whether it is a router. Only `output` is needed, and only of a type that
+/// does not route: a router's is refused at its key. An absent list is an
+/// empty one, an absent description is empty, an absent `routes` is false, and
+/// a document without `types` declares none. An `optional` list and a
 /// `standing` key are refused at their keys.
 /// Parameters come back in the order they are written, in whichever TOML form.
 // @A node type document read in the order it is written,IMPL_READER_TYPES,impl,[CREQ_READER_TYPES],[DEC_NAMES_AS_KEYS, DEC_TYPES_IN_OWN_DOCUMENTS]
@@ -495,7 +510,8 @@ impl<'t> Reading<'t> {
     fn node_type(&self, name: &str, item: &Item) -> Result<NodeType, ReadFault> {
         let key = ["types", name];
         let declaration = self.table(item, &key)?;
-        let output = self.needed(item, declaration, &key, "output")?;
+        let routes = self.flag(declaration, &key, "routes")?;
+        let produces = self.produces(item, declaration, &key, routes)?;
         self.no_optional(declaration, &key)?;
         self.no_standing(declaration, &key)?;
         let required = self.parameters(declaration, &key, "required")?;
@@ -512,9 +528,36 @@ impl<'t> Reading<'t> {
             description,
             required,
             globals: self.globals(declaration, &key)?,
-            output: self.context_type(output, &[&key[..], &["output"]].concat())?,
-            routes: self.flag(declaration, &key, "routes")?,
+            produces,
         })
+    }
+
+    /// What `declaration` says a node of its type produces: the output it
+    /// declares, needed of a node type that does not route, or a route, the
+    /// output refused at its key for a node type that does.
+    // @A router's type declares no output and every other one,IMPL_READER_ROUTER_OUTPUT,impl,[CREQ_READER_ROUTER_DECLARES_NO_OUTPUT],[DEC_ROUTER_DECLARES_NO_OUTPUT]
+    fn produces(
+        &self,
+        item: &Item,
+        declaration: &dyn TableLike,
+        key: &[&str],
+        routes: bool,
+    ) -> Result<Produces, ReadFault> {
+        if !routes {
+            let output = self.needed(item, declaration, key, "output")?;
+            return self
+                .context_type(output, &[key, &["output"]].concat())
+                .map(Produces::Output);
+        }
+        match declaration.get_key_value("output") {
+            None => Ok(Produces::Route),
+            Some((written, _)) => Err(self.fault(
+                written.span(),
+                FaultKind::RouterOutput {
+                    key: path(&[key, &["output"]].concat()),
+                },
+            )),
+        }
     }
 
     /// What `declaration` says under `name`, a boolean, or false when it has
@@ -1569,12 +1612,12 @@ fn entry_mark_refused() {
 
 #[test]
 fn routes_read() {
-    let text = "[types.route]\noutput = \"note\"\nroutes = true\n\n[types.draft]\noutput = \"note\"\nroutes = false\n\n[types.review]\noutput = \"note\"\n";
+    let text = "[types.route]\nroutes = true\n\n[types.draft]\noutput = \"note\"\nroutes = false\n\n[types.review]\noutput = \"note\"\n";
     let read = read_node_types("types.toml", text).expect("it reads");
     let routes: Vec<(&str, bool)> = read
         .node_types()
         .iter()
-        .map(|declared| (declared.name.as_str(), declared.routes))
+        .map(|declared| (declared.name.as_str(), declared.routes()))
         .collect();
     assert_eq!(
         routes,
@@ -1599,6 +1642,57 @@ fn routes_read() {
             }
         )
     );
+}
+
+#[test]
+fn router_output_refused() {
+    // A router declaring an output, refused at the key, line and column.
+    let fault = read_node_types(
+        "types.toml",
+        "[types.ok]\noutput = \"note\"\n\n[types.route]\nroutes = true\noutput = \"note\"\n",
+    )
+    .expect_err("a router declares no output");
+    assert_eq!(
+        (fault.line(), fault.column(), fault.kind()),
+        (
+            6,
+            1,
+            &FaultKind::RouterOutput {
+                key: vec!["types".to_owned(), "route".to_owned(), "output".to_owned()],
+            }
+        )
+    );
+    assert!(
+        fault.to_string().contains("a router, which makes none"),
+        "{fault}"
+    );
+
+    // A node type that does not route still needs its output.
+    let fault = read_node_types("types.toml", "[types.plain]\nroutes = false\n")
+        .expect_err("a node that does not route declares its output");
+    assert!(
+        matches!(fault.kind(), FaultKind::MissingKey { key } if key.join(".") == "types.plain.output"),
+        "{fault:?}"
+    );
+
+    // The controls: a router declaring none reads without an output, and a
+    // node type declaring one reads it.
+    let read = read_node_types(
+        "types.toml",
+        "[types.route]\nroutes = true\n\n[types.plain]\noutput = \"note\"\n",
+    )
+    .expect("it reads");
+    let outputs: Vec<(&str, Option<&str>)> = read
+        .node_types()
+        .iter()
+        .map(|declared| {
+            (
+                declared.name.as_str(),
+                declared.output().map(|t| t.as_str()),
+            )
+        })
+        .collect();
+    assert_eq!(outputs, [("route", None), ("plain", Some("note"))]);
 }
 
 #[test]
@@ -1688,18 +1782,18 @@ fn routed_input_read() {
             .map(|&part| part.to_owned())
             .collect::<Vec<_>>()
     };
-    let text = "name = \"w\"\n\n[instances.next]\nnode_type = \"sink\"\nbindings = { input = { from = \"router\", input = \"draft\" }, hint = \"router\" }\n";
+    let text = "name = \"w\"\n\n[instances.next]\nnode_type = \"sink\"\nbindings = { input = { from = \"router\", input = \"draft\" }, hint = \"writer\" }\n";
     let (definition, _) = read_workflow("w.toml", text, &catalogue()).expect("it reads");
     let bindings: Vec<(&str, &str, Option<&str>)> = definition.instances[0]
         .bindings
         .iter()
         .map(|b| (b.parameter.as_str(), b.source.as_str(), b.input.as_deref()))
         .collect();
-    // The table is the router's input `draft`, and the name beside it the
-    // router's output.
+    // The table is the router's input `draft`, and the name beside it
+    // another instance's output.
     assert_eq!(
         bindings,
-        [("input", "router", Some("draft")), ("hint", "router", None)]
+        [("input", "router", Some("draft")), ("hint", "writer", None)]
     );
 
     // A table missing its input, and one holding a key besides the two, are

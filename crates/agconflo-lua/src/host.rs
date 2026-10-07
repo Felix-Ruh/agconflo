@@ -65,6 +65,13 @@ pub enum ScriptFailure {
         /// What it returned: `nothing`, a Lua type's name, or how many values.
         found: String,
     },
+    /// A router's script returned something, where a router makes no context
+    /// and its script returns nothing.
+    RouterReturned {
+        /// What it returned: `a context`, a Lua type's name, or how many
+        /// values.
+        found: String,
+    },
     /// The script executed more instructions than its limit.
     InstructionLimit,
     /// The script allocated more memory than its limit.
@@ -157,6 +164,10 @@ impl fmt::Display for ScriptFailure {
             Self::NotOneContext { found } => {
                 write!(f, "the script returned {found} rather than one context")
             }
+            Self::RouterReturned { found } => write!(
+                f,
+                "the script of a router returned {found}: a router makes no context, so its script returns nothing and names where its run goes on to through host.route"
+            ),
             Self::InstructionLimit => f.write_str("the script exceeded its instruction limit"),
             Self::MemoryLimit => f.write_str("the script exceeded its memory limit"),
             Self::ModelCallLimit => f.write_str("the script exceeded its model call limit"),
@@ -323,9 +334,13 @@ pub(crate) struct Performing {
     pub(crate) routes: bool,
 }
 
-/// What a script produced: its one output, and for a router's the instances
-/// it named, in the order named.
-pub(crate) type Produced = (Context, Option<Vec<String>>);
+/// What a script produced: its one output, or for a router's own activation,
+/// which produces no context, the instances it named, in the order named.
+#[derive(Clone, Debug)]
+pub(crate) enum Produced {
+    Output(Context),
+    Routed(Vec<String>),
+}
 
 /// Perform `activation` by running `script` in a new state and a thread of its
 /// own, or say how it failed.
@@ -384,12 +399,15 @@ pub(crate) async fn perform(
         Err(error) => Err(error),
     };
 
-    let output = outcome(returned, &over_instructions, &calls)?;
-    let route = route.take();
-    if routes && route.is_none() {
-        return Err(ScriptFailure::NoRoute);
+    let returned = outcome(returned, &over_instructions, &calls)?;
+    if routes {
+        nothing_returned(returned)?;
+        return route
+            .take()
+            .map(Produced::Routed)
+            .ok_or(ScriptFailure::NoRoute);
     }
-    Ok((output, route))
+    one_context(returned).map(Produced::Output)
 }
 
 /// The Lua half of `require`, given the function compiling the module supplied
@@ -470,8 +488,9 @@ fn route_function(
 ///
 /// `host.complete` checks the call limit before calling, takes its prompt as a
 /// context and nothing else, and gives the answer back as a new context of the
-/// type the script names, or of its output's declared type when it names none.
-/// Between the two, its model may yield: see [`complete`].
+/// type the script names, or of its output's declared type when it names none;
+/// naming none where no output is declared, as a router's script, it fails
+/// before calling. Between the two, its model may yield: see [`complete`].
 // @A model call through the host,IMPL_HOST_COMPLETE,impl,[CREQ_HOST_MODEL_ANSWER, CREQ_HOST_PROMPT_IS_A_CONTEXT, CREQ_HOST_MODEL_CALL_LIMIT],[NOTE_HOST_OWNED_HANDLES]
 fn host_functions(
     lua: &Lua,
@@ -483,7 +502,9 @@ fn host_functions(
     performing: Performing,
 ) -> LuaResult<LuaTable> {
     let host = lua.create_table()?;
-    host.raw_set("output", activation.output().as_str())?;
+    if let Some(declared) = activation.output() {
+        host.raw_set("output", declared.as_str())?;
+    }
 
     let issuing = source.clone();
     host.raw_set(
@@ -521,7 +542,9 @@ fn host_functions(
         roster: roster.clone(),
         calls: calls.clone(),
         limits,
-        output: activation.output().as_str().to_owned(),
+        output: activation
+            .output()
+            .map(|declared| declared.as_str().to_owned()),
         callees: performing.callees,
         replay: performing.replay,
         mailbox: performing.mailbox,
@@ -537,7 +560,11 @@ fn host_functions(
                 let completing = completing.clone();
                 async move {
                     let prompt = prompt?;
-                    let declared = declared.unwrap_or_else(|| completing.output.clone());
+                    let declared = declared.or_else(|| completing.output.clone()).ok_or_else(|| {
+                        LuaError::external(
+                            "a router declares no output to type a model's answer by: name the type, host.complete(role, prompt, type)",
+                        )
+                    })?;
                     let declared = ContextType::new(&declared).map_err(LuaError::external)?;
                     complete(&completing, &role, prompt, declared)
                         .await
@@ -590,7 +617,8 @@ struct Completing {
     roster: Roster,
     calls: Rc<Calls>,
     limits: Limits,
-    output: String,
+    /// The type the activation declares for its output, `None` for a router's.
+    output: Option<String>,
     callees: Vec<NodeType>,
     replay: Replay,
     mailbox: Rc<Mailbox>,
@@ -1068,7 +1096,7 @@ fn outcome(
     returned: LuaResult<LuaMultiValue>,
     over_instructions: &Cell<bool>,
     calls: &Calls,
-) -> Result<Context, ScriptFailure> {
+) -> Result<LuaMultiValue, ScriptFailure> {
     if over_instructions.get() {
         return Err(ScriptFailure::InstructionLimit);
     }
@@ -1078,7 +1106,23 @@ fn outcome(
     if let Some(failed) = calls.failed.borrow_mut().take() {
         return Err(failed);
     }
-    returned.map_err(failure).and_then(one_context)
+    returned.map_err(failure)
+}
+
+/// Nothing, which is what a router's script returns, or a failure saying what
+/// it returned instead: a context, a Lua type's name, or how many values.
+// @A router's script returns nothing,IMPL_HOST_ROUTER_RETURNS_NOTHING,impl,[CREQ_HOST_ONE_CONTEXT, CREQ_HOST_ROUTE_NAMED],[DEC_ROUTER_PASSES_ON_ITS_INPUTS]
+fn nothing_returned(values: LuaMultiValue) -> Result<(), ScriptFailure> {
+    let returned = |found: String| Err(ScriptFailure::RouterReturned { found });
+    let values: Vec<LuaValue> = values.into_iter().collect();
+    match values.as_slice() {
+        [] => Ok(()),
+        [LuaValue::UserData(handed)] if handed.borrow::<Handed>().is_ok() => {
+            returned("a context".to_owned())
+        }
+        [one] => returned(one.type_name().to_owned()),
+        several => returned(format!("{} values", several.len())),
+    }
 }
 
 /// The one context `values` holds, or a failure saying what they held instead:
@@ -1329,6 +1373,48 @@ fn not_one_context_fails() {
             "{script}"
         );
     }
+
+    // A router's script, whose type declares no output, returning anything
+    // having named its route: a context, a string, two values. `host.output`
+    // is not there to make one with.
+    let cases = [
+        (
+            "local given, host = ...\nhost.route({'a'})\nreturn host.text('note', 'x')",
+            "a context",
+        ),
+        (
+            "local given, host = ...\nhost.route({'a'})\nreturn 'plain'",
+            "string",
+        ),
+        (
+            "local given, host = ...\nhost.route({'a'})\nreturn given.input, given.input",
+            "2 values",
+        ),
+    ];
+    for (script, found) in cases {
+        let (instance, failure) = failed(routed_run(script).0);
+        assert_eq!(
+            (instance.as_str(), failure),
+            (
+                "r",
+                ScriptFailure::RouterReturned {
+                    found: found.to_owned()
+                }
+            ),
+            "{script}"
+        );
+    }
+    let (instance, failure) = failed(
+        routed_run(
+            "local given, host = ...\nhost.route({'a'})\nreturn host.text(host.output, 'x')",
+        )
+        .0,
+    );
+    assert_eq!(instance, "r");
+    assert!(
+        matches!(&failure, ScriptFailure::Raised { message } if message.contains("bad argument")),
+        "{failure:?}"
+    );
 }
 
 #[cfg(test)]
@@ -1791,6 +1877,48 @@ node_type = "first"
 
 #[cfg(test)]
 #[test]
+fn untyped_answer_in_router_fails() {
+    let stub = crate::models::Stub::answering(200, "go");
+    let pass = "local given, host = ...\nreturn host.text(host.output, given.input:render())";
+    let join =
+        "local given, host = ...\nreturn host.compose(host.output, {given.left, given.right}, ' ')";
+    let routed = |router: &str| {
+        let behaviours = Behaviours::new()
+            .define("seed", "seed.lua", pass)
+            .define("route", "route.lua", router)
+            .define("take", "take.lua", pass)
+            .define("join", "join.lua", join);
+        crate::scripted::run_with_roster(
+            &workflow(ROUTED_TYPES, ROUTED),
+            &behaviours,
+            &drafting(&stub),
+            Some(("s", "seed")),
+        )
+    };
+
+    // A router's script asking a model with no type: its node type declares
+    // no output to type the answer by, so the call fails, naming the type
+    // argument it lacks, and nothing is sent.
+    let (instance, failure) = failed(routed(
+        "local given, host = ...\nlocal verdict = host.complete('drafting', given.input)\nhost.route({'a', 'b'})",
+    ));
+    assert_eq!(instance, "r");
+    assert!(
+        matches!(&failure, ScriptFailure::Raised { message } if message.contains("a router declares no output to type a model's answer by: name the type")),
+        "{failure:?}"
+    );
+    assert!(stub.requests().is_empty(), "no call was made");
+
+    // The control: naming the type, the router is answered and routes.
+    let result = rendered(routed(
+        "local given, host = ...\nlocal verdict = host.complete('drafting', given.input, 'verdict')\nassert(verdict:type() == 'verdict' and verdict:render() == 'go')\nhost.route({'a', 'b'})",
+    ));
+    assert_eq!(result, "seed seed");
+    assert_eq!(stub.requests().len(), 1);
+}
+
+#[cfg(test)]
+#[test]
 fn prompt_must_be_a_context() {
     let stub = crate::models::Stub::answering(200, "unused");
     let failure = first_fails_calling(
@@ -2027,7 +2155,6 @@ output = "note"
 
 [types.route]
 required = { input = "note" }
-output = "note"
 routes = true
 
 [types.take]
@@ -2054,11 +2181,11 @@ branches = { a = ["a"], b = ["b"], both = ["a", "b"] }
 
 [instances.a]
 node_type = "take"
-bindings = { input = "r" }
+bindings = { input = { from = "r", input = "input" } }
 
 [instances.b]
 node_type = "take"
-bindings = { input = "r" }
+bindings = { input = { from = "r", input = "input" } }
 
 [instances.j]
 node_type = "join"
@@ -2099,11 +2226,10 @@ fn routed_run(router: &str) -> (Result<crate::Outcome, crate::ScriptedRefusal>, 
 #[test]
 fn route_named() {
     // Two names, in an order that is not the definition's: both branches run,
-    // and the router's output is reported with the names as named.
-    let (ended, records) = routed_run(
-        "local given, host = ...\nhost.route({'b', 'a'})\nreturn host.text(host.output, 'both')",
-    );
-    assert_eq!(rendered(ended), "both both");
+    // each given the router's input, and the router is reported with the names
+    // as named and no output.
+    let (ended, records) = routed_run("local given, host = ...\nhost.route({'b', 'a'})");
+    assert_eq!(rendered(ended), "seed seed");
     assert!(
         records
             .iter()
@@ -2111,11 +2237,9 @@ fn route_named() {
         "{records:?}"
     );
 
-    // None: the router's output is reported with no names, and the run goes
-    // nowhere from it.
-    let (ended, records) = routed_run(
-        "local given, host = ...\nhost.route({})\nreturn host.text(host.output, 'neither')",
-    );
+    // None: the router is reported with no names, and the run goes nowhere
+    // from it.
+    let (ended, records) = routed_run("local given, host = ...\nhost.route({})");
     assert!(
         matches!(
             ended,
@@ -2151,9 +2275,7 @@ fn route_refused() {
     );
 
     // A router naming twice.
-    let (ended, _) = routed_run(
-        "local given, host = ...\nhost.route({'a'})\nhost.route({'b'})\nreturn host.text(host.output, 'twice')",
-    );
+    let (ended, _) = routed_run("local given, host = ...\nhost.route({'a'})\nhost.route({'b'})");
     let (instance, failure) = failed(ended);
     assert_eq!(instance, "r");
     assert!(
@@ -2162,8 +2284,7 @@ fn route_refused() {
     );
 
     // A router ending without naming.
-    let (ended, _) =
-        routed_run("local given, host = ...\nreturn host.text(host.output, 'nowhere')");
+    let (ended, _) = routed_run("local given, host = ...\nlocal _ = given.input:render()");
     let (instance, failure) = failed(ended);
     assert_eq!(
         (instance.as_str(), &failure),

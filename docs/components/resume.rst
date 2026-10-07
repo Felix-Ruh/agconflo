@@ -30,11 +30,16 @@ the run's rule of one context per identifier, kept across an interruption.
    :derived_from: FEAT_RUN_RECORDED
    :allocated_to: COMP_RUN_RECORD
    :ears_pattern: ubiquitous
-   :statement: Run record shall write a run as text holding its budget, the activations it spent, its arguments, each output it accepted in the order accepted with the inputs its activation was given, and every context those hold once each.
+   :statement: Run record shall write a run as text holding its budget, the activations it spent, its arguments, each report it accepted in the order accepted with the inputs its activation was given, and every context those hold once each.
 
-   Measured, those are the whole of a run's state (``EVD_RUN_STATE_DERIVABLE``),
-   and the inputs are what tells its workflow from another
-   (``DEC_RECORD_IS_OUTPUTS``).
+   A report is what the run's caller gave for an activation performed: its
+   output, or a router's route, which a router gives in place of one
+   (``DEC_ROUTE_RECORDED_ALONE``). Measured, those are the whole of a run's
+   state (``EVD_RUN_STATE_DERIVABLE``), and the inputs are what tells its
+   workflow from another (``DEC_RECORD_IS_OUTPUTS``).
+
+   Revised under ``DEC_CHANGE_RECORD_HOLDS_THE_RUN``: it had held each output
+   accepted.
 
    Failure modes:
 
@@ -75,7 +80,9 @@ the run's rule of one context per identifier, kept across an interruption.
    :derived_from: FEAT_RESUME_REPEATS_NO_OUTPUT
    :allocated_to: COMP_RUN_RECORD
    :ears_pattern: ubiquitous
-   :statement: Run record shall resume a run holding every output its record holds, having spent the activations its record spent, and offering again the activation that was outstanding when it was recorded.
+   :statement: Run record shall resume a run having accepted every report its record holds, having spent the activations its record spent, and offering again the activation that was outstanding when it was recorded.
+
+   A report is an output or a router's route (``CREQ_RECORD_HOLDS_THE_RUN``).
 
    Failure modes:
 
@@ -83,9 +90,12 @@ the run's rule of one context per identifier, kept across an interruption.
      large enough stops short of completing after being resumed.
    - **The outstanding activation lost.** The resumed run offers the next one,
      and the instance that was running never produces.
-   - **The recorded outputs handed to the caller to perform again.** Every
+   - **The recorded activations handed to the caller to perform again.** Every
      recorded activation runs twice, which is the measured shape
      (``EVD_INTERRUPTED_RUN_REPEATS_CALLS``).
+
+   Revised under ``DEC_CHANGE_RECORD_CONTINUES_THE_RUN``: it had held every
+   output its record holds.
 
 .. comp_req:: A resumed context is the context recorded
    :id: CREQ_RECORD_KEEPS_CONTEXTS
@@ -136,24 +146,29 @@ the run's rule of one context per identifier, kept across an interruption.
    :derived_from: FEAT_RESUME_REFUSES_ANOTHER_RUN
    :allocated_to: COMP_RUN_RECORD
    :ears_pattern: unwanted
-   :statement: If the workflow a record is resumed against would not have offered each recorded output's activation in the recorded order with the recorded inputs, then Run record shall refuse to resume it naming the first recorded output that differs.
+   :statement: If the workflow a record is resumed against would not have offered each recorded report's activation in the recorded order with the recorded inputs, then Run record shall refuse to resume it naming the first recorded report that differs.
 
-   The run offers each activation in turn and is handed the recorded output
-   (``DEC_RESUME_BY_REPLAY``); what the run offers is compared first.
+   The run offers each activation in turn and is handed the recorded report,
+   an output or a router's route (``DEC_RESUME_BY_REPLAY``,
+   ``CREQ_RECORD_HOLDS_THE_RUN``); what the run offers is compared first.
 
    Failure modes:
 
    - **Only instance names compared.** The measured shape: a rewired workflow
      resumes (``EVD_REPLAY_BY_NAME_ACCEPTS_REWIRING``).
-   - **Recorded outputs left over.** A record holding more outputs than the
+   - **Recorded reports left over.** A record holding more reports than the
      workflow would have asked for - one after its designated output, or one
      for an instance it does not have - resumes with some of them never
      reported.
-   - **An output the run refuses reported anyway.** A recorded output of a type
+   - **A report the run refuses made anyway.** A recorded output of a type
      the workflow no longer declares for its instance is held by the resumed
      run.
    - **More activations spent than a run could have spent.** A count below the
-     outputs, or more than one above them, describes no run.
+     reports, or above them by more than the activations the run would have
+     outstanding, describes no run.
+
+   Revised under ``DEC_CHANGE_RECORD_REFUSES_DIVERGENCE``: it had spoken of
+   each recorded output.
 
 .. comp_req:: A record whose run would not start is refused as the start refuses
    :id: CREQ_RECORD_REFUSES_WHAT_START_REFUSES

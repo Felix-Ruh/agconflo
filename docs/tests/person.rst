@@ -146,26 +146,31 @@ behaviour supplied by naming a person rather than by a script.
    :coverage: full
 
    The review loop with its router performed by a person: the run stops at the
-   router's step, and each answer naming the drafter continues it to the
-   router's next step; the third, naming the finisher, completes it with the
-   third draft. The last record holds two routes back and one on.
+   router's step, and each answer, a route and no text, naming the drafter
+   continues it to the router's next step; the third, naming the finisher,
+   completes it with the third draft. The last record holds two routes back
+   and one on.
 
-   Catches: the names dropped; the names reported in another order.
+   Catches: the names dropped; the names reported in another order; text
+   asked for beside the route.
 
-.. test_case:: A route that does not fit its step is refused
+.. test_case:: An answer that does not fit its step is refused
    :id: TEST_SCRIPTED_PERSON_BAD_ROUTE_REFUSED
-   :verifies: CREQ_HOST_REFUSES_BAD_PERSON_ROUTE
+   :verifies: CREQ_HOST_REFUSES_BAD_PERSON_ROUTE, CREQ_HOST_REFUSES_ANSWER_WITHOUT_TEXT
    :test_kind: error_path
    :coverage: full
 
-   At the router's step, an answer with no route and one naming an instance
-   no edge out of the router enters are each refused, and no record is handed
-   over. At a person's step that is a call's activation of a node type that
-   routes, an answer with a route is refused; the same answer without one is
-   taken - the control.
+   At the router's step, an answer with no route, one naming an instance no
+   edge out of the router enters, and one giving text beside a route that
+   would be taken are each refused, naming the router, and no record is
+   handed over. At a person's step that is not a router's - a call's
+   activation of a node type a person performs - an answer with a route and
+   one with no text are each refused; the same answer with text and no route
+   is taken - the control.
 
-   Catches: a missing route read as every edge; a route on a step that is not
-   a router's own ignored; a misspelt name failing the run.
+   Catches: a missing route read as every edge; text for a router's step
+   dropped; a route on a step that is not a router's own ignored; no text
+   taken as empty text; a misspelt name failing the run.
 
 .. test_case:: The runner carries a route and tells a router's choices
    :id: TEST_RUNNER_PERSON_ROUTES
@@ -174,23 +179,29 @@ behaviour supplied by naming a person rather than by a script.
    :coverage: full
 
    A project whose router a person performs: the run stops at the router's
-   step with the instances its edges enter handed back, the drafter and the
-   finisher, and answering through the record's file with a route continues
-   it where named.
+   step with the instances its edges enter handed back, ``third`` and
+   ``fourth``, and answering through the record's file with a route and no
+   text continues it where named, ``third`` given what the router was given.
 
-   Catches: the route dropped between the person and the scripted run;
-   nothing handed back; instances handed back that no edge enters.
+   Catches: the route dropped between the person and the scripted run; text
+   required beside a route; nothing handed back; instances handed back that
+   no edge enters.
 
 .. test_case:: The command line takes --route and prints a router's choices
    :id: TEST_COMMAND_PERSON_ROUTES
-   :verifies: CREQ_COMMAND_READS_ROUTE
+   :verifies: CREQ_COMMAND_READS_ROUTE, CREQ_COMMAND_MISUSE
    :test_kind: positive
    :coverage: full
 
    Run as a person would: a run stopping at a router's step prints the step
-   with the instances it may name on standard output; ``agconflo answer
-   --route drafter`` continues it; ``--route ""`` sends it nowhere, and the
-   run ends quiescent rather than refusing an empty name.
+   with the instances it may name, and no type it produces, on standard
+   output. An answer giving ``--text`` beside the route is refused, exit
+   status 4, saying the router makes no context; one giving neither text nor
+   a route is refused as a command line it cannot read, exit status 2; the
+   step is still awaited after both. ``agconflo answer --route a`` alone
+   continues it, ``a`` given what the router was given; ``--route ""`` sends
+   it nowhere, and the run ends quiescent rather than refusing an empty name.
 
    Catches: an empty name taken as an instance; the choices printed to
-   standard error.
+   standard error; text demanded beside a route; text for a router's step
+   taken.
