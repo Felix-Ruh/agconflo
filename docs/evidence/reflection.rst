@@ -59,3 +59,32 @@ maintainer allowed for these runs.
    prompt many times this size. A call to a tool not offered is rare on a
    task this small, and when it comes, today it fails the activation and the
    run with it (``DEC_MALFORMED_CALL_FAILS``).
+
+.. evd:: Answered why, the weak model called again correctly where the run used to fail
+   :id: EVD_REFUSAL_ANSWERED_LIVE
+   :evd_kind: measurement
+   :observed_on: 2026-10-08
+   :observation: Asked to give lookup a parameter it does not declare, deepseek-v4.1-flash did in 2 of 2 runs; each was refused, the model called again with query alone and answered, exit 0, where the engine before failed both runs, exit 5.
+
+   Run through the ``agconflo`` command on a scratch workflow: one instance,
+   ``asker``, whose script asks the role ``asking`` a question and may call
+   ``lookup``, a script node type taking ``query``. Every role went to
+   ``deepseek/deepseek-v4.1-flash`` through OpenRouter, or to
+   ``qwen3.8-27b-ridge`` in LM Studio at a context of 25,088 tokens.
+
+   With the prompt telling the model to call ``lookup`` with ``query`` and
+   ``lang``, deepseek made that call in both runs on this pull request's
+   engine. Each record holds three exchanges, the first with the call
+   refused as ``lookup`` with ``it declares no parameter lang``; the model
+   called again with ``query`` alone, and ended "the lookup tool has no
+   ``lang`` parameter, so my first call ... ". The same workflow on ``main``
+   at ``6c47155``, in two runs, ended exit 5: "the node asker failed: the
+   model's call to lookup is refused: it declares no parameter lang". qwen
+   left ``lang`` out in both of its runs, and nothing was refused.
+
+   With the prompt instead telling the model to search with a tool
+   ``search_codes``, which was not offered, neither model called it:
+   deepseek called ``lookup`` in 3 of 3 runs, once saying it had used the
+   tool that was there, and qwen in 2 of 2. With
+   ``EVD_WEAK_MODEL_KEPT_TO_ITS_TOOLS``, a call to a tool not offered was
+   not seen once from these two models.
