@@ -541,3 +541,88 @@ or keeps, on the commit named. Re-running one later shows what has moved since.
    ``IMPL_RUN_WALKS_EVERY_EDGE``, ``TEST_RUN_ROUTED_WALKS_CHOSEN`` and its
    run. The lines: the two markers, one line of ``features/person`` and one
    of ``tests/repetition``.
+
+.. evd:: The impact of a resumed run performing again no recorded activation
+   :id: EVD_IMPACT_RESUME_REPEATS_NO_OUTPUT
+   :evd_kind: measurement
+   :observed_on: 2026-10-07
+   :observation: FEAT_RESUME_REPEATS_NO_OUTPUT answers to 1 need, has 13 below it by link, 12 requirements sharing a component with it and 4 sharing its architecture, and is named on 4 lines outside its definition.
+
+   The six analyses below were each run as ``sh scripts/impact.sh <ID>`` on
+   ``cda8afd``, for the requirements the router change's first thirteen
+   records missed. Above this one: ``STKH_RESUMABLE_RUN``. Below:
+   ``CREQ_RECORD_CONTINUES_THE_RUN``, ``ARCH_RESUME``,
+   ``IMPL_RECORD_RESUME``, and five test cases with their runs -
+   ``TEST_RECORD_OUTSTANDING_NOT_CHARGED_AGAIN``,
+   ``TEST_RECORD_RESUMED_RUN_ENDS_ALIKE``,
+   ``TEST_RECORD_RESUMES_MID_REPETITION``,
+   ``TEST_RUNNER_RECORDED_TOOL_STEP_NOT_REPEATED`` and
+   ``TEST_SCRIPTED_INTERRUPTED_RUN_RESUMES``. Beside it: every requirement
+   allocated to ``COMP_RUN_RECORD``, and ``FEAT_RESUME_KEEPS_CONTEXTS``,
+   ``FEAT_RESUME_REFUSES_ANOTHER_RUN``, ``FEAT_RUN_RECORDED`` and
+   ``FEAT_SCRIPTED_RUN_RECORDED`` under ``ARCH_RESUME``. The lines: one each
+   of ``features/runner``, ``features/tools``, ``features/yield`` and
+   ``components/yield``.
+
+.. evd:: The impact of a resumed run accepting every recorded report
+   :id: EVD_IMPACT_RECORD_CONTINUES_THE_RUN
+   :evd_kind: measurement
+   :observed_on: 2026-10-07
+   :observation: CREQ_RECORD_CONTINUES_THE_RUN answers to 2 needs, has 7 below it by link and 12 requirements sharing its component, and is named on 4 lines outside its definition.
+
+   Above it: ``FEAT_RESUME_REPEATS_NO_OUTPUT`` and ``STKH_RESUMABLE_RUN``.
+   Below: ``IMPL_RECORD_RESUME``, and three test cases with their runs -
+   ``TEST_RECORD_OUTSTANDING_NOT_CHARGED_AGAIN``,
+   ``TEST_RECORD_RESUMED_RUN_ENDS_ALIKE`` and
+   ``TEST_RECORD_RESUMES_MID_REPETITION``. Beside it: every requirement
+   allocated to ``COMP_RUN_RECORD``. The lines: that marker, two lines of
+   ``decisions/routing`` and one of ``features/routing``.
+
+.. evd:: The impact of the record holding each report
+   :id: EVD_IMPACT_RECORD_HOLDS_THE_RUN
+   :evd_kind: measurement
+   :observed_on: 2026-10-07
+   :observation: CREQ_RECORD_HOLDS_THE_RUN answers to 2 needs, has 4 below it by link and 12 requirements sharing its component, and is named on 9 lines outside its definition.
+
+   Above it: ``FEAT_RUN_RECORDED`` and ``STKH_RESUMABLE_RUN``. Below:
+   ``IMPL_RECORD_EVENTS``, ``IMPL_RECORD_WRITE``,
+   ``TEST_RECORD_HOLDS_THE_RUN`` and its run. Beside it: every requirement
+   allocated to ``COMP_RUN_RECORD``. The lines: the two markers, and seven of
+   ``scripts/comment-rules.sh``, which plants its id in markers it checks the
+   shape of.
+
+.. evd:: The impact of divergence being checked for every report
+   :id: EVD_IMPACT_RECORD_REFUSES_DIVERGENCE
+   :evd_kind: measurement
+   :observed_on: 2026-10-07
+   :observation: CREQ_RECORD_REFUSES_DIVERGENCE answers to 2 needs, has 3 below it by link and 12 requirements sharing its component, and is named on 3 lines outside its definition.
+
+   Above it: ``FEAT_RESUME_REFUSES_ANOTHER_RUN`` and ``STKH_RESUMABLE_RUN``.
+   Below: ``IMPL_RECORD_RESUME``, ``TEST_RECORD_DIVERGED_RECORD_REFUSED`` and
+   its run. Beside it: every requirement allocated to ``COMP_RUN_RECORD``.
+   The lines: that marker, the body of ``CREQ_RECORD_HOLDS_ROUTES`` and one
+   line of ``components/yield``.
+
+.. evd:: The impact of a model's answer typed where no output is declared
+   :id: EVD_IMPACT_HOST_MODEL_ANSWER
+   :evd_kind: measurement
+   :observed_on: 2026-10-07
+   :observation: CREQ_HOST_MODEL_ANSWER answers to 2 needs, has 3 below it by link and 36 requirements sharing its component, and is named on 1 line outside its definition.
+
+   Above it: ``FEAT_MODEL_ANSWER_IS_A_CONTEXT`` and ``STKH_PROVENANCE``.
+   Below: ``IMPL_HOST_COMPLETE``, ``TEST_HOST_MODEL_ANSWER_IS_A_CONTEXT`` and
+   its run. Beside it: every requirement allocated to ``COMP_SCRIPT_HOST``.
+   The line is that marker.
+
+.. evd:: The impact of a stuck run naming what never activated
+   :id: EVD_IMPACT_RUN_ENDS_QUIESCENT
+   :evd_kind: measurement
+   :observed_on: 2026-10-07
+   :observation: CREQ_RUN_ENDS_QUIESCENT answers to 2 needs, has 5 below it by link and 23 requirements sharing its component, and is named on 3 lines outside its definition.
+
+   Above it: ``FEAT_RUN_QUIESCENCE_ENDS`` and ``STKH_STUCK_RUN``. Below:
+   ``IMPL_RUN_STEP``, and two test cases with their runs -
+   ``TEST_RUN_IDLE_INSTANCE_DOES_NOT_MAKE_IT_STUCK`` and
+   ``TEST_RUN_QUIESCENT_NAMES_ONLY_UNPRODUCED``. Beside it: every requirement
+   allocated to ``COMP_WORKFLOW_RUN``. The lines: that marker, and one line
+   each of ``components/run`` and ``features/behaviour``.

@@ -1732,3 +1732,206 @@ changed.
      records sit beside this.
    - Text: the two markers; one line of ``features/person`` and one of
      ``tests/repetition``, unchanged.
+
+.. dec:: Restated: a resumed run performs again no activation its record holds as performed
+   :id: DEC_CHANGE_RESUME_REPEATS_NO_OUTPUT
+   :dec_status: accepted
+   :decided_on: 2026-10-07
+   :supported_by: EVD_IMPACT_RESUME_REPEATS_NO_OUTPUT
+   :statement: Agconflo's requirements project shall state FEAT_RESUME_REPEATS_NO_OUTPUT of every activation a record holds as performed because its parent keeps all of a run's work and not only the work that made an output.
+
+   Old: "When a run is resumed from its record, Agconflo shall continue it
+   without performing again any activation whose output the record holds."
+   New: "When a run is resumed from its record, Agconflo shall continue it
+   without performing again any activation the record holds as performed."
+
+   Justification: wrong against its own parent, claiming less than it.
+   ``STKH_RESUMABLE_RUN`` resumes the run that was interrupted, and the
+   feature's own body says what that rules out: work performed a second
+   time. "Whose output the record holds" named the one mark of finished work
+   there was, the mechanism of its day. An activation that finishes having
+   given no output - a router's, whose report is its route
+   (``DEC_ROUTER_PASSES_ON_ITS_INPUTS``) - is work all the same, and
+   performing it again asks its model or its person again. The new statement
+   names the property, as the feature's title always did.
+
+   Verdicts on the impact analysis (``EVD_IMPACT_RESUME_REPEATS_NO_OUTPUT``):
+
+   - Up, ``STKH_RESUMABLE_RUN``: unchanged.
+   - Down: ``CREQ_RECORD_CONTINUES_THE_RUN`` changes under its own record;
+     ``ARCH_RESUME`` unaffected; ``IMPL_RECORD_RESUME`` unchanged, handing
+     the run a router's recorded route as it hands an output; the five test
+     cases unaffected, each resuming activations that gave an output.
+   - Sideways, the run record's requirements and ``ARCH_RESUME``'s four
+     other features: unaffected but those whose records sit beside this.
+   - Text: the openings of ``features/runner`` and ``features/tools`` and
+     the body of a ``components/yield`` requirement cite it for steps that
+     give an output, unchanged; the body of ``FEAT_RESUME_REPEATS_NO_ANSWER``
+     restates the old statement and is reworded.
+
+.. dec:: Restated: a resumed run accepts every report its record holds
+   :id: DEC_CHANGE_RECORD_CONTINUES_THE_RUN
+   :dec_status: accepted
+   :decided_on: 2026-10-07
+   :supported_by: EVD_IMPACT_RECORD_CONTINUES_THE_RUN
+   :statement: Agconflo's requirements project shall state CREQ_RECORD_CONTINUES_THE_RUN of every report its record holds because its parent now keeps every activation the record holds as performed.
+
+   Old: "Run record shall resume a run holding every output its record holds,
+   having spent the activations its record spent, and offering again the
+   activation that was outstanding when it was recorded." New: "Run record
+   shall resume a run having accepted every report its record holds, having
+   spent the activations its record spent, and offering again the activation
+   that was outstanding when it was recorded."
+
+   Justification: its parent changed (``DEC_CHANGE_RESUME_REPEATS_NO_OUTPUT``).
+   A report is what the run accepted for an activation performed, an output
+   or a route (``CREQ_RECORD_HOLDS_THE_RUN``), and accepting it from the
+   record is what keeps that activation from being performed again.
+
+   Verdicts on the impact analysis (``EVD_IMPACT_RECORD_CONTINUES_THE_RUN``):
+
+   - Up: changed above; ``STKH_RESUMABLE_RUN`` unchanged.
+   - Down: ``IMPL_RECORD_RESUME`` unchanged; its three test cases unaffected.
+   - Sideways, the run record's requirements: unaffected but those whose
+     records sit beside this.
+   - Text: the marker; two lines of ``decisions/routing``, each citing it for
+     a resumed run running no script again, unchanged; the body of
+     ``FEAT_ROUTE_RECORDED``, which says a router's names are not in its
+     output, reworded.
+
+.. dec:: Restated: the record holds each report the run accepted
+   :id: DEC_CHANGE_RECORD_HOLDS_THE_RUN
+   :dec_status: accepted
+   :decided_on: 2026-10-07
+   :supported_by: EVD_IMPACT_RECORD_HOLDS_THE_RUN
+   :statement: Agconflo's requirements project shall state CREQ_RECORD_HOLDS_THE_RUN of each report a run accepted because its parent asks for a record of the run and an activation's report is not always an output.
+
+   Old: "Run record shall write a run as text holding its budget, the
+   activations it spent, its arguments, each output it accepted in the order
+   accepted with the inputs its activation was given, and every context those
+   hold once each." New: "Run record shall write a run as text holding its
+   budget, the activations it spent, its arguments, each report it accepted
+   in the order accepted with the inputs its activation was given, and every
+   context those hold once each."
+
+   Justification: wrong against its own parent, claiming less than it.
+   ``FEAT_RUN_RECORDED`` asks for a record of the run, and
+   ``EVD_RUN_STATE_DERIVABLE`` measured the outputs as the whole of a run's
+   state when every activation gave one. An activation that gives a route in
+   place of an output (``DEC_ROUTE_RECORDED_ALONE``) is part of that state
+   too: held without its inputs or its place among the rest, the record
+   describes no run.
+
+   Verdicts on the impact analysis (``EVD_IMPACT_RECORD_HOLDS_THE_RUN``):
+
+   - Up, ``FEAT_RUN_RECORDED`` and ``STKH_RESUMABLE_RUN``: unchanged.
+   - Down: ``IMPL_RECORD_WRITE`` and ``IMPL_RECORD_EVENTS`` unchanged, each
+     writing a router's entry with its inputs in its place;
+     ``TEST_RECORD_HOLDS_THE_RUN`` unaffected.
+   - Sideways, the run record's requirements: unaffected but those whose
+     records sit beside this.
+   - Text: the two markers; seven lines of ``scripts/comment-rules.sh``, which
+     plant its id only as a well-formed marker, unaffected.
+
+.. dec:: Restated: a record diverging at any report is refused
+   :id: DEC_CHANGE_RECORD_REFUSES_DIVERGENCE
+   :dec_status: accepted
+   :decided_on: 2026-10-07
+   :supported_by: EVD_IMPACT_RECORD_REFUSES_DIVERGENCE
+   :statement: Agconflo's requirements project shall state CREQ_RECORD_REFUSES_DIVERGENCE of each recorded report because its parent refuses any record that describes no run of its workflow.
+
+   Old: "If the workflow a record is resumed against would not have offered
+   each recorded output's activation in the recorded order with the recorded
+   inputs, then Run record shall refuse to resume it naming the first
+   recorded output that differs." New: "If the workflow a record is resumed
+   against would not have offered each recorded report's activation in the
+   recorded order with the recorded inputs, then Run record shall refuse to
+   resume it naming the first recorded report that differs."
+
+   Justification: wrong against its own parent, claiming less than it.
+   ``FEAT_RESUME_REFUSES_ANOTHER_RUN`` refuses a record that does not
+   describe a run of the workflow. One whose router's entry was given inputs
+   the workflow would not give it is such a record, and "each recorded
+   output's activation" does not reach it.
+
+   Verdicts on the impact analysis (``EVD_IMPACT_RECORD_REFUSES_DIVERGENCE``):
+
+   - Up: unchanged.
+   - Down: ``IMPL_RECORD_RESUME`` changes: it already compared a router's
+     entry, and now counts it among the reports the activations spent are
+     held to, and its refusals name a report where they named an output;
+     ``TEST_RECORD_DIVERGED_RECORD_REFUSED`` unaffected, and
+     ``TEST_RECORD_ROUTES_KEPT`` gains a spent count below the reports of a
+     record holding a route, and verifies this as well.
+   - Sideways, the run record's requirements: unaffected but those whose
+     records sit beside this.
+   - Text: the marker; the body of ``CREQ_RECORD_HOLDS_ROUTES``, citing it for
+     a route the workflow no longer has, unchanged; one line of
+     ``components/yield``, for a call's output, unchanged.
+
+.. dec:: Restated: an untyped model answer where no output is declared fails
+   :id: DEC_CHANGE_HOST_MODEL_ANSWER
+   :dec_status: accepted
+   :decided_on: 2026-10-07
+   :supported_by: EVD_IMPACT_HOST_MODEL_ANSWER
+   :statement: Agconflo's requirements project shall state CREQ_HOST_MODEL_ANSWER as failing a model call that names no type for a node type declaring no output because as written it asks for a type that does not exist.
+
+   Old: "Script host shall give a script a model's answer as a new context of
+   the type the script names for it, or of its output's declared type when it
+   names none." New: "Script host shall give a script a model's answer as a
+   new context of the type the script names for it, or of its output's
+   declared type when it names none, failing the call where it names none and
+   its node type declares none."
+
+   Justification: wrong against its own parent, in that it cannot be
+   verified as written. ``FEAT_MODEL_ANSWER_IS_A_CONTEXT`` asks for the
+   answer as a new context, which needs a type; the statement took the
+   declared output's wherever the script named none, and a node type may
+   declare none (``DEC_ROUTER_DECLARES_NO_OUTPUT``). Failing the call, before
+   any request, is the only answer that neither chooses a type for the
+   script nor pays for an answer nothing can hold.
+
+   Verdicts on the impact analysis (``EVD_IMPACT_HOST_MODEL_ANSWER``):
+
+   - Up, ``FEAT_MODEL_ANSWER_IS_A_CONTEXT`` and ``STKH_PROVENANCE``:
+     unchanged.
+   - Down: ``IMPL_HOST_COMPLETE`` changes, failing such a call before any
+     request; ``TEST_HOST_MODEL_ANSWER_IS_A_CONTEXT`` unaffected, and a new
+     case, ``TEST_HOST_UNTYPED_ANSWER_IN_ROUTER_FAILS``, verifies the
+     failure.
+   - Sideways, the script host's requirements: unaffected but those whose
+     records sit beside this.
+   - Text: the marker.
+
+.. dec:: Restated: a stuck run names the instances that never activated
+   :id: DEC_CHANGE_RUN_ENDS_QUIESCENT
+   :dec_status: accepted
+   :decided_on: 2026-10-07
+   :supported_by: EVD_IMPACT_RUN_ENDS_QUIESCENT
+   :statement: Agconflo's requirements project shall state CREQ_RUN_ENDS_QUIESCENT as naming every instance that never activated because naming one that did its work without an output points at the wrong part of the workflow.
+
+   Old: "If no instance of a run may activate and its designated instance has
+   produced no output, then Workflow run shall end that run naming every
+   instance that produced none." New: "If no instance of a run may activate
+   and its designated instance has produced no output, then Workflow run
+   shall end that run naming every instance that never activated."
+
+   Justification: wrong against its own parents. ``FEAT_RUN_QUIESCENCE_ENDS``
+   and ``STKH_STUCK_RUN`` above it report a run in which no node can make
+   further progress, and the requirement's own failure modes say what the
+   names are for: the instances that did no work, and not those that did.
+   "Produced none" took giving an output for doing work; an instance whose
+   activations gave none - a router's, whose report is its route
+   (``DEC_ROUTER_PASSES_ON_ITS_INPUTS``) - did its work and would be named.
+
+   Verdicts on the impact analysis (``EVD_IMPACT_RUN_ENDS_QUIESCENT``):
+
+   - Up: unchanged.
+   - Down: ``IMPL_RUN_STEP`` unchanged, already naming an instance by whether
+     it ran; ``TEST_RUN_QUIESCENT_NAMES_ONLY_UNPRODUCED``, whose router names
+     nothing and is not named, unchanged but for its body, which says so;
+     ``TEST_RUN_IDLE_INSTANCE_DOES_NOT_MAKE_IT_STUCK`` unaffected.
+   - Sideways, the workflow run's requirements: unaffected but those whose
+     records sit beside this.
+   - Text: the marker; one line each of ``components/run`` and
+     ``features/behaviour``, citing it for quiescence, unchanged.

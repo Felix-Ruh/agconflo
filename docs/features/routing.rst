@@ -98,11 +98,11 @@ closes the file.
 
    A run resumed from its record goes on from where it stopped, and where it
    stopped depends on every branch taken before. Resuming runs no finished
-   activation again: its output comes from the record
-   (``CREQ_RECORD_CONTINUES_THE_RUN``). Which edges a finished router walked is
-   not in that output - its decision may be a model's text that a script read
-   - so without the names the resumed run cannot say which contexts each edge
-   holds.
+   activation again: what it gave comes from the record
+   (``CREQ_RECORD_CONTINUES_THE_RUN``). A router gives no output, only the
+   instances it named (``DEC_ROUTER_PASSES_ON_ITS_INPUTS``) - its decision may
+   be a model's text that a script read and kept nowhere - so without the
+   names the resumed run cannot say which contexts each edge holds.
 
    It can be false while the parents hold only by running every finished
    router again on resuming and trusting it to choose as it did, which a

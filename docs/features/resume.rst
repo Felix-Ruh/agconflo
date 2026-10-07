@@ -45,7 +45,7 @@ and names the components they are divided between, which are defined in
    :derived_from: STKH_RESUMABLE_RUN
    :ears_pattern: event
    :verification_method: test
-   :statement: When a run is resumed from its record, Agconflo shall continue it without performing again any activation whose output the record holds.
+   :statement: When a run is resumed from its record, Agconflo shall continue it without performing again any activation the record holds as performed.
 
    The parent's own words, made testable: work is thrown away exactly when it
    is performed a second time. Measured, today every activation is
@@ -55,6 +55,9 @@ and names the components they are divided between, which are defined in
    arguments has, in a sense, been resumed: it reaches the ending it would have
    reached, having repeated every model call on the way. The test is that shape
    exactly, with the calls counted.
+
+   Revised under ``DEC_CHANGE_RESUME_REPEATS_NO_OUTPUT``: it had spoken of an
+   activation whose output the record holds.
 
 .. feat_req:: A resumed run holds the contexts it held
    :id: FEAT_RESUME_KEEPS_CONTEXTS

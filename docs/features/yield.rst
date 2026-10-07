@@ -183,7 +183,7 @@ the requirements this feature allocates to them.
    after an interruption in the middle of an activation made again the model
    call it had already been answered (``EVD_WORK_INSIDE_AN_ACTIVATION_REPEATS``).
    The run was resumed; the answer was bought twice. ``FEAT_RESUME_REPEATS_NO_OUTPUT``
-   rules this out for an activation whose output the record holds, and says
+   rules this out for an activation the record holds as performed, and says
    nothing of one in progress, which is where a call puts a run for as long as
    the called node type takes.
 

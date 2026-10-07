@@ -264,7 +264,7 @@ component requirement whose subject is anything else.
    :derived_from: FEAT_RUN_QUIESCENCE_ENDS
    :allocated_to: COMP_WORKFLOW_RUN
    :ears_pattern: unwanted
-   :statement: If no instance of a run may activate and its designated instance has produced no output, then Workflow run shall end that run naming every instance that produced none.
+   :statement: If no instance of a run may activate and its designated instance has produced no output, then Workflow run shall end that run naming every instance that never activated.
 
    Both halves are needed and they come from different places. That nothing may
    activate is the scheduler's answer (``CREQ_SCHEDULER_NONE_READY``). That the
@@ -280,11 +280,16 @@ component requirement whose subject is anything else.
      depend on.
    - **The run left open rather than ended.** A caller asks again and nothing
      changes, because nothing is running that could change it.
-   - **Ended without naming what was waiting.** The instances that produced
-     nothing are what a person reads to find the cycle or the missing wire, and a
-     bare report of stuckness sends them to the whole graph.
-   - **Naming instances that did produce.** The list then includes nodes that did
-     their work, which points at the wrong part of the workflow.
+   - **Ended without naming what was waiting.** The instances that never
+     activated are what a person reads to find the cycle or the missing wire,
+     and a bare report of stuckness sends them to the whole graph.
+   - **Naming instances that did activate.** The list then includes nodes that
+     did their work - a router, whose work leaves no output
+     (``DEC_ROUTER_PASSES_ON_ITS_INPUTS``), among them - which points at the
+     wrong part of the workflow.
+
+   Revised under ``DEC_CHANGE_RUN_ENDS_QUIESCENT``: it had named every
+   instance that produced no output.
 
 .. comp_req:: A failed activation ends the run with its failure
    :id: CREQ_RUN_ENDS_ON_FAILURE

@@ -103,19 +103,27 @@ component requirement whose subject is anything else.
    :derived_from: FEAT_MODEL_ANSWER_IS_A_CONTEXT
    :allocated_to: COMP_SCRIPT_HOST
    :ears_pattern: ubiquitous
-   :statement: Script host shall give a script a model's answer as a new context of the type the script names for it, or of its output's declared type when it names none.
+   :statement: Script host shall give a script a model's answer as a new context of the type the script names for it, or of its output's declared type when it names none, failing the call where it names none and its node type declares none.
 
    Issued from the run's one identifier source, like every context a script
    makes, so it is new to the run (``CREQ_RUN_REFUSES_SHARED_OUTPUT_IDENTIFIER``).
+   A router's node type declares no output (``DEC_ROUTER_DECLARES_NO_OUTPUT``),
+   so its script names the type of every answer it asks for.
 
    Failure modes:
 
    - **The answer returned as a string.** The model's bytes enter the output as
      the script's.
    - **The answer's type chosen by the host.** A script composing answers of two
-     kinds cannot tell them apart by type.
+     kinds cannot tell them apart by type; one whose node type declares no
+     output is given an answer typed by nothing it wrote.
    - **The answer's text altered.** Trimmed or normalised, it is no longer what
      the model said.
+   - **The call sent when it can only fail.** A model is paid for an answer no
+     type can hold.
+
+   Revised under ``DEC_CHANGE_HOST_MODEL_ANSWER``: it had given every answer
+   the script did not type its output's declared type.
 
 .. comp_req:: A prompt that is not a context is refused
    :id: CREQ_HOST_PROMPT_IS_A_CONTEXT
