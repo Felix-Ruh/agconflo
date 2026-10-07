@@ -150,6 +150,31 @@ pub enum WiringDefect {
     /// rest, with each input's passes.
     // @Inputs that share no pass as a defect,TRACE_DEFECT_UNPAIRED,trace,[],[DEC_PAIRING_IS_WIRING]
     Unpaired(Unpaired),
+    /// A binding takes the output of a router, which makes none.
+    // @Taking from a router what it does not make as defects,TRACE_DEFECT_ROUTER_OUTPUT,trace,[],[DEC_ROUTER_PASSES_ON_ITS_INPUTS]
+    RouterOutputTaken {
+        /// The instance consuming the binding.
+        instance: String,
+        /// The parameter it fills.
+        parameter: String,
+        /// The router whose output it takes.
+        router: String,
+    },
+    /// The definition designates a router as its output, which makes none.
+    RouterDesignated {
+        /// The definition's name.
+        definition: String,
+        /// The router it designates.
+        router: String,
+    },
+    /// An instance declares a call to a node type that routes, which makes
+    /// nothing to give back.
+    RouterCalled {
+        /// The instance declaring the call.
+        instance: String,
+        /// The node type called, as it was written.
+        router: String,
+    },
 }
 
 impl WiringDefect {
@@ -169,10 +194,14 @@ impl WiringDefect {
             | Self::BranchesNotRouted { instance }
             | Self::InstanceInNoBranch { instance, .. }
             | Self::BranchNamesUnentered { instance, .. }
-            | Self::RepeatedBranch { instance, .. } => Some(instance),
+            | Self::RepeatedBranch { instance, .. }
+            | Self::RouterOutputTaken { instance, .. }
+            | Self::RouterCalled { instance, .. } => Some(instance),
             Self::CycleUnstarted { instances } => instances.first().map(String::as_str),
             Self::Unpaired(unpaired) => Some(&unpaired.instance),
-            Self::SignatureOutputs { .. } | Self::UnresolvedOutput { .. } => None,
+            Self::SignatureOutputs { .. }
+            | Self::UnresolvedOutput { .. }
+            | Self::RouterDesignated { .. } => None,
         }
     }
 
@@ -184,7 +213,9 @@ impl WiringDefect {
             | Self::UndeclaredParameter { parameter, .. }
             | Self::RepeatedBinding { parameter, .. }
             | Self::ContextTypeDisagreement { parameter, .. }
-            | Self::UnroutedInput { parameter, .. } => Some(parameter),
+            | Self::UnroutedInput { parameter, .. }
+            | Self::RouterOutputTaken { parameter, .. } => Some(parameter),
+            Self::RouterDesignated { .. } | Self::RouterCalled { .. } => None,
             Self::UnresolvedNodeType { .. }
             | Self::RepeatedInstance { .. }
             | Self::SignatureOutputs { .. }
@@ -209,6 +240,7 @@ impl WiringDefect {
         match self {
             Self::UnresolvedCall { unresolved, .. } => Some(unresolved),
             Self::UnportableCallName { name, .. } => Some(name),
+            Self::RouterCalled { router, .. } => Some(router),
             _ => None,
         }
     }
@@ -334,6 +366,22 @@ impl fmt::Display for WiringDefect {
                 }
             },
             Self::Unpaired(unpaired) => unpaired.fmt(f),
+            Self::RouterOutputTaken {
+                instance,
+                parameter,
+                router,
+            } => write!(
+                f,
+                "'{parameter}' of the node '{instance}' is bound to the router '{router}', which makes no output: bind one of its inputs, {{ from = \"{router}\", input = \"...\" }}"
+            ),
+            Self::RouterDesignated { definition, router } => write!(
+                f,
+                "the workflow '{definition}' designates the router '{router}' as its output, and a router makes none"
+            ),
+            Self::RouterCalled { instance, router } => write!(
+                f,
+                "the node '{instance}' may call '{router}', a router, which makes nothing to give back"
+            ),
         }
     }
 }
@@ -365,7 +413,9 @@ proptest! {
                 | WiringDefect::UndeclaredParameter { .. }
                 | WiringDefect::RepeatedBinding { .. }
                 | WiringDefect::ContextTypeDisagreement { .. }
-                | WiringDefect::UnroutedInput { .. } => {}
+                | WiringDefect::UnroutedInput { .. }
+                | WiringDefect::RouterOutputTaken { .. } => {}
+                WiringDefect::RouterDesignated { .. } | WiringDefect::RouterCalled { .. } => continue,
                 WiringDefect::UnresolvedNodeType { .. }
                 | WiringDefect::RepeatedInstance { .. }
                 | WiringDefect::SignatureOutputs { .. }

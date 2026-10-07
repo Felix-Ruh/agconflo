@@ -431,10 +431,11 @@ together.
 
    A document binding a parameter to ``{ from = "r", input = "draft" }``, with a
    comment beside it, is written back unchanged byte for byte. Then that binding
-   is repointed to the router's output, and a new instance takes the router's
-   input: the first is written as the name ``"r"``, the second as a table of
-   ``from`` and ``input``, and the document reads back as the definition.
+   is repointed to the output of another instance, ``s``, and a new instance
+   takes the router's input: the first is written as the name ``"s"``, the
+   second as a table of ``from`` and ``input``, and the document reads back as
+   the definition.
 
    Catches: a routed input written as its source's name alone, which reads back
-   as the router's output (``DEC_ROUTED_INPUT_BOUND_BY_TABLE``); an unchanged
-   table rewritten and its comment lost.
+   as a binding of the router's output (``DEC_ROUTED_INPUT_BOUND_BY_TABLE``); an
+   unchanged table rewritten and its comment lost.

@@ -45,27 +45,26 @@ impl Passes {
     }
 
     /// Record that `activation`, an instance's own, produced `output` as its
-    /// instance's next pass - and for a router's, the inputs it was given and
-    /// the branch `route` names it took, none where it named nothing.
-    // @An output held as its instance's next pass,IMPL_RUN_WALKS_EVERY_EDGE,impl,[CREQ_RUN_WALKS_EVERY_EDGE, CREQ_RUN_WALKS_ROUTED],[DEC_PASS_CLOCKS, DEC_ONE_GRAPH]
-    pub(crate) fn produced(
-        &mut self,
-        activation: &Activation,
-        output: &Context,
-        route: Option<Option<usize>>,
-    ) {
-        let instance = activation.instance.clone();
+    /// instance's next pass.
+    // @An output held as its instance's next pass,IMPL_RUN_WALKS_EVERY_EDGE,impl,[CREQ_RUN_WALKS_EVERY_EDGE],[DEC_PASS_CLOCKS, DEC_ONE_GRAPH]
+    pub(crate) fn produced(&mut self, activation: &Activation, output: &Context) {
         self.outputs
-            .entry(instance.clone())
+            .entry(activation.instance.clone())
             .or_default()
             .push(output.clone());
-        if let Some(branch) = route {
-            self.given
-                .entry(instance.clone())
-                .or_default()
-                .push(activation.inputs.clone());
-            self.routes.entry(instance).or_default().push(branch);
-        }
+    }
+
+    /// Record that `activation`, a router's own, took `branch` as its
+    /// instance's next pass, none where it named nothing, with the inputs it
+    /// was given, which are what its edges carry.
+    // @A router's inputs held with the branch it took as its next pass,IMPL_RUN_ROUTER_PASS,impl,[CREQ_RUN_WALKS_ROUTED],[DEC_PASS_CLOCKS, DEC_ROUTER_PASSES_ON_ITS_INPUTS]
+    pub(crate) fn routed(&mut self, activation: &Activation, branch: Option<usize>) {
+        let instance = activation.instance.clone();
+        self.given
+            .entry(instance.clone())
+            .or_default()
+            .push(activation.inputs.clone());
+        self.routes.entry(instance).or_default().push(branch);
     }
 
     /// The latest output of `instance`, when it has produced one.
@@ -78,9 +77,11 @@ impl Passes {
         self.runs(instance) > 0
     }
 
-    /// How many passes `instance` has run.
+    /// How many passes `instance` has run: its outputs, or for a router, which
+    /// makes none, the branches it took.
     fn runs(&self, instance: &str) -> usize {
         self.outputs.get(instance).map_or(0, Vec::len)
+            + self.routes.get(instance).map_or(0, Vec::len)
     }
 
     /// The pass of `router` on which it took one of `branches` for the time
@@ -192,7 +193,7 @@ pub struct Activation {
     pub(crate) node_type: String,
     pub(crate) call: Option<String>,
     pub(crate) inputs: Vec<(String, Context)>,
-    pub(crate) output: ContextType,
+    pub(crate) output: Option<ContextType>,
 }
 
 impl Activation {
@@ -222,9 +223,10 @@ impl Activation {
     }
 
     /// The context type the activation's node type declares for its one output,
-    /// which is the type the run accepts an output of.
-    pub fn output(&self) -> &ContextType {
-        &self.output
+    /// which is the type the run accepts an output of - or `None` for a
+    /// router's, which produces no context.
+    pub fn output(&self) -> Option<&ContextType> {
+        self.output.as_ref()
     }
 }
 
@@ -285,7 +287,7 @@ pub(crate) fn activation_for(
         node_type: declared.name.clone(),
         call: None,
         inputs,
-        output: declared.output.clone(),
+        output: declared.output().cloned(),
     })
 }
 
@@ -395,7 +397,7 @@ fn answers(workflow: &WorkflowDefinition) -> Vec<String> {
             given(&activation).join(",")
         ));
         let context = ctx(&mut source, "note");
-        passes.produced(&activation, &context, None);
+        passes.produced(&activation, &context);
     }
 
     answers.sort();
@@ -725,7 +727,7 @@ fn offered_once_per_pass() {
     // An instance reading nothing is offered once, and never again.
     let v = offered(&workflow, &arguments, &passes, "v").expect("nothing to wait for");
     let v0 = ctx(&mut source, "note");
-    passes.produced(&v, &v0, None);
+    passes.produced(&v, &v0);
     for _ in 0..3 {
         assert!(offered(&workflow, &arguments, &passes, "v").is_none());
     }
@@ -735,13 +737,13 @@ fn offered_once_per_pass() {
     let x = offered(&workflow, &arguments, &passes, "x").expect("given its first");
     assert!(x.inputs()[0].1.is(&seed));
     let x0 = ctx(&mut source, "note");
-    passes.produced(&x, &x0, None);
+    passes.produced(&x, &x0);
 
     // `c`'s first pass: then, with nothing of a second pass, not offered
     // however often it is asked.
     let c = offered(&workflow, &arguments, &passes, "c").expect("its first pass");
     assert!(c.inputs()[0].1.is(&v0) && c.inputs()[1].1.is(&x0));
-    passes.produced(&c, &ctx(&mut source, "note"), None);
+    passes.produced(&c, &ctx(&mut source, "note"));
     for _ in 0..3 {
         assert!(offered(&workflow, &arguments, &passes, "c").is_none());
     }
@@ -751,7 +753,7 @@ fn offered_once_per_pass() {
     let x = offered(&workflow, &arguments, &passes, "x").expect("its second pass");
     assert!(x.inputs()[0].1.is(&x0));
     let x1 = ctx(&mut source, "note");
-    passes.produced(&x, &x1, None);
+    passes.produced(&x, &x1);
     let c = offered(&workflow, &arguments, &passes, "c").expect("its second pass");
     assert!(c.inputs()[0].1.is(&v0) && c.inputs()[1].1.is(&x1));
 }
@@ -797,7 +799,7 @@ fn looping(branches: &[(&str, &[&str])], more: Vec<NodeInstance>) -> WorkflowDef
     ];
     let mut instances = vec![
         instance("b", "Src", &[]),
-        instance("d", "Draft", &[("brief", "b"), ("feedback", "r")]),
+        instance("d", "Draft", &[("brief", "b")]).taking("feedback", "r", "draft"),
         instance("r", "Route", &[("draft", "d")]).branching(branches),
     ];
     instances.extend(more);
@@ -889,11 +891,14 @@ fn unpaired_inputs_reported() {
         &[("brief", "note"), ("feedback", "note"), ("aside", "note")],
         "note",
     ));
-    slower.instances[1] = instance(
+    // Bound in this order, `feedback` taking the router's input `draft`.
+    let mut drafter = instance(
         "d",
         "Draft3",
         &[("brief", "b"), ("feedback", "r"), ("aside", "s")],
     );
+    drafter.bindings[1].input = Some("draft".to_owned());
+    slower.instances[1] = drafter;
     let found = unpaired_of(&slower, &[("d", "feedback")]);
     assert_eq!(found.len(), 1, "{found:?}");
     assert_eq!(found[0].instance, "d");

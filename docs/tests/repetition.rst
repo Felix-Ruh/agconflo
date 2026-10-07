@@ -115,7 +115,7 @@ from.
    :test_kind: error_path
    :coverage: full
 
-   A review loop whose drafter reads the router's output and its input back:
+   A review loop whose drafter reads the router's input back on two edges:
    with both edges back declaring a first context it is sound, and with
    neither, or with only one of the two, the drafter and the router are
    reported once as a cycle. A cycle of two instances no router is on and an
@@ -188,22 +188,27 @@ from.
    Catches: the context placed after what was walked first; the context given
    for every pass; its type taken from elsewhere.
 
-.. test_case:: A router reading its own output starts from the first context it declares
-   :id: TEST_RUN_ROUTER_READS_ITS_OWN_OUTPUT
+.. test_case:: A loop's state passed back by a router starts from the first context declared
+   :id: TEST_RUN_LOOP_STATE_PASSED_BACK_BY_A_ROUTER
    :verifies: CREQ_SCHEDULER_GIVES_FIRST, FEAT_FIRST_CONTEXT_DECLARED
    :test_kind: positive
    :coverage: partial
 
-   The first development workflow's shape: a router reading a goal and its
-   own output, declaring ``start`` as its first context, going round by
-   naming itself and on by naming the output's instance. Its first pass is
-   given ``start``, each pass after the output of the pass before, and the
-   output's instance the goal once the router names it; the run completes.
-   The control: declaring no first context, the router alone is reported as
-   a cycle nothing starts.
+   The first development workflow's shape, its state made by a node and not
+   by the router: ``verdict`` reads a goal and the state the router ``judge``
+   passes back as its input, declaring ``start`` as its first context;
+   ``judge`` reads the goal and ``verdict``'s state, going round by naming
+   ``verdict`` and on by naming the output's instance, which takes the goal
+   from it. ``verdict``'s first pass is given ``start``, each pass after the
+   very state of the pass before, and the output's instance the goal once the
+   router names it; the run completes. The controls: declaring no first
+   context, ``verdict`` and ``judge`` are reported as a cycle nothing starts;
+   and the shape the case had before, a router reading its own output, is
+   reported as taking an output a router does not make.
 
    Catches: the context placed after what was walked first, where what is
-   walked is the router's own output.
+   walked is a router's input; the state passed back as another context than
+   the one made.
 
 .. test_case:: An argument for a parameter a binding fills is refused
    :id: TEST_RUN_ARGUMENT_FOR_BOUND_PARAMETER_REFUSED

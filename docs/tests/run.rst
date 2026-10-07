@@ -402,7 +402,7 @@ single requirement to verify.
    the result does not depend on, and the case that catches a scheduler's
    quiescence being read as the run's.
 
-.. test_case:: A quiescent run names only the instances that produced nothing
+.. test_case:: A quiescent run names only the instances that never activated
    :id: TEST_RUN_QUIESCENT_NAMES_ONLY_UNPRODUCED
    :verifies: CREQ_RUN_ENDS_QUIESCENT
    :test_kind: error_path
@@ -411,8 +411,9 @@ single requirement to verify.
    A workflow whose first instance produces and whose router, reading it,
    names nothing, the remaining instances on the branch it did not take, the
    designated output among them: the run ends quiescent, the ending naming
-   those instances and not the two that did their work. The other three
-   endings are not reported.
+   those instances and not the two that did their work - the router among
+   them, which did its work producing no output. The other three endings are
+   not reported.
 
    Naming everything would point a reader at the whole graph, which is the same
    as naming nothing.

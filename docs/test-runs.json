@@ -813,6 +813,15 @@
           "title": "agconflo-lua host::unsupplied_module_fails",
           "type": "test_run"
         },
+        "RUN_HOST_UNTYPED_ANSWER_IN_ROUTER_FAILS": {
+          "executes": [
+            "TEST_HOST_UNTYPED_ANSWER_IN_ROUTER_FAILS"
+          ],
+          "id": "RUN_HOST_UNTYPED_ANSWER_IN_ROUTER_FAILS",
+          "test_outcome": "passed",
+          "title": "agconflo-lua host::untyped_answer_in_router_fails",
+          "type": "test_run"
+        },
         "RUN_ID_CANNOT_BE_FORGED": {
           "executes": [
             "TEST_ID_CANNOT_BE_FORGED"
@@ -1477,6 +1486,15 @@
           "id": "RUN_READER_ROUTED_INPUT_READ",
           "test_outcome": "passed",
           "title": "agconflo-core reader::routed_input_read",
+          "type": "test_run"
+        },
+        "RUN_READER_ROUTER_OUTPUT_REFUSED": {
+          "executes": [
+            "TEST_READER_ROUTER_OUTPUT_REFUSED"
+          ],
+          "id": "RUN_READER_ROUTER_OUTPUT_REFUSED",
+          "test_outcome": "passed",
+          "title": "agconflo-core reader::router_output_refused",
           "type": "test_run"
         },
         "RUN_READER_ROUTES_READ": {
@@ -2190,6 +2208,15 @@
           "title": "agconflo-core run::last_permitted_activation_completes",
           "type": "test_run"
         },
+        "RUN_RUN_LOOP_STATE_PASSED_BACK_BY_A_ROUTER": {
+          "executes": [
+            "TEST_RUN_LOOP_STATE_PASSED_BACK_BY_A_ROUTER"
+          ],
+          "id": "RUN_RUN_LOOP_STATE_PASSED_BACK_BY_A_ROUTER",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::loop_state_passed_back_by_a_router",
+          "type": "test_run"
+        },
         "RUN_RUN_MISSING_ARGUMENT_IS_REFUSED": {
           "executes": [
             "TEST_RUN_MISSING_ARGUMENT_IS_REFUSED"
@@ -2359,15 +2386,6 @@
           "id": "RUN_RUN_ROUTED_WALKS_CHOSEN",
           "test_outcome": "passed",
           "title": "agconflo-core run::routed_walks_chosen",
-          "type": "test_run"
-        },
-        "RUN_RUN_ROUTER_READS_ITS_OWN_OUTPUT": {
-          "executes": [
-            "TEST_RUN_ROUTER_READS_ITS_OWN_OUTPUT"
-          ],
-          "id": "RUN_RUN_ROUTER_READS_ITS_OWN_OUTPUT",
-          "test_outcome": "passed",
-          "title": "agconflo-core run::router_reads_its_own_output",
           "type": "test_run"
         },
         "RUN_RUN_ROUTE_NOT_A_BRANCH_REFUSED": {
@@ -3232,6 +3250,15 @@
           "id": "RUN_WIRING_ROUTED_INPUT_CHECKED",
           "test_outcome": "passed",
           "title": "agconflo-core wiring::routed_input_checked",
+          "type": "test_run"
+        },
+        "RUN_WIRING_ROUTER_GIVES_ONLY_INPUTS": {
+          "executes": [
+            "TEST_WIRING_ROUTER_GIVES_ONLY_INPUTS"
+          ],
+          "id": "RUN_WIRING_ROUTER_GIVES_ONLY_INPUTS",
+          "test_outcome": "passed",
+          "title": "agconflo-core wiring::router_gives_only_inputs",
           "type": "test_run"
         },
         "RUN_WIRING_SELF_BINDING_AND_SHARED_TYPES_PASS": {

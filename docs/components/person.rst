@@ -90,6 +90,23 @@ and how an activation is performed.
    - **A record not handed over after it.** An interruption after the person
      answered and before the next output loses the answer.
 
+.. comp_req:: An answer without text for a step declaring an output is refused
+   :id: CREQ_HOST_REFUSES_ANSWER_WITHOUT_TEXT
+   :derived_from: FEAT_PERSON_TEXT_IS_THE_OUTPUT
+   :allocated_to: COMP_SCRIPT_HOST
+   :ears_pattern: unwanted
+   :statement: If a person's answer for the awaited activation of a node type that declares an output gives no text, then Script host shall refuse it having run nothing.
+
+   An answer's text is optional for its caller, a router's step taking none
+   (``DEC_PERSON_ROUTE_IS_THE_ANSWER``). Refused as an answer for another step
+   is (``CREQ_HOST_REFUSES_ANSWER_ELSEWHERE``), so the person answers again.
+
+   Failure modes:
+
+   - **No text taken as empty text**, and the run holding an output nobody
+     wrote.
+   - **The run failed**, where the person could have answered again.
+
 .. comp_req:: An answer for a step the run does not await is refused, with nothing run
    :id: CREQ_HOST_REFUSES_ANSWER_ELSEWHERE
    :derived_from: FEAT_PERSON_ANSWER_ELSEWHERE_REFUSED

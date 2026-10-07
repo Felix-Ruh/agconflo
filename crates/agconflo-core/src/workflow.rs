@@ -34,12 +34,36 @@ pub struct NodeType {
     pub required: Vec<Parameter>,
     /// Context types read by declaration rather than through a binding.
     pub globals: Vec<ContextType>,
-    /// The context type of the one output a node of this type produces.
-    pub output: ContextType,
-    /// Whether a node of this type is a router: its script names the
-    /// instances its run goes on to, and its output is its decision.
-    // @A router declared on the node type,TRACE_WORKFLOW_ROUTES,trace,[],[DEC_ROUTER_DECLARED]
-    pub routes: bool,
+    /// What a node of this type produces for each activation.
+    pub produces: Produces,
+}
+
+/// What a node of one type produces for each activation: one output of a
+/// declared context type, or, for a router, the instances its run goes on to
+/// and no context.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Produces {
+    /// One output, of this context type.
+    Output(ContextType),
+    /// A route: the type is a router's, and declares no output.
+    // @A router declared on the node type with no output,TRACE_WORKFLOW_ROUTES,trace,[],[DEC_ROUTER_DECLARED, DEC_ROUTER_DECLARES_NO_OUTPUT]
+    Route,
+}
+
+impl NodeType {
+    /// The context type of the one output a node of this type produces, or
+    /// none for a router's.
+    pub fn output(&self) -> Option<&ContextType> {
+        match &self.produces {
+            Produces::Output(declared) => Some(declared),
+            Produces::Route => None,
+        }
+    }
+
+    /// Whether a node of this type is a router.
+    pub fn routes(&self) -> bool {
+        self.produces == Produces::Route
+    }
 }
 
 /// One parameter of one instance, wired to the output of a named instance: both
@@ -54,7 +78,7 @@ pub struct Binding {
     pub source: String,
     /// The input of that instance the binding carries, when it takes one of a
     /// router's inputs rather than the instance's output.
-    // @A binding taking a router's input,TRACE_WORKFLOW_ROUTED_INPUT,trace,[],[DEC_ROUTED_INPUT_BOUND_BY_TABLE, DEC_ROUTER_OUTPUT_IS_ITS_DECISION]
+    // @A binding taking a router's input,TRACE_WORKFLOW_ROUTED_INPUT,trace,[],[DEC_ROUTED_INPUT_BOUND_BY_TABLE, DEC_ROUTER_PASSES_ON_ITS_INPUTS]
     pub input: Option<String>,
     /// The text of the first context this binding gives its instance, before
     /// any it carries, when it declares one.
@@ -126,8 +150,7 @@ pub(crate) fn node_type(name: &str, required: &[(&str, &str)], output: &str) -> 
         description: String::new(),
         required: parameters(required),
         globals: Vec::new(),
-        output: context_type(output),
-        routes: false,
+        produces: Produces::Output(context_type(output)),
     }
 }
 
@@ -139,9 +162,9 @@ impl NodeType {
         self
     }
 
-    /// The same declaration, as a router's.
+    /// The same declaration, as a router's, which declares no output.
     pub(crate) fn routing(mut self) -> Self {
-        self.routes = true;
+        self.produces = Produces::Route;
         self
     }
 

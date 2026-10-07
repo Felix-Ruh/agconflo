@@ -292,14 +292,15 @@ async fn resume_in<C: Container>(
 }
 
 /// The run whose record `record` holds, continued with `text` as the output of
-/// the step it awaits for `instance`, its later records kept in the same file
-/// and its tool steps performed in a sandbox - or why it was not. A refused
-/// answer leaves the file as it was.
+/// the step it awaits for `instance` - or, for a router's step, with `route` as
+/// the instances its run goes on to and no text - its later records kept in the
+/// same file and its tool steps performed in a sandbox; or why it was not. A
+/// refused answer leaves the file as it was.
 pub async fn answer(
     sources: Sources<'_>,
     record: &Path,
     instance: &str,
-    text: &str,
+    text: Option<&str>,
     route: Option<&[String]>,
 ) -> Result<Stopped, Refusal> {
     answer_in(sources, record, instance, text, route, Sandbox::new).await
@@ -311,7 +312,7 @@ async fn answer_in<C: Container>(
     sources: Sources<'_>,
     record: &Path,
     instance: &str,
-    text: &str,
+    text: Option<&str>,
     route: Option<&[String]>,
     make: impl FnOnce(&Grants, &Path) -> C,
 ) -> Result<Stopped, Refusal> {
@@ -631,7 +632,7 @@ impl Tooled<'_> {
                 self.models.roster(),
                 &held,
                 &instance,
-                &text,
+                Some(&text),
                 None,
                 self.project.limits(),
                 |record| kept.keep(record),
@@ -666,13 +667,13 @@ fn stopped(
 
 /// For a router's own activation, every instance an edge out of it enters, in
 /// the definition's order and each once; `None` for any other activation.
-// @A router's choices handed back with its awaited step,IMPL_RUNNER_TELLS_ROUTES,impl,[CREQ_RUNNER_TELLS_ROUTES],[DEC_PERSON_ROUTE_IN_THE_ANSWER]
+// @A router's choices handed back with its awaited step,IMPL_RUNNER_TELLS_ROUTES,impl,[CREQ_RUNNER_TELLS_ROUTES],[DEC_PERSON_ROUTE_IS_THE_ANSWER]
 fn routes_from(definition: &WorkflowDefinition, activation: &Activation) -> Option<Vec<String>> {
     let routes = activation.call().is_none()
         && definition
             .node_types
             .iter()
-            .any(|declared| declared.name == activation.node_type() && declared.routes);
+            .any(|declared| declared.name == activation.node_type() && declared.routes());
     routes.then(|| {
         definition
             .instances
@@ -704,7 +705,7 @@ use proptest::prelude::*;
 /// types taking what came before - one asking a model, one adding to it, one a
 /// person performs, one whose script fails, and a router naming nothing.
 #[cfg(test)]
-const TYPES: &str = "[types.begin]\nrequired = { brief = \"note\" }\noutput = \"note\"\n\n[types.ask]\nrequired = { before = \"note\" }\noutput = \"note\"\n\n[types.add]\nrequired = { before = \"note\" }\noutput = \"note\"\n\n[types.review]\nrequired = { before = \"note\" }\noutput = \"note\"\n\n[types.broken]\nrequired = { before = \"note\" }\noutput = \"note\"\n\n[types.stop]\nrequired = { before = \"note\" }\noutput = \"note\"\nroutes = true\n";
+const TYPES: &str = "[types.begin]\nrequired = { brief = \"note\" }\noutput = \"note\"\n\n[types.ask]\nrequired = { before = \"note\" }\noutput = \"note\"\n\n[types.add]\nrequired = { before = \"note\" }\noutput = \"note\"\n\n[types.review]\nrequired = { before = \"note\" }\noutput = \"note\"\n\n[types.broken]\nrequired = { before = \"note\" }\noutput = \"note\"\n\n[types.stop]\nrequired = { before = \"note\" }\nroutes = true\n";
 
 /// The scripts, by file.
 #[cfg(test)]
@@ -722,10 +723,7 @@ const SCRIPTS: [(&str, &str); 5] = [
         "local given, host = ...\nreturn host.text(host.output, given.before:render() .. '+c')\n",
     ),
     ("broken.lua", "error('broke here')\n"),
-    (
-        "stop.lua",
-        "local given, host = ...\nhost.route({})\nreturn host.text(host.output, 'none')\n",
-    ),
+    ("stop.lua", "local given, host = ...\nhost.route({})\n"),
 ];
 
 /// A project in `scratch`: `first` begins, `second` is of `middle`, `third`
@@ -1045,7 +1043,7 @@ fn answers_the_awaited_step() {
 
     let text = "ok\r\nfine\n";
     assert_eq!(
-        completed(runtime().block_on(answer(sources, &record, "second", text, None))),
+        completed(runtime().block_on(answer(sources, &record, "second", Some(text), None))),
         format!("{text}+c")
     );
     assert_ne!(
@@ -1053,7 +1051,7 @@ fn answers_the_awaited_step() {
         awaiting
     );
 
-    match runtime().block_on(answer(sources, &record, "second", text, None)) {
+    match runtime().block_on(answer(sources, &record, "second", Some(text), None)) {
         Err(Refusal::Run(ScriptedRefusal::NotAwaited { .. })) => {}
         other => panic!("expected a second answer refused, got {other:?}"),
     }
@@ -1075,7 +1073,7 @@ fn answer_elsewhere_leaves_the_file() {
         .expect("the run awaits a person");
     let before = std::fs::read(&record).expect("the record");
 
-    match runtime().block_on(answer(sources, &record, "third", "text", None)) {
+    match runtime().block_on(answer(sources, &record, "third", Some("text"), None)) {
         Err(Refusal::Run(ScriptedRefusal::NotAwaited { .. })) => {}
         other => panic!("expected the answer refused, got {other:?}"),
     }
@@ -1727,9 +1725,14 @@ fn refuses_without_grants() {
             stand_in.clone()
         })),
         runtime().block_on(resume_in(without, &record, |_, _| stand_in.clone())),
-        runtime().block_on(answer_in(without, &record, "fetched", "t", None, |_, _| {
-            stand_in.clone()
-        })),
+        runtime().block_on(answer_in(
+            without,
+            &record,
+            "fetched",
+            Some("t"),
+            None,
+            |_, _| stand_in.clone(),
+        )),
     ];
     for refused in refusals {
         assert!(matches!(refused, Err(Refusal::NoGrants)), "{refused:?}");
@@ -1911,7 +1914,7 @@ fn engine_failure_leaves_the_step() {
         sources,
         &copy,
         "executed",
-        "typed",
+        Some("typed"),
         None,
         |_, _| untouched.clone(),
     )));
@@ -2225,7 +2228,7 @@ fn unreachable_engine_not_refused() {
         sources,
         &record,
         "fetched",
-        "typed",
+        Some("typed"),
         None,
         |_, _| unreachable(),
     ));
@@ -2453,11 +2456,11 @@ fn person_routes() {
     // instance after it.
     scratch.write(
         "types.toml",
-        format!("{TYPES}\n[types.choose]\nrequired = {{ before = \"note\" }}\noutput = \"note\"\nroutes = true\n"),
+        format!("{TYPES}\n[types.choose]\nrequired = {{ before = \"note\" }}\nroutes = true\n"),
     );
     scratch.write(
         "flow.toml",
-        "name = \"routed\"\noutput = \"third\"\n\n[instances.first]\nnode_type = \"begin\"\n\n[instances.second]\nnode_type = \"choose\"\nbindings = { before = \"first\" }\nbranches = { third = [\"third\"], fourth = [\"fourth\"] }\n\n[instances.third]\nnode_type = \"add\"\nbindings = { before = \"second\" }\n\n[instances.fourth]\nnode_type = \"add\"\nbindings = { before = \"second\" }\n",
+        "name = \"routed\"\noutput = \"third\"\n\n[instances.first]\nnode_type = \"begin\"\n\n[instances.second]\nnode_type = \"choose\"\nbindings = { before = \"first\" }\nbranches = { third = [\"third\"], fourth = [\"fourth\"] }\n\n[instances.third]\nnode_type = \"add\"\nbindings = { before = { from = \"second\", input = \"before\" } }\n\n[instances.fourth]\nnode_type = \"add\"\nbindings = { before = { from = \"second\", input = \"before\" } }\n",
     );
     let text = std::fs::read_to_string(&manifest).expect("the manifest");
     std::fs::write(
@@ -2485,14 +2488,14 @@ fn person_routes() {
         Some(vec!["third".to_owned(), "fourth".to_owned()])
     );
 
-    // Answered through the record's file with a route, the run goes on where
-    // named.
+    // Answered through the record's file with a route and no text, the run
+    // goes on where named, given what the router was given.
     let answered = runtime().block_on(answer(
         sources,
         &record,
         "second",
-        "chosen",
+        None,
         Some(&["third".to_owned()]),
     ));
-    assert_eq!(completed(answered), "chosen+c");
+    assert_eq!(completed(answered), "x+a+c");
 }

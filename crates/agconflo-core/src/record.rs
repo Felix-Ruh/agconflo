@@ -26,8 +26,8 @@ use crate::run::{
 use crate::workflow::WorkflowDefinition;
 
 /// The version of the record this module writes, and the only one it reads.
-// @Records at version 3,TRACE_RECORD_VERSION,trace,[],[DEC_RECORD_HOLDS_EXCHANGES, DEC_RECORD_IN_TOML, DEC_RECORD_IN_CORE, DEC_FIRST_CONTEXT_DECLARED]
-const VERSION: &str = "3";
+// @Records at version 4,TRACE_RECORD_VERSION,trace,[],[DEC_RECORD_HOLDS_EXCHANGES, DEC_RECORD_IN_TOML, DEC_RECORD_IN_CORE, DEC_FIRST_CONTEXT_DECLARED, DEC_ROUTE_RECORDED_ALONE]
+const VERSION: &str = "4";
 
 /// What a record says of a source that has issued every identifier it has.
 const EXHAUSTED: &str = "exhausted";
@@ -57,11 +57,11 @@ pub enum ResumeRefusal {
         parameter: String,
     },
     /// The workflow would not have produced this record: the first recorded
-    /// output it disagrees with.
+    /// report - an output, or a router's route - it disagrees with.
     Diverged {
-        /// Where that output stands among the recorded ones, the first being 0.
-        output: usize,
-        /// The instance the record says produced it.
+        /// Where that report stands among the recorded ones, the first being 0.
+        report: usize,
+        /// The instance the record says made it.
         instance: String,
         /// How the workflow disagrees.
         divergence: Divergence,
@@ -77,19 +77,19 @@ pub enum ResumeRefusal {
         refusal: CallRefusal,
     },
     /// The activations recorded as spent are not what a run with the recorded
-    /// events could have spent: fewer than its outputs, or more than the
+    /// events could have spent: fewer than its reports, or more than the
     /// activations it would have outstanding afterwards - the one performing,
     /// and the one waiting on its call - where the workflow would offer
     /// nothing more.
     SpentDisagrees {
         /// The activations the record says were spent.
         spent: usize,
-        /// The outputs it holds.
-        outputs: usize,
+        /// The reports it holds: its outputs and its routes.
+        reports: usize,
     },
 }
 
-/// How a workflow disagrees with one recorded output.
+/// How a workflow disagrees with one recorded report.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Divergence {
@@ -109,7 +109,7 @@ pub enum Divergence {
         /// What the run would give it.
         offered: Vec<(String, ContextId)>,
     },
-    /// The run refused the recorded output, for the reason it gives.
+    /// The run refused the recorded report, for the reason it gives.
     Refused(OutputRefusal),
 }
 
@@ -232,12 +232,12 @@ impl fmt::Display for ResumeRefusal {
                 "the recorded first context of {instance}.{parameter} is not the one the workflow declares"
             ),
             Self::Diverged {
-                output,
+                report,
                 instance,
                 divergence,
             } => write!(
                 f,
-                "recorded output {output}, of {instance}, is not one the workflow would have produced: {divergence}"
+                "recorded report {report}, of {instance}, is not one the workflow would have produced: {divergence}"
             ),
             Self::CallRefused {
                 instance,
@@ -247,9 +247,9 @@ impl fmt::Display for ResumeRefusal {
                 f,
                 "recorded call {call}, of {instance}, is not one the workflow would accept: {refusal}"
             ),
-            Self::SpentDisagrees { spent, outputs } => write!(
+            Self::SpentDisagrees { spent, reports } => write!(
                 f,
-                "{spent} activations recorded as spent for {outputs} outputs, which no run of the workflow could have spent"
+                "{spent} activations recorded as spent for {reports} outputs and routes, which no run of the workflow could have spent"
             ),
         }
     }
@@ -423,16 +423,21 @@ impl<'a, F> Run<'a, F> {
             .read()
             .map_err(ResumeRefusal::Unreadable)?;
 
-        let outputs = read
+        let reports = read
             .events
             .iter()
-            .filter(|event| matches!(event.what, Happened::Output { .. }))
+            .filter(|event| {
+                matches!(
+                    event.what,
+                    Happened::Output { .. } | Happened::Routed { .. }
+                )
+            })
             .count();
         let disagrees = ResumeRefusal::SpentDisagrees {
             spent: read.spent,
-            outputs,
+            reports,
         };
-        if read.spent < outputs {
+        if read.spent < reports {
             return Err(disagrees);
         }
 
@@ -448,7 +453,7 @@ impl<'a, F> Run<'a, F> {
         let mut replayed = 0;
         for recorded in &read.events {
             let diverged = |divergence| ResumeRefusal::Diverged {
-                output: replayed,
+                report: replayed,
                 instance: recorded.instance.clone(),
                 divergence,
             };
@@ -457,11 +462,7 @@ impl<'a, F> Run<'a, F> {
                 .map_err(diverged)?;
 
             match &recorded.what {
-                Happened::Output {
-                    context,
-                    inputs,
-                    route,
-                } => {
+                Happened::Output { inputs, .. } | Happened::Routed { inputs, .. } => {
                     let mut offered: Vec<(String, ContextId)> = activation
                         .inputs()
                         .iter()
@@ -474,10 +475,12 @@ impl<'a, F> Run<'a, F> {
                             offered,
                         }));
                     }
-                    let output = read.contexts[context].clone();
-                    match route {
-                        None => run.produced(output),
-                        Some(route) => run.routed(output, route.clone()),
+                    match &recorded.what {
+                        Happened::Output { context, .. } => {
+                            run.produced(read.contexts[context].clone())
+                        }
+                        Happened::Routed { route, .. } => run.routed(route.clone()),
+                        _ => unreachable!("matched as an output or a route"),
                     }
                     .map_err(|refusal| diverged(Divergence::Refused(refusal)))?;
                     replayed += 1;
@@ -615,22 +618,20 @@ fn written_event(event: &Event) -> Table {
 
     let mut entry = Table::new();
     match event {
-        Event::Output {
-            activation,
-            output,
-            route,
-        } => {
+        Event::Output { activation, output } => {
             entry["instance"] = value(activation.instance());
             if let Some(call) = activation.call() {
                 entry["performing"] = value(call);
             }
             entry["output"] = value(id(output));
             entry["inputs"] = value(inputs(activation.inputs()));
-            // @A router's route written beside its output,IMPL_RECORD_ROUTES,impl,[CREQ_RECORD_HOLDS_ROUTES],[DEC_ROUTE_RECORDED]
-            if let Some(route) = route {
-                let named: toml_edit::Array = route.iter().map(String::as_str).collect();
-                entry["route"] = value(named);
-            }
+        }
+        // @A router's route written as its entry,IMPL_RECORD_ROUTES,impl,[CREQ_RECORD_HOLDS_ROUTES],[DEC_ROUTE_RECORDED_ALONE]
+        Event::Routed { activation, route } => {
+            entry["instance"] = value(activation.instance());
+            let named: toml_edit::Array = route.iter().map(String::as_str).collect();
+            entry["route"] = value(named);
+            entry["inputs"] = value(inputs(activation.inputs()));
         }
         Event::Exchange {
             instance,
@@ -706,12 +707,16 @@ struct Recorded {
 
 /// What one recorded event says happened.
 enum Happened {
-    /// An output, its activation's inputs ordered by parameter, and the
-    /// instances a router named.
+    /// An output, and its activation's inputs ordered by parameter.
     Output {
         context: ContextId,
         inputs: Vec<(String, ContextId)>,
-        route: Option<Vec<String>>,
+    },
+    /// The instances a router named, and its activation's inputs ordered by
+    /// parameter.
+    Routed {
+        inputs: Vec<(String, ContextId)>,
+        route: Vec<String>,
     },
     /// An exchange, its contexts made.
     Exchange(Exchange),
@@ -898,32 +903,29 @@ impl<'t> Reading<'t> {
             self.only(
                 event,
                 &["event", at],
-                &["instance", "performing", "output", "inputs", "route"],
+                &["instance", "performing", "output", "inputs"],
             )?;
             let written = self.needed(event, place, &["event", at, "inputs"])?;
             let mut inputs = inputs_of(written, &["event", at, "inputs"])?;
             inputs.sort_by(|a, b| a.0.cmp(&b.0));
-            let route = match event.get("route") {
-                None => None,
-                Some(_) => {
-                    let mut named = Vec::new();
-                    for (position, item) in
-                        self.strings(event.get("route"), &["event", at, "route"])?
-                    {
-                        let position = position.to_string();
-                        named.push(
-                            self.string(&item, &["event", at, "route", position.as_str()])?
-                                .to_owned(),
-                        );
-                    }
-                    Some(named)
-                }
-            };
             Happened::Output {
                 context: known(output, &["event", at, "output"])?,
                 inputs,
-                route,
             }
+        } else if event.get("route").is_some() {
+            self.only(event, &["event", at], &["instance", "route", "inputs"])?;
+            let written = self.needed(event, place, &["event", at, "inputs"])?;
+            let mut inputs = inputs_of(written, &["event", at, "inputs"])?;
+            inputs.sort_by(|a, b| a.0.cmp(&b.0));
+            let mut route = Vec::new();
+            for (position, item) in self.strings(event.get("route"), &["event", at, "route"])? {
+                let position = position.to_string();
+                route.push(
+                    self.string(&item, &["event", at, "route", position.as_str()])?
+                        .to_owned(),
+                );
+            }
+            Happened::Routed { inputs, route }
         } else if let Some(written) = event.get("exchange") {
             self.only(
                 event,
@@ -1347,7 +1349,10 @@ fn chain(count: usize) -> WorkflowDefinition {
 /// when it is given nothing.
 #[cfg(test)]
 fn answer(source: &mut IdSource, activation: &crate::Activation) -> Context {
-    let declared = activation.output().clone();
+    let declared = activation
+        .output()
+        .expect("an activation of a type declaring an output")
+        .clone();
     let word = Context::text(source, declared.clone(), "w").expect("a fresh source issues");
     match activation.inputs().first() {
         Some((_, input)) => Context::compose(source, declared, [input, &word, input], " ")
@@ -1487,7 +1492,7 @@ fn holds_the_run() {
     // the text holds and not what a reader makes of it.
     let text = run.record(&source);
     let record: DocumentMut = text.parse().expect("a record is TOML");
-    assert_eq!(record["version"].as_str(), Some("3"));
+    assert_eq!(record["version"].as_str(), Some("4"));
     assert_eq!(record["budget"].as_str(), Some("7"));
     // Two outputs and one activation outstanding.
     assert_eq!(record["spent"].as_str(), Some("3"));
@@ -1795,10 +1800,10 @@ fn diverged_record_refused() {
     let refused =
         |workflow: &WorkflowDefinition, record: &str| match Run::<()>::resume(workflow, record) {
             Err(ResumeRefusal::Diverged {
-                output,
+                report,
                 instance,
                 divergence,
-            }) => (output, instance, divergence),
+            }) => (report, instance, divergence),
             Err(other) => panic!("expected a divergence, got {other:?}"),
             Ok(_) => panic!("expected a divergence, and it resumed"),
         };
@@ -1875,7 +1880,7 @@ fn diverged_record_refused() {
             Run::<()>::resume(&three, &altered).err(),
             Some(ResumeRefusal::SpentDisagrees {
                 spent: expected,
-                outputs: 3
+                reports: 3
             })
         );
     }
@@ -1883,8 +1888,8 @@ fn diverged_record_refused() {
 
 #[test]
 fn routes_kept() {
-    // A router given two sources' outputs, with a branch taking its output and
-    // one taking its input; it names the first.
+    // A router given a source's output, each branch taking its input; it
+    // names the first.
     let workflow = definition(
         vec![
             node_type("Src", &[], "note"),
@@ -1898,7 +1903,7 @@ fn routes_kept() {
                 ("close", &["close"]),
                 ("end", &["out"]),
             ]),
-            instance("revise", "Take", &[("seed", "r")]),
+            instance("revise", "Take", &[]).taking("seed", "r", "draft"),
             instance("close", "Take", &[]).taking("seed", "r", "draft"),
             instance("out", "Take", &[]).taking("seed", "r", "draft"),
         ],
@@ -1910,16 +1915,25 @@ fn routes_kept() {
         let Step::Activate(activation) = run.step() else {
             panic!("offered")
         };
-        let output = answer(&mut source, &activation);
         if activation.instance() == "r" {
-            run.routed(output, vec!["revise".to_owned()])
-                .expect("routed");
+            run.routed(vec!["revise".to_owned()]).expect("routed");
         } else {
+            let output = answer(&mut source, &activation);
             run.produced(output).expect("accepted");
         }
     }
     let record = run.record(&source);
     assert!(record.contains("route = [\"revise\"]"), "{record}");
+    // The router's entry is its names and inputs, and holds no output.
+    let parsed: toml_edit::DocumentMut = record.parse().expect("a record is TOML");
+    let events = parsed["event"].as_array_of_tables().expect("events");
+    let routed = events
+        .iter()
+        .find(|event| event["instance"].as_str() == Some("r"))
+        .expect("the router's entry");
+    let mut keys: Vec<&str> = routed.iter().map(|(key, _)| key).collect();
+    keys.sort_unstable();
+    assert_eq!(keys, ["inputs", "instance", "route"], "{record}");
 
     // Resumed, the branch named is offered, and after it nothing: the other was
     // never walked.
@@ -1936,16 +1950,45 @@ fn routes_kept() {
     ));
 
     // A record naming an instance the workflow no longer has is refused as
-    // diverging, at the router's output.
+    // diverging, at the router's report.
     let renamed = record.replace("route = [\"revise\"]", "route = [\"gone\"]");
     match Run::<()>::resume(&workflow, &renamed) {
         Err(ResumeRefusal::Diverged {
-            output: 1,
+            report: 1,
             instance,
             divergence: Divergence::Refused(OutputRefusal::NoEdgeTo { named, .. }),
         }) => assert_eq!((instance.as_str(), named.as_str()), ("r", "gone")),
-        other => panic!("expected the router's output refused, got {other:?}"),
+        other => panic!("expected the router's route refused, got {other:?}"),
     }
+
+    // An output written beside the router's route is no entry a record holds:
+    // refused where it is written.
+    let with_output = record.replacen(
+        "route = [\"revise\"]",
+        "route = [\"revise\"]\noutput = \"c1\"",
+        1,
+    );
+    assert_ne!(with_output, record, "the edit landed");
+    match Run::<()>::resume(&workflow, &with_output) {
+        Err(ResumeRefusal::Unreadable(fault)) => assert!(
+            matches!(fault.kind(), RecordFaultKind::UnexpectedKey { key } if key[0] == "event"),
+            "{fault:?}"
+        ),
+        other => panic!("expected the entry refused, got {other:?}"),
+    }
+
+    // Fewer activations recorded as spent than the record holds reports for,
+    // its route counted beside its output: refused before anything is
+    // replayed.
+    let underspent = record.replace("spent = \"2\"", "spent = \"1\"");
+    assert_ne!(underspent, record, "the edit landed");
+    assert_eq!(
+        Run::<()>::resume(&workflow, &underspent).err(),
+        Some(ResumeRefusal::SpentDisagrees {
+            spent: 1,
+            reports: 2
+        })
+    );
 }
 
 /// One instance reading its own output, declaring `first` as its first
@@ -2006,7 +2049,7 @@ fn resumes_mid_repetition() {
     let altered = record.replace(&at, &format!("seed = \"{}\"", first.id().value()));
     match Run::<()>::resume(&workflow, &altered) {
         Err(ResumeRefusal::Diverged {
-            output: 1,
+            report: 1,
             instance,
             divergence: Divergence::InputsDiffer { .. },
         }) => assert_eq!(instance, "x"),
@@ -2206,9 +2249,9 @@ fn unreadable_refused() {
     assert_eq!(not_toml.line(), 2);
 
     assert_eq!(
-        damaged("version = \"3\"", "version = \"4\"").kind(),
+        damaged("version = \"4\"", "version = \"5\"").kind(),
         &RecordFaultKind::Version {
-            found: "4".to_owned()
+            found: "5".to_owned()
         }
     );
     assert_eq!(
@@ -2400,7 +2443,7 @@ fn holds_exchanges() {
 
     let text = run.record(&source);
     let record: DocumentMut = text.parse().expect("a record is TOML");
-    assert_eq!(record["version"].as_str(), Some("3"));
+    assert_eq!(record["version"].as_str(), Some("4"));
     let events = events_of(&text);
     let kinds: Vec<&str> = events
         .iter()
