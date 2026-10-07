@@ -1047,6 +1047,15 @@
           "title": "agconflo-lua models::provider_failure_carried",
           "type": "test_run"
         },
+        "RUN_MODELS_REFUSED_CALL_SENT_AS_MADE": {
+          "executes": [
+            "TEST_MODELS_REFUSED_CALL_SENT_AS_MADE"
+          ],
+          "id": "RUN_MODELS_REFUSED_CALL_SENT_AS_MADE",
+          "test_outcome": "passed",
+          "title": "agconflo-lua models::refused_call_sent_as_made",
+          "type": "test_run"
+        },
         "RUN_MODELS_ROLES_REACH_THEIR_MODELS": {
           "executes": [
             "TEST_MODELS_ROLES_REACH_THEIR_MODELS"
@@ -1612,6 +1621,15 @@
           "id": "RUN_RECORD_OUTSTANDING_NOT_CHARGED_AGAIN",
           "test_outcome": "passed",
           "title": "agconflo-core record::outstanding_not_charged_again",
+          "type": "test_run"
+        },
+        "RUN_RECORD_REFUSED_CALLS_KEPT": {
+          "executes": [
+            "TEST_RECORD_REFUSED_CALLS_KEPT"
+          ],
+          "id": "RUN_RECORD_REFUSED_CALLS_KEPT",
+          "test_outcome": "passed",
+          "title": "agconflo-core record::refused_calls_kept",
           "type": "test_run"
         },
         "RUN_RECORD_RESUMED_RUN_ENDS_ALIKE": {
@@ -2352,6 +2370,15 @@
           "title": "agconflo-core run::refusal_does_not_spend_the_budget",
           "type": "test_run"
         },
+        "RUN_RUN_REFUSED_CALLS_HELD": {
+          "executes": [
+            "TEST_RUN_REFUSED_CALLS_HELD"
+          ],
+          "id": "RUN_RUN_REFUSED_CALLS_HELD",
+          "test_outcome": "passed",
+          "title": "agconflo-core run::refused_calls_held",
+          "type": "test_run"
+        },
         "RUN_RUN_REFUSED_OUTPUT_CAN_BE_FAILED": {
           "executes": [
             "TEST_RUN_REFUSED_OUTPUT_CAN_BE_FAILED"
@@ -2838,6 +2865,15 @@
           "title": "agconflo-lua scripted::decision_replayed",
           "type": "test_run"
         },
+        "RUN_SCRIPTED_EACH_FAULT_ANSWERED": {
+          "executes": [
+            "TEST_SCRIPTED_EACH_FAULT_ANSWERED"
+          ],
+          "id": "RUN_SCRIPTED_EACH_FAULT_ANSWERED",
+          "test_outcome": "passed",
+          "title": "agconflo-lua scripted::each_fault_answered",
+          "type": "test_run"
+        },
         "RUN_SCRIPTED_EXCHANGES_REPORTED_BEFORE_CALLS": {
           "executes": [
             "TEST_SCRIPTED_EXCHANGES_REPORTED_BEFORE_CALLS"
@@ -2872,15 +2908,6 @@
           "id": "RUN_SCRIPTED_INTERRUPTED_RUN_RESUMES",
           "test_outcome": "passed",
           "title": "agconflo-lua scripted::interrupted_run_resumes",
-          "type": "test_run"
-        },
-        "RUN_SCRIPTED_MALFORMED_CALL_FAILS": {
-          "executes": [
-            "TEST_SCRIPTED_MALFORMED_CALL_FAILS"
-          ],
-          "id": "RUN_SCRIPTED_MALFORMED_CALL_FAILS",
-          "test_outcome": "passed",
-          "title": "agconflo-lua scripted::malformed_call_fails",
           "type": "test_run"
         },
         "RUN_SCRIPTED_MODEL_YIELDS": {
@@ -2982,13 +3009,31 @@
           "title": "agconflo-lua scripted::record_after_each_answer",
           "type": "test_run"
         },
-        "RUN_SCRIPTED_REFUSED_CALL_FAILS_WITH_THE_REFUSAL": {
+        "RUN_SCRIPTED_REFUSALS_END_AT_THE_LIMIT": {
           "executes": [
-            "TEST_SCRIPTED_REFUSED_CALL_FAILS_WITH_THE_REFUSAL"
+            "TEST_SCRIPTED_REFUSALS_END_AT_THE_LIMIT"
           ],
-          "id": "RUN_SCRIPTED_REFUSED_CALL_FAILS_WITH_THE_REFUSAL",
+          "id": "RUN_SCRIPTED_REFUSALS_END_AT_THE_LIMIT",
           "test_outcome": "passed",
-          "title": "agconflo-lua scripted::refused_call_fails_with_the_refusal",
+          "title": "agconflo-lua scripted::refusals_end_at_the_limit",
+          "type": "test_run"
+        },
+        "RUN_SCRIPTED_REFUSAL_REPLAYED": {
+          "executes": [
+            "TEST_SCRIPTED_REFUSAL_REPLAYED"
+          ],
+          "id": "RUN_SCRIPTED_REFUSAL_REPLAYED",
+          "test_outcome": "passed",
+          "title": "agconflo-lua scripted::refusal_replayed",
+          "type": "test_run"
+        },
+        "RUN_SCRIPTED_REFUSED_CALL_ANSWERED": {
+          "executes": [
+            "TEST_SCRIPTED_REFUSED_CALL_ANSWERED"
+          ],
+          "id": "RUN_SCRIPTED_REFUSED_CALL_ANSWERED",
+          "test_outcome": "passed",
+          "title": "agconflo-lua scripted::refused_call_answered",
           "type": "test_run"
         },
         "RUN_SCRIPTED_REPLAY_THAT_DIVERGES_FAILS": {
@@ -3027,6 +3072,15 @@
           "title": "agconflo-lua scripted::route_not_a_branch_refused",
           "type": "test_run"
         },
+        "RUN_SCRIPTED_RUN_REFUSAL_ANSWERED": {
+          "executes": [
+            "TEST_SCRIPTED_RUN_REFUSAL_ANSWERED"
+          ],
+          "id": "RUN_SCRIPTED_RUN_REFUSAL_ANSWERED",
+          "test_outcome": "passed",
+          "title": "agconflo-lua scripted::run_refusal_answered",
+          "type": "test_run"
+        },
         "RUN_SCRIPTED_SAME_WORKFLOW_TWO_PROVIDERS": {
           "executes": [
             "TEST_SCRIPTED_SAME_WORKFLOW_TWO_PROVIDERS"
@@ -3043,6 +3097,15 @@
           "id": "RUN_SCRIPTED_SOURCE_HANDED_BACK_ADVANCED",
           "test_outcome": "passed",
           "title": "agconflo-lua scripted::source_handed_back_advanced",
+          "type": "test_run"
+        },
+        "RUN_SCRIPTED_UNREFUSED_CALLS_PERFORMED": {
+          "executes": [
+            "TEST_SCRIPTED_UNREFUSED_CALLS_PERFORMED"
+          ],
+          "id": "RUN_SCRIPTED_UNREFUSED_CALLS_PERFORMED",
+          "test_outcome": "passed",
+          "title": "agconflo-lua scripted::unrefused_calls_performed",
           "type": "test_run"
         },
         "RUN_SCRIPTED_WORKFLOWS_RUN_TO_COMPLETION": {

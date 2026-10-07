@@ -131,7 +131,7 @@ an MCP server needs a behaviour written in Rust, which is the next slice.
    instance's. The keys are parameter names, which the offer holds
    (``DEC_TOOLS_OFFERED_AS_CONTEXTS``); braces, quotes and escapes are the
    format's, as a message's role is. A value that is not a string has no text
-   to be a context of, and fails the call (``DEC_MALFORMED_CALL_FAILS``).
+   to be a context of, and the call is refused (``DEC_REFUSED_CALL_ANSWERED``).
 
    The local model writes its arguments compactly, so for it the two never
    differed (``EVD_LOCAL_MODEL_WRITES_COMPACT_ARGUMENTS``); a hosted provider's
@@ -191,7 +191,7 @@ an MCP server needs a behaviour written in Rust, which is the next slice.
 
 .. dec:: A malformed call fails its activation
    :id: DEC_MALFORMED_CALL_FAILS
-   :dec_status: accepted
+   :dec_status: superseded
    :decided_on: 2026-09-24
    :supported_by: EVD_GENAI_PASSES_MALFORMED_CALLS
    :statement: Agconflo shall fail an activation whose model's answer makes a call that is undeclared or whose arguments are not an object of strings filling the called node type's parameters, performing none of that answer's calls.
@@ -214,6 +214,10 @@ an MCP server needs a behaviour written in Rust, which is the next slice.
    Arguments that are not JSON at all fail inside ``genai`` before a call
    exists (``EVD_GENAI_PASSES_MALFORMED_CALLS``). That is a model call that
    failed, and is carried as one (``FEAT_MODEL_FAILURE_CARRIED``).
+
+   Superseded by ``DEC_REFUSED_CALL_ANSWERED``, which answers a refused call
+   with a context naming its fault and goes on with the activation, and
+   ``DEC_UNREFUSED_CALLS_PERFORMED``, which performs the calls beside it.
 
 .. dec:: Several calls in one answer are performed in order
    :id: DEC_CALLS_IN_ORDER

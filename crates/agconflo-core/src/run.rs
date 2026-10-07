@@ -606,17 +606,63 @@ impl Call {
     }
 }
 
+/// One call a model made that its activation's performer refused, as the model
+/// made it: the provider's identifier, the node type it named, a context holding
+/// its arguments as the provider gave them, and the context it was answered with.
+// @A refused call as the model made it,TRACE_RUN_REFUSED_CALL_VALUE,trace,[],[DEC_RECORD_HOLDS_REFUSED_CALLS]
+#[derive(Clone, Debug)]
+pub struct RefusedCall {
+    id: String,
+    node_type: String,
+    arguments: Context,
+    answer: Context,
+}
+
+impl RefusedCall {
+    /// A refused call, with the provider's identifier `id`, to `node_type`, its
+    /// arguments held in `arguments`, answered with `answer`.
+    pub fn new(id: &str, node_type: &str, arguments: Context, answer: Context) -> Self {
+        Self {
+            id: id.to_owned(),
+            node_type: node_type.to_owned(),
+            arguments,
+            answer,
+        }
+    }
+
+    /// The provider's identifier for this call, as it issued it.
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    /// The node type the model named.
+    pub fn node_type(&self) -> &str {
+        &self.node_type
+    }
+
+    /// The call's arguments as the provider gave them.
+    pub fn arguments(&self) -> &Context {
+        &self.arguments
+    }
+
+    /// What the call was answered with in place of an output.
+    pub fn answer(&self) -> &Context {
+        &self.answer
+    }
+}
+
 /// What an activation's performer sent out and got back: the offer and the
-/// window a model call was made with, the answer, and the calls the answer made,
+/// window a model call was made with, the answer, the calls the answer made,
 /// each whole - the provider's identifier, the node type and the contexts it was
-/// made with.
-// @An exchange of contexts,TRACE_RUN_EXCHANGE_VALUE,trace,[],[DEC_RECORD_HOLDS_EXCHANGES]
+/// made with - and the calls of it that were refused.
+// @An exchange of contexts,TRACE_RUN_EXCHANGE_VALUE,trace,[],[DEC_RECORD_HOLDS_EXCHANGES, DEC_RECORD_HOLDS_REFUSED_CALLS]
 #[derive(Clone, Debug)]
 pub struct Exchange {
     offer: Vec<Context>,
     window: Context,
     answer: Context,
     calls: Vec<Call>,
+    refused: Vec<RefusedCall>,
 }
 
 impl Exchange {
@@ -628,7 +674,19 @@ impl Exchange {
             window,
             answer,
             calls: Vec::new(),
+            refused: Vec::new(),
         }
+    }
+
+    /// The same exchange, its answer also making `refused`, which was refused.
+    pub fn refusing(mut self, refused: RefusedCall) -> Self {
+        self.refused.push(refused);
+        self
+    }
+
+    /// The calls of the answer that were refused, in the order it made them.
+    pub fn refused(&self) -> &[RefusedCall] {
+        &self.refused
     }
 
     /// The same exchange, having offered `offer` as well.
@@ -664,13 +722,21 @@ impl Exchange {
     }
 
     /// Every context the exchange holds: the offer, the window, the answer, then
-    /// each call's contexts.
+    /// each call's contexts, then each refused call's arguments and answer.
     fn contexts(&self) -> impl Iterator<Item = &Context> {
-        self.offer.iter().chain([&self.window, &self.answer]).chain(
-            self.calls
-                .iter()
-                .flat_map(|call| call.inputs.iter().map(|(_, given)| given)),
-        )
+        self.offer
+            .iter()
+            .chain([&self.window, &self.answer])
+            .chain(
+                self.calls
+                    .iter()
+                    .flat_map(|call| call.inputs.iter().map(|(_, given)| given)),
+            )
+            .chain(
+                self.refused
+                    .iter()
+                    .flat_map(|refused| [&refused.arguments, &refused.answer]),
+            )
     }
 }
 
@@ -1388,7 +1454,7 @@ impl<'a, F> Run<'a, F> {
     /// of it, when nothing is outstanding or when a context of it is a second
     /// one under an identifier the run holds; a context held already brings
     /// nothing in.
-    // @An exchange held with its activation,IMPL_RUN_EXCHANGE,impl,[CREQ_RUN_HOLDS_EXCHANGES, CREQ_RUN_REFUSES_SHARED_CALL_IDENTIFIER]
+    // @An exchange held with its activation,IMPL_RUN_EXCHANGE,impl,[CREQ_RUN_HOLDS_EXCHANGES, CREQ_RUN_HOLDS_REFUSED_CALLS, CREQ_RUN_REFUSES_SHARED_CALL_IDENTIFIER]
     pub fn exchange(&mut self, exchange: Exchange) -> Result<(), ExchangeRefusal> {
         let Some(outstanding) = &self.outstanding else {
             return Err(ExchangeRefusal::NothingOutstanding);
@@ -4308,4 +4374,64 @@ proptest! {
             prop_assert_eq!(offers, budget);
         }
     }
+}
+
+#[cfg(test)]
+#[test]
+fn refused_calls_held() {
+    let mut source = IdSource::new();
+    let mut second_source = IdSource::new();
+    let workflow = calling("second");
+    let mut run =
+        Run::<Infallible>::start(&workflow, Arguments::new(), 10, &mut source).expect("sound");
+    offered(&mut run);
+
+    // An answer making one call and one the performer refused, beside it.
+    let arguments = ctx(&mut source, "note");
+    let refusal = ctx(&mut source, "note");
+    let (call, ..) = lookup_call(&mut source, "call_1");
+    run.exchange(
+        Exchange::new(ctx(&mut source, "note"), ctx(&mut source, "note"))
+            .calling(call)
+            .refusing(RefusedCall::new(
+                "call_2",
+                "bash",
+                arguments.clone(),
+                refusal.clone(),
+            )),
+    )
+    .expect("an exchange holding a refused call");
+    let held = &run.exchanges()[0];
+    assert_eq!(held.calls().len(), 1);
+    let refused: Vec<(&str, &str, ContextId, ContextId)> = held
+        .refused()
+        .iter()
+        .map(|r| (r.id(), r.node_type(), r.arguments().id(), r.answer().id()))
+        .collect();
+    assert_eq!(
+        refused,
+        [("call_2", "bash", arguments.id(), refusal.id())],
+        "the refused call held whole"
+    );
+
+    // A refused call bringing a different context under an identifier the run
+    // holds is refused with its exchange, as a call's would be.
+    let impostor = ctx(&mut second_source, "note");
+    assert_eq!(
+        impostor.id(),
+        arguments.id(),
+        "the stimulus: one identifier, two contexts"
+    );
+    assert_eq!(
+        run.exchange(
+            Exchange::new(ctx(&mut source, "note"), ctx(&mut source, "note")).refusing(
+                RefusedCall::new("call_3", "bash", impostor, ctx(&mut source, "note"))
+            )
+        ),
+        Err(ExchangeRefusal::IdentifierShared {
+            instance: "asker".to_owned(),
+            id: arguments.id(),
+        })
+    );
+    assert_eq!(run.exchanges().len(), 1, "nothing of it is held");
 }

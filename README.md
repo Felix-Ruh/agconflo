@@ -44,6 +44,9 @@ another provider by changing that mapping. What a model is shown is contexts and
 its answer comes back as a context of its own. A model may call the node types its instance
 declares, offered to it as tools: each call runs as a step of the run - counted against the budget,
 performed by that node type's own script or by a person - and the model goes on with its output. A
+call that is refused - to a node type not offered, or with arguments that do not fill its
+parameters with text - is answered with why and what the step may call, and the model goes on: the
+refusal is a context in its window and its run's record like any output. A
 scripted run hands its caller a record when it starts, after every output and after every answer,
 so a run interrupted mid-call is resumed without asking again for any answer its record holds. A
 node type can instead be performed by a person: the run stops at that step and hands it to
